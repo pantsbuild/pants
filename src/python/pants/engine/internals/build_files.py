@@ -20,12 +20,28 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
 
+@dataclass(frozen=True)
+class BuildFileOptions:
+    patterns: tuple[str, ...]
+    ignores: tuple[str, ...]
+    prelude_globs: tuple[str, ...]
+
+
+@rule
+def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
+    return BuildFileOptions(
+        patterns=tuple(global_options.options.build_patterns),
+        ignores=tuple(global_options.options.build_ignore),
+        prelude_globs=tuple(global_options.options.build_file_prelude_globs),
+    )
+
+
 @rule(desc="Expand macros")
-async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            global_options.options.build_file_prelude_globs,
+            build_file_options.prelude_globs,
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
@@ -82,10 +98,10 @@ class AddressFamilyDir(EngineAwareParameter):
         return self.path
 
 
-@rule(desc="Search for addresses in BUILD files.")
+@rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
-    global_options: GlobalOptions,
+    build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
 ) -> AddressFamily:
@@ -97,8 +113,8 @@ async def parse_address_family(
         DigestContents,
         PathGlobs(
             globs=(
-                *(os.path.join(directory.path, p) for p in global_options.options.build_patterns),
-                *(f"!{p}" for p in global_options.options.build_ignore),
+                *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                *(f"!{p}" for p in build_file_options.ignores),
             )
         ),
     )
@@ -157,7 +173,9 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
 
 @rule
 async def addresses_from_address_specs(
-    address_specs: AddressSpecs, global_options: GlobalOptions, specs_filter: AddressSpecsFilter
+    address_specs: AddressSpecs,
+    build_file_options: BuildFileOptions,
+    specs_filter: AddressSpecsFilter,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
@@ -182,8 +200,8 @@ async def addresses_from_address_specs(
         Paths,
         PathGlobs,
         address_specs.to_path_globs(
-            build_patterns=global_options.options.build_patterns,
-            build_ignore_patterns=global_options.options.build_ignore,
+            build_patterns=build_file_options.patterns,
+            build_ignore_patterns=build_file_options.ignores,
         ),
     )
     dirnames = {os.path.dirname(f) for f in paths.files}
