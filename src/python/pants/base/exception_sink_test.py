@@ -55,6 +55,10 @@ def test_set_invalid_log_location():
             "The provided log location path at '/' is not writable or could not be created: "
             "[Errno 21] Is a directory: '/'."
         ),
+        Platform.linux_arm64: (
+            "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
+            "denied: '/.pids'"
+        ),
         Platform.linux_x86_64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
             "denied: '/.pids'"
