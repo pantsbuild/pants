@@ -6,7 +6,7 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core.goals import check, fmt, lint, package, publish, repl, run, tailor, test
+from pants.core.goals import check, fmt, lint, mend, package, publish, repl, run, tailor, test
 from pants.core.target_types import (
     ArchiveTarget,
     FilesGeneratorTarget,
@@ -38,6 +38,7 @@ def rules():
         *check.rules(),
         *fmt.rules(),
         *lint.rules(),
+        *mend.rules(),
         *package.rules(),
         *publish.rules(),
         *repl.rules(),

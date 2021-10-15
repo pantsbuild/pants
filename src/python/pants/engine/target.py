@@ -283,7 +283,6 @@ class Target:
 
     deprecated_alias: ClassVar[str | None] = None
     deprecated_alias_removal_version: ClassVar[str | None] = None
-    deprecated_alias_removal_hint: ClassVar[str | None] = None
 
     # These get calculated in the constructor
     address: Address
