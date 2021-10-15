@@ -868,11 +868,16 @@ def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
 
 def test_download_file(downloads_rule_runner: RuleRunner) -> None:
     with temporary_dir() as temp_dir:
-        roland = Path(temp_dir, "roland")
-        roland.write_text("European Burmese")
+        roland_abs = Path(temp_dir, "roland")
+        roland_abs.write_text("European Burmese")
         snapshot = downloads_rule_runner.request(
             Snapshot,
-            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
+            [DownloadFile(f"file:{roland_abs}", ROLAND_FILE_DIGEST)],
+        )
+        roland_rel = os.path.relpath(roland_abs)
+        snapshot = downloads_rule_runner.request(
+            Snapshot,
+            [DownloadFile(f"file:{roland_rel}", ROLAND_FILE_DIGEST)],
         )
 
     assert snapshot.files == ("roland",)
@@ -889,7 +894,7 @@ def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
         roland.write_text("European Burmese")
         snapshot = downloads_rule_runner.request(
             Snapshot,
-            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
+            [DownloadFile(f"file:{roland}", ROLAND_FILE_DIGEST)],
         )
 
     assert snapshot.files == ("roland",)
