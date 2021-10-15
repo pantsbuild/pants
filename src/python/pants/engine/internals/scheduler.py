@@ -281,10 +281,13 @@ class Scheduler:
         filenames = set(direct_filenames)
         # TODO(#11707): Evaluate removing the invalidation of parent directories.
         filenames.update(os.path.dirname(f) for f in direct_filenames)
-        return native_engine.graph_invalidate(self.py_scheduler, tuple(filenames))
+        return native_engine.graph_invalidate_paths(self.py_scheduler, tuple(filenames))
 
     def invalidate_all_files(self) -> int:
         return native_engine.graph_invalidate_all_paths(self.py_scheduler)
+
+    def invalidate_all(self) -> None:
+        native_engine.graph_invalidate_all(self.py_scheduler)
 
     def check_invalidation_watcher_liveness(self) -> None:
         native_engine.check_invalidation_watcher_liveness(self.py_scheduler)

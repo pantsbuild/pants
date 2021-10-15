@@ -52,6 +52,11 @@ pub mod gen {
       tonic::include_proto!("buildbarn.cas");
     }
   }
+  pub mod pants {
+    pub mod cache {
+      tonic::include_proto!("pants.cache");
+    }
+  }
 }
 
 mod verification;

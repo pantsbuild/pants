@@ -33,14 +33,14 @@ use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
 use clap::{value_t, App, Arg};
 use futures::future::FutureExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use store::Store;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;

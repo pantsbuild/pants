@@ -3,27 +3,28 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 use std::fmt::Display;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::{self, fmt};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
-use futures::stream::StreamExt;
+use grpc_util::prost::MessageExt;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use url::Url;
 
 use crate::context::{Context, Core};
+use crate::downloads;
 use crate::externs;
 use crate::externs::engine_aware;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use bytes::BufMut;
 use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
@@ -35,11 +36,8 @@ use process_execution::{
   ProcessResultSource,
 };
 
-use bytes::Bytes;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::{Digest, Fingerprint};
-use reqwest::Error;
-use std::pin::Pin;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -867,92 +865,22 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-#[async_trait]
-trait StreamingDownload: Send {
-  async fn next(&mut self) -> Option<Result<Bytes, String>>;
-}
-
-struct NetDownload {
-  stream: futures_core::stream::BoxStream<'static, Result<Bytes, Error>>,
-}
-
-impl NetDownload {
-  async fn start(core: &Arc<Core>, url: Url, file_name: String) -> Result<NetDownload, String> {
-    // TODO: Retry failures
-    let response = core
-      .http_client
-      .get(url.clone())
-      .send()
-      .await
-      .map_err(|err| format!("Error downloading file: {}", err))?;
-
-    // Handle common HTTP errors.
-    if response.status().is_server_error() {
-      return Err(format!(
-        "Server error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    } else if response.status().is_client_error() {
-      return Err(format!(
-        "Client error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    }
-    let byte_stream = Pin::new(Box::new(response.bytes_stream()));
-    Ok(NetDownload {
-      stream: byte_stream,
-    })
-  }
-}
-
-#[async_trait]
-impl StreamingDownload for NetDownload {
-  async fn next(&mut self) -> Option<Result<Bytes, String>> {
-    self
-      .stream
-      .next()
-      .await
-      .map(|result| result.map_err(|err| err.to_string()))
-  }
-}
-
-struct FileDownload {
-  stream: tokio_util::io::ReaderStream<tokio::fs::File>,
-}
-
-impl FileDownload {
-  async fn start(path: &str, file_name: String) -> Result<FileDownload, String> {
-    let file = tokio::fs::File::open(path).await.map_err(|e| {
-      format!(
-        "Error ({}) opening file at {} for download to {}",
-        e, path, file_name
-      )
-    })?;
-    let stream = tokio_util::io::ReaderStream::new(file);
-    Ok(FileDownload { stream })
-  }
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
 
-#[async_trait]
-impl StreamingDownload for FileDownload {
-  async fn next(&mut self) -> Option<Result<Bytes, String>> {
-    self
-      .stream
-      .next()
-      .await
-      .map(|result| result.map_err(|err| err.to_string()))
-  }
-}
-
 impl DownloadedFile {
-  async fn load_or_download(
+  fn url_key(url: &Url, digest: Digest) -> CacheKey {
+    let observed_url = ObservedUrl {
+      url: url.path().to_owned(),
+      observed_digest: Some(digest.into()),
+    };
+    CacheKey {
+      key_type: CacheKeyType::Url.into(),
+      digest: Some(Digest::of_bytes(&observed_url.to_bytes()).into()),
+    }
+  }
+
+  pub async fn load_or_download(
     &self,
     core: Arc<Core>,
     url: Url,
@@ -969,85 +897,29 @@ impl DownloadedFile {
         &url, &file_name, e
       )
     })?;
-    let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
-    if maybe_bytes.is_none() {
-      DownloadedFile::download(core.clone(), url, file_name, digest).await?;
+
+    // See if we have observed this URL and Digest before: if so, see whether we already have the
+    // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
+    // check that a Digest has ever been observed at the given URL.
+    let url_key = Self::url_key(&url, digest);
+    let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
+
+    // If we hit the ObservedUrls cache, then we have successfully fetched this Digest from
+    // this URL before. If we still have the bytes, then we skip fetching the content again.
+    let usable_in_store = have_observed_url
+      && core
+        .store()
+        .load_file_bytes_with(digest, |_| ())
+        .await?
+        .is_some();
+
+    if !usable_in_store {
+      downloads::download(core.clone(), url, file_name, digest).await?;
+      // The value was successfully fetched and matched the digest: record in the ObservedUrls
+      // cache.
+      core.local_cache.store(&url_key, Bytes::from("")).await?;
     }
     core.store().snapshot_of_one_file(path, digest, true).await
-  }
-
-  async fn start_download(
-    core: &Arc<Core>,
-    url: Url,
-    file_name: String,
-  ) -> Result<Box<dyn StreamingDownload>, String> {
-    if url.scheme() == "file" {
-      return Ok(Box::new(FileDownload::start(url.path(), file_name).await?));
-    }
-    Ok(Box::new(NetDownload::start(core, url, file_name).await?))
-  }
-
-  async fn download(
-    core: Arc<Core>,
-    url: Url,
-    file_name: String,
-    expected_digest: hashing::Digest,
-  ) -> Result<(), String> {
-    let mut response_stream = DownloadedFile::start_download(&core, url, file_name).await?;
-
-    let (actual_digest, bytes) = {
-      struct SizeLimiter<W: std::io::Write> {
-        writer: W,
-        written: usize,
-        size_limit: usize,
-      }
-
-      impl<W: std::io::Write> Write for SizeLimiter<W> {
-        fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-          let new_size = self.written + buf.len();
-          if new_size > self.size_limit {
-            Err(std::io::Error::new(
-              std::io::ErrorKind::InvalidData,
-              "Downloaded file was larger than expected digest",
-            ))
-          } else {
-            self.written = new_size;
-            self.writer.write_all(buf)?;
-            Ok(buf.len())
-          }
-        }
-
-        fn flush(&mut self) -> Result<(), std::io::Error> {
-          self.writer.flush()
-        }
-      }
-
-      let mut hasher = hashing::WriterHasher::new(SizeLimiter {
-        writer: bytes::BytesMut::with_capacity(expected_digest.size_bytes).writer(),
-        written: 0,
-        size_limit: expected_digest.size_bytes,
-      });
-
-      while let Some(next_chunk) = response_stream.next().await {
-        let chunk =
-          next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
-        hasher
-          .write_all(&chunk)
-          .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
-      }
-      let (digest, bytewriter) = hasher.finish();
-      (digest, bytewriter.writer.into_inner().freeze())
-    };
-
-    if expected_digest != actual_digest {
-      return Err(format!(
-        "Wrong digest for downloaded file: want {:?} got {:?}",
-        expected_digest, actual_digest
-      ));
-    }
-
-    let _ = core.store().store_file_bytes(bytes, true).await?;
-    Ok(())
   }
 }
 

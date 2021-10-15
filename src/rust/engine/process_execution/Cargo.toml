@@ -10,8 +10,9 @@ async-trait = "0.1"
 async-lock = "2.4"
 walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
-bazel_protos = { path = "../bazel_protos" }
+protos = { path = "../protos" }
 bytes = "1.0"
+cache = { path = "../cache" }
 derivative = "2.2"
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
@@ -21,7 +22,6 @@ libc = "0.2.39"
 log = "0.4"
 nails = "0.12"
 sha2 = "0.9"
-sharded_lmdb = {  path = "../sharded_lmdb" }
 shell-quote = "0.1.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
@@ -52,6 +52,7 @@ tryfuture = { path = "../tryfuture" }
 maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
 parking_lot = "0.11"
+sharded_lmdb = { path = "../sharded_lmdb" }
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }

@@ -7,12 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
 use futures::FutureExt;
 use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
 use tokio::time::sleep;
