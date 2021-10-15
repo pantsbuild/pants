@@ -15,7 +15,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     SourcesField,
     Target,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
@@ -87,10 +86,9 @@ async def file_deps(
             TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
         )
         targets = transitive_targets.closure
-    elif filedeps_subsystem.globs:
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
     else:
-        targets = await Get(Targets, Addresses, addresses)
+        # NB: We must preserve target generators, not replace with their generated targets.
+        targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in targets

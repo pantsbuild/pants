@@ -71,13 +71,21 @@ def run_goal(
 
 
 def test_no_filters_provided() -> None:
-    # `filter` behaves like `list` when there are no specified filters.
-    targets = [MockTarget({}, Address("", target_name=name)) for name in ("t3", "t2", "t1")]
-    assert run_goal(targets) == dedent(
+    # `filter` behaves like `list` when there are no specified filters. Note that it includes
+    # generated targets.
+    addresses = (
+        Address("", target_name="t2"),
+        Address("", target_name="t1"),
+        Address("", target_name="gen", relative_file_path="f.ext"),
+        Address("", target_name="gen", generated_name="foo"),
+    )
+    stdout = run_goal([MockTarget({}, addr) for addr in addresses])
+    assert stdout == dedent(
         """\
+        //:gen#foo
         //:t1
         //:t2
-        //:t3
+        //f.ext:gen
         """
     )
 

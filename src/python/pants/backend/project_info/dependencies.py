@@ -91,7 +91,11 @@ async def dependencies(
         )
         targets = Targets(transitive_targets.dependencies)
     else:
+        # NB: We must preserve target generators for the roots, i.e. not replace with their
+        # generated targets.
         target_roots = await Get(UnexpandedTargets, Addresses, addresses)
+        # NB: When determining dependencies, though, we replace target generators with their
+        # generated targets.
         dependencies_per_target_root = await MultiGet(
             Get(
                 Targets,

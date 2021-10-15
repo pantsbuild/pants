@@ -20,11 +20,7 @@ class MockTarget(Target):
 
 
 def run_goal(
-    targets: list[MockTarget],
-    *,
-    show_documented: bool = False,
-    show_provides: bool = False,
-    provides_columns: str | None = None,
+    targets: list[MockTarget], *, show_documented: bool = False, show_provides: bool = False
 ) -> tuple[str, str]:
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
         run_rule_with_mocks(
@@ -52,14 +48,20 @@ def run_goal(
 
 
 def test_list_normal() -> None:
-    # Note that these are unsorted.
-    target_names = ("t3", "t2", "t1")
-    stdout, _ = run_goal([MockTarget({}, Address("", target_name=name)) for name in target_names])
+    # Note that these are unsorted and that we include generated targets.
+    addresses = (
+        Address("", target_name="t2"),
+        Address("", target_name="t1"),
+        Address("", target_name="gen", relative_file_path="f.ext"),
+        Address("", target_name="gen", generated_name="foo"),
+    )
+    stdout, _ = run_goal([MockTarget({}, addr) for addr in addresses])
     assert stdout == dedent(
         """\
+        //:gen#foo
         //:t1
         //:t2
-        //:t3
+        //f.ext:gen
         """
     )
 

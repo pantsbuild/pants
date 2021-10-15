@@ -59,10 +59,19 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
     directory: str
     error_if_no_matches: ClassVar[bool]
 
-    @abstractmethod
     def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
         """Generate glob patterns matching all the BUILD files this address spec must inspect to
-        resolve the addresses."""
+        resolve the addresses.
+
+        The default matches the directory's BUILD file and all ancestor directories, which is
+        necessary to handle generated targets that may be defined in ancestor BUILD files.
+        Subclasses can extend this default.
+        """
+        return {
+            os.path.join(f, pattern)
+            for pattern in build_patterns
+            for f in recursive_dirname(self.directory)
+        }
 
     @abstractmethod
     def matches(self, tgt_residence_dir: str) -> bool:
@@ -79,9 +88,6 @@ class SiblingAddresses(AddressGlobSpec):
 
     def __str__(self) -> str:
         return f"{self.directory}:"
-
-    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
-        return {os.path.join(self.directory, pat) for pat in build_patterns}
 
     def matches(self, tgt_residence_dir: str) -> bool:
         return tgt_residence_dir == self.directory
@@ -108,7 +114,10 @@ class DescendantAddresses(AddressGlobSpec):
         return f"{self.directory}::"
 
     def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
-        return {os.path.join(self.directory, "**", pat) for pat in build_patterns}
+        return {
+            *super().to_build_file_globs(build_patterns),
+            *(os.path.join(self.directory, "**", pat) for pat in build_patterns),
+        }
 
     def matches(self, tgt_residence_dir: str) -> bool:
         return fast_relpath_optional(tgt_residence_dir, self.directory) is not None
@@ -131,13 +140,6 @@ class AscendantAddresses(AddressGlobSpec):
 
     def __str__(self) -> str:
         return f"{self.directory}^"
-
-    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
-        return {
-            os.path.join(f, pattern)
-            for pattern in build_patterns
-            for f in recursive_dirname(self.directory)
-        }
 
     def matches(self, tgt_residence_dir: str) -> bool:
         return fast_relpath_optional(self.directory, tgt_residence_dir) is not None

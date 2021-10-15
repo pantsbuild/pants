@@ -289,6 +289,88 @@ def resolve_address_specs(
     return set(result)
 
 
+def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) -> None:
+    address_specs_rule_runner.write_files(
+        {
+            "demo/BUILD": dedent(
+                """\
+                generator(sources=['**/*.txt'])
+                """
+            ),
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/subdir/f.txt": "",
+            "demo/subdir/f.another_ext": "",
+            "demo/subdir/BUILD": "mock_tgt(name='another_ext', sources=['f.another_ext'])",
+            "another_dir/BUILD": "mock_tgt(sources=[])",
+        }
+    )
+
+    def assert_resolved(spec: AddressSpec, expected: set[Address]) -> None:
+        result = resolve_address_specs(address_specs_rule_runner, [spec])
+        assert result == expected
+
+    # Literals should be "one-in, one-out".
+    assert_resolved(AddressLiteralSpec("demo"), {Address("demo")})
+    assert_resolved(
+        AddressLiteralSpec("demo/f1.txt"), {Address("demo", relative_file_path="f1.txt")}
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo", None, "f1.txt"), {Address("demo", generated_name="f1.txt")}
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo/subdir", "another_ext"),
+        {Address("demo/subdir", target_name="another_ext")},
+    )
+
+    assert_resolved(
+        # Match all targets that reside in `demo/`, either because explicitly declared there or
+        # generated into that dir. Note that this does not include `demo#subdir/f2.ext`, even
+        # though its target generator matches.
+        SiblingAddresses("demo"),
+        {
+            Address("demo"),
+            Address("demo", relative_file_path="f1.txt"),
+            Address("demo", generated_name="f1.txt"),
+            Address("demo", relative_file_path="f2.txt"),
+            Address("demo", generated_name="f2.txt"),
+        },
+    )
+    assert_resolved(
+        # Should include all generated targets that reside in `demo/subdir`, even though their
+        # target generator is in an ancestor.
+        SiblingAddresses("demo/subdir"),
+        {
+            Address("demo", relative_file_path="subdir/f.txt"),
+            Address("demo", generated_name="subdir/f.txt"),
+            Address("demo/subdir", target_name="another_ext"),
+        },
+    )
+
+    all_tgts_in_demo = {
+        Address("demo"),
+        Address("demo", relative_file_path="f1.txt"),
+        Address("demo", generated_name="f1.txt"),
+        Address("demo", relative_file_path="f2.txt"),
+        Address("demo", generated_name="f2.txt"),
+        Address("demo", relative_file_path="subdir/f.txt"),
+        Address("demo", generated_name="subdir/f.txt"),
+        Address("demo/subdir", target_name="another_ext"),
+    }
+    assert_resolved(DescendantAddresses("demo"), all_tgts_in_demo)
+    assert_resolved(AscendantAddresses("demo/subdir"), all_tgts_in_demo)
+    assert_resolved(
+        AscendantAddresses("demo"),
+        {
+            Address("demo"),
+            Address("demo", relative_file_path="f1.txt"),
+            Address("demo", generated_name="f1.txt"),
+            Address("demo", relative_file_path="f2.txt"),
+            Address("demo", generated_name="f2.txt"),
+        },
+    )
+
+
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
     address_specs_rule_runner.write_files(
@@ -326,7 +408,9 @@ def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> N
         }
     )
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="b")
+        Address("demo", target_name="b"),
+        Address("demo", target_name="b", relative_file_path="f.txt"),
+        Address("demo", target_name="b", generated_name="f.txt"),
     }
 
     # The same filtering should work when given literal addresses, including generated targets and
@@ -366,7 +450,9 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
     )
 
     assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="not_me")
+        Address("demo", target_name="not_me"),
+        Address("demo", target_name="not_me", relative_file_path="f.txt"),
+        Address("demo", target_name="not_me", generated_name="f.txt"),
     }
 
     # The same filtering should work when given literal addresses, including generated targets and
