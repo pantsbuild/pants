@@ -41,6 +41,7 @@ use workunit_store::{
   in_workunit, Metric, ObservationMetric, RunningWorkunit, SpanId, WorkunitMetadata, WorkunitStore,
 };
 
+use crate::reusable_caches::merge_reusable_input_digests;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
   ProcessCacheScope, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
@@ -738,8 +739,24 @@ impl crate::CommandRunner for CommandRunner {
     let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
+    // Rewrite the request to merge reusable inputs into the input root.
+    let request = {
+      let mut req = self.extract_compatible_request(&request).unwrap();
+      if !req.reusable_input_digests.is_empty() {
+        let merged_input_digest = merge_reusable_input_digests(
+          &self.store,
+          req.input_files,
+          req.reusable_input_digests.clone(),
+        )
+        .map_err(|err| format!("Unable to merge digest: {:?}", err))
+        .await?;
+        req.input_files = merged_input_digest;
+        req.reusable_input_digests.clear();
+      }
+      req
+    };
+
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self.extract_compatible_request(&request).unwrap();
     let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
