@@ -5,23 +5,60 @@ from __future__ import annotations
 
 import os.path
 import tokenize
+from collections import defaultdict
+from dataclasses import dataclass
 from io import BytesIO
+from typing import DefaultDict
 
 from pants.base.specs import Specs
 from pants.core.goals.tailor import specs_to_dirs
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.internals.parser import ParseError
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+# ------------------------------------------------------------------------------------------
+# Generic goal
+# ------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RewrittenBuildFile:
+    path: str
+    lines: tuple[str, ...]
+    change_descriptions: tuple[str, ...]
+
+
+@union
+@dataclass(frozen=True)
+class RewrittenBuildFileRequest(EngineAwareParameter):
+    path: str
+    lines: tuple[str, ...]
+
+    def debug_hint(self) -> str:
+        return self.path
+
+    def tokenize(self) -> list[tokenize.TokenInfo]:
+        _bytes_stream = BytesIO("\n".join(self.lines).encode("utf-8"))
+        try:
+            return list(tokenize.tokenize(_bytes_stream.readline))
+        except tokenize.TokenError as e:
+            raise ParseError(f"Failed to parse {self.path}: {e}")
 
 
 class MendSubsystem(GoalSubsystem):
     name = "mend"
     help = "Automate fixing Pants deprecations."
+
+    required_union_implementations = (RewrittenBuildFileRequest,)
 
 
 class MendGoal(Goal):
@@ -34,7 +71,7 @@ async def run_mend(
     console: Console,
     workspace: Workspace,
     specs: Specs,
-    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
 ) -> MendGoal:
     all_build_files = await Get(
         DigestContents,
@@ -50,70 +87,95 @@ async def run_mend(
         ),
     )
 
-    # TODO: Decide how to handle if any fixers need to be AST-based. Do we switch everything to
-    #  AST, or somehow pipe tokenizer-based fixers into AST-based ones?
-    try:
-        build_files_to_tokens_and_lines = {
-            build_file.path: (
-                list(tokenize.tokenize(BytesIO(build_file.content).readline)),
-                tuple(build_file.content.decode("utf-8").splitlines()),
-            )
-            for build_file in all_build_files
-        }
-    except tokenize.TokenError:
-        # If a BUILD file can't be fixed, we simply ignore it for now. The user can still manually
-        # fix that file.
-        #
-        # This behavior can be changed to error or warn if that seems useful.
-        return MendGoal(exit_code=1)
-
-    renamed_target_types = {
-        tgt.deprecated_alias: tgt.alias
-        for tgt in registered_target_types.types
-        if tgt.deprecated_alias is not None
+    build_file_to_lines = {
+        build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
+        for build_file in all_build_files
     }
+    build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
+    for rewrite_request_cls in union_membership[RewrittenBuildFileRequest]:
+        all_rewritten_files = await MultiGet(
+            Get(
+                RewrittenBuildFile,
+                RewrittenBuildFileRequest,
+                rewrite_request_cls(build_file, lines),
+            )
+            for build_file, lines in build_file_to_lines.items()
+        )
+        for rewritten_file in all_rewritten_files:
+            if not rewritten_file.change_descriptions:
+                continue
+            build_file_to_lines[rewritten_file.path] = rewritten_file.lines
+            build_file_to_change_descriptions[rewritten_file.path].extend(
+                rewritten_file.change_descriptions
+            )
 
-    # TODO: Allow piping a fixer into another one.
-    updated_build_files = {}
-    for path, (tokens, lines) in build_files_to_tokens_and_lines.items():
-        possibly_new_build = maybe_rename_deprecated_targets(renamed_target_types, lines, tokens)
-        if possibly_new_build is not None:
-            updated_build_files[path] = possibly_new_build
-
-    if not updated_build_files:
+    changed_build_files = {
+        build_file
+        for build_file, change_descriptions in build_file_to_change_descriptions.items()
+        if change_descriptions
+    }
+    if not changed_build_files:
         console.print_stdout(
-            "No required changes found. Note that there may still be deprecations this goal "
-            f"doesn't know how to fix. See {doc_url('upgrade-tips')} for upgrade tips."
+            "No required changes to BUILD files found. Note that there may still be deprecations "
+            f"this goal doesn't know how to fix. See {doc_url('upgrade-tips')} for upgrade tips."
         )
         return MendGoal(exit_code=0)
 
     result = await Get(
         Digest,
         CreateDigest(
-            FileContent(path, ("\n".join(new_content) + "\n").encode("utf-8"))
-            for path, new_content in updated_build_files.items()
+            FileContent(
+                build_file, ("\n".join(build_file_to_lines[build_file]) + "\n").encode("utf-8")
+            )
+            for build_file in changed_build_files
         ),
     )
     workspace.write_digest(result)
 
-    for updated_build_file in updated_build_files:
-        console.print_stdout(f"Updated {console.blue(updated_build_file)}:")
-        # TODO: Generalize this.
-        console.print_stdout("  - Renamed deprecated target type names")
+    for build_file in changed_build_files:
+        formatted_changes = "\n".join(
+            f"  - {description}" for description in build_file_to_change_descriptions[build_file]
+        )
+        console.print_stdout(f"Updated {console.blue(build_file)}:\n{formatted_changes}")
+
     return MendGoal(exit_code=0)
 
 
+# ------------------------------------------------------------------------------------------
+# Rename deprecated target types fixer
+# ------------------------------------------------------------------------------------------
+
+
+class RenameDeprecatedTargetsRequest(RewrittenBuildFileRequest):
+    pass
+
+
+class RenamedTargetTypes(FrozenDict[str, str]):
+    """Deprecated target type names to new names."""
+
+
+@rule
+def determine_renamed_target_types(target_types: RegisteredTargetTypes) -> RenamedTargetTypes:
+    return RenamedTargetTypes(
+        {
+            tgt.deprecated_alias: tgt.alias
+            for tgt in target_types.types
+            if tgt.deprecated_alias is not None
+        }
+    )
+
+
+@rule(desc="Check for deprecated target type names", level=LogLevel.DEBUG)
 def maybe_rename_deprecated_targets(
-    deprecated_tgt_name_to_rename: dict[str, str],
-    original_lines: tuple[str, ...],
-    tokens: list[tokenize.TokenInfo],
-) -> tuple[str, ...] | None:
+    request: RenameDeprecatedTargetsRequest,
+    renamed_target_types: RenamedTargetTypes,
+) -> RewrittenBuildFile:
+    tokens = request.tokenize()
+
     def should_be_renamed(token: tokenize.TokenInfo) -> bool:
         no_indentation = token.start[1] == 0
         if not (
-            token.type is tokenize.NAME
-            and token.string in deprecated_tgt_name_to_rename
-            and no_indentation
+            token.type is tokenize.NAME and token.string in renamed_target_types and no_indentation
         ):
             return False
         # Ensure that the next token is `(`
@@ -123,19 +185,25 @@ def maybe_rename_deprecated_targets(
             return False
         return next_token.type is tokenize.OP and next_token.string == "("
 
-    updated_text_lines = list(original_lines)
+    updated_text_lines = list(request.lines)
     for token in tokens:
         if not should_be_renamed(token):
             continue
         line_index = token.start[0] - 1
-        line = original_lines[line_index]
+        line = request.lines[line_index]
         suffix = line[token.end[1] :]
-        new_symbol = deprecated_tgt_name_to_rename[token.string]
+        new_symbol = renamed_target_types[token.string]
         updated_text_lines[line_index] = f"{new_symbol}{suffix}"
 
-    result = tuple(updated_text_lines)
-    return result if result != original_lines else None
+    result_lines = tuple(updated_text_lines)
+    return RewrittenBuildFile(
+        request.path,
+        result_lines,
+        change_descriptions=(
+            ("Renamed deprecated target type names",) if result_lines != request.lines else ()
+        ),
+    )
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest))
