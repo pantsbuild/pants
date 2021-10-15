@@ -113,9 +113,7 @@ def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> st
     nothing = object()
 
     def normalize_value(val: Any) -> Any:
-        if isinstance(val, collections.abc.Mapping) and not all(
-            isinstance(k, str) for k in val.keys()
-        ):
+        if isinstance(val, collections.abc.Mapping):
             return {str(k): normalize_value(v) for k, v in val.items()}
         return val
 

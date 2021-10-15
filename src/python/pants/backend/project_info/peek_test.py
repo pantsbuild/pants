@@ -17,7 +17,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 # TODO: Remove this if/when we add an overrides field to `files`.
 class FilesGeneratorTargetWithOverrides(FilesGeneratorTarget):
-    core_fields = (*FilesGeneratorTarget.core_fields, OverridesField)
+    core_fields = (*FilesGeneratorTarget.core_fields, OverridesField)  # type: ignore[assignment]
 
 
 @pytest.mark.parametrize(

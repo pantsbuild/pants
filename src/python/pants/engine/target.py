@@ -607,7 +607,7 @@ class Targets(Collection[Target]):
     """A heterogeneous collection of instances of Target subclasses.
 
     While every element will be a subclass of `Target`, there may be many different `Target` types
-    in this collection, e.g. some `Files` targets and some `PythonLibrary` targets.
+    in this collection, e.g. some `FileTarget` and some `PythonTestTarget`.
 
     Often, you will want to filter out the relevant targets by looking at what fields they have
     registered, e.g.:
@@ -615,7 +615,8 @@ class Targets(Collection[Target]):
         valid_tgts = [tgt for tgt in tgts if tgt.has_fields([Compatibility, PythonSources])]
 
     You should not check the Target's actual type because this breaks custom target types;
-    for example, prefer `tgt.has_field(PythonTestsSources)` to `isinstance(tgt, PythonTests)`.
+    for example, prefer `tgt.has_field(PythonTestsSourcesField)` to
+    `isinstance(tgt, PythonTestsTarget)`.
     """
 
     def expect_single(self) -> Target:
@@ -901,6 +902,7 @@ def generate_file_level_targets(
     )
 
     used_overrides = set()
+    normalized_overrides = overrides or {}
 
     def gen_tgt(full_fp: str, address: Address) -> Target:
         generated_target_fields: dict[str, ImmutableValue] = {}
@@ -926,9 +928,9 @@ def generate_file_level_targets(
             elif field.value != field.default:
                 generated_target_fields[field.alias] = field.value
 
-        if full_fp in (overrides or {}):
+        if full_fp in normalized_overrides:
             used_overrides.add(full_fp)
-            generated_target_fields.update(overrides[full_fp])
+            generated_target_fields.update(normalized_overrides[full_fp])
 
         return generated_target_cls(
             generated_target_fields,
@@ -939,13 +941,14 @@ def generate_file_level_targets(
 
     result = tuple(gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
 
-    unused_overrides = set(overrides or {}) - used_overrides
+    unused_overrides = set(normalized_overrides.keys()) - used_overrides
     if unused_overrides:
         unused_relative_paths = sorted(
             fast_relpath(fp, generator.address.spec_path) for fp in unused_overrides
         )
         all_valid_relative_paths = sorted(
-            tgt.address._relative_file_path or tgt.address.generated_name for tgt in result
+            cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
+            for tgt in result
         )
         raise InvalidFieldException(
             f"Unused file paths in the `overrides` field for {generator.address}: "
