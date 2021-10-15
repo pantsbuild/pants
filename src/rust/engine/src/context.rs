@@ -61,6 +61,7 @@ pub struct Core {
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
+  pub local_cache: PersistentCache,
   pub vfs: PosixFS,
   pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
@@ -468,8 +469,7 @@ impl Core {
       store,
       command_runner,
       http_client,
-      // TODO: Errors in initialization should definitely be exposed as python
-      // exceptions, rather than as panics.
+      local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
       build_root,

@@ -11,7 +11,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
+use grpc_util::prost::MessageExt;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -866,6 +869,17 @@ impl From<Snapshot> for NodeKey {
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
+  fn url_key(url: &Url, digest: Digest) -> CacheKey {
+    let observed_url = ObservedUrl {
+      url: url.path().to_owned(),
+      observed_digest: Some(digest.into()),
+    };
+    CacheKey {
+      key_type: CacheKeyType::Url.into(),
+      digest: Some(Digest::of_bytes(&observed_url.to_bytes()).into()),
+    }
+  }
+
   pub async fn load_or_download(
     &self,
     core: Arc<Core>,
@@ -883,9 +897,27 @@ impl DownloadedFile {
         &url, &file_name, e
       )
     })?;
-    let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
-    if maybe_bytes.is_none() {
+
+    // See if we have observed this URL and Digest before: if so, see whether we already have the
+    // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
+    // check that a Digest has ever been observed at the given URL.
+    let url_key = Self::url_key(&url, digest);
+    let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
+
+    // If we hit the ObservedUrls cache, then we have successfully fetched this Digest from
+    // this URL before. If we still have the bytes, then we skip fetching the content again.
+    let usable_in_store = have_observed_url
+      && core
+        .store()
+        .load_file_bytes_with(digest, |_| ())
+        .await?
+        .is_some();
+
+    if !usable_in_store {
       downloads::download(core.clone(), url, file_name, digest).await?;
+      // The value was successfully fetched and matched the digest: record in the ObservedUrls
+      // cache.
+      core.local_cache.store(&url_key, Bytes::from("")).await?;
     }
     core.store().snapshot_of_one_file(path, digest, true).await
   }
