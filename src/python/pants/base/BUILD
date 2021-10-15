@@ -35,3 +35,9 @@ python_tests(
   sources=['exiter_integration_test.py'],
   timeout=180,
 )
+
+python_tests(
+  name='specs_integration_test',
+  sources=['specs_integration_test.py'],
+  timeout=180,
+)

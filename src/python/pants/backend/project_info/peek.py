@@ -155,7 +155,10 @@ class _PeekJsonEncoder(json.JSONEncoder):
 
 
 @rule
-async def get_target_data(targets: UnexpandedTargets) -> TargetDatas:
+async def get_target_data(
+    # NB: We must preserve target generators, not replace with their generated targets.
+    targets: UnexpandedTargets,
+) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
     # We "hydrate" these field with the engine, but not every target has them registered.
@@ -167,6 +170,7 @@ async def get_target_data(targets: UnexpandedTargets) -> TargetDatas:
         if tgt.has_field(SourcesField):
             targets_with_sources.append(tgt)
 
+    # NB: When determining dependencies, we replace target generators with their generated targets.
     dependencies_per_target = await MultiGet(
         Get(
             Targets,

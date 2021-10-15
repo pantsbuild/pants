@@ -67,11 +67,11 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
         necessary to handle generated targets that may be defined in ancestor BUILD files.
         Subclasses can extend this default.
         """
-        return set(
+        return {
             os.path.join(f, pattern)
             for pattern in build_patterns
             for f in recursive_dirname(self.directory)
-        )
+        }
 
     @abstractmethod
     def matches(self, tgt_residence_dir: str) -> bool:
@@ -140,13 +140,6 @@ class AscendantAddresses(AddressGlobSpec):
 
     def __str__(self) -> str:
         return f"{self.directory}^"
-
-    def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
-        return {
-            os.path.join(f, pattern)
-            for pattern in build_patterns
-            for f in recursive_dirname(self.directory)
-        }
 
     def matches(self, tgt_residence_dir: str) -> bool:
         return fast_relpath_optional(self.directory, tgt_residence_dir) is not None

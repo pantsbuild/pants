@@ -63,6 +63,7 @@ async def list_targets(
         )
 
     if list_subsystem.provides:
+        # We must preserve target generators, not replace with their generated targets.
         targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_provide_artifacts = {
             tgt.address: tgt[ProvidesField].value
@@ -75,6 +76,7 @@ async def list_targets(
         return List(exit_code=0)
 
     if list_subsystem.documented:
+        # We must preserve target generators, not replace with their generated targets.
         targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_descriptions = cast(
             Dict[Address, str],

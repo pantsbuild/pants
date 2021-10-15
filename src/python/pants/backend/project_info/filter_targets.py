@@ -100,6 +100,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
 
 @goal_rule
 def filter_targets(
+    # NB: We must preserve target generators, not replace with their generated targets.
     targets: UnexpandedTargets,
     filter_subsystem: FilterSubsystem,
     console: Console,
