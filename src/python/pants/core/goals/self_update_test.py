@@ -3,13 +3,85 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from textwrap import dedent
+
 import pytest
 
 from pants.core.goals.self_update import (
     RenameDeprecatedTargetsRequest,
     RenamedTargetTypes,
+    RewrittenBuildFile,
+    RewrittenBuildFileRequest,
+    SelfUpdateGoal,
     maybe_rename_deprecated_targets,
+    run_self_update,
 )
+from pants.engine.rules import rule
+from pants.engine.unions import UnionRule
+from pants.testutil.rule_runner import RuleRunner
+
+# ------------------------------------------------------------------------------------------
+# Generic goal
+# ------------------------------------------------------------------------------------------
+
+
+class MockRewriteAddLine(RewrittenBuildFileRequest):
+    pass
+
+
+class MockRewriteReverseLines(RewrittenBuildFileRequest):
+    pass
+
+
+@rule
+def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
+    return RewrittenBuildFile(
+        request.path, (*request.lines, "added line"), change_descriptions=("Added a new line",)
+    )
+
+
+@rule
+def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
+    return RewrittenBuildFile(
+        request.path, tuple(reversed(request.lines)), change_descriptions=("Reversed lines",)
+    )
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=(
+            run_self_update,
+            add_line,
+            reverse_lines,
+            UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
+            UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
+        )
+    )
+
+
+def test_pipe_fixers_correctly(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
+    result = rule_runner.run_goal_rule(SelfUpdateGoal)
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        """\
+        Updated BUILD:
+          - Added a new line
+          - Reversed lines
+        Updated dir/BUILD:
+          - Added a new line
+          - Reversed lines
+        """
+    )
+    assert Path(rule_runner.build_root, "BUILD").read_text() == "added line\nline\n"
+    assert Path(rule_runner.build_root, "dir/BUILD").read_text() == "added line\nline 2\nline 1\n"
+
+
+# ------------------------------------------------------------------------------------------
+# Renamed target types fixer
+# ------------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(

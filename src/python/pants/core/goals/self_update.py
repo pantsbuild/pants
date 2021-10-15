@@ -24,6 +24,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
@@ -46,6 +47,7 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
     def debug_hint(self) -> str:
         return self.path
 
+    @memoized
     def tokenize(self) -> list[tokenize.TokenInfo]:
         _bytes_stream = BytesIO("\n".join(self.lines).encode("utf-8"))
         try:
