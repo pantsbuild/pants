@@ -283,31 +283,11 @@ class FinalizedSetupKwargs(SetupKwargs):
 
 
 @dataclass(frozen=True)
-class SetupPyChroot:
-    """A chroot containing a setup.py and the sources it operates on."""
+class DistBuildChroot:
+    """A chroot containing PEP 517 build setup and the sources it operates on."""
 
     digest: Digest
     working_directory: str  # Path to dir within digest.
-
-
-@dataclass(frozen=True)
-class RunSetupPyRequest:
-    """A request to run setup.py to build a distribution."""
-
-    exported_target: ExportedTarget
-    interpreter_constraints: InterpreterConstraints
-    chroot: SetupPyChroot
-    wheel: bool
-    sdist: bool
-    wheel_config_settings: FrozenDict[str, tuple[str, ...]]
-    sdist_config_settings: FrozenDict[str, tuple[str, ...]]
-
-
-@dataclass(frozen=True)
-class RunSetupPyResult:
-    """The result of running a setup.py command."""
-
-    output: Digest  # The state of the chroot after running setup.py.
 
 
 @enum.unique
@@ -387,8 +367,7 @@ def validate_commands(commands: tuple[str, ...]):
 
 @rule
 async def package_python_dist(
-    field_set: PythonDistributionFieldSet,
-    python_setup: PythonSetup,
+    field_set: PythonDistributionFieldSet, python_setup: PythonSetup, setuptools: Setuptools
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
@@ -396,7 +375,7 @@ async def package_python_dist(
         transitive_targets.closure, python_setup
     ) or InterpreterConstraints(python_setup.interpreter_constraints)
     chroot = await Get(
-        SetupPyChroot,
+        DistBuildChroot,
         SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
     )
 
@@ -414,16 +393,25 @@ async def package_python_dist(
         )
 
     if wheel or sdist:
+        # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture
+        # any changes setup made within it without also capturing other artifacts of the pex
+        # process invocation.
+        chroot_prefix = "chroot"
+        working_directory = os.path.join(chroot_prefix, chroot.working_directory)
+        prefixed_chroot = await Get(Digest, AddPrefix(chroot.digest, chroot_prefix))
         setup_py_result = await Get(
-            RunSetupPyResult,
-            RunSetupPyRequest(
-                exported_target,
-                interpreter_constraints,
-                chroot,
-                wheel,
-                sdist,
-                wheel_config_settings,
-                sdist_config_settings,
+            DistBuildResult,
+            DistBuildRequest(
+                requires=setuptools.pex_requirements(),
+                build_backend="setuptools.build_meta",
+                interpreter_constraints=interpreter_constraints,
+                build_wheel=wheel,
+                build_sdist=sdist,
+                input=prefixed_chroot,
+                working_directory=working_directory,
+                target_address_spec=exported_target.target.address.spec,
+                wheel_config_settings=wheel_config_settings,
+                sdist_config_settings=sdist_config_settings,
             ),
         )
         dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
@@ -487,37 +475,6 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def run_setup_py(req: RunSetupPyRequest, setuptools: Setuptools) -> RunSetupPyResult:
-    """Run a setup.py command on a single exported target."""
-
-    # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture any
-    # changes setup made within it (e.g., when running 'develop') without also capturing other
-    # artifacts of the pex process invocation.
-    chroot_prefix = "chroot"
-    working_directory = os.path.join(chroot_prefix, req.chroot.working_directory)
-
-    prefixed_chroot = await Get(Digest, AddPrefix(req.chroot.digest, chroot_prefix))
-
-    result = await Get(
-        DistBuildResult,
-        DistBuildRequest(
-            requires=setuptools.pex_requirements(),
-            build_backend="setuptools.build_meta",
-            interpreter_constraints=req.interpreter_constraints,
-            build_wheel=req.wheel,
-            build_sdist=req.sdist,
-            input=prefixed_chroot,
-            working_directory=working_directory,
-            target_address_spec=req.exported_target.target.address.spec,
-            wheel_config_settings=req.wheel_config_settings,
-            sdist_config_settings=req.sdist_config_settings,
-        ),
-    )
-
-    return RunSetupPyResult(result.output)
-
-
-@rule
 async def determine_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
@@ -558,7 +515,7 @@ class GeneratedSetupPy:
 @rule
 async def generate_chroot(
     request: SetupPyChrootRequest, subsys: SetupPyGeneration
-) -> SetupPyChroot:
+) -> DistBuildChroot:
     generate_setup = request.exported_target.target.get(GenerateSetupField).value
     if generate_setup is None:
         generate_setup = subsys.generate_setup_default
@@ -604,7 +561,7 @@ async def generate_chroot(
         )
         working_directory = os.path.dirname(stripped[0])
         chroot_digest = sources.digest
-    return SetupPyChroot(chroot_digest, working_directory)
+    return DistBuildChroot(chroot_digest, working_directory)
 
 
 @rule
