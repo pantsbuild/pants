@@ -13,18 +13,24 @@ import venv
 import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import date, timedelta
+from enum import Enum
 from functools import total_ordering
+from math import ceil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import sleep
-from typing import Callable, Iterable, Iterator, NamedTuple, cast
+from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
 from common import banner, die, green
+from packaging.version import Version
 from reversion import reversion
 
+from pants.util.memo import memoized_property
 from pants.util.strutil import strip_prefix
 
 # -----------------------------------------------------------------------------------------------
@@ -117,12 +123,59 @@ class PackageAccessValidator:
 
 
 @total_ordering
+class PackageVersionType(Enum):
+    DEV = 0
+    PRE = 1
+    STABLE = 2
+
+    @classmethod
+    def from_version(cls, version: Version) -> PackageVersionType:
+        if version.is_devrelease:
+            return cls.DEV
+        elif version.pre:
+            return cls.PRE
+        else:
+            return cls.STABLE
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, PackageVersionType):
+            return NotImplemented
+        return self.value < other.value
+
+
+@dataclass(frozen=True)
+class PackageVersion:
+    name: str
+    version: Version
+    size_mb: int
+    most_recent_upload_date: date
+
+    @property
+    def freshness_key(self) -> tuple[PackageVersionType, date, Version]:
+        """A sort key of the type, the creation time, and then (although unlikely to be used) the
+        Version.
+
+        Sorts the "stalest" releases first, and the "freshest" releases last.
+        """
+        return (
+            PackageVersionType.from_version(self.version),
+            self.most_recent_upload_date,
+            self.version,
+        )
+
+
+@total_ordering
 class Package:
     def __init__(
-        self, name: str, target: str, validate: Callable[[str, Path, list[str]], None]
+        self,
+        name: str,
+        target: str,
+        max_size_mb: int,
+        validate: Callable[[str, Path, list[str]], None],
     ) -> None:
         self.name = name
         self.target = target
+        self.max_size_mb = max_size_mb
         self.validate = validate
 
     def __lt__(self, other):
@@ -151,17 +204,70 @@ class Package:
             return False
         response.raise_for_status()
 
+    @memoized_property
+    def _json_package_data(self) -> dict[str, Any]:
+        return cast(dict, requests.get(f"https://pypi.org/pypi/{self.name}/json").json())
+
     def latest_published_version(self) -> str:
-        json_data = requests.get(f"https://pypi.org/pypi/{self.name}/json").json()
-        return cast(str, json_data["info"]["version"])
+        return cast(str, self._json_package_data["info"]["version"])
 
-    def owners(self) -> set[str]:
-        def can_publish(role: str) -> bool:
-            return role in {"Owner", "Maintainer"}
+    def stale_versions(self) -> Sequence[PackageVersion]:
+        def pv(version: str, artifacts: list[dict[str, Any]]) -> PackageVersion | None:
+            upload_dates = [
+                date.fromisoformat(artifact["upload_time_iso_8601"].split("T")[0])
+                for artifact in artifacts
+                if "T" in artifact["upload_time_iso_8601"]
+            ]
+            size_bytes = sum(int(artifact["size"]) for artifact in artifacts)
+            size_mb = ceil(size_bytes / 1000000)
+            if not upload_dates:
+                return None
+            return PackageVersion(self.name, Version(version), size_mb, max(upload_dates))
 
-        client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
-        roles = client.package_roles(self.name)
-        return {row[1] for row in roles if can_publish(row[0])}  # type: ignore[union-attr,index]
+        maybe_versions = [
+            pv(version, artifacts)
+            for version, artifacts in self._json_package_data["releases"].items()
+            if artifacts
+        ]
+        all_versions_by_freshness_ascending = sorted(
+            (pv for pv in maybe_versions if pv), key=lambda pv: pv.freshness_key
+        )
+
+        # The stalest artifacts which do fit into our threshold will be considered to be stale.
+        # We leave a little more than the max size of an artifact as buffer space in case a new
+        # release is particularly large.
+        max_artifacts_size_mb = max(pv.size_mb for pv in all_versions_by_freshness_ascending)
+        available_mb = self.max_size_mb - (max_artifacts_size_mb * 1.1)
+
+        # Exclude all artifacts which are younger than a threshold, both as a safety measure, and
+        # to account for the fact that although we would generally want to delete a dev release
+        # before a stable release (etc), that breaks down for very recent releases.
+        versions_by_freshness_ascending = []
+        for version in all_versions_by_freshness_ascending:
+            if version.most_recent_upload_date + MINIMUM_STALE_AGE < date.today():
+                # Eligible to be removed.
+                versions_by_freshness_ascending.append(version)
+                continue
+            # Not eligible: must be kept.
+            available_mb -= version.size_mb
+
+        # If we have no versions that we can prune, and are already beyond the threshold, it's
+        # very likely that a release will fail.
+        if not versions_by_freshness_ascending and available_mb < 0:
+            print(
+                f"There are no stale artifacts to prune (older than {MINIMUM_STALE_AGE}) and "
+                "we are over capacity: the release is very likely to fail. See "
+                "[https://github.com/pantsbuild/pants/issues/11614].",
+                file=sys.stderr,
+            )
+
+        # Pop versions from the end of the list (the "freshest") while we have remaining space.
+        while versions_by_freshness_ascending:
+            if versions_by_freshness_ascending[-1].size_mb > available_mb:
+                break
+            available_mb -= versions_by_freshness_ascending.pop().size_mb
+
+        return versions_by_freshness_ascending
 
 
 def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
@@ -243,12 +349,23 @@ def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str
     )
 
 
+# Artifacts created within this time range will never be considered to be stale.
+MINIMUM_STALE_AGE = timedelta(days=180)
+
+
 # NB: This a native wheel. We expect a distinct wheel for each Python version and each
 # platform (macOS_x86 x macos_arm x linux).
-PANTS_PKG = Package("pantsbuild.pants", "src/python/pants:pants-packaged", validate_pants_pkg)
+PANTS_PKG = Package(
+    "pantsbuild.pants",
+    "src/python/pants:pants-packaged",
+    # TODO: See https://github.com/pypa/pypi-support/issues/1376.
+    20000,
+    validate_pants_pkg,
+)
 TESTUTIL_PKG = Package(
     "pantsbuild.pants.testutil",
     "src/python/pants/testutil:testutil_wheel",
+    20000,
     validate_testutil_pkg,
 )
 PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
@@ -625,6 +742,7 @@ def publish() -> None:
     banner("Releasing to PyPI and GitHub")
     # Check prereqs.
     check_clean_git_branch()
+    prompt_artifact_freshness()
     check_pgp()
     check_roles()
 
@@ -792,6 +910,24 @@ def upload_wheels_via_twine() -> None:
     )
 
 
+def prompt_artifact_freshness() -> None:
+    stale_versions = [
+        stale_version for package in PACKAGES for stale_version in package.stale_versions()
+    ]
+    if stale_versions:
+        print("\n".join(f"Stale:\n  {sv}" for sv in stale_versions))
+        input(
+            "\nTo ensure that there is adequate storage for new artifacts, the stale release "
+            "artifacts listed above should be deleted via [https://pypi.org/]'s UI.\n"
+            "If you have any concerns about the listed artifacts, or do not have access to "
+            "delete them yourself, please raise an issue in #development Slack or on "
+            "[https://github.com/pantsbuild/pants/issues/11614].\n"
+            "Press enter when you have deleted the listed artifacts: "
+        )
+    else:
+        print("No stale artifacts detected.")
+
+
 def prompt_apple_silicon() -> None:
     input(
         f"We need to release for Apple Silicon. Please message Eric on Slack asking to release "
@@ -947,6 +1083,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-roles")
+    subparsers.add_parser("validate-freshness")
     subparsers.add_parser("list-prebuilt-wheels")
     subparsers.add_parser("check-pants-wheels")
     return parser
@@ -970,6 +1107,8 @@ def main() -> None:
         build_pex(fetch=True)
     if args.command == "validate-roles":
         PackageAccessValidator.validate_all()
+    if args.command == "validate-freshness":
+        prompt_artifact_freshness()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
     if args.command == "check-pants-wheels":
