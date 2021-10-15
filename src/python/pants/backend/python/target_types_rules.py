@@ -49,6 +49,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    OverridesField,
     SourcesPaths,
     SourcesPathsRequest,
     Targets,
@@ -56,6 +57,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -77,18 +79,32 @@ class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
 @rule
 async def generate_targets_from_python_tests(
     request: GenerateTargetsFromPythonTests,
+    files_not_found_behavior: FilesNotFoundBehavior,
     python_infer: PythonInferSubsystem,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         PythonTestTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
+        overrides=all_overrides,
     )
 
 
@@ -100,17 +116,31 @@ class GenerateTargetsFromPythonSources(GenerateTargetsRequest):
 async def generate_targets_from_python_sources(
     request: GenerateTargetsFromPythonSources,
     python_infer: PythonInferSubsystem,
+    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[PythonSourcesGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         PythonSourceTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not python_infer.imports,
+        overrides=all_overrides,
     )
 
 
