@@ -12,6 +12,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.goals.setup_py import (
     AmbiguousOwnerError,
     DependencyOwner,
+    DistBuildChroot,
     ExportedTarget,
     ExportedTargetRequirements,
     FinalizedSetupKwargs,
@@ -24,7 +25,6 @@ from pants.backend.python.goals.setup_py import (
     OwnedDependency,
     SetupKwargs,
     SetupKwargsRequest,
-    SetupPyChroot,
     SetupPyChrootRequest,
     SetupPyGeneration,
     SetupPySources,
@@ -109,7 +109,7 @@ def chroot_rule_runner() -> RuleRunner:
             setup_kwargs_plugin,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
-            QueryRule(SetupPyChroot, (SetupPyChrootRequest,)),
+            QueryRule(DistBuildChroot, (SetupPyChrootRequest,)),
             QueryRule(SetupPySources, (SetupPyChrootRequest,)),
             QueryRule(FinalizedSetupKwargs, (GenerateSetupPyRequest,)),
         ]
@@ -124,7 +124,7 @@ def assert_chroot(
 ) -> None:
     tgt = rule_runner.get_target(addr)
     req = SetupPyChrootRequest(ExportedTarget(tgt), py2=False)
-    chroot = rule_runner.request(SetupPyChroot, [req])
+    chroot = rule_runner.request(DistBuildChroot, [req])
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
 
@@ -140,7 +140,7 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Ex
     tgt = rule_runner.get_target(addr)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
-            SetupPyChroot,
+            DistBuildChroot,
             [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
         )
     ex = excinfo.value
@@ -551,37 +551,6 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
 
 
 def test_get_sources() -> None:
-    rule_runner = create_setup_py_rule_runner(
-        rules=[
-            get_sources,
-            get_owned_dependencies,
-            get_exporting_owner,
-            *target_types_rules.rules(),
-            *python_sources.rules(),
-            QueryRule(OwnedDependencies, (DependencyOwner,)),
-            QueryRule(SetupPySources, (SetupPyChrootRequest,)),
-        ]
-    )
-
-    rule_runner.add_to_build_file(
-        "src/python/foo/bar/baz",
-        textwrap.dedent(
-            """
-            python_sources(name='baz1', sources=['baz1.py'])
-            python_sources(name='baz2', sources=['baz2.py'])
-            """
-        ),
-    )
-    rule_runner.create_file("src/python/foo/bar/baz/baz1.py")
-    rule_runner.create_file("src/python/foo/bar/baz/baz2.py")
-    rule_runner.create_file("src/python/foo/bar/__init__.py", _namespace_decl)
-    rule_runner.add_to_build_file("src/python/foo/qux", "python_sources()")
-    rule_runner.create_file("src/python/foo/qux/__init__.py")
-    rule_runner.create_file("src/python/foo/qux/qux.py")
-    rule_runner.add_to_build_file("src/python/foo/resources", 'resource(source="js/code.js")')
-    rule_runner.create_file("src/python/foo/resources/js/code.js")
-    rule_runner.create_file("src/python/foo/__init__.py")
-
     def assert_sources(
         expected_files,
         expected_packages,
@@ -589,6 +558,37 @@ def test_get_sources() -> None:
         expected_package_data,
         addrs,
     ):
+        rule_runner = create_setup_py_rule_runner(
+            rules=[
+                get_sources,
+                get_owned_dependencies,
+                get_exporting_owner,
+                *target_types_rules.rules(),
+                *python_sources.rules(),
+                QueryRule(OwnedDependencies, (DependencyOwner,)),
+                QueryRule(SetupPySources, (SetupPyChrootRequest,)),
+            ]
+        )
+
+        rule_runner.add_to_build_file(
+            "src/python/foo/bar/baz",
+            textwrap.dedent(
+                """
+                python_sources(name='baz1', sources=['baz1.py'])
+                python_sources(name='baz2', sources=['baz2.py'])
+                """
+            ),
+        )
+        rule_runner.create_file("src/python/foo/bar/baz/baz1.py")
+        rule_runner.create_file("src/python/foo/bar/baz/baz2.py")
+        rule_runner.create_file("src/python/foo/bar/__init__.py", _namespace_decl)
+        rule_runner.add_to_build_file("src/python/foo/qux", "python_sources()")
+        rule_runner.create_file("src/python/foo/qux/__init__.py")
+        rule_runner.create_file("src/python/foo/qux/qux.py")
+        rule_runner.add_to_build_file("src/python/foo/resources", 'resource(source="js/code.js")')
+        rule_runner.create_file("src/python/foo/resources/js/code.js")
+        rule_runner.create_file("src/python/foo/__init__.py")
+
         # We synthesize an owner for the addrs, so we have something to put in SetupPyChrootRequest.
         rule_runner.create_file(
             "src/python/foo/BUILD",
