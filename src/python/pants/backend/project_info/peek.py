@@ -8,9 +8,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
-from typing import Iterable, cast
-
-from pkg_resources import Requirement
+from typing import Any, Iterable, cast
 
 from pants.engine.addresses import Address, BuildFileAddress
 from pants.engine.collection import Collection
@@ -111,12 +109,21 @@ class TargetDatas(Collection[TargetData]):
     pass
 
 
-def _render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
+def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
     nothing = object()
+
+    def normalize_value(val: Any) -> Any:
+        if isinstance(val, collections.abc.Mapping) and not all(
+            isinstance(k, str) for k in val.keys()
+        ):
+            return {str(k): normalize_value(v) for k, v in val.items()}
+        return val
 
     def to_json(td: TargetData) -> dict:
         fields = {
-            (f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias): v.value
+            (
+                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
+            ): normalize_value(v.value)
             for k, v in td.target.field_values.items()
             if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
         }
@@ -137,8 +144,6 @@ def _render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> s
 
 class _PeekJsonEncoder(json.JSONEncoder):
     """Allow us to serialize some commmonly found types in BUILD files."""
-
-    safe_to_str_types = (Requirement,)
 
     def default(self, o):
         """Return a serializable object for o."""
@@ -220,7 +225,7 @@ async def peek(
         return Peek(exit_code=0)
 
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
-    output = _render_json(tds, subsys.exclude_defaults)
+    output = render_json(tds, subsys.exclude_defaults)
     with subsys.output(console) as write_stdout:
         write_stdout(output)
     return Peek(exit_code=0)

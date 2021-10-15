@@ -11,7 +11,13 @@ from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
+from pants.engine.target import OverridesField
 from pants.testutil.rule_runner import RuleRunner
+
+
+# TODO: Remove this if/when we add an overrides field to `files`.
+class FilesGeneratorTargetWithOverrides(FilesGeneratorTarget):
+    core_fields = (*FilesGeneratorTarget.core_fields, OverridesField)
 
 
 @pytest.mark.parametrize(
@@ -26,8 +32,14 @@ from pants.testutil.rule_runner import RuleRunner
         pytest.param(
             [
                 TargetData(
-                    FilesGeneratorTarget(
-                        {"sources": ["*.txt"]}, Address("example", target_name="files_target")
+                    FilesGeneratorTargetWithOverrides(
+                        {
+                            "sources": ["*.txt"],
+                            # Regression test that we can handle a dict with `tuple[str, ...]` as
+                            # key.
+                            "overrides": {("foo.txt",): {"tags": ["overridden"]}},
+                        },
+                        Address("example", target_name="files_target"),
                     ),
                     ("foo.txt", "bar.txt"),
                     tuple(),
@@ -41,6 +53,13 @@ from pants.testutil.rule_runner import RuleRunner
                     "address": "example:files_target",
                     "target_type": "files",
                     "dependencies": [],
+                    "overrides": {
+                      "('foo.txt',)": {
+                        "tags": [
+                          "overridden"
+                        ]
+                      }
+                    },
                     "sources": [
                       "foo.txt",
                       "bar.txt"
@@ -143,7 +162,7 @@ from pants.testutil.rule_runner import RuleRunner
     ],
 )
 def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
-    actual_output = peek._render_json(expanded_target_infos, exclude_defaults)
+    actual_output = peek.render_json(expanded_target_infos, exclude_defaults)
     assert actual_output == expected_output
 
 
