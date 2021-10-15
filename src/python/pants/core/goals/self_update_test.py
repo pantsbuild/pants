@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.core.goals.mend import (
+from pants.core.goals.self_update import (
     RenameDeprecatedTargetsRequest,
     RenamedTargetTypes,
     maybe_rename_deprecated_targets,

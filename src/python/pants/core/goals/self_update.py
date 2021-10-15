@@ -54,25 +54,32 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
 
-class MendSubsystem(GoalSubsystem):
-    name = "mend"
-    help = "Automate fixing Pants deprecations."
+class SelfUpdateSubsystem(GoalSubsystem):
+    name = "self-update"
+    help = (
+        "Automate fixing Pants deprecations.\n\n"
+        "This will not (yet) handle the full upgrade. You must still manually change "
+        "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
+        f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
+        "This goal is normally run without arguments. Alternatively, you can specify directory "
+        "paths for Pants to only update BUILD files there and in subdirectories."
+    )
 
     required_union_implementations = (RewrittenBuildFileRequest,)
 
 
-class MendGoal(Goal):
-    subsystem_cls = MendSubsystem
+class SelfUpdateGoal(Goal):
+    subsystem_cls = SelfUpdateSubsystem
 
 
 @goal_rule(desc="Automate fixing Pants deprecations", level=LogLevel.DEBUG)
-async def run_mend(
+async def run_self_update(
     build_file_options: BuildFileOptions,
     console: Console,
     workspace: Workspace,
     specs: Specs,
     union_membership: UnionMembership,
-) -> MendGoal:
+) -> SelfUpdateGoal:
     all_build_files = await Get(
         DigestContents,
         PathGlobs(
@@ -116,10 +123,11 @@ async def run_mend(
     }
     if not changed_build_files:
         console.print_stdout(
-            "No required changes to BUILD files found. Note that there may still be deprecations "
-            f"this goal doesn't know how to fix. See {doc_url('upgrade-tips')} for upgrade tips."
+            "No required changes to BUILD files found.\n\n"
+            "Note that there may still be deprecations this goal doesn't know how to fix. See "
+            f"{doc_url('upgrade-tips')} for upgrade tips."
         )
-        return MendGoal(exit_code=0)
+        return SelfUpdateGoal(exit_code=0)
 
     result = await Get(
         Digest,
@@ -138,7 +146,7 @@ async def run_mend(
         )
         console.print_stdout(f"Updated {console.blue(build_file)}:\n{formatted_changes}")
 
-    return MendGoal(exit_code=0)
+    return SelfUpdateGoal(exit_code=0)
 
 
 # ------------------------------------------------------------------------------------------

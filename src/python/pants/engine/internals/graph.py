@@ -133,8 +133,8 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
         removal_version=tgt_type.deprecated_alias_removal_version,
         entity=f"the target name {tgt_type.deprecated_alias}",
         hint=(
-            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `./pants mend` to "
-            "automatically fix your BUILD files."
+            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `./pants self-update` "
+            "to automatically fix your BUILD files."
         ),
     )
     return _WarnDeprecatedTarget()
