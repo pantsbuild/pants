@@ -26,6 +26,7 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
   Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
+use fs::RelativePath;
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -537,6 +538,88 @@ async fn make_execute_request_with_timeout() {
         )
         .unwrap(),
         144,
+      ))
+        .into(),
+    ),
+    ..Default::default()
+  };
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
+async fn make_execute_request_using_reusable_input_digests() {
+  let input_directory = TestDirectory::containing_roland();
+  let req = Process {
+    argv: owned_string_vec(&["/bin/echo", "yo"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: None,
+    input_files: EMPTY_DIGEST,
+    // Intentionally poorly sorted:
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
+    timeout: None,
+    description: "some description".to_owned(),
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    platform_constraint: None,
+    use_nailgun: EMPTY_DIGEST,
+    execution_slot_variable: None,
+    cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: {
+      let mut map = BTreeMap::new();
+      map.insert(RelativePath::new("cats").unwrap(), input_directory.digest());
+      map
+    },
+  };
+
+  let want_command = remexec::Command {
+    arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "none".to_owned(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: "SOME".to_owned(),
+        value: "value".to_owned(),
+      },
+    ],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
+    output_directories: vec!["directory/name".to_owned()],
+    platform: Some(remexec::Platform::default()),
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "c426b29478ec1ddbd872fbfad63ae9151eb9196edcd1a10aa0aab3aa1b48eef8",
+        )
+        .unwrap(),
+        123,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some((&input_directory.digest()).into()),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "08ff4ee93b1f4ecabc2d1c4db2f39fe3d1e5946134bb3c4fd28ebde3adfe5f90",
+        )
+        .unwrap(),
+        140,
       ))
         .into(),
     ),
