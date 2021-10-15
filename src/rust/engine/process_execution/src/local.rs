@@ -32,6 +32,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
 
+use crate::reusable_caches::merge_reusable_input_digests;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
   ProcessResultMetadata, ProcessResultSource,
@@ -643,6 +644,7 @@ pub async fn prepare_workdir(
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
   let input_files = req.input_files;
+  let reusable_input_digests = req.reusable_input_digests.clone();
   in_workunit!(
     context.workunit_store.clone(),
     "setup_sandbox".to_owned(),
@@ -651,8 +653,16 @@ pub async fn prepare_workdir(
       ..WorkunitMetadata::default()
     },
     |_workunit| async move {
+      // Merge reusable input digests into `input_files`.
+      // TODO: Symlink or bind mount reusable inputs into the input root from a persistent
+      //   cache (which would occur after materializing the input files).
+      let merged_input_digest =
+        merge_reusable_input_digests(&store2, input_files, reusable_input_digests)
+          .map_err(|err| format!("Unable to merge digest: {:?}", err))
+          .boxed()
+          .await?;
       store2
-        .materialize_directory(workdir_path_2, input_files)
+        .materialize_directory(workdir_path_2, merged_input_digest)
         .await
     },
   )

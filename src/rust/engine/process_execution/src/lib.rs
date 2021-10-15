@@ -61,6 +61,7 @@ mod remote_cache_tests;
 pub mod nailgun;
 
 pub mod named_caches;
+pub mod reusable_caches;
 
 extern crate uname;
 

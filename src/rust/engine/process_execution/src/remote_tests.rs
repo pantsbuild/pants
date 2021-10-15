@@ -89,6 +89,7 @@ async fn make_execute_request() {
     use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -166,6 +167,7 @@ async fn make_execute_request_with_instance_name() {
     use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -256,6 +258,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let mut want_command = remexec::Command {
@@ -493,6 +496,7 @@ async fn make_execute_request_with_timeout() {
     use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
+    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
