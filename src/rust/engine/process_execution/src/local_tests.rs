@@ -578,6 +578,67 @@ async fn working_directory() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
+#[tokio::test]
+async fn reusable_input_digests() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
+  // then run from the ./cats directory.
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_dir = TempDir::new().unwrap();
+
+  let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
+  process.working_directory = Some(RelativePath::new("cats").unwrap());
+  process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
+  process.input_files = EMPTY_DIGEST;
+  process.timeout = one_second();
+  process.description = "confused-cat".to_string();
+  process.reusable_input_digests = {
+    let mut map = BTreeMap::new();
+    map.insert(
+      RelativePath::new("cats").unwrap(),
+      TestDirectory::containing_roland().digest(),
+    );
+    map
+  };
+
+  let result = run_command_locally_in_dir(
+    process,
+    work_dir.path().to_owned(),
+    true,
+    &mut workunit,
+    Some(store),
+    Some(executor),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::containing_roland().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
 async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
