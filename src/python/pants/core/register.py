@@ -6,7 +6,18 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core.goals import check, fmt, lint, self_update, package, publish, repl, run, tailor, test
+from pants.core.goals import (
+    check,
+    fmt,
+    lint,
+    package,
+    publish,
+    repl,
+    run,
+    self_update,
+    tailor,
+    test,
+)
 from pants.core.target_types import (
     ArchiveTarget,
     FilesGeneratorTarget,

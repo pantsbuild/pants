@@ -181,6 +181,7 @@ def maybe_rename_deprecated_targets(
     renamed_target_types: RenamedTargetTypes,
 ) -> RewrittenBuildFile:
     tokens = request.tokenize()
+    applied_renames: set[tuple[str, str]] = set()
 
     def should_be_renamed(token: tokenize.TokenInfo) -> bool:
         no_indentation = token.start[1] == 0
@@ -203,14 +204,14 @@ def maybe_rename_deprecated_targets(
         line = request.lines[line_index]
         suffix = line[token.end[1] :]
         new_symbol = renamed_target_types[token.string]
+        applied_renames.add((token.string, new_symbol))
         updated_text_lines[line_index] = f"{new_symbol}{suffix}"
 
-    result_lines = tuple(updated_text_lines)
     return RewrittenBuildFile(
         request.path,
-        result_lines,
-        change_descriptions=(
-            ("Renamed deprecated target type names",) if result_lines != request.lines else ()
+        tuple(updated_text_lines),
+        change_descriptions=tuple(
+            f"Renamed `{deprecated}` to `{new}`" for deprecated, new in sorted(applied_renames)
         ),
     )
 
