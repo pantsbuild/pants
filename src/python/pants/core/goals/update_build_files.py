@@ -9,7 +9,7 @@ import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import DefaultDict
+from typing import DefaultDict, cast
 
 from colors import green as unsafe_green
 from colors import red as unsafe_red
@@ -60,10 +60,10 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
     def red(self, s: str) -> str:
-        return unsafe_red(s) if self.colors_enabled else s
+        return cast(str, unsafe_red(s)) if self.colors_enabled else s
 
     def green(self, s: str) -> str:
-        return unsafe_green(s) if self.colors_enabled else s
+        return cast(str, unsafe_green(s)) if self.colors_enabled else s
 
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):

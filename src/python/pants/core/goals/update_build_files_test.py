@@ -100,7 +100,7 @@ def test_pipe_fixers_correctly(rule_runner: RuleRunner) -> None:
 )
 def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     result = maybe_rename_deprecated_targets(
-        RenameDeprecatedTargetsRequest("BUILD", tuple(lines)),
+        RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
         RenamedTargetTypes({"deprecated_name": "new_name"}),
     )
     assert not result.change_descriptions
@@ -118,7 +118,7 @@ def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
 )
 def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = maybe_rename_deprecated_targets(
-        RenameDeprecatedTargetsRequest("BUILD", tuple(lines)),
+        RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
         RenamedTargetTypes({"deprecated_name": "new_name"}),
     )
     assert result.change_descriptions
