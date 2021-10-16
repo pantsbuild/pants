@@ -56,11 +56,11 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
 
-class SelfUpdateSubsystem(GoalSubsystem):
-    name = "self-update"
+class UpgradeBuildFilesSubsystem(GoalSubsystem):
+    name = "upgrade-build-files"
     help = (
-        "Automate fixing Pants deprecations.\n\n"
-        "This will not (yet) handle the full upgrade. You must still manually change "
+        "Automate fixing Pants deprecations in BUILD files.\n\n"
+        "This does handle the full Pants upgrade. You must still manually change "
         "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
         f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
         "This goal is normally run without arguments. Alternatively, you can specify directory "
@@ -70,18 +70,18 @@ class SelfUpdateSubsystem(GoalSubsystem):
     required_union_implementations = (RewrittenBuildFileRequest,)
 
 
-class SelfUpdateGoal(Goal):
-    subsystem_cls = SelfUpdateSubsystem
+class UpgradeBuildFilesGoal(Goal):
+    subsystem_cls = UpgradeBuildFilesSubsystem
 
 
-@goal_rule(desc="Automate fixing Pants deprecations", level=LogLevel.DEBUG)
-async def run_self_update(
+@goal_rule(desc="Automate fixing Pants deprecations in BUILD files", level=LogLevel.DEBUG)
+async def upgrade_build_files(
     build_file_options: BuildFileOptions,
     console: Console,
     workspace: Workspace,
     specs: Specs,
     union_membership: UnionMembership,
-) -> SelfUpdateGoal:
+) -> UpgradeBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
         PathGlobs(
@@ -118,18 +118,18 @@ async def run_self_update(
                 rewritten_file.change_descriptions
             )
 
-    changed_build_files = {
+    changed_build_files = sorted(
         build_file
         for build_file, change_descriptions in build_file_to_change_descriptions.items()
         if change_descriptions
-    }
+    )
     if not changed_build_files:
         console.print_stdout(
             "No required changes to BUILD files found.\n\n"
             "Note that there may still be deprecations this goal doesn't know how to fix. See "
             f"{doc_url('upgrade-tips')} for upgrade tips."
         )
-        return SelfUpdateGoal(exit_code=0)
+        return UpgradeBuildFilesGoal(exit_code=0)
 
     result = await Get(
         Digest,
@@ -148,7 +148,7 @@ async def run_self_update(
         )
         console.print_stdout(f"Updated {console.blue(build_file)}:\n{formatted_changes}")
 
-    return SelfUpdateGoal(exit_code=0)
+    return UpgradeBuildFilesGoal(exit_code=0)
 
 
 # ------------------------------------------------------------------------------------------
