@@ -14,7 +14,6 @@ from typing import DefaultDict, cast
 from colors import green as unsafe_green
 from colors import red as unsafe_red
 
-from pants.base.specs import Specs
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Workspace
@@ -89,7 +88,6 @@ async def update_build_files(
     build_file_options: BuildFileOptions,
     console: Console,
     workspace: Workspace,
-    specs: Specs,
     union_membership: UnionMembership,
 ) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
