@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os.path
 import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
 from typing import DefaultDict
+
+from colors import green as unsafe_green
+from colors import red as unsafe_red
 
 from pants.base.specs import Specs
 from pants.engine.console import Console
@@ -42,6 +46,7 @@ class RewrittenBuildFile:
 class RewrittenBuildFileRequest(EngineAwareParameter):
     path: str
     lines: tuple[str, ...]
+    colors_enabled: bool = dataclasses.field(compare=False)
 
     def debug_hint(self) -> str:
         return self.path
@@ -53,6 +58,12 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             return list(tokenize.tokenize(_bytes_stream.readline))
         except tokenize.TokenError as e:
             raise ParseError(f"Failed to parse {self.path}: {e}")
+
+    def red(self, s: str) -> str:
+        return unsafe_red(s) if self.colors_enabled else s
+
+    def green(self, s: str) -> str:
+        return unsafe_green(s) if self.colors_enabled else s
 
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
@@ -101,7 +112,7 @@ async def update_build_files(
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,
-                rewrite_request_cls(build_file, lines),
+                rewrite_request_cls(build_file, lines, colors_enabled=console._use_colors),
             )
             for build_file, lines in build_file_to_lines.items()
         )
@@ -206,7 +217,8 @@ def maybe_rename_deprecated_targets(
         request.path,
         tuple(updated_text_lines),
         change_descriptions=tuple(
-            f"Renamed `{deprecated}` to `{new}`" for deprecated, new in sorted(applied_renames)
+            f"Renamed `{request.red(deprecated)}` to `{request.green(new)}`"
+            for deprecated, new in sorted(applied_renames)
         ),
     )
 
