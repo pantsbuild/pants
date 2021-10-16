@@ -1526,7 +1526,7 @@ def test_transitive_excludes_error() -> None:
         registered_target_types=[Valid1, Valid2, Invalid],
         union_membership=UnionMembership({}),
     )
-    assert "Bad value '!!//:bad' in the `dependencies` field for demo." in exc.args[0]
+    assert "Bad value '!!//:bad' in the `dependencies` field for demo:demo" in exc.args[0]
     assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]
 
 

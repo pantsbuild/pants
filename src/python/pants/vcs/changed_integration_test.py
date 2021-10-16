@@ -225,8 +225,8 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
         # A `python_sources` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources/sources.py"],
-            direct=["src/python/sources", "src/python/sources/sources.py"],
-            transitive=["src/python/sources", "src/python/sources/sources.py"],
+            direct=["src/python/sources:sources", "src/python/sources/sources.py"],
+            transitive=["src/python/sources:sources", "src/python/sources/sources.py"],
         ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),
@@ -343,7 +343,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
+            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
@@ -380,7 +380,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, deleted_file))
             pants_run = self.run_pants(["--changed-since=HEAD", "list"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
+            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:sources")
 
 
 ChangedIntegrationTest.generate_tests()
