@@ -8,14 +8,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.goals.upgrade_build_files import (
+from pants.core.goals.update_build_files import (
     RenameDeprecatedTargetsRequest,
     RenamedTargetTypes,
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
-    UpgradeBuildFilesGoal,
+    UpdateBuildFilesGoal,
     maybe_rename_deprecated_targets,
-    upgrade_build_files,
+    update_build_files,
 )
 from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
@@ -52,7 +52,7 @@ def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            upgrade_build_files,
+            update_build_files,
             add_line,
             reverse_lines,
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
@@ -63,7 +63,7 @@ def rule_runner() -> RuleRunner:
 
 def test_pipe_fixers_correctly(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
-    result = rule_runner.run_goal_rule(UpgradeBuildFilesGoal)
+    result = rule_runner.run_goal_rule(UpdateBuildFilesGoal)
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\

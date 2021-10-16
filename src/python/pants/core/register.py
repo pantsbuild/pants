@@ -16,7 +16,7 @@ from pants.core.goals import (
     run,
     tailor,
     test,
-    upgrade_build_files,
+    update_build_files,
 )
 from pants.core.target_types import (
     ArchiveTarget,
@@ -49,7 +49,7 @@ def rules():
         *check.rules(),
         *fmt.rules(),
         *lint.rules(),
-        *upgrade_build_files.rules(),
+        *update_build_files.rules(),
         *package.rules(),
         *publish.rules(),
         *repl.rules(),

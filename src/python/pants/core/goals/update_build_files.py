@@ -56,8 +56,8 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
 
-class UpgradeBuildFilesSubsystem(GoalSubsystem):
-    name = "upgrade-build-files"
+class UpdateBuildFilesSubsystem(GoalSubsystem):
+    name = "update-build-files"
     help = (
         "Automate fixing Pants deprecations in BUILD files.\n\n"
         "This does handle the full Pants upgrade. You must still manually change "
@@ -70,18 +70,18 @@ class UpgradeBuildFilesSubsystem(GoalSubsystem):
     required_union_implementations = (RewrittenBuildFileRequest,)
 
 
-class UpgradeBuildFilesGoal(Goal):
-    subsystem_cls = UpgradeBuildFilesSubsystem
+class UpdateBuildFilesGoal(Goal):
+    subsystem_cls = UpdateBuildFilesSubsystem
 
 
 @goal_rule(desc="Automate fixing Pants deprecations in BUILD files", level=LogLevel.DEBUG)
-async def upgrade_build_files(
+async def update_build_files(
     build_file_options: BuildFileOptions,
     console: Console,
     workspace: Workspace,
     specs: Specs,
     union_membership: UnionMembership,
-) -> UpgradeBuildFilesGoal:
+) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
         PathGlobs(
@@ -129,7 +129,7 @@ async def upgrade_build_files(
             "Note that there may still be deprecations this goal doesn't know how to fix. See "
             f"{doc_url('upgrade-tips')} for upgrade tips."
         )
-        return UpgradeBuildFilesGoal(exit_code=0)
+        return UpdateBuildFilesGoal(exit_code=0)
 
     result = await Get(
         Digest,
@@ -148,7 +148,7 @@ async def upgrade_build_files(
         )
         console.print_stdout(f"Updated {console.blue(build_file)}:\n{formatted_changes}")
 
-    return UpgradeBuildFilesGoal(exit_code=0)
+    return UpdateBuildFilesGoal(exit_code=0)
 
 
 # ------------------------------------------------------------------------------------------
