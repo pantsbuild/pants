@@ -379,6 +379,9 @@ class BinaryPathRequest:
     might be `BinaryPathTest(args=["--version"])` since it will both ensure the program runs and
     also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
     path.
+
+    N.B.: Unlike a traditional $PATH search, a BinaryPathRequest will also consider any entries in
+    the `search_path` that are file paths in addition to traditional directory paths.
     """
 
     search_path: SearchPath
@@ -535,10 +538,17 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
         set -uox pipefail
 
+        # Handle PATH elements that are filenames to allow for precise selection.
+        for path in ${{PATH//:/ }}; do
+            if [[ "$1" == "${{path/*\\/}}" && -f "${{path}}" && -x "${{path}}" ]]; then
+                echo "${{path}}"
+            fi
+        done
+
         if command -v which > /dev/null; then
-            command which -a $1 || true
+            command which -a "$1" || true
         else
-            command -v $1 || true
+            command -v "$1" || true
         fi
         """
     )
