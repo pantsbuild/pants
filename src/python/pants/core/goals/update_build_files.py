@@ -11,7 +11,6 @@ from io import BytesIO
 from typing import DefaultDict
 
 from pants.base.specs import Specs
-from pants.core.goals.tailor import specs_to_dirs
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Workspace
@@ -59,12 +58,12 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
     help = (
-        "Automate fixing Pants deprecations in BUILD files.\n\n"
+        "Automatically fix deprecations in BUILD files.\n\n"
         "This does handle the full Pants upgrade. You must still manually change "
         "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
         f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
-        "This goal is normally run without arguments. Alternatively, you can specify directory "
-        "paths for Pants to only update BUILD files there and in subdirectories."
+        "This goal is (for now) run without arguments, which will run over all BUILD files in your "
+        "project."
     )
 
     required_union_implementations = (RewrittenBuildFileRequest,)
@@ -86,11 +85,7 @@ async def update_build_files(
         DigestContents,
         PathGlobs(
             globs=(
-                *(
-                    os.path.join(dir_path, "**", p)
-                    for dir_path in specs_to_dirs(specs)
-                    for p in build_file_options.patterns
-                ),
+                *(os.path.join("**", p) for p in build_file_options.patterns),
                 *(f"!{p}" for p in build_file_options.ignores),
             )
         ),
