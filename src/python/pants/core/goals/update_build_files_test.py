@@ -14,10 +14,11 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
+    UpdateBuildFilesSubsystem,
     maybe_rename_deprecated_targets,
     update_build_files,
 )
-from pants.engine.rules import rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -37,14 +38,14 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 @rule
 def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
-        request.path, (*request.lines, "added line"), change_descriptions=("Added a new line",)
+        request.path, (*request.lines, "added line"), change_descriptions=("Add a new line",)
     )
 
 
 @rule
 def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
     return RewrittenBuildFile(
-        request.path, tuple(reversed(request.lines)), change_descriptions=("Reversed lines",)
+        request.path, tuple(reversed(request.lines)), change_descriptions=("Reverse lines",)
     )
 
 
@@ -55,28 +56,49 @@ def rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
+            SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
         )
     )
 
 
-def test_pipe_fixers_correctly(rule_runner: RuleRunner) -> None:
+def test_goal_rewrite_mode(rule_runner: RuleRunner) -> None:
+    """Checks that we correctly write the changes and pipe fixers to each other."""
     rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
     result = rule_runner.run_goal_rule(UpdateBuildFilesGoal)
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
         Updated BUILD:
-          - Added a new line
-          - Reversed lines
+          - Add a new line
+          - Reverse lines
         Updated dir/BUILD:
-          - Added a new line
-          - Reversed lines
+          - Add a new line
+          - Reverse lines
         """
     )
     assert Path(rule_runner.build_root, "BUILD").read_text() == "added line\nline\n"
     assert Path(rule_runner.build_root, "dir/BUILD").read_text() == "added line\nline 2\nline 1\n"
+
+
+def test_goal_check_mode(rule_runner: RuleRunner) -> None:
+    """Checks that we correctly set the exit code and pipe fixers to each other."""
+    rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
+    result = rule_runner.run_goal_rule(UpdateBuildFilesGoal, args=["--check"])
+    assert result.exit_code == 1
+    assert result.stdout == dedent(
+        """\
+        Would update BUILD:
+          - Add a new line
+          - Reverse lines
+        Would update dir/BUILD:
+          - Add a new line
+          - Reverse lines
+        """
+    )
+    assert Path(rule_runner.build_root, "BUILD").read_text() == "line\n"
+    assert Path(rule_runner.build_root, "dir/BUILD").read_text() == "line 1\nline 2\n"
 
 
 # ------------------------------------------------------------------------------------------

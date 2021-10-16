@@ -78,6 +78,23 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
     required_union_implementations = (RewrittenBuildFileRequest,)
 
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--check",
+            type=bool,
+            default=False,
+            help=(
+                "Do not write changes to disk, only write back what would change. Return code "
+                "0 means there would be no changes, and 1 means that there would be. "
+            ),
+        )
+
+    @property
+    def check(self) -> bool:
+        return cast(bool, self.options.check)
+
 
 class UpdateBuildFilesGoal(Goal):
     subsystem_cls = UpdateBuildFilesSubsystem
@@ -85,6 +102,7 @@ class UpdateBuildFilesGoal(Goal):
 
 @goal_rule(desc="Automate fixing Pants deprecations in BUILD files", level=LogLevel.DEBUG)
 async def update_build_files(
+    update_build_files_subsystem: UpdateBuildFilesSubsystem,
     build_file_options: BuildFileOptions,
     console: Console,
     workspace: Workspace,
@@ -128,31 +146,33 @@ async def update_build_files(
         if change_descriptions
     )
     if not changed_build_files:
-        console.print_stdout(
+        console.print_stderr(
             "No required changes to BUILD files found.\n\n"
             "Note that there may still be deprecations this goal doesn't know how to fix. See "
             f"{doc_url('upgrade-tips')} for upgrade tips."
         )
         return UpdateBuildFilesGoal(exit_code=0)
 
-    result = await Get(
-        Digest,
-        CreateDigest(
-            FileContent(
-                build_file, ("\n".join(build_file_to_lines[build_file]) + "\n").encode("utf-8")
-            )
-            for build_file in changed_build_files
-        ),
-    )
-    workspace.write_digest(result)
+    if not update_build_files_subsystem.check:
+        result = await Get(
+            Digest,
+            CreateDigest(
+                FileContent(
+                    build_file, ("\n".join(build_file_to_lines[build_file]) + "\n").encode("utf-8")
+                )
+                for build_file in changed_build_files
+            ),
+        )
+        workspace.write_digest(result)
 
     for build_file in changed_build_files:
         formatted_changes = "\n".join(
             f"  - {description}" for description in build_file_to_change_descriptions[build_file]
         )
-        console.print_stdout(f"Updated {console.blue(build_file)}:\n{formatted_changes}")
+        tense = "Would update" if update_build_files_subsystem.check else "Updated"
+        console.print_stdout(f"{tense} {console.blue(build_file)}:\n{formatted_changes}")
 
-    return UpdateBuildFilesGoal(exit_code=0)
+    return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
 
 
 # ------------------------------------------------------------------------------------------
@@ -215,7 +235,7 @@ def maybe_rename_deprecated_targets(
         request.path,
         tuple(updated_text_lines),
         change_descriptions=tuple(
-            f"Renamed `{request.red(deprecated)}` to `{request.green(new)}`"
+            f"Rename `{request.red(deprecated)}` to `{request.green(new)}`"
             for deprecated, new in sorted(applied_renames)
         ),
     )
