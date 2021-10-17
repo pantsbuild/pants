@@ -303,7 +303,7 @@ class RuleRunner:
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
 
         stdout, stderr = StringIO(), StringIO()
-        console = Console(stdout=stdout, stderr=stderr)
+        console = Console(stdout=stdout, stderr=stderr, use_colors=False)
 
         exit_code = self.scheduler.run_goal_rule(
             goal,
