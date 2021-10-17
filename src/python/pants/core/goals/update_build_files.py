@@ -9,19 +9,33 @@ import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import DefaultDict, cast
+from typing import ClassVar, DefaultDict, cast
 
 from colors import green, red
 
+from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -46,8 +60,14 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
     lines: tuple[str, ...]
     colors_enabled: bool = dataclasses.field(compare=False)
 
+    deprecation_fixer: ClassVar[bool] = False
+
     def debug_hint(self) -> str:
         return self.path
+
+    def to_file_content(self) -> FileContent:
+        lines = "\n".join(self.lines) + "\n"
+        return FileContent(self.path, lines.encode("utf-8"))
 
     @memoized
     def tokenize(self) -> list[tokenize.TokenInfo]:
@@ -67,7 +87,7 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
     help = (
-        "Automatically fix deprecations in BUILD files.\n\n"
+        "Autoformat and fix safe deprecations in BUILD files.\n\n"
         "This does not handle the full Pants upgrade. You must still manually change "
         "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
         f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
@@ -89,17 +109,40 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
                 "0 means there would be no changes, and 1 means that there would be. "
             ),
         )
+        register(
+            "--autoformat",
+            type=bool,
+            default=True,
+            help=("Format BUILD files using Black.\n\n" "Set TODO"),
+        )
+        register(
+            "--fix-safe-deprecations",
+            type=bool,
+            default=True,
+            help=(
+                "Automatically fix deprecations that are safe because they do not change "
+                "semantics, such as renaming target types."
+            ),
+        )
 
     @property
     def check(self) -> bool:
         return cast(bool, self.options.check)
+
+    @property
+    def autoformat(self) -> bool:
+        return cast(bool, self.options.autoformat)
+
+    @property
+    def fix_safe_deprecations(self) -> bool:
+        return cast(bool, self.options.fix_safe_deprecations)
 
 
 class UpdateBuildFilesGoal(Goal):
     subsystem_cls = UpdateBuildFilesSubsystem
 
 
-@goal_rule(desc="Automate fixing Pants deprecations in BUILD files", level=LogLevel.DEBUG)
+@goal_rule(desc="Run update-build-files goal", level=LogLevel.DEBUG)
 async def update_build_files(
     update_build_files_subsystem: UpdateBuildFilesSubsystem,
     build_file_options: BuildFileOptions,
@@ -117,12 +160,22 @@ async def update_build_files(
         ),
     )
 
+    rewrite_request_classes = []
+    for request in union_membership[RewrittenBuildFileRequest]:
+        if issubclass(request, AutoformatWithBlackRequest):
+            if update_build_files_subsystem.autoformat:
+                rewrite_request_classes.append(request)
+            else:
+                continue
+        if update_build_files_subsystem.fix_safe_deprecations or not request.deprecation_fixer:
+            rewrite_request_classes.append(request)
+
     build_file_to_lines = {
         build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
         for build_file in all_build_files
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
-    for rewrite_request_cls in union_membership[RewrittenBuildFileRequest]:
+    for rewrite_request_cls in rewrite_request_classes:
         all_rewritten_files = await MultiGet(
             Get(
                 RewrittenBuildFile,
@@ -175,12 +228,76 @@ async def update_build_files(
 
 
 # ------------------------------------------------------------------------------------------
+# Black formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+class AutoformatWithBlackRequest(RewrittenBuildFileRequest):
+    pass
+
+
+@rule
+async def autoformat_build_file_with_black(
+    request: AutoformatWithBlackRequest, black: Black
+) -> RewrittenBuildFile:
+    black_pex_get = Get(
+        VenvPex,
+        PexRequest(
+            output_filename="black.pex",
+            internal_only=True,
+            requirements=black.pex_requirements(),
+            interpreter_constraints=black.interpreter_constraints,
+            main=black.main,
+        ),
+    )
+    build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))
+    )
+    black_pex, build_file_digest, config_files = await MultiGet(
+        black_pex_get, build_file_digest_get, config_files_get
+    )
+
+    input_digest = await Get(
+        Digest, MergeDigests((build_file_digest, config_files.snapshot.digest))
+    )
+
+    argv = []
+    if black.config:
+        argv.extend(["--config", black.config])
+    argv.extend(black.args)
+    argv.append(request.path)
+
+    black_result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            black_pex,
+            argv=argv,
+            input_digest=input_digest,
+            output_files=(request.path,),
+            description=f"Run Black on {request.path}.",
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    if black_result.output_digest == build_file_digest:
+        return RewrittenBuildFile(request.path, request.lines, change_descriptions=())
+
+    result_contents = await Get(DigestContents, Digest, black_result.output_digest)
+    assert len(result_contents) == 1
+    result_lines = tuple(result_contents[0].content.decode("utf-8").splitlines())
+    return RewrittenBuildFile(
+        request.path, result_lines, change_descriptions=("Format with Black",)
+    )
+
+
+# ------------------------------------------------------------------------------------------
 # Rename deprecated target types fixer
 # ------------------------------------------------------------------------------------------
 
 
 class RenameDeprecatedTargetsRequest(RewrittenBuildFileRequest):
-    pass
+    deprecation_fixer = True
 
 
 class RenamedTargetTypes(FrozenDict[str, str]):
@@ -241,4 +358,11 @@ def maybe_rename_deprecated_targets(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest))
+    return (
+        *collect_rules(),
+        *pex.rules(),
+        UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
+        # NB: We want this to come at the end so that running Black happens after all our
+        # deprecation fixers.
+        UnionRule(RewrittenBuildFileRequest, AutoformatWithBlackRequest),
+    )
