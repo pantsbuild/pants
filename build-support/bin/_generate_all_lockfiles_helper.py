@@ -10,9 +10,6 @@ should be.
 
 import logging
 import subprocess
-import tempfile
-
-import toml
 
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
@@ -57,124 +54,112 @@ def main() -> None:
     )
 
     logger.info("Now, generating default tool lockfiles for users")
-
-    # We activate subsystems in an ad-hoc way below and this can potentially cause clashes with
-    # cmd.alias registrations; so we setup a pants config identical to the checked-in one with just
-    # any aliases removed. This is safe since we use no aliases in the command below.
-    with open("pants.toml") as fp:
-        config = toml.load(fp)
-    config.get("cli", {"alias": {}}).pop("alias")
-    with tempfile.NamedTemporaryFile(mode="w", prefix="pants.", suffix=".toml") as config_fp:
-        toml.dump(config, config_fp)
-        config_fp.flush()
-
-        # Now, generate default tool lockfiles. We must be careful that our own internal settings
-        # (e.g. custom extra requirements) do not mess up the defaults.
-        subprocess.run(
-            [
-                "./pants",
-                "--concurrent",
-                f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
-                f"--pants-config-files=['{config_fp.name}']",
-                # Autoflake.
-                f"--autoflake-version={Autoflake.default_version}",
-                f"--autoflake-extra-requirements={repr(Autoflake.default_extra_requirements)}",
-                f"--autoflake-interpreter-constraints={repr(Autoflake.default_interpreter_constraints)}",
-                f"--autoflake-lockfile={Autoflake.default_lockfile_path}",
-                # Bandit.
-                "--backend-packages=+['pants.backend.python.lint.bandit']",
-                f"--bandit-version={Bandit.default_version}",
-                f"--bandit-extra-requirements={repr(Bandit.default_extra_requirements)}",
-                f"--bandit-lockfile={Bandit.default_lockfile_path}",
-                # Black.
-                f"--black-version={Black.default_version}",
-                f"--black-extra-requirements={repr(Black.default_extra_requirements)}",
-                f"--black-interpreter-constraints={repr(Black.default_interpreter_constraints)}",
-                f"--black-lockfile={Black.default_lockfile_path}",
-                # Docformatter.
-                f"--docformatter-version={Docformatter.default_version}",
-                f"--docformatter-extra-requirements={repr(Docformatter.default_extra_requirements)}",
-                f"--docformatter-interpreter-constraints={repr(Docformatter.default_interpreter_constraints)}",
-                f"--docformatter-lockfile={Docformatter.default_lockfile_path}",
-                # Flake8.
-                f"--flake8-version={Flake8.default_version}",
-                f"--flake8-extra-requirements={repr(Flake8.default_extra_requirements)}",
-                f"--flake8-lockfile={Flake8.default_lockfile_path}",
-                # Isort.
-                f"--isort-version={Isort.default_version}",
-                f"--isort-extra-requirements={repr(Isort.default_extra_requirements)}",
-                f"--isort-interpreter-constraints={repr(Isort.default_interpreter_constraints)}",
-                f"--isort-lockfile={Isort.default_lockfile_path}",
-                # Pylint.
-                "--backend-packages=+['pants.backend.python.lint.pylint']",
-                f"--pylint-version={Pylint.default_version}",
-                f"--pylint-extra-requirements={repr(Pylint.default_extra_requirements)}",
-                "--pylint-source-plugins=[]",
-                f"--pylint-lockfile={Pylint.default_lockfile_path}",
-                # Yapf.
-                "--backend-packages=+['pants.backend.python.lint.yapf']",
-                f"--yapf-version={Yapf.default_version}",
-                f"--yapf-extra-requirements={repr(Yapf.default_extra_requirements)}",
-                f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
-                f"--yapf-lockfile={Yapf.default_lockfile_path}",
-                # PyUpgrade.
-                "--backend-packages=+['pants.backend.python.lint.pyupgrade']",
-                f"--pyupgrade-version={PyUpgrade.default_version}",
-                f"--pyupgrade-extra-requirements={repr(PyUpgrade.default_extra_requirements)}",
-                f"--pyupgrade-interpreter-constraints={repr(PyUpgrade.default_interpreter_constraints)}",
-                f"--pyupgrade-lockfile={PyUpgrade.default_lockfile_path}",
-                # IPython.
-                f"--ipython-version={IPython.default_version}",
-                f"--ipython-extra-requirements={repr(IPython.default_extra_requirements)}",
-                f"--ipython-lockfile={IPython.default_lockfile_path}",
-                # Setuptools.
-                f"--setuptools-version={Setuptools.default_version}",
-                f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
-                f"--setuptools-lockfile={Setuptools.default_lockfile_path}",
-                # MyPy.
-                f"--mypy-version={MyPy.default_version}",
-                f"--mypy-extra-requirements={repr(MyPy.default_extra_requirements)}",
-                "--mypy-source-plugins=[]",
-                f"--mypy-interpreter-constraints={repr(MyPy.default_interpreter_constraints)}",
-                f"--mypy-lockfile={MyPy.default_lockfile_path}",
-                # MyPy Protobuf.
-                "--backend-packages=+['pants.backend.codegen.protobuf.python']",
-                f"--mypy-protobuf-version={PythonProtobufMypyPlugin.default_version}",
-                f"--mypy-protobuf-extra-requirements={repr(PythonProtobufMypyPlugin.default_extra_requirements)}",
-                f"--mypy-protobuf-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
-                f"--mypy-protobuf-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
-                # Lambdex.
-                "--backend-packages=+['pants.backend.google_cloud_function.python','pants.backend.awslambda.python']",
-                f"--lambdex-version={Lambdex.default_version}",
-                f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
-                f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",
-                f"--lambdex-lockfile={Lambdex.default_lockfile_path}",
-                # Pytest
-                f"--pytest-version={PyTest.default_version}",
-                f"--pytest-extra-requirements={repr(PyTest.default_extra_requirements)}",
-                f"--pytest-lockfile={PyTest.default_lockfile_path}",
-                # Coverage.py
-                f"--coverage-py-version={CoverageSubsystem.default_version}",
-                f"--coverage-py-extra-requirements={repr(CoverageSubsystem.default_extra_requirements)}",
-                f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
-                f"--coverage-py-lockfile={CoverageSubsystem.default_lockfile_path}",
-                # HCL2 for Terraform dependency inference
-                "--backend-packages=+['pants.backend.experimental.terraform']",
-                f"--terraform-hcl2-parser-version={TerraformHcl2Parser.default_version}",
-                f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
-                f"--terraform-hcl2-parser-interpreter-constraints={repr(TerraformHcl2Parser.default_interpreter_constraints)}",
-                f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
-                # Dockerfile parser for Docker dependency inference
-                "--backend-packages=+['pants.backend.experimental.docker']",
-                f"--dockerfile-parser-version={DockerfileParser.default_version}",
-                f"--dockerfile-parser-extra-requirements={repr(DockerfileParser.default_extra_requirements)}",
-                f"--dockerfile-parser-interpreter-constraints={repr(DockerfileParser.default_interpreter_constraints)}",
-                f"--dockerfile-parser-lockfile={DockerfileParser.default_lockfile_path}",
-                # Run the goal.
-                "generate-lockfiles",
-            ],
-            check=True,
-        )
+    # Now, generate default tool lockfiles. We must be careful that our own internal settings
+    # (e.g. custom extra requirements) do not mess up the defaults.
+    subprocess.run(
+        [
+            "./pants",
+            "--concurrent",
+            f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+            # Autoflake.
+            f"--autoflake-version={Autoflake.default_version}",
+            f"--autoflake-extra-requirements={repr(Autoflake.default_extra_requirements)}",
+            f"--autoflake-interpreter-constraints={repr(Autoflake.default_interpreter_constraints)}",
+            f"--autoflake-lockfile={Autoflake.default_lockfile_path}",
+            # Bandit.
+            "--backend-packages=+['pants.backend.python.lint.bandit']",
+            f"--bandit-version={Bandit.default_version}",
+            f"--bandit-extra-requirements={repr(Bandit.default_extra_requirements)}",
+            f"--bandit-lockfile={Bandit.default_lockfile_path}",
+            # Black.
+            f"--black-version={Black.default_version}",
+            f"--black-extra-requirements={repr(Black.default_extra_requirements)}",
+            f"--black-interpreter-constraints={repr(Black.default_interpreter_constraints)}",
+            f"--black-lockfile={Black.default_lockfile_path}",
+            # Docformatter.
+            f"--docformatter-version={Docformatter.default_version}",
+            f"--docformatter-extra-requirements={repr(Docformatter.default_extra_requirements)}",
+            f"--docformatter-interpreter-constraints={repr(Docformatter.default_interpreter_constraints)}",
+            f"--docformatter-lockfile={Docformatter.default_lockfile_path}",
+            # Flake8.
+            f"--flake8-version={Flake8.default_version}",
+            f"--flake8-extra-requirements={repr(Flake8.default_extra_requirements)}",
+            f"--flake8-lockfile={Flake8.default_lockfile_path}",
+            # Isort.
+            f"--isort-version={Isort.default_version}",
+            f"--isort-extra-requirements={repr(Isort.default_extra_requirements)}",
+            f"--isort-interpreter-constraints={repr(Isort.default_interpreter_constraints)}",
+            f"--isort-lockfile={Isort.default_lockfile_path}",
+            # Pylint.
+            "--backend-packages=+['pants.backend.python.lint.pylint']",
+            f"--pylint-version={Pylint.default_version}",
+            f"--pylint-extra-requirements={repr(Pylint.default_extra_requirements)}",
+            "--pylint-source-plugins=[]",
+            f"--pylint-lockfile={Pylint.default_lockfile_path}",
+            # Yapf.
+            "--backend-packages=+['pants.backend.python.lint.yapf']",
+            f"--yapf-version={Yapf.default_version}",
+            f"--yapf-extra-requirements={repr(Yapf.default_extra_requirements)}",
+            f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
+            f"--yapf-lockfile={Yapf.default_lockfile_path}",
+            # PyUpgrade.
+            "--backend-packages=+['pants.backend.python.lint.pyupgrade']",
+            f"--pyupgrade-version={PyUpgrade.default_version}",
+            f"--pyupgrade-extra-requirements={repr(PyUpgrade.default_extra_requirements)}",
+            f"--pyupgrade-interpreter-constraints={repr(PyUpgrade.default_interpreter_constraints)}",
+            f"--pyupgrade-lockfile={PyUpgrade.default_lockfile_path}",
+            # IPython.
+            f"--ipython-version={IPython.default_version}",
+            f"--ipython-extra-requirements={repr(IPython.default_extra_requirements)}",
+            f"--ipython-lockfile={IPython.default_lockfile_path}",
+            # Setuptools.
+            f"--setuptools-version={Setuptools.default_version}",
+            f"--setuptools-extra-requirements={repr(Setuptools.default_extra_requirements)}",
+            f"--setuptools-lockfile={Setuptools.default_lockfile_path}",
+            # MyPy.
+            f"--mypy-version={MyPy.default_version}",
+            f"--mypy-extra-requirements={repr(MyPy.default_extra_requirements)}",
+            "--mypy-source-plugins=[]",
+            f"--mypy-interpreter-constraints={repr(MyPy.default_interpreter_constraints)}",
+            f"--mypy-lockfile={MyPy.default_lockfile_path}",
+            # MyPy Protobuf.
+            "--backend-packages=+['pants.backend.codegen.protobuf.python']",
+            f"--mypy-protobuf-version={PythonProtobufMypyPlugin.default_version}",
+            f"--mypy-protobuf-extra-requirements={repr(PythonProtobufMypyPlugin.default_extra_requirements)}",
+            f"--mypy-protobuf-interpreter-constraints={repr(PythonProtobufMypyPlugin.default_interpreter_constraints)}",
+            f"--mypy-protobuf-lockfile={PythonProtobufMypyPlugin.default_lockfile_path}",
+            # Lambdex.
+            "--backend-packages=+['pants.backend.google_cloud_function.python','pants.backend.awslambda.python']",
+            f"--lambdex-version={Lambdex.default_version}",
+            f"--lambdex-extra-requirements={repr(Lambdex.default_extra_requirements)}",
+            f"--lambdex-interpreter-constraints={repr(Lambdex.default_interpreter_constraints)}",
+            f"--lambdex-lockfile={Lambdex.default_lockfile_path}",
+            # Pytest
+            f"--pytest-version={PyTest.default_version}",
+            f"--pytest-extra-requirements={repr(PyTest.default_extra_requirements)}",
+            f"--pytest-lockfile={PyTest.default_lockfile_path}",
+            # Coverage.py
+            f"--coverage-py-version={CoverageSubsystem.default_version}",
+            f"--coverage-py-extra-requirements={repr(CoverageSubsystem.default_extra_requirements)}",
+            f"--coverage-py-interpreter-constraints={repr(CoverageSubsystem.default_interpreter_constraints)}",
+            f"--coverage-py-lockfile={CoverageSubsystem.default_lockfile_path}",
+            # HCL2 for Terraform dependency inference
+            "--backend-packages=+['pants.backend.experimental.terraform']",
+            f"--terraform-hcl2-parser-version={TerraformHcl2Parser.default_version}",
+            f"--terraform-hcl2-parser-extra-requirements={repr(TerraformHcl2Parser.default_extra_requirements)}",
+            f"--terraform-hcl2-parser-interpreter-constraints={repr(TerraformHcl2Parser.default_interpreter_constraints)}",
+            f"--terraform-hcl2-parser-lockfile={TerraformHcl2Parser.default_lockfile_path}",
+            # Dockerfile parser for Docker dependency inference
+            "--backend-packages=+['pants.backend.experimental.docker']",
+            f"--dockerfile-parser-version={DockerfileParser.default_version}",
+            f"--dockerfile-parser-extra-requirements={repr(DockerfileParser.default_extra_requirements)}",
+            f"--dockerfile-parser-interpreter-constraints={repr(DockerfileParser.default_interpreter_constraints)}",
+            f"--dockerfile-parser-lockfile={DockerfileParser.default_lockfile_path}",
+            # Run the goal.
+            "generate-lockfiles",
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":
