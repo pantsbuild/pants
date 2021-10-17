@@ -529,29 +529,28 @@ async def tailor(
     )
     ptgts = [dspt.putative_target for dspt in fixed_sources_ptgts]
 
-    if not ptgts:
-        return Tailor(exit_code=0)
-
-    edited_build_files = await Get(
-        EditedBuildFiles,
-        EditBuildFilesRequest(
-            PutativeTargets(ptgts),
-            tailor_subsystem.build_file_name,
-            tailor_subsystem.build_file_header,
-            tailor_subsystem.build_file_indent,
-        ),
-    )
-    updated_build_files = set(edited_build_files.updated_paths)
-    workspace.write_digest(edited_build_files.digest)
-    ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
-    for build_file_path, ptgts in ptgts_by_build_file.items():
-        verb = "Updated" if build_file_path in updated_build_files else "Created"
-        console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
-        for ptgt in ptgts:
-            console.print_stdout(
-                f"  - Added {console.green(ptgt.type_alias)} target " f"{console.cyan(ptgt.name)}"
-            )
-    return Tailor(exit_code=0)
+    if ptgts:
+        edited_build_files = await Get(
+            EditedBuildFiles,
+            EditBuildFilesRequest(
+                PutativeTargets(ptgts),
+                tailor_subsystem.build_file_name,
+                tailor_subsystem.build_file_header,
+                tailor_subsystem.build_file_indent,
+            ),
+        )
+        updated_build_files = set(edited_build_files.updated_paths)
+        workspace.write_digest(edited_build_files.digest)
+        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
+        for build_file_path, ptgts in ptgts_by_build_file.items():
+            verb = "Updated" if build_file_path in updated_build_files else "Created"
+            console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
+            for ptgt in ptgts:
+                console.print_stdout(
+                    f"  - Added {console.green(ptgt.type_alias)} target "
+                    f"{console.cyan(ptgt.name)}"
+                )
+    return Tailor(0)
 
 
 def rules():

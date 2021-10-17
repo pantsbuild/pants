@@ -11,8 +11,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import DefaultDict, cast
 
-from colors import green as unsafe_green
-from colors import red as unsafe_red
+from colors import green, red
 
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -59,20 +58,20 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
     def red(self, s: str) -> str:
-        return cast(str, unsafe_red(s)) if self.colors_enabled else s
+        return cast(str, red(s)) if self.colors_enabled else s
 
     def green(self, s: str) -> str:
-        return cast(str, unsafe_green(s)) if self.colors_enabled else s
+        return cast(str, green(s)) if self.colors_enabled else s
 
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
     help = (
         "Automatically fix deprecations in BUILD files.\n\n"
-        "This does handle the full Pants upgrade. You must still manually change "
+        "This does not handle the full Pants upgrade. You must still manually change "
         "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
         f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
-        "This goal is (for now) run without arguments, which will run over all BUILD files in your "
+        "This goal is run without arguments. It will run over all BUILD files in your "
         "project."
     )
 
