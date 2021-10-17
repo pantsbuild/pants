@@ -34,6 +34,7 @@
 extern crate derivative;
 
 mod context;
+mod downloads;
 mod externs;
 mod interning;
 mod intrinsics;

@@ -36,8 +36,8 @@ pub use log::Level;
 
 use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use hashing::{Digest, EMPTY_FINGERPRINT};
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use workunit_store::{in_workunit, RunningWorkunit, WorkunitMetadata, WorkunitStore};

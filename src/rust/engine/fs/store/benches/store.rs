@@ -34,12 +34,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::{
   File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, PosixFS, PreparedPathGlobs,
   StrictGlobMatching,
 };
 use hashing::{Digest, EMPTY_DIGEST};
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 

@@ -1,5 +1,5 @@
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use grpc_util::prost::MessageExt;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 #[derive(Clone)]
 pub struct TestData {

@@ -152,13 +152,18 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "graph_invalidate",
-    py_fn!(py, graph_invalidate(a: PyScheduler, b: Vec<String>)),
+    "graph_invalidate_paths",
+    py_fn!(py, graph_invalidate_paths(a: PyScheduler, b: Vec<String>)),
   )?;
   m.add(
     py,
     "graph_invalidate_all_paths",
     py_fn!(py, graph_invalidate_all_paths(a: PyScheduler)),
+  )?;
+  m.add(
+    py,
+    "graph_invalidate_all",
+    py_fn!(py, graph_invalidate_all(a: PyScheduler)),
   )?;
   m.add(py, "graph_len", py_fn!(py, graph_len(a: PyScheduler)))?;
   m.add(
@@ -1354,16 +1359,27 @@ fn tasks_add_query(
   })
 }
 
-fn graph_invalidate(py: Python, scheduler_ptr: PyScheduler, paths: Vec<String>) -> CPyResult<u64> {
+fn graph_invalidate_paths(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  paths: Vec<String>,
+) -> CPyResult<u64> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let paths = paths.into_iter().map(PathBuf::from).collect();
-    py.allow_threads(|| Ok(scheduler.invalidate(&paths) as u64))
+    py.allow_threads(|| Ok(scheduler.invalidate_paths(&paths) as u64))
   })
 }
 
 fn graph_invalidate_all_paths(py: Python, scheduler_ptr: PyScheduler) -> CPyResult<u64> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     py.allow_threads(|| Ok(scheduler.invalidate_all_paths() as u64))
+  })
+}
+
+fn graph_invalidate_all(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    py.allow_threads(|| scheduler.invalidate_all());
+    Ok(None)
   })
 }
 

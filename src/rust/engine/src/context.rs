@@ -17,7 +17,7 @@ use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
+use cache::PersistentCache;
 use double_checked_cell_async::DoubleCheckedCell;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
@@ -27,9 +27,9 @@ use process_execution::{
   self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
   RemoteCacheWarningsBehavior,
 };
+use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
 use rule_graph::RuleGraph;
-use sharded_lmdb::ShardedLmdb;
 use store::{self, Store};
 use task_executor::Executor;
 use uuid::Uuid;
@@ -61,6 +61,7 @@ pub struct Core {
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
+  pub local_cache: PersistentCache,
   pub vfs: PosixFS,
   pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
@@ -199,9 +200,9 @@ impl Core {
     full_store: &Store,
     remote_store_address: &Option<String>,
     executor: &Executor,
+    local_cache: &PersistentCache,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
-    local_store_options: &LocalStoreOptions,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
@@ -274,17 +275,9 @@ impl Core {
 
     // Possibly use the local cache runner, regardless of remote execution/caching.
     let maybe_local_cached_command_runner = if exec_strategy_opts.local_cache {
-      let process_execution_store = ShardedLmdb::new(
-        local_store_options.store_dir.join("processes"),
-        local_store_options.process_cache_max_size_bytes,
-        executor.clone(),
-        local_store_options.lease_time,
-        local_store_options.shard_count,
-      )
-      .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
         maybe_remote_enabled_command_runner.into(),
-        process_execution_store,
+        local_cache.clone(),
         full_store.clone(),
         process_execution_metadata.clone(),
       ))
@@ -386,6 +379,15 @@ impl Core {
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
+    let local_cache = PersistentCache::new(
+      &local_store_options.store_dir,
+      // TODO: Rename.
+      local_store_options.process_cache_max_size_bytes,
+      executor.clone(),
+      local_store_options.lease_time,
+      local_store_options.shard_count,
+    )?;
+
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_eager_fetch
     {
@@ -408,9 +410,9 @@ impl Core {
       &full_store,
       &remoting_opts.store_address,
       &executor,
+      &local_cache,
       &local_execution_root_dir,
       &named_caches_dir,
-      &local_store_options,
       &process_execution_metadata,
       &root_ca_certs,
       &exec_strategy_opts,
@@ -467,8 +469,7 @@ impl Core {
       store,
       command_runner,
       http_client,
-      // TODO: Errors in initialization should definitely be exposed as python
-      // exceptions, rather than as panics.
+      local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
       build_root,
