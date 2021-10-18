@@ -3,40 +3,25 @@
 
 from __future__ import annotations
 
-from itertools import groupby
-from typing import Iterable, Type, TypeVar
+from typing import Type, TypeVar
 
 from pants.util.ordered_set import FrozenOrderedSet
 
-_T = TypeVar("_T", bound="KeyValueSequenceUtilMixin")
+_T = TypeVar("_T", bound="KeyValueSequenceUtil")
 
 
-class KeyValueSequenceUtilMixin(FrozenOrderedSet[str]):
+class KeyValueSequenceUtil(FrozenOrderedSet[str]):
     @classmethod
-    def from_iterables(cls: Type[_T], *iterables: Iterable[str]) -> _T:
-        """Takes `KEY` or `KEY=VALUE` pairs from iterables.
+    def from_strings(cls: Type[_T], *strings: str) -> _T:
+        """Takes all `KEY`/`KEY=VALUE` strings and dedupes by `KEY`.
 
-        The prio is in ascending order, so the last iterable will win in case a `KEY` exists in more
-        than one iterable.
+        The last seen `KEY` wins in case of duplicates.
         """
 
-        def extract_key(entry: tuple[str, int]) -> str:
-            pair, it_idx = entry
-            return pair.partition("=")[0]
+        key_to_entry: dict[str, str] = {}
+        for entry in strings:
+            # Note that last entry with the same key wins.
+            key_to_entry[entry.partition("=")[0]] = entry
+        deduped_entries = sorted(key_to_entry.values())
 
-        def iterator_order(entry: tuple[str, int]) -> int:
-            pair, it_idx = entry
-            return it_idx
-
-        data = sorted((pair, it_idx) for it_idx, it in enumerate(iterables) for pair in it)
-        return cls(
-            FrozenOrderedSet(
-                sorted(
-                    {
-                        # Take the pair value of the last entry in the group.
-                        sorted(group, key=iterator_order)[-1][0]
-                        for _key, group in groupby(data, extract_key)
-                    }
-                )
-            )
-        )
+        return cls(FrozenOrderedSet(deduped_entries))

@@ -8,12 +8,12 @@ from typing import cast
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerBuildArgsField
-from pants.backend.docker.utils import KeyValueSequenceUtilMixin
+from pants.backend.docker.utils import KeyValueSequenceUtil
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 
 
-class DockerBuildArgs(KeyValueSequenceUtilMixin):
+class DockerBuildArgs(KeyValueSequenceUtil):
     pass
 
 
@@ -26,9 +26,9 @@ class DockerBuildArgsRequest:
 async def docker_build_args(
     request: DockerBuildArgsRequest, docker_options: DockerOptions
 ) -> DockerBuildArgs:
-    return DockerBuildArgs.from_iterables(
-        docker_options.build_args,
-        cast("tuple[str, ...]", request.target.get(DockerBuildArgsField).value),
+    return DockerBuildArgs.from_strings(
+        *docker_options.build_args,
+        *cast("tuple[str, ...]", request.target.get(DockerBuildArgsField).value),
     )
 
 
