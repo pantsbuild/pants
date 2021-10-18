@@ -538,18 +538,19 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 
         set -uox pipefail
 
-        # Handle PATH elements that are filenames to allow for precise selection.
         for path in ${{PATH//:/ }}; do
-            if [[ "$1" == "${{path/*\\/}}" && -f "${{path}}" && -x "${{path}}" ]]; then
-                echo "${{path}}"
+            if [[ -d "${{path}}" ]]; then
+                # Handle traditional directory PATH element.
+                maybe_exe="${{path}}/$1"
+            else
+                # Handle PATH elements that are filenames to allow for precise selection.
+                maybe_exe="${{path}}"
+            fi
+            if [[ "$1" == "${{maybe_exe/*\\/}}" && -f "${{maybe_exe}}" && -x "${{maybe_exe}}" ]]
+            then
+                echo "${{maybe_exe}}"
             fi
         done
-
-        if command -v which > /dev/null; then
-            command which -a "$1" || true
-        else
-            command -v "$1" || true
-        fi
         """
     )
     script_digest = await Get(
