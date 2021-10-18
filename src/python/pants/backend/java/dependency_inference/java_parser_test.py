@@ -274,13 +274,22 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
                 """
                 package org.pantsbuild.test;
 
+                @ClassAnnotation
                 public class AnImpl implements SomeInterface {
+                    @InnerClassAnnotation
                     public static class Inner extends SomeGeneric<String> {
                     }
 
+                    @FieldAnnotation
                     Provided provided = provided;
+
                     public AnImpl(Provider<SomeThing> provider) {
                         this.provided = provider.provide();
+                    }
+
+                    @Override
+                    public int foo() {
+                        return 2;
                     }
                 }
                 """
@@ -306,10 +315,14 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
     assert analysis.imports == []
     assert analysis.top_level_types == ["org.pantsbuild.test.AnImpl"]
     assert analysis.consumed_unqualified_types == [
+        "InnerClassAnnotation",
         "SomeInterface",
+        "FieldAnnotation",
+        "ClassAnnotation",
         "SomeThing",
         "SomeGeneric",
         "String",
+        "Override",
         "Provided",
         "Provider",
     ]

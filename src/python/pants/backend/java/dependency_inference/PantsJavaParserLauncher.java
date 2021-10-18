@@ -12,6 +12,7 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Name;
 import com.github.javaparser.ast.nodeTypes.NodeWithType;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
@@ -136,6 +137,8 @@ public class PantsJavaParserLauncher {
                 .collect(Collectors.toList()));
 
         HashSet<Type> candidateConsumedTypes = new HashSet<>();
+        HashSet<String> identifiers = new HashSet<>();
+
         cu.walk(new Consumer<Node>() {
             @Override
             public void accept(Node node) {
@@ -160,10 +163,13 @@ public class PantsJavaParserLauncher {
                     candidateConsumedTypes.addAll(classOrIntfDecl.getExtendedTypes());
                     candidateConsumedTypes.addAll(classOrIntfDecl.getImplementedTypes());
                 }
+                if (node instanceof AnnotationExpr) {
+                    AnnotationExpr annoExpr = (AnnotationExpr) node;
+                    identifiers.add(annoExpr.getNameAsString());
+                }
             }
         });
 
-        HashSet<String> identifiers = new HashSet<>();
         for (Type type : candidateConsumedTypes) {
             List<String> identifiersForType = unwrapIdentifiersForType(type);
             identifiers.addAll(identifiersForType);
