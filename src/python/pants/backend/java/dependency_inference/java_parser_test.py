@@ -247,3 +247,69 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     assert analysis.imports == []
     assert analysis.top_level_types == ["SimpleSource", "Foo"]
     assert analysis.consumed_unqualified_types == []
+
+
+@maybe_skip_jdk_test
+def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "BUILD": dedent(
+                """\
+                coursier_lockfile(
+                    name='lockfile',
+                    source="coursier_resolve.lockfile",
+                )
+
+                java_source(
+                    name='source',
+                    source='SomeUnqualifiedTypes.java',
+                    dependencies=[':lockfile'],
+                )
+                """
+            ),
+            "SomeUnqualifiedTypes.java": dedent(
+                """
+                package org.pantsbuild.test;
+
+                public class AnImpl implements SomeInterface {
+                    public static class Inner extends SomeGeneric<String> {
+                    }
+
+                    Provided provided = provided;
+                    public AnImpl(Provider<SomeThing> provider) {
+                        this.provided = provider.provide();
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(address=Address(spec_path="", target_name="source"))
+
+    source_files = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(
+                (target.get(SourcesField),),
+                for_sources_types=(JavaSourceField,),
+                enable_codegen=True,
+            )
+        ],
+    )
+
+    analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
+    assert analysis.declared_package == "org.pantsbuild.test"
+    assert analysis.imports == []
+    assert analysis.top_level_types == ["org.pantsbuild.test.AnImpl"]
+    assert analysis.consumed_unqualified_types == [
+        "SomeInterface",
+        "SomeThing",
+        "SomeGeneric",
+        "String",
+        "Provided",
+        "Provider",
+    ]

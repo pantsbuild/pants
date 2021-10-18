@@ -7,11 +7,13 @@ import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.PackageDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.Name;
+import com.github.javaparser.ast.nodeTypes.NodeWithType;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.WildcardType;
@@ -137,6 +139,10 @@ public class PantsJavaParserLauncher {
         cu.walk(new Consumer<Node>() {
             @Override
             public void accept(Node node) {
+                if (node instanceof NodeWithType) {
+                    NodeWithType<?, ?> typedNode = (NodeWithType<?, ?>) node;
+                    candidateConsumedTypes.add(typedNode.getType());
+                }
                 if (node instanceof VariableDeclarator) {
                     VariableDeclarator varDecl = (VariableDeclarator) node;
                     candidateConsumedTypes.add(varDecl.getType());
@@ -148,6 +154,11 @@ public class PantsJavaParserLauncher {
                         candidateConsumedTypes.add(param.getType());
                     }
                     System.out.println("Method type: " + methodDecl.getType());
+                }
+                if (node instanceof ClassOrInterfaceDeclaration) {
+                    ClassOrInterfaceDeclaration classOrIntfDecl = (ClassOrInterfaceDeclaration) node;
+                    candidateConsumedTypes.addAll(classOrIntfDecl.getExtendedTypes());
+                    candidateConsumedTypes.addAll(classOrIntfDecl.getImplementedTypes());
                 }
             }
         });
