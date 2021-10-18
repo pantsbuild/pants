@@ -287,16 +287,25 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     coarsened_targets = rule_runner.request(
         CoarsenedTargets, [Addresses([t.address for t in expanded_targets])]
     )
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    assert len(coarsened_target.members) == 2
-    request = CompileJavaSourceRequest(component=coarsened_target)
+    assert len(coarsened_targets) == 2
+    assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {
+    coarsened_targets_sorted = sorted(list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address))
+
+    request0 = CompileJavaSourceRequest(component=coarsened_targets_sorted[0])
+    compiled_classfiles0 = rule_runner.request(CompiledClassfiles, [request0])
+    classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
+    assert classpath0.content == {
         ".ExampleLib.java.lib.jar": {
             "org/pantsbuild/example/lib/ExampleLib.class",
+        }
+    }
+
+    request1 = CompileJavaSourceRequest(component=coarsened_targets_sorted[1])
+    compiled_classfiles1 = rule_runner.request(CompiledClassfiles, [request1])
+    classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
+    assert classpath1.content == {
+        ".OtherLib.java.lib.jar": {
             "org/pantsbuild/example/lib/OtherLib.class",
         }
     }
