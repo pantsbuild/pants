@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 
-import py.path
 import pytest
 
 from pants.engine.fs import (
@@ -302,15 +302,15 @@ def test_find_binary_on_path_without_bash(rule_runner: RuleRunner) -> None:
         assert binary_paths.first_path.path == binary_path_abs
 
 
-def test_find_binary_file_path(rule_runner: RuleRunner, tmpdir: py.path.local) -> None:
+def test_find_binary_file_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
     binary_name = "mybin"
-    binary_path_abs = tmpdir / "bin" / binary_name
-    binary_path_abs.write("", ensure=True)
-    binary_path_abs.chmod(0o755)
+    binary_path_abs = tmp_path / "bin" / binary_name
+    binary_path_abs.parent.mkdir(parents=True)
+    binary_path_abs.touch(mode=0o755)
 
     binary_paths = rule_runner.request(
         BinaryPaths,
-        [BinaryPathRequest(binary_name=binary_name, search_path=[binary_path_abs.strpath])],
+        [BinaryPathRequest(binary_name=binary_name, search_path=[str(binary_path_abs)])],
     )
     assert binary_paths.first_path is not None
-    assert binary_paths.first_path.path == binary_path_abs
+    assert binary_paths.first_path.path == str(binary_path_abs)
