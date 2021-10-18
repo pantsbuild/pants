@@ -3,59 +3,40 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional, Type, TypeVar, cast
+from itertools import groupby
+from typing import Iterable, Type, TypeVar
 
-from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
-_T = TypeVar("_T", bound="FrozenDictUtilsMixin")
-_T2 = TypeVar("_T2", bound="FrozenDictUtilsMixin")
+_T = TypeVar("_T", bound="KeyValueSequenceUtilMixin")
 
 
-class FrozenDictUtilsMixin(FrozenDict[str, Optional[str]]):
-    """Generic mixin class for frozen dicts, to work with lists of "KEY[=VALUE]" strings."""
-
+class KeyValueSequenceUtilMixin(FrozenOrderedSet[str]):
     @classmethod
-    def from_strings(cls: Type[_T], strings: Iterable[str]) -> _T:
+    def from_iterables(cls: Type[_T], *iterables: Iterable[str]) -> _T:
+        """Takes `KEY` or `KEY=VALUE` pairs from iterables.
+
+        The prio is in ascending order, so the last iterable will win in case a `KEY` exists in more
+        than one iterable.
+        """
+
+        def extract_key(entry: tuple[str, int]) -> str:
+            pair, it_idx = entry
+            return pair.partition("=")[0]
+
+        def iterator_order(entry: tuple[str, int]) -> int:
+            pair, it_idx = entry
+            return it_idx
+
+        data = sorted((pair, it_idx) for it_idx, it in enumerate(iterables) for pair in it)
         return cls(
-            {
-                key: value if eq else None
-                for key, eq, value in [pair.partition("=") for pair in strings]
-            }
+            FrozenOrderedSet(
+                sorted(
+                    {
+                        # Take the pair value of the last entry in the group.
+                        sorted(group, key=iterator_order)[-1][0]
+                        for _key, group in groupby(data, extract_key)
+                    }
+                )
+            )
         )
-
-    @property
-    def to_strings(self) -> tuple[str, ...]:
-        """This will return all pairs as "KEY=VALUE" and "KEY" for `None` values."""
-        return tuple(sorted({*self.to_pairs, *self.to_keys_none_value}))
-
-    @property
-    def to_pairs(self) -> tuple[str, ...]:
-        """Returns all "KEY=VALUE" pairs.
-
-        This will exclude any keys with a `None` value.
-
-        Complements `to_keys_none_value`.
-        """
-        return tuple(sorted("=".join(s for s in [key, value] if s) for key, value in self.items()))
-
-    @property
-    def to_keys_none_value(self) -> set[str]:
-        """Returns all "KEY" values.
-
-        This will only include keys with a `None` value.
-
-        Complements `to_pairs`.
-        """
-        return set(sorted(key for key, value in self.items() if value is None))
-
-    def merge(self: _T, raw_other: _T2 | Iterable[str]) -> _T:
-        """Update this dict, with the values of the other, and return the merged result."""
-        if not raw_other:
-            return self
-
-        other = (
-            raw_other
-            if isinstance(raw_other, FrozenDictUtilsMixin)
-            else FrozenDictUtilsMixin.from_strings(raw_other)
-        )
-        return type(self)({**cast(dict, self), **cast(dict, other)})

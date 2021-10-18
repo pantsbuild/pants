@@ -26,25 +26,22 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.mark.parametrize(
-    "build_args, extra_build_args, expected_build_args, expected_env_vars",
+    "build_args, extra_build_args, expected_build_args",
     [
         (
             (),
             None,
             (),
-            set(),
         ),
         (
             (""),
             None,
             (),
-            set(),
         ),
         (
             ("ARG1=val1",),
             None,
             ("ARG1=val1",),
-            set(),
         ),
         (
             ("ARG1=val1",),
@@ -53,19 +50,16 @@ def rule_runner() -> RuleRunner:
                 "ARG1=val1",
                 "ARG2=val2",
             ),
-            set(),
         ),
         (
             ("ARG1=val1",),
             ("ARG1",),
             ("ARG1",),
-            {"ARG1"},
         ),
         (
             ("ARG1",),
             ("ARG1=val1",),
             ("ARG1=val1",),
-            set(),
         ),
     ],
 )
@@ -74,10 +68,8 @@ def test_docker_build_args_rule(
     build_args: tuple[str, ...],
     extra_build_args: tuple[str, ...] | None,
     expected_build_args: tuple[str, ...],
-    expected_env_vars: set[str],
 ) -> None:
     tgt = DockerImage({"extra_build_args": extra_build_args}, address=Address("test"))
     rule_runner.set_options([f"--docker-build-args={build_arg}" for build_arg in build_args])
     res = rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)])
-    assert res.build_args == expected_build_args
-    assert res.to_keys_none_value == expected_env_vars
+    assert tuple(res) == expected_build_args
