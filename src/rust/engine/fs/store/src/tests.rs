@@ -7,13 +7,13 @@ use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
 use fs::{DigestEntry, FileEntry};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use mock::StubCAS;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
 

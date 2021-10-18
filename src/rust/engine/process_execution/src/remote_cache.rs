@@ -6,8 +6,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
 use fs::RelativePath;
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -17,6 +15,8 @@ use grpc_util::{
 };
 use hashing::Digest;
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, FileNode, Tree};
 use store::Store;

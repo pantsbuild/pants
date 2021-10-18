@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
 use bytes::BytesMut;
 use fs::{
   ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
@@ -21,6 +19,8 @@ use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::{Either, Itertools};
 use log::log_enabled;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 
 use crate::{snapshot::osstring_as_utf8, Snapshot};
 

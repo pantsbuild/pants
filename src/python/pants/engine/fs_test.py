@@ -66,6 +66,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
+ROLAND_FILE_DIGEST = FileDigest(
+    "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16
+)
 ROLAND_DIGEST = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
 
 
@@ -828,6 +831,9 @@ DOWNLOADS_FILE_DIGEST = FileDigest(
 DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
     "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
 )
+ROLAND_DOWNLOAD_DIGEST = Digest(
+    "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82
+)
 
 
 def test_download_valid(downloads_rule_runner: RuleRunner) -> None:
@@ -860,20 +866,34 @@ def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
     assert "wrong digest" in str(exc.value).lower()
 
 
-def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
-    # We would error if we hit the HTTP server with 404, but we're not going to hit the HTTP
-    # server because it's cached, so we shouldn't see an error.
-    prime_store_with_roland_digest(downloads_rule_runner)
-    with http_server(StubHandler) as port:
-        download_file = DownloadFile(
-            f"http://localhost:{port}/roland",
-            FileDigest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+def test_download_file(downloads_rule_runner: RuleRunner) -> None:
+    with temporary_dir() as temp_dir:
+        roland = Path(temp_dir, "roland")
+        roland.write_text("European Burmese")
+        snapshot = downloads_rule_runner.request(
+            Snapshot,
+            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
         )
-        snapshot = downloads_rule_runner.request(Snapshot, [download_file])
+
     assert snapshot.files == ("roland",)
-    assert snapshot.digest == Digest(
-        "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82
-    )
+    assert snapshot.digest == ROLAND_DOWNLOAD_DIGEST
+
+
+def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
+    # We put the expected content in the store, but because we have never fetched it from this
+    # URL, we confirm the URL and attempt to refetch. Once it is cached, it does not need to be
+    # refetched.
+    prime_store_with_roland_digest(downloads_rule_runner)
+    with temporary_dir() as temp_dir:
+        roland = Path(temp_dir, "roland")
+        roland.write_text("European Burmese")
+        snapshot = downloads_rule_runner.request(
+            Snapshot,
+            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
+        )
+
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == ROLAND_DOWNLOAD_DIGEST
 
 
 def test_download_https() -> None:

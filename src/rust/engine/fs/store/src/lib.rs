@@ -45,8 +45,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
 use bytes::Bytes;
 use double_checked_cell_async::DoubleCheckedCell;
 use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, RelativePath};
@@ -57,6 +55,8 @@ use grpc_util::status_to_str;
 use hashing::{Digest, EMPTY_DIGEST};
 use parking_lot::Mutex;
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
@@ -409,7 +409,7 @@ impl Store {
             )
           })?;
           if cfg!(debug_assertions) {
-            bazel_protos::verify_directory_canonical(digest, &directory).unwrap();
+            protos::verify_directory_canonical(digest, &directory).unwrap();
           }
           Ok(directory)
         },
@@ -422,7 +422,7 @@ impl Store {
               digest, e
             )
           })?;
-          bazel_protos::verify_directory_canonical(digest, &directory)?;
+          protos::verify_directory_canonical(digest, &directory)?;
           Ok(directory)
         },
       )

@@ -1,15 +1,14 @@
 [package]
+name = "cache"
 version = "0.0.1"
 edition = "2018"
-name = "testutil"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-stream = "0.3"
-protos = { path = "../protos" }
 bytes = "1.0"
 grpc_util = { path = "../grpc_util" }
-fs = { path = "../fs" }
 hashing = { path = "../hashing" }
-prost = "0.8" 
+protos = { path = "../protos" }
+sharded_lmdb = {  path = "../sharded_lmdb" }
+task_executor = { path = "../task_executor" }

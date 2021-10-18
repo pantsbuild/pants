@@ -31,7 +31,6 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import git_url
 from pants.util.enums import match
 
 
@@ -212,12 +211,6 @@ class ShellSourcesGeneratorTarget(Target):
 
     deprecated_alias = "shell_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
-    deprecated_alias_removal_hint = (
-        "Use `shell_sources` instead, which behaves the same.\n\n"
-        "To automate fixing this, download "
-        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
-        "`python3 rename_targets_pants28.py --help` for instructions."
-    )
 
 
 class GenerateTargetsFromShellSources(GenerateTargetsRequest):

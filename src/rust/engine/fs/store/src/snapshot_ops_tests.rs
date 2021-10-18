@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
 use hashing::Digest;
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use testutil::make_file;
 
 use crate::{
