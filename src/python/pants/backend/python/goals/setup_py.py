@@ -15,7 +15,7 @@ from functools import partial
 from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet, Setuptools
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     GenerateSetupField,
     PythonDistributionEntryPointsField,
@@ -31,7 +31,13 @@ from pants.backend.python.target_types import (
     WheelConfigSettingsField,
     WheelField,
 )
-from pants.backend.python.util_rules.dists import DistBuildRequest, DistBuildResult, distutils_repr
+from pants.backend.python.util_rules.dists import (
+    BuildSystem,
+    BuildSystemRequest,
+    DistBuildRequest,
+    DistBuildResult,
+    distutils_repr,
+)
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
@@ -173,8 +179,8 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
 
 
 @dataclass(frozen=True)
-class SetupPySources:
-    """The sources required by a setup.py command.
+class DistBuildSources:
+    """The sources required to build a distribution.
 
     Includes some information derived from analyzing the source, namely the packages, namespace
     packages and resource files in the source.
@@ -187,8 +193,8 @@ class SetupPySources:
 
 
 @dataclass(frozen=True)
-class SetupPyChrootRequest:
-    """A request to create a chroot containing a setup.py and the sources it operates on."""
+class DistBuildChrootRequest:
+    """A request to create a chroot for building a dist in."""
 
     exported_target: ExportedTarget
     py2: bool  # Whether to use py2 or py3 package semantics.
@@ -367,16 +373,21 @@ def validate_commands(commands: tuple[str, ...]):
 
 @rule
 async def package_python_dist(
-    field_set: PythonDistributionFieldSet, python_setup: PythonSetup, setuptools: Setuptools
+    field_set: PythonDistributionFieldSet,
+    python_setup: PythonSetup,
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
+
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     ) or InterpreterConstraints(python_setup.interpreter_constraints)
     chroot = await Get(
         DistBuildChroot,
-        SetupPyChrootRequest(exported_target, py2=interpreter_constraints.includes_python2()),
+        DistBuildChrootRequest(
+            exported_target,
+            py2=interpreter_constraints.includes_python2(),
+        ),
     )
 
     dist_tgt = exported_target.target
@@ -399,11 +410,13 @@ async def package_python_dist(
         chroot_prefix = "chroot"
         working_directory = os.path.join(chroot_prefix, chroot.working_directory)
         prefixed_chroot = await Get(Digest, AddPrefix(chroot.digest, chroot_prefix))
+        build_system = await Get(
+            BuildSystem, BuildSystemRequest(prefixed_chroot, working_directory)
+        )
         setup_py_result = await Get(
             DistBuildResult,
             DistBuildRequest(
-                requires=setuptools.pex_requirements(),
-                build_backend="setuptools.build_meta",
+                build_system=build_system,
                 interpreter_constraints=interpreter_constraints,
                 build_wheel=wheel,
                 build_sdist=sdist,
@@ -504,7 +517,7 @@ async def determine_setup_kwargs(
 @dataclass(frozen=True)
 class GenerateSetupPyRequest:
     exported_target: ExportedTarget
-    sources: SetupPySources
+    sources: DistBuildSources
 
 
 @dataclass(frozen=True)
@@ -514,7 +527,7 @@ class GeneratedSetupPy:
 
 @rule
 async def generate_chroot(
-    request: SetupPyChrootRequest, subsys: SetupPyGeneration
+    request: DistBuildChrootRequest, subsys: SetupPyGeneration
 ) -> DistBuildChroot:
     generate_setup = request.exported_target.target.get(GenerateSetupField).value
     if generate_setup is None:
@@ -535,7 +548,7 @@ async def generate_chroot(
         )
     # ... to here.
 
-    sources = await Get(SetupPySources, SetupPyChrootRequest, request)
+    sources = await Get(DistBuildSources, DistBuildChrootRequest, request)
 
     if generate_setup:
         generated_setup_py = await Get(
@@ -659,8 +672,8 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
 
 @rule
 async def get_sources(
-    request: SetupPyChrootRequest, union_membership: UnionMembership
-) -> SetupPySources:
+    request: DistBuildChrootRequest, union_membership: UnionMembership
+) -> DistBuildSources:
     owned_deps, transitive_targets = await MultiGet(
         Get(OwnedDependencies, DependencyOwner(request.exported_target)),
         Get(
@@ -704,7 +717,7 @@ async def get_sources(
         init_py_digest_contents=init_py_digest_contents,
         py2=request.py2,
     )
-    return SetupPySources(
+    return DistBuildSources(
         digest=all_sources.stripped_source_files.snapshot.digest,
         packages=packages,
         namespace_packages=namespace_packages,
