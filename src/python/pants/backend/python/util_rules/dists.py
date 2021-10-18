@@ -68,7 +68,7 @@ class BuildSystem:
     build_backend: str
 
     @classmethod
-    def legacy(cls, setuptools: Setuptools) -> "BuildSystem":
+    def legacy(cls, setuptools: Setuptools) -> BuildSystem:
         return cls(setuptools.pex_requirements(), "setuptools.build_meta:__legacy__")
 
 
