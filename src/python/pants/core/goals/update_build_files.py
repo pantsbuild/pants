@@ -9,7 +9,7 @@ import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import ClassVar, DefaultDict, cast
+from typing import DefaultDict, cast
 
 from colors import green, red
 
@@ -60,8 +60,6 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
     lines: tuple[str, ...]
     colors_enabled: bool = dataclasses.field(compare=False)
 
-    deprecation_fixer: ClassVar[bool] = False
-
     def debug_hint(self) -> str:
         return self.path
 
@@ -82,6 +80,13 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
 
     def green(self, s: str) -> str:
         return cast(str, green(s)) if self.colors_enabled else s
+
+
+class DeprecationFixerRequest(RewrittenBuildFileRequest):
+    """A fixer for deprecations.
+
+    These can be disabled by the user with `--no-fix-safe-deprecations`.
+    """
 
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
@@ -110,10 +115,16 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
             ),
         )
         register(
-            "--autoformat",
+            "--fmt",
             type=bool,
             default=True,
-            help=("Format BUILD files using Black.\n\n" "Set TODO"),
+            help=(
+                "Format BUILD files using Black.\n\n"
+                "Set `[black].args`, `[black].config`, and `[black].config_discovery` to change "
+                "Black's behavior. Set `[black].interpreter_constraints` and "
+                "`[python-setup].interpreter_search_path` to change which interpreter is used to "
+                "run Black."
+            ),
         )
         register(
             "--fix-safe-deprecations",
@@ -130,7 +141,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         return cast(bool, self.options.check)
 
     @property
-    def autoformat(self) -> bool:
+    def fmt(self) -> bool:
         return cast(bool, self.options.autoformat)
 
     @property
@@ -142,7 +153,7 @@ class UpdateBuildFilesGoal(Goal):
     subsystem_cls = UpdateBuildFilesSubsystem
 
 
-@goal_rule(desc="Run update-build-files goal", level=LogLevel.DEBUG)
+@goal_rule(desc="Update all BUILD files", level=LogLevel.DEBUG)
 async def update_build_files(
     update_build_files_subsystem: UpdateBuildFilesSubsystem,
     build_file_options: BuildFileOptions,
@@ -163,11 +174,13 @@ async def update_build_files(
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
         if issubclass(request, AutoformatWithBlackRequest):
-            if update_build_files_subsystem.autoformat:
+            if update_build_files_subsystem.fmt:
                 rewrite_request_classes.append(request)
             else:
                 continue
-        if update_build_files_subsystem.fix_safe_deprecations or not request.deprecation_fixer:
+        if update_build_files_subsystem.fix_safe_deprecations or not issubclass(
+            request, DeprecationFixerRequest
+        ):
             rewrite_request_classes.append(request)
 
     build_file_to_lines = {
@@ -296,8 +309,8 @@ async def autoformat_build_file_with_black(
 # ------------------------------------------------------------------------------------------
 
 
-class RenameDeprecatedTargetsRequest(RewrittenBuildFileRequest):
-    deprecation_fixer = True
+class RenameDeprecatedTargetsRequest(DeprecationFixerRequest):
+    pass
 
 
 class RenamedTargetTypes(FrozenDict[str, str]):
