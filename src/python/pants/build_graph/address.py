@@ -328,9 +328,10 @@ class Address(EngineAwareParameter):
                 if self._target_name is None and not parent_prefix
                 else f"{file_portion}:{parent_prefix}{self.target_name}"
             )
-        target_portion = f":{self._target_name}" if self._target_name is not None else ""
-        generated_portion = f"#{self.generated_name}" if self.generated_name is not None else ""
-        return f"{prefix}{self.spec_path}{target_portion}{generated_portion}"
+        if self.generated_name is not None:
+            target_portion = f":{self._target_name}" if self._target_name is not None else ""
+            return f"{prefix}{self.spec_path}{target_portion}#{self.generated_name}"
+        return f"{prefix}{self.spec_path}:{self.target_name}"
 
     @property
     def path_safe_spec(self) -> str:

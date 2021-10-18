@@ -255,7 +255,7 @@ def test_address_spec() -> None:
         assert str(address) == expected
         assert address.path_safe_spec == expected_path_spec
 
-    assert_spec(Address("a/b"), expected="a/b", expected_path_spec="a.b")
+    assert_spec(Address("a/b"), expected="a/b:b", expected_path_spec="a.b")
 
     assert_spec(Address("a/b", target_name="c"), expected="a/b:c", expected_path_spec="a.b.c")
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
@@ -392,7 +392,7 @@ def test_address_create_generated() -> None:
 @pytest.mark.parametrize(
     "addr,expected",
     [
-        (Address("a/b/c"), AddressInput("a/b/c")),
+        (Address("a/b/c"), AddressInput("a/b/c", target_component="c")),
         (Address("a/b/c", target_name="tgt"), AddressInput("a/b/c", "tgt")),
         (
             Address("a/b/c", target_name="tgt", generated_name="gen"),

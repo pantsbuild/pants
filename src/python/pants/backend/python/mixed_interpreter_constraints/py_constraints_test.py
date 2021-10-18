@@ -73,25 +73,25 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
 
 def test_render_constraints(rule_runner: RuleRunner) -> None:
     write_files(rule_runner)
-    result = run_goal(rule_runner, ["app"])
+    result = run_goal(rule_runner, ["app:app"])
     assert result.stdout == dedent(
         """\
         Final merged constraints: CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6
 
         CPython==3.7.*
-          app
+          app:app
 
         CPython>=3.6
           lib2/a.py
           lib2/b.py
 
         CPython==2.7.* OR CPython>=3.5
-          lib1
+          lib1:lib1
         """
     )
 
     # If we run on >1 input, we include a warning about what the "final merged constraints" mean.
-    result = run_goal(rule_runner, ["app", "lib1"])
+    result = run_goal(rule_runner, ["app:app", "lib1:lib1"])
     assert "Consider using a more precise query" in result.stdout
 
 
@@ -101,9 +101,9 @@ def test_constraints_summary(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
-        app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",3,0\r
-        lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,1\r
-        lib2,CPython>=3.6,CPython>=3.6,2,0\r
+        app:app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",3,0\r
+        lib1:lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,1\r
+        lib2:lib2,CPython>=3.6,CPython>=3.6,2,0\r
         lib2/a.py,CPython>=3.6,CPython>=3.6,0,2\r
         lib2/b.py,CPython>=3.6,CPython>=3.6,0,2\r
         """

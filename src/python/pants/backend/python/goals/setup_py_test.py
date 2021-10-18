@@ -917,7 +917,7 @@ def test_owned_dependencies() -> None:
     )
     assert_owned(
         [
-            "src/python/foo",
+            "src/python/foo:foo",
             "src/python/foo:foo-dist",
             "src/python/foo/bar:bar2",
             "src/python/foo/bar:bar-resources",
@@ -1107,7 +1107,7 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
     assert_no_owner(exporting_owner_rule_runner, Address("src/python/notanancestor/aaa"))
     assert_is_owner(
         exporting_owner_rule_runner,
-        "src/python/notanancestor/bbb",
+        "src/python/notanancestor/bbb:bbb",
         Address("src/python/notanancestor/bbb"),
     )
 
@@ -1147,12 +1147,12 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
     )
 
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/aaa/bbb", Address("src/python/aaa/bbb/ccc")
+        exporting_owner_rule_runner, "src/python/aaa/bbb:bbb", Address("src/python/aaa/bbb/ccc")
     )
     assert_is_owner(
-        exporting_owner_rule_runner, "src/python/aaa/bbb", Address("src/python/aaa/bbb")
+        exporting_owner_rule_runner, "src/python/aaa/bbb:bbb", Address("src/python/aaa/bbb")
     )
-    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa", Address("src/python/aaa"))
+    assert_is_owner(exporting_owner_rule_runner, "src/python/aaa:aaa", Address("src/python/aaa"))
 
 
 def test_validate_args() -> None:

@@ -55,7 +55,7 @@ def test_no_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_normal(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=["base"], expected=["intermediate"])
+    assert_dependees(rule_runner, targets=["base"], expected=["intermediate:intermediate"])
     assert_dependees(
         rule_runner,
         targets=["base"],
@@ -63,8 +63,8 @@ def test_normal(rule_runner: RuleRunner) -> None:
         expected=dedent(
             """\
             {
-                "base": [
-                    "intermediate"
+                "base:base": [
+                    "intermediate:intermediate"
                 ]
             }"""
         ).splitlines(),
@@ -80,14 +80,14 @@ def test_no_dependees(rule_runner: RuleRunner) -> None:
         expected=dedent(
             """\
             {
-                "leaf": []
+                "leaf:leaf": []
             }"""
         ).splitlines(),
     )
 
 
 def test_closed(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=["leaf"], closed=True, expected=["leaf"])
+    assert_dependees(rule_runner, targets=["leaf"], closed=True, expected=["leaf:leaf"])
     assert_dependees(
         rule_runner,
         targets=["leaf"],
@@ -96,8 +96,8 @@ def test_closed(rule_runner: RuleRunner) -> None:
         expected=dedent(
             """\
             {
-                "leaf": [
-                    "leaf"
+                "leaf:leaf": [
+                    "leaf:leaf"
                 ]
             }"""
         ).splitlines(),
@@ -106,7 +106,10 @@ def test_closed(rule_runner: RuleRunner) -> None:
 
 def test_transitive(rule_runner: RuleRunner) -> None:
     assert_dependees(
-        rule_runner, targets=["base"], transitive=True, expected=["intermediate", "leaf"]
+        rule_runner,
+        targets=["base"],
+        transitive=True,
+        expected=["intermediate:intermediate", "leaf:leaf"],
     )
     assert_dependees(
         rule_runner,
@@ -116,9 +119,9 @@ def test_transitive(rule_runner: RuleRunner) -> None:
         expected=dedent(
             """\
             {
-                "base": [
-                    "intermediate",
-                    "leaf"
+                "base:base": [
+                    "intermediate:intermediate",
+                    "leaf:leaf"
                 ]
             }"""
         ).splitlines(),
@@ -133,7 +136,7 @@ def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
         targets=["base", "intermediate"],
         transitive=True,
         # NB: `intermediate` is not included because it's a root and we have `--no-closed`.
-        expected=["leaf"],
+        expected=["leaf:leaf"],
     )
     assert_dependees(
         rule_runner,
@@ -143,12 +146,12 @@ def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
         expected=dedent(
             """\
             {
-                "base": [
-                    "intermediate",
-                    "leaf"
+                "base:base": [
+                    "intermediate:intermediate",
+                    "leaf:leaf"
                 ],
-                "intermediate": [
-                    "leaf"
+                "intermediate:intermediate": [
+                    "leaf:leaf"
                 ]
             }"""
         ).splitlines(),
@@ -157,7 +160,12 @@ def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.add_to_build_file("special", "tgt(special_deps=['intermediate'])")
-    assert_dependees(rule_runner, targets=["intermediate"], expected=["leaf", "special"])
     assert_dependees(
-        rule_runner, targets=["base"], transitive=True, expected=["intermediate", "leaf", "special"]
+        rule_runner, targets=["intermediate"], expected=["leaf:leaf", "special:special"]
+    )
+    assert_dependees(
+        rule_runner,
+        targets=["base"],
+        transitive=True,
+        expected=["intermediate:intermediate", "leaf:leaf", "special:special"],
     )

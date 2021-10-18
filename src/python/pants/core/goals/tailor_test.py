@@ -240,8 +240,8 @@ def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     assert ("baz3.f90",) == ptgt.kwargs.get("sources")
     assert (
         "# NOTE: Sources restricted from the default for fortran_library due to conflict with",
-        "#   - src/fortran/foo",
-        "#   - src/fortran/foo/bar",
+        "#   - src/fortran/foo/bar:bar",
+        "#   - src/fortran/foo:foo",
     ) == ptgt.comments
 
 
