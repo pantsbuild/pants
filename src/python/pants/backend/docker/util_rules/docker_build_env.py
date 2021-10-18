@@ -30,9 +30,9 @@ async def docker_build_environment_vars(
     request: DockerBuildEnvironmentRequest, docker_options: DockerOptions
 ) -> DockerBuildEnvironment:
     build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(request.target))
-    env_vars = KeyValueSequenceUtil.from_iterables(
-        {build_arg for build_arg in build_args if "=" not in build_arg},
-        docker_options.env_vars,
+    env_vars = KeyValueSequenceUtil.from_strings(
+        *{build_arg for build_arg in build_args if "=" not in build_arg},
+        *docker_options.env_vars,
     )
     env = await Get(Environment, EnvironmentRequest(tuple(env_vars)))
     return DockerBuildEnvironment(env)

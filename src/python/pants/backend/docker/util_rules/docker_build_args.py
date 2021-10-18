@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerBuildArgsField
@@ -28,7 +27,7 @@ async def docker_build_args(
 ) -> DockerBuildArgs:
     return DockerBuildArgs.from_strings(
         *docker_options.build_args,
-        *cast("tuple[str, ...]", request.target.get(DockerBuildArgsField).value),
+        *(request.target.get(DockerBuildArgsField).value or ()),
     )
 
 
