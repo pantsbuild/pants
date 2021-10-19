@@ -11,13 +11,10 @@ python_sources(
     overrides={
         "generate_docs.py": {"dependencies": [":docs_templates"]},
         "generate_user_list.py": {"dependencies": [":user_list_templates"]},
-    }
+    },
 )
 
-python_tests(
-    name="py_tests",
-    overrides={"reversion_test.py": {"timeout": 90}},
-)
+python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
 
 pex_binary(name="changelog", entry_point="changelog.py")
 pex_binary(name="check_banned_imports", entry_point="check_banned_imports.py")
