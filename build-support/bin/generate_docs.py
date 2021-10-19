@@ -207,7 +207,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
     ]
-    deactivated_plugins = ["toolchain.pants.plugin==0.14.0"]
+    deactivated_plugins = ["toolchain.pants.plugin==0.15.0"]
     argv = [
         "./pants",
         "--concurrent",
