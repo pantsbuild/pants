@@ -632,15 +632,7 @@ class PythonTestTarget(Target):
 
 
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = (
-        "test_*.py",
-        "*_test.py",
-        "tests.py",
-        "conftest.py",
-        "test_*.pyi",
-        "*_test.pyi",
-        "tests.pyi",
-    )
+    default = ("test_*.py", "*_test.py", "tests.py")
 
 
 class PythonTestsOverrideField(OverridesField):

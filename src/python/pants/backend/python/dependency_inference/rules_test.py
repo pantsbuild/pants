@@ -211,22 +211,24 @@ def test_infer_python_conftests() -> None:
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
-        target_types=[PythonTestsGeneratorTarget],
+        target_types=[PythonTestsGeneratorTarget, PythonSourcesGeneratorTarget],
     )
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"],
+        ["--source-root-patterns=src/python"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.create_file("src/python/root/conftest.py")
-    rule_runner.add_to_build_file("src/python/root", "python_tests()")
+    rule_runner.add_to_build_file("src/python/root", "python_sources()")
 
     rule_runner.create_file("src/python/root/mid/conftest.py")
-    rule_runner.add_to_build_file("src/python/root/mid", "python_tests()")
+    rule_runner.add_to_build_file("src/python/root/mid", "python_sources()")
 
     rule_runner.create_file("src/python/root/mid/leaf/conftest.py")
     rule_runner.create_file("src/python/root/mid/leaf/this_is_a_test.py")
-    rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
+    rule_runner.add_to_build_file(
+        "src/python/root/mid/leaf", "python_sources()\npython_tests(name='tests')"
+    )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address)
@@ -236,7 +238,9 @@ def test_infer_python_conftests() -> None:
         )
 
     assert run_dep_inference(
-        Address("src/python/root/mid/leaf", relative_file_path="this_is_a_test.py")
+        Address(
+            "src/python/root/mid/leaf", target_name="tests", relative_file_path="this_is_a_test.py"
+        )
     ) == InferredDependencies(
         [
             Address("src/python/root", relative_file_path="conftest.py"),

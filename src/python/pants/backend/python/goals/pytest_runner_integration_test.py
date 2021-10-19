@@ -354,7 +354,7 @@ def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
                     print('In conftest!')
                 """
             ),
-            f"{SOURCE_ROOT}/BUILD": "python_tests()",
+            f"{SOURCE_ROOT}/BUILD": "python_sources()",
             f"{PACKAGE}/tests.py": GOOD_TEST,
             f"{PACKAGE}/BUILD": "python_tests()",
         }

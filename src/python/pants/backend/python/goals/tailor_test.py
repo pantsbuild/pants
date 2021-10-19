@@ -31,17 +31,21 @@ def test_classify_source_files() -> None:
         "foo/bar/baz_test.py",
         "foo/test_bar.py",
         "foo/tests.py",
+    }
+    source_files = {
+        "foo/bar/baz.py",
+        "foo/bar_baz.py",
+        "foo.pyi",
         "conftest.py",
         "foo/bar/baz_test.pyi",
         "foo/test_bar.pyi",
         "tests.pyi",
     }
-    lib_files = {"foo/bar/baz.py", "foo/bar_baz.py", "foo.pyi"}
 
     assert {
         PythonTestsGeneratorTarget: test_files,
-        PythonSourcesGeneratorTarget: lib_files,
-    } == classify_source_files(test_files | lib_files)
+        PythonSourcesGeneratorTarget: source_files,
+    } == classify_source_files(test_files | source_files)
 
 
 @pytest.fixture
