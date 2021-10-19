@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent
@@ -140,12 +141,14 @@ async def prepare_shell_command_process(
         )
 
         command_env = {
-            "TOOLS": " ".join(shlex.quote(tool.binary_name) for tool in tool_requests),
+            "TOOLS": " ".join(
+                shlex.quote(re.sub(r"\W", "_", tool.binary_name)) for tool in tool_requests
+            ),
         }
 
         for binary, tool_request in zip(tool_paths, tool_requests):
             if binary.first_path:
-                command_env[tool_request.binary_name] = binary.first_path.path
+                command_env[re.sub(r"\W", "_", tool_request.binary_name)] = binary.first_path.path
             else:
                 raise BinaryNotFoundError.from_request(
                     tool_request,
@@ -200,7 +203,7 @@ async def prepare_shell_command_process(
             dedent(
                 f"""\
                 $mkdir -p {bin_relpath}
-                for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}; done
+                for tool in $TOOLS; do $ln -sf ${{!tool}} {bin_relpath}; done
                 export PATH="$PWD/{bin_relpath}"
                 """
             ).split("\n")
