@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import Callable
 
 import pytest
+import yaml
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.register import rules as python_rules
@@ -135,6 +138,55 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "my-package-0.1.0.tar.gz skipped (requested)." in result.stderr
     assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+
+
+def test_structured_output(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                python_sources()
+                python_distribution(
+                  name="dist",
+                  provides=python_artifact(
+                    name="my-package",
+                    version="0.1.0",
+                  ),
+                  repositories=["skip"],
+                )
+                """
+            ),
+        }
+    )
+
+    result = rule_runner.run_goal_rule(
+        Publish,
+        args=(
+            f"--output=published.json",
+            "src:dist",
+        ),
+        env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+    )
+
+    assert result.exit_code == 0
+    assert "my-package-0.1.0.tar.gz skipped (requested)." in result.stderr
+    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+
+    expected = [
+        {
+            "names": [
+                "my-package-0.1.0.tar.gz",
+                "my_package-0.1.0-py3-none-any.whl",
+            ],
+            "published": False,
+            "status": "skipped (requested)",
+            "target": "src:dist",
+        },
+    ]
+
+    with open("published.json") as fd:
+        data = json.load(fd)
+        assert data == expected
 
 
 @pytest.mark.skip("Can not run interactive process from test..?")
