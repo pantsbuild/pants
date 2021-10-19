@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 import pytest
 
 from pants.engine.addresses import Address
+from pants.engine.fs import Paths
 from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
@@ -27,6 +28,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OverridesField,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -39,6 +41,8 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
+from pants.option.global_options import FilesNotFoundBehavior
+from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -457,6 +461,7 @@ def test_generate_file_level_targets() -> None:
         *,
         add_dependencies_on_all_siblings: bool = False,
         use_generated_addr_syntax: bool = False,
+        overrides: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> GeneratedTargets:
         return generate_file_level_targets(
             MockGenerated,
@@ -466,6 +471,7 @@ def test_generate_file_level_targets() -> None:
             add_dependencies_on_all_siblings=add_dependencies_on_all_siblings,
             use_generated_address_syntax=use_generated_addr_syntax,
             use_source_field=False,
+            overrides=overrides,
         )
 
     tgt = MockGenerator(
@@ -539,6 +545,22 @@ def test_generate_file_level_targets() -> None:
         ],
     )
 
+    # Can override fields.
+    assert generate(
+        tgt, ["demo/f1.ext"], overrides={"demo/f1.ext": {"tags": ["overridden"]}}
+    ) == GeneratedTargets(
+        tgt,
+        [
+            MockGenerated(
+                {
+                    MultipleSourcesField.alias: ["f1.ext"],
+                    Tags.alias: ["overridden"],
+                },
+                Address("demo", relative_file_path="f1.ext"),
+            ),
+        ],
+    )
+
     # The file path must match the filespec of the generator target's SourcesField.
     with pytest.raises(AssertionError) as exc:
         generate(tgt, ["demo/fake.ext"])
@@ -606,6 +628,29 @@ def test_generated_targets_address_validation() -> None:
             MockTarget({}, Address("dir", target_name="generator", relative_file_path="gen")),
         ],
     )
+
+
+def test_generated_targets_unused_overrides() -> None:
+    class MockGenerator(Target):
+        alias = "generator"
+        core_fields = (Dependencies, Tags, MultipleSourcesField)
+
+    class MockGenerated(Target):
+        alias = "generated"
+        core_fields = (Dependencies, Tags, SingleSourceField)
+
+    with pytest.raises(InvalidFieldException) as exc:
+        generate_file_level_targets(
+            MockGenerated,
+            MockGenerator(
+                {MultipleSourcesField.alias: ["f*.ext"]}, Address("dir", target_name="gen")
+            ),
+            ["dir/f1.ext", "dir/f2.ext"],
+            None,
+            add_dependencies_on_all_siblings=False,
+            overrides={"dir/fake.ext": {"tags": ["overridden"]}},
+        )
+    assert "Unused file paths in the `overrides` field for dir:gen: ['fake.ext']" in str(exc.value)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1181,3 +1226,73 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
     assert f"['{another_dir}', '{addr_a}']" in caplog.text
     maybe_warn([addr_a, addr_b, another_dir], ignores=[addr_b], owners_must_be_ancestors=True)
     assert not caplog.records
+
+
+# -----------------------------------------------------------------------------------------------
+# Test `overrides` field
+# -----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw_value",
+    [
+        0,
+        object(),
+        "hello",
+        ["hello"],
+        ["hello", "world"],
+        {"hello": 0},
+        {0: "world"},
+        {"hello": "world"},
+        {("hello",): "world"},
+        {("hello",): ["world"]},
+        {(0,): {"field": "value"}},
+        {("hello",): {0: "value"}},
+    ],
+)
+def test_overrides_field_data_validation(raw_value: Any) -> None:
+    with pytest.raises(InvalidFieldTypeException):
+        OverridesField(raw_value, Address("", target_name="example"))
+
+
+def test_overrides_field_normalization() -> None:
+    addr = Address("", target_name="example")
+
+    assert OverridesField(None, addr).value is None
+    assert OverridesField({}, addr).value == {}
+
+    # Note that `list_field` is not hashable. We have to override `__hash__` for this to work.
+    tgt1_override = {"str_field": "value", "list_field": [0, 1, 3]}
+    tgt2_override = {"int_field": 0, "dict_field": {"a": 0}}
+
+    # Convert a `str` key to `tuple[str, ...]`.
+    field = OverridesField({"tgt1": tgt1_override, ("tgt1", "tgt2"): tgt2_override}, addr)
+    assert field.value == {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    with no_exception():
+        hash(field)
+
+    path_field = OverridesField(
+        {"foo.ext": tgt1_override, ("foo.ext", "bar*.ext"): tgt2_override}, Address("dir")
+    )
+    to_globs = [
+        path_globs.globs for path_globs in path_field.to_path_globs(FilesNotFoundBehavior.error)
+    ]
+    assert to_globs == [("dir/foo.ext",), ("dir/bar*.ext", "dir/foo.ext")]
+    assert path_field.flatten_paths(
+        {
+            Paths(("dir/foo.ext",), ()): tgt1_override,
+            Paths(("dir/bar1.ext", "dir/bar2.ext"), ()): tgt2_override,
+        },
+    ) == {
+        "dir/foo.ext": tgt1_override,
+        "dir/bar1.ext": tgt2_override,
+        "dir/bar2.ext": tgt2_override,
+    }
+    with pytest.raises(InvalidFieldException):
+        # Same field is overridden for the same file multiple times, which is an error.
+        path_field.flatten_paths(
+            {
+                Paths(("dir/foo.ext",), ()): tgt1_override,
+                Paths(("dir/foo.ext", "dir/bar.ext"), ()): tgt1_override,
+            }
+        )
