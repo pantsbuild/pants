@@ -6,10 +6,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Callable
 
 import pytest
-import yaml
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.register import rules as python_rules
@@ -162,7 +160,7 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(
         Publish,
         args=(
-            f"--output=published.json",
+            "--output=published.json",
             "src:dist",
         ),
         env_inherit={"HOME", "PATH", "PYENV_ROOT"},
