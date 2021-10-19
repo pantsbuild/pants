@@ -63,6 +63,7 @@ async def compile_java_source(
     request: CompileJavaSourceRequest,
 ) -> FallibleCompiledClassfiles:
     # Request the component's direct dependency classpath.
+    print(f"deps: {', '.join(str(dep) for dep in request.component.dependencies)}")
     direct_dependency_classfiles_fallible = await MultiGet(
         Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=coarsened_dep))
         for coarsened_dep in request.component.dependencies

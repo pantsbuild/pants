@@ -10,6 +10,9 @@ import pytest
 
 from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
+from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
@@ -17,12 +20,13 @@ from pants.core.goals.check import CheckResults
 from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets, Sources
 from pants.jvm import jdk_rules
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
@@ -37,7 +41,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 
 
 @pytest.fixture
@@ -57,10 +61,16 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *coursier_rules(),
             *jdk_rules.rules(),
+            *java_dep_inf_rules(),
+            *java_parser.rules(),
+            *java_parser_launcher.rules(),
+            *source_files.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
+            # QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
     )
@@ -487,6 +497,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     assert classpath.content == {".Main.java.main.jar": {"org/pantsbuild/main/Main.class"}}
 
 
+@logging
 @maybe_skip_jdk_test
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
@@ -551,13 +562,22 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
         }
     )
 
+    ctgt = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="main")
+    )
+    print(f"ctgt={ctgt}")
+
+    # source_files = rule_runner.request(SourceFiles, [SourceFilesRequest(tgt.get(Sources) for tgt in ctgt.members)])
+    # analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
+    # print(f"analysis={analysis}")
+
+    # rule_runner.request(JavaSourceDependencyAnalysis, [])
+
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
         [
             CompileJavaSourceRequest(
-                component=expect_single_expanded_coarsened_target(
-                    rule_runner, Address(spec_path="", target_name="main")
-                )
+                component=ctgt
             )
         ],
     )
