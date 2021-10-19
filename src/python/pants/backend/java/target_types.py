@@ -19,6 +19,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.target_types import JvmCompatibleResolveNamesField
 
 
 class JavaSourceField(SingleSourceField):
@@ -42,8 +43,8 @@ class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         JavaTestSourceField,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Java test, run with JUnit."
 
@@ -93,6 +94,7 @@ class JavaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourceField,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Java source file containing application or library code."
 
@@ -103,7 +105,12 @@ class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
 
 class JavaSourcesGeneratorTarget(Target):
     alias = "java_sources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JavaSourcesGeneratorSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        JavaSourcesGeneratorSourcesField,
+        JvmCompatibleResolveNamesField,
+    )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 

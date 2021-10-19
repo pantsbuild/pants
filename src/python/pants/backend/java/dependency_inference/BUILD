@@ -12,6 +12,9 @@ resources(name="java_src", sources=["*.java"])
 
 java_sources(
     name="javaparser",
+    compatible_resolves=[
+      "pants_core",  # TODO: define pants_core resolve.
+    ],
     dependencies=[
         ":javaparser_lockfile",
         ":com.github.javaparser_javaparser-symbol-solver-core",

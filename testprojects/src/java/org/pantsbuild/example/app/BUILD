@@ -7,6 +7,5 @@ deploy_jar(
     dependencies=[":app"],
 )
 
-java_sources(dependencies=[":lockfile"])
-
+java_sources(compatible_resolves=["exampleapp"])
 coursier_lockfile(name="lockfile", source="coursier_resolve.lockfile")
