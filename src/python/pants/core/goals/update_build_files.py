@@ -131,8 +131,8 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
             type=bool,
             default=True,
             help=(
-                "Automatically fix deprecations that are safe because they do not change "
-                "semantics, such as renaming target types."
+                "Automatically fix deprecations, such as target type renames, that are safe "
+                "because they do not change semantics."
             ),
         )
 
