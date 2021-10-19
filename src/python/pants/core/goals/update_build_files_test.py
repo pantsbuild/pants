@@ -11,7 +11,7 @@ import pytest
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.util_rules import pex
 from pants.core.goals.update_build_files import (
-    AutoformatWithBlackRequest,
+    FormatWithBlackRequest,
     RenameDeprecatedTargetsRequest,
     RenamedTargetTypes,
     RewrittenBuildFile,
@@ -127,7 +127,7 @@ def black_rule_runner() -> RuleRunner:
             *pex.rules(),
             SubsystemRule(Black),
             SubsystemRule(UpdateBuildFilesSubsystem),
-            UnionRule(RewrittenBuildFileRequest, AutoformatWithBlackRequest),
+            UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         )
     )
 

@@ -92,7 +92,7 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
     help = (
-        "Autoformat and fix safe deprecations in BUILD files.\n\n"
+        "Format and fix safe deprecations in BUILD files.\n\n"
         "This does not handle the full Pants upgrade. You must still manually change "
         "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
         f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
@@ -142,7 +142,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
     @property
     def fmt(self) -> bool:
-        return cast(bool, self.options.autoformat)
+        return cast(bool, self.options.fmt)
 
     @property
     def fix_safe_deprecations(self) -> bool:
@@ -173,7 +173,7 @@ async def update_build_files(
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
-        if issubclass(request, AutoformatWithBlackRequest):
+        if issubclass(request, FormatWithBlackRequest):
             if update_build_files_subsystem.fmt:
                 rewrite_request_classes.append(request)
             else:
@@ -245,13 +245,13 @@ async def update_build_files(
 # ------------------------------------------------------------------------------------------
 
 
-class AutoformatWithBlackRequest(RewrittenBuildFileRequest):
+class FormatWithBlackRequest(RewrittenBuildFileRequest):
     pass
 
 
 @rule
-async def autoformat_build_file_with_black(
-    request: AutoformatWithBlackRequest, black: Black
+async def format_build_file_with_black(
+    request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
     black_pex_get = Get(
         VenvPex,
@@ -377,5 +377,5 @@ def rules():
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         # NB: We want this to come at the end so that running Black happens after all our
         # deprecation fixers.
-        UnionRule(RewrittenBuildFileRequest, AutoformatWithBlackRequest),
+        UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
     )
