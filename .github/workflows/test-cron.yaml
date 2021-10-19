@@ -350,6 +350,8 @@ jobs:
     - name: Lint
       run: './pants validate ''**''
 
+        ./pants update-build-files --check
+
         ./pants lint check ::
 
         '
