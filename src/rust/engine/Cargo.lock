@@ -146,23 +146,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
-name = "bazel_protos"
-version = "0.0.1"
-dependencies = [
- "bytes",
- "copy_dir",
- "dir-diff",
- "hashing",
- "prost",
- "prost-build",
- "prost-types",
- "tempfile",
- "tonic",
- "tonic-build",
- "walkdir 2.3.1",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,7 +186,6 @@ dependencies = [
 name = "brfs"
 version = "0.0.1"
 dependencies = [
- "bazel_protos",
  "bytes",
  "clap",
  "dirs-next",
@@ -217,6 +199,7 @@ dependencies = [
  "log 0.4.14",
  "parking_lot",
  "protobuf",
+ "protos",
  "store",
  "task_executor",
  "tempfile",
@@ -256,6 +239,18 @@ name = "bytes"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
+
+[[package]]
+name = "cache"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "grpc_util",
+ "hashing",
+ "protos",
+ "sharded_lmdb",
+ "task_executor",
+]
 
 [[package]]
 name = "cargo_metadata"
@@ -396,15 +391,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd51eab21ab4fd6a3bf889e2d0958c0a6e3a61ad04260325e919e652a2a62826"
 
 [[package]]
-name = "copy_dir"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e4281031634644843bd2f5aa9c48cf98fc48d6b083bd90bb11becf10deaf8b0"
-dependencies = [
- "walkdir 0.1.8",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -469,7 +455,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
- "walkdir 2.3.1",
+ "walkdir",
 ]
 
 [[package]]
@@ -592,15 +578,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dir-diff"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2860407d7d7e2e004bb2128510ad9e8d669e76fa005ccf567977b5d71b8b4a0b"
-dependencies = [
- "walkdir 2.3.1",
-]
-
-[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -666,8 +643,8 @@ dependencies = [
  "async-trait",
  "async_latch",
  "async_semaphore",
- "bazel_protos",
  "bytes",
+ "cache",
  "concrete_time",
  "cpython",
  "crossbeam-channel 0.4.4",
@@ -694,12 +671,12 @@ dependencies = [
  "parking_lot",
  "petgraph",
  "process_execution",
+ "protos",
  "rand 0.8.2",
  "regex",
  "reqwest",
  "rule_graph",
  "serde_json",
- "sharded_lmdb",
  "smallvec 0.6.14",
  "stdio",
  "store",
@@ -846,7 +823,6 @@ dependencies = [
 name = "fs_util"
 version = "0.0.1"
 dependencies = [
- "bazel_protos",
  "bytes",
  "clap",
  "env_logger",
@@ -856,6 +832,7 @@ dependencies = [
  "hashing",
  "parking_lot",
  "prost",
+ "protos",
  "rand 0.8.2",
  "serde",
  "serde_derive",
@@ -1325,7 +1302,7 @@ dependencies = [
  "regex",
  "same-file",
  "thread_local",
- "walkdir 2.3.1",
+ "walkdir",
  "winapi-util",
 ]
 
@@ -1524,9 +1501,9 @@ dependencies = [
 name = "local_execution_server"
 version = "0.1.0"
 dependencies = [
- "bazel_protos",
  "clap",
  "mock",
+ "protos",
  "structopt 0.2.18",
 ]
 
@@ -1713,7 +1690,6 @@ name = "mock"
 version = "0.0.1"
 dependencies = [
  "async-stream",
- "bazel_protos",
  "bytes",
  "futures",
  "grpc_util",
@@ -1723,6 +1699,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "prost-types",
+ "protos",
  "testutil",
  "tokio",
  "tonic",
@@ -1812,7 +1789,7 @@ dependencies = [
  "libc",
  "mio 0.6.23",
  "mio-extras",
- "walkdir 2.3.1",
+ "walkdir",
  "winapi 0.3.9",
 ]
 
@@ -2225,9 +2202,9 @@ dependencies = [
  "async-lock",
  "async-trait",
  "async_semaphore",
- "bazel_protos",
  "bincode",
  "bytes",
+ "cache",
  "concrete_time",
  "derivative",
  "double-checked-cell-async",
@@ -2245,6 +2222,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "prost-types",
+ "protos",
  "rand 0.8.2",
  "regex",
  "serde",
@@ -2265,7 +2243,7 @@ dependencies = [
  "tryfuture",
  "uname",
  "uuid",
- "walkdir 2.3.1",
+ "walkdir",
  "workunit_store",
 ]
 
@@ -2273,7 +2251,6 @@ dependencies = [
 name = "process_executor"
 version = "0.0.1"
 dependencies = [
- "bazel_protos",
  "clap",
  "dirs-next",
  "env_logger",
@@ -2284,6 +2261,7 @@ dependencies = [
  "log 0.4.14",
  "process_execution",
  "prost",
+ "protos",
  "shlex",
  "store",
  "structopt 0.3.20",
@@ -2350,6 +2328,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db50e77ae196458ccd3dc58a31ea1a90b0698ab1b7928d89f644c25d72070267"
 dependencies = [
  "bytes",
+]
+
+[[package]]
+name = "protos"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "hashing",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "tonic",
+ "tonic-build",
 ]
 
 [[package]]
@@ -3079,7 +3070,6 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "bazel_protos",
  "bytes",
  "concrete_time",
  "criterion",
@@ -3102,6 +3092,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "prost-types",
+ "protos",
  "serde",
  "serde_derive",
  "sharded_lmdb",
@@ -3114,7 +3105,7 @@ dependencies = [
  "tower-service",
  "tryfuture",
  "uuid",
- "walkdir 2.3.1",
+ "walkdir",
  "workunit_store",
 ]
 
@@ -3282,12 +3273,12 @@ name = "testutil"
 version = "0.0.1"
 dependencies = [
  "async-stream",
- "bazel_protos",
  "bytes",
  "fs",
  "grpc_util",
  "hashing",
  "prost",
+ "protos",
 ]
 
 [[package]]
@@ -3719,16 +3710,6 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-
-[[package]]
-name = "walkdir"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c66c0b9792f0a765345452775f3adbd28dde9d33f30d13e5dcc5ae17cf6f3780"
-dependencies = [
- "kernel32-sys",
- "winapi 0.2.8",
-]
 
 [[package]]
 name = "walkdir"

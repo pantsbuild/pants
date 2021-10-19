@@ -16,6 +16,17 @@ from pants.engine.target import (
 )
 
 
+class DockerBuildArgsField(StringSequenceField):
+    alias = "extra_build_args"
+    default = ()
+    help = (
+        "Build arguments (`--build-arg`) to use when building this image. "
+        "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
+        "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
+        "Use `[docker].build_args` to set default build args for all images."
+    )
+
+
 class DockerImageSources(MultipleSourcesField):
     default = ("Dockerfile",)
     expected_num_files = 1
@@ -100,6 +111,7 @@ class DockerImage(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        DockerBuildArgsField,
         DockerDependencies,
         DockerImageSources,
         DockerImageTags,

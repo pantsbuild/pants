@@ -96,7 +96,7 @@ impl Scheduler {
   ///
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
-  pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
+  pub fn invalidate_paths(&self, paths: &HashSet<PathBuf>) -> usize {
     self.core.graph.invalidate(paths, "external")
   }
 
@@ -105,6 +105,13 @@ impl Scheduler {
   ///
   pub fn invalidate_all_paths(&self) -> usize {
     self.core.graph.invalidate_all("external")
+  }
+
+  ///
+  /// Invalidate the entire graph.
+  ///
+  pub fn invalidate_all(&self) {
+    self.core.graph.clear();
   }
 
   ///

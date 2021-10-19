@@ -22,6 +22,7 @@ members = [
   "async_latch",
   "async_semaphore",
   "async_value",
+  "cache",
   "client",
   "concrete_time",
   "engine_pyo3",
@@ -62,8 +63,9 @@ default-members = [
   ".",
   "async_latch",
   "async_semaphore",
-  "client",
   "async_value",
+  "cache",
+  "client",
   "concrete_time",
   "engine_pyo3",
   "fs",
@@ -106,8 +108,9 @@ default = []
 async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
-bazel_protos = { path = "bazel_protos" }
+protos = { path = "protos" }
 bytes = "1.0"
+cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 # TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
 cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
@@ -137,7 +140,6 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }

@@ -103,6 +103,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joe Smith
 + Johan Oskarsson
 + John Barry
++ John Basila
 + John Chee
 + John Gallagher
 + John Ioannidis

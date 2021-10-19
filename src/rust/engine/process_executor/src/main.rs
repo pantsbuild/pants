@@ -32,13 +32,13 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2::{Action, Command};
-use bazel_protos::gen::buildbarn::cas::UncachedActionResult;
-use bazel_protos::require_digest;
 use fs::RelativePath;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
+use protos::gen::buildbarn::cas::UncachedActionResult;
+use protos::require_digest;
 use store::{Store, StoreWrapper};
 use structopt::StructOpt;
 use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};

@@ -8,9 +8,11 @@ python_sources(
 
 resources(name="impl", sources=["*.c"])
 
+resources(name="pyproject", sources=["pyproject.toml"])
+
 python_distribution(
     name = "dist",
-    dependencies = [":impl", ":lib"],
+    dependencies = [":pyproject", ":impl", ":lib"],
     generate_setup = False,
     provides = python_artifact(
         name = "native",

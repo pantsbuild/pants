@@ -98,6 +98,10 @@ class DockerOptions(Subsystem):
         return tuple(sorted(set(self.options.build_args)))
 
     @property
+    def env_vars(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.options.env_vars)))
+
+    @property
     def env_vars_to_pass_to_docker(self) -> tuple[str, ...]:
         return tuple(
             sorted(

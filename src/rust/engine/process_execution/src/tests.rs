@@ -6,8 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
 use crate::{Process, ProcessResultMetadata, ProcessResultSource};
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use prost_types::Timestamp;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 
 #[test]

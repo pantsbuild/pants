@@ -2,7 +2,8 @@ use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
-use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
+use cache::PersistentCache;
+use sharded_lmdb::DEFAULT_LEASE_TIME;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -43,8 +44,8 @@ fn create_cached_runner(
   let cache_dir = TempDir::new().unwrap();
   let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
 
-  let process_execution_store = ShardedLmdb::new(
-    cache_dir.path().to_owned(),
+  let cache = PersistentCache::new(
+    cache_dir.path(),
     max_lmdb_size,
     runtime.clone(),
     DEFAULT_LEASE_TIME,
@@ -54,7 +55,7 @@ fn create_cached_runner(
 
   let runner = Box::new(crate::cache::CommandRunner::new(
     local.into(),
-    process_execution_store,
+    cache,
     store,
     ProcessMetadata::default(),
   ));

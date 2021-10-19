@@ -113,7 +113,7 @@ def test_docker_skip_push(rule_runner: RuleRunner) -> None:
     assert_publish(
         result[0],
         ("skip-test/skip-test:latest",),
-        "(by `skip_push` on src/skip-test)",
+        "(by `skip_push` on src/skip-test:skip-test)",
         None,
     )
 

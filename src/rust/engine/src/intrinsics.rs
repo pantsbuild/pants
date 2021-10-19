@@ -3,10 +3,9 @@ use std::process::Stdio;
 
 use crate::context::Context;
 use crate::externs;
-use crate::nodes::MultiPlatformExecuteProcess;
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, NodeResult, Paths, SessionValues,
-  Snapshot,
+  lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
+  NodeResult, Paths, SessionValues, Snapshot,
 };
 use crate::python::{throw, Value};
 use crate::tasks::Intrinsic;

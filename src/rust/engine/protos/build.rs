@@ -21,12 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "protos/googleapis/google/rpc/error_details.proto",
         "protos/googleapis/google/rpc/status.proto",
         "protos/googleapis/google/longrunning/operations.proto",
+        "protos/pants/cache.proto",
         "protos/standard/google/protobuf/empty.proto",
       ],
       &[
         "protos/bazelbuild_remote-apis",
         "protos/buildbarn",
         "protos/googleapis",
+        "protos/pants",
         "protos/standard",
       ],
     )?;

@@ -734,12 +734,6 @@ class PythonSourcesGeneratorTarget(Target):
 
     deprecated_alias = "python_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
-    deprecated_alias_removal_hint = (
-        "Use `python_sources` instead, which behaves the same.\n\n"
-        "To automate fixing this, download "
-        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
-        "`python3 rename_targets_pants28.py --help` for instructions."
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -958,12 +952,6 @@ class PythonRequirementTarget(Target):
 
     deprecated_alias = "python_requirement_library"
     deprecated_alias_removal_version = "2.9.0.dev0"
-    deprecated_alias_removal_hint = (
-        "Use `python_requirement` instead, which behaves the same.\n\n"
-        "To automate fixing this, download "
-        f"{git_url('build-support/migration-support/rename_targets_pants28.py')}, then run "
-        "`python3 rename_targets_pants28.py --help` for instructions."
-    )
 
     def validate(self) -> None:
         if (

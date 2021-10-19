@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 async-stream = "0.3"
 async-trait = "0.1"
-bazel_protos = { path = "../../bazel_protos" }
+protos = { path = "../../protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
 double-checked-cell-async = "2.0"

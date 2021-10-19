@@ -32,7 +32,6 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bazel_protos::require_digest;
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
@@ -44,6 +43,7 @@ use grpc_util::prost::MessageExt;
 use grpc_util::tls::{CertificateCheck, MtlsConfig};
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
 use store::{
