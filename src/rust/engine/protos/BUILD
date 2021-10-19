@@ -2,6 +2,4 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Track files depended on to build the native engine to allow for downstream invalidations.
-files(
-  sources=["**/Cargo.*", "**/*.rs", "!**/target/*"],
-)
+files(sources=["**/Cargo.*", "**/*.rs", "!**/target/*"])
