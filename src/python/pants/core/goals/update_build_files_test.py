@@ -18,7 +18,7 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
-    autoformat_build_file_with_black,
+    format_build_file_with_black,
     maybe_rename_deprecated_targets,
     update_build_files,
 )
@@ -121,7 +121,7 @@ BLACK_ENV_INHERIT = {"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"}
 def black_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            autoformat_build_file_with_black,
+            format_build_file_with_black,
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
