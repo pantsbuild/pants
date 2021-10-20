@@ -76,7 +76,12 @@ def rule_runner() -> RuleRunner:
             DeployJar,
         ],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=[
+            '--jvm-resolves={"test": "coursier_resolve.lockfile"}',
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     return rule_runner
 
 
@@ -248,16 +253,8 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
-                        dependencies=[
-                            ":lockfile",
-                        ],
+                        compatible_resolves=["test", ],
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
@@ -288,16 +285,8 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     java_sources(
                         name="example",
                         sources=["**/*.java", ],
-                        dependencies=[
-                            ":lockfile",
-                        ],
+                        compatible_resolves=["test", ],
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
@@ -328,9 +317,9 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
+                        compatible_resolves=["test", ],
                         sources=["**/*.java", ],
                         dependencies=[
-                            ":lockfile",
                             ":com.fasterxml.jackson.core_jackson-databind",
                         ],
                     )
@@ -341,12 +330,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                         artifact = "jackson-databind",
                         version = "2.12.5",
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": COURSIER_LOCKFILE_SOURCE,

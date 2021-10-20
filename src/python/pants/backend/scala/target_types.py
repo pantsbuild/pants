@@ -17,6 +17,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.target_types import JvmCompatibleResolveNamesField
 
 
 class ScalaSourceField(SingleSourceField):
@@ -42,6 +43,7 @@ class ScalaJunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaTestSourceField,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Scala test, run with JUnit."
 
@@ -61,6 +63,7 @@ class ScalaJunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaTestsGeneratorSourcesField,
         Dependencies,
+        JvmCompatibleResolveNamesField,
     )
     help = (
         "Generate a `junit_test` target for each file in the `sources` field (defaults to "
@@ -100,6 +103,7 @@ class ScalaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourceField,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -115,7 +119,12 @@ class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSources):
 
 class ScalaSourcesGeneratorTarget(Target):
     alias = "scala_sources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ScalaSourcesGeneratorSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ScalaSourcesGeneratorSourcesField,
+        JvmCompatibleResolveNamesField,
+    )
     help = (
         "Generate a `scala_source` target for each file in the `sources` field (defaults to "
         "all files named in the directory whose names end in `.scala` except for those which "

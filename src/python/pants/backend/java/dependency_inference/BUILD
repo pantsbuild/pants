@@ -13,7 +13,7 @@ resources(name="java_src", sources=["*.java"])
 java_sources(
     name="javaparser",
     compatible_resolves=[
-      "pants_core",  # TODO: define pants_core resolve.
+      "pants_java_parser",
     ],
     dependencies=[
         ":javaparser_lockfile",
@@ -30,10 +30,10 @@ jvm_artifact(
 )
 
 jvm_artifact(
-    name="com.fasterxml.jackson.core_jackson-databind",
-    group="com.fasterxml.jackson.core",
-    artifact="jackson-databind",
-    version="2.12.4",
+  name = "com.fasterxml.jackson.core_jackson-databind",
+  group = "com.fasterxml.jackson.core",
+  artifact = "jackson-databind",
+  version = "2.12.4",
 )
 
 coursier_lockfile(name="javaparser_lockfile", source="coursier_resolve.lockfile")

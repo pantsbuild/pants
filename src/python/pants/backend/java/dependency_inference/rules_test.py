@@ -37,6 +37,8 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
+NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -61,6 +63,9 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
+        bootstrap_args=[
+            NAMED_RESOLVE_OPTIONS,
+        ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -72,7 +77,10 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -118,7 +126,10 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -132,7 +143,10 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
             ),
             "sub/BUILD": dedent(
                 """\
-                java_sources(name = 'b')
+                java_sources(
+                    name = 'b',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "sub/B.java": dedent(
@@ -162,7 +176,10 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -176,7 +193,10 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
             ),
             "sub/BUILD": dedent(
                 """\
-                java_sources(name = 'b')
+                java_sources(
+                    name = 'b',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "sub/B.java": dedent(
@@ -268,7 +288,10 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "Main.java": dedent(
@@ -291,7 +314,10 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -333,7 +359,10 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -414,7 +443,10 @@ def test_package_private_dep(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "A.java": dedent(
@@ -463,8 +495,14 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'lib')
-                junit_tests(name = 'tests')
+                java_sources(
+                    name = 'lib',
+                    compatible_resolves=["test", ],
+                )
+                junit_tests(
+                    name = 'tests',
+                    compatible_resolves=["test", ],
+                )
                 """
             ),
             "FooTest.java": dedent(
