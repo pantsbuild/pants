@@ -73,6 +73,7 @@ async def create_pex_binary_run_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             [field_set.address],
+            internal_only=True,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             sources=sources,
         ),

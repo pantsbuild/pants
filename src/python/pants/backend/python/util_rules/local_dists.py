@@ -18,15 +18,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    Digest,
-    DigestContents,
-    DigestSubset,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import Digest, DigestContents, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.util.dirutil import fast_relpath_optional
@@ -42,6 +34,7 @@ class LocalDistsPexRequest:
     """Request to build the local dists from the dependency closure of a set of addresses."""
 
     addresses: Addresses
+    internal_only: bool
     interpreter_constraints: InterpreterConstraints
     # The result will return these with the sources provided by the dists subtracted out.
     # This will help the caller prevent sources from appearing twice on sys.path.
@@ -50,13 +43,13 @@ class LocalDistsPexRequest:
     def __init__(
         self,
         addresses: Iterable[Address],
+        internal_only: bool,
         *,
         interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
-        sources: PythonSourceFiles = PythonSourceFiles(
-            SourceFiles(EMPTY_SNAPSHOT, tuple()), tuple()
-        ),
+        sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
         self.addresses = Addresses(addresses)
+        self.internal_only = internal_only
         self.interpreter_constraints = interpreter_constraints
         self.sources = sources
 
@@ -138,7 +131,7 @@ async def build_local_dists(
             requirements=PexRequirements(wheels),
             interpreter_constraints=request.interpreter_constraints,
             additional_inputs=wheels_digest,
-            internal_only=True,
+            internal_only=request.internal_only,
         ),
     )
 

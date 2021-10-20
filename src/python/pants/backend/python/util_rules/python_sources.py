@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
@@ -11,7 +13,7 @@ from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.fs import MergeDigests, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
 from pants.engine.unions import UnionMembership
@@ -38,6 +40,10 @@ class PythonSourceFiles:
 
     source_files: SourceFiles
     source_roots: Tuple[str, ...]  # Source roots for the specified source files.
+
+    @classmethod
+    def empty(cls) -> PythonSourceFiles:
+        return cls(SourceFiles(EMPTY_SNAPSHOT, tuple()), tuple())
 
 
 @dataclass(frozen=True)

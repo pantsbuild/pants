@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     Pex,
@@ -27,12 +28,20 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    Digest,
+    DigestContents,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -197,16 +206,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         )
         all_targets = transitive_targets.closure
 
-    input_digests = []
-    if request.additional_sources:
-        input_digests.append(request.additional_sources)
-    if request.include_source_files:
-        prepared_sources = await Get(
-            StrippedPythonSourceFiles, PythonSourceFilesRequest(all_targets)
-        )
-        input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
-    merged_input_digest = await Get(Digest, MergeDigests(input_digests))
-
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
@@ -218,6 +217,38 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         interpreter_constraints = calculated_constraints or InterpreterConstraints(
             python_setup.interpreter_constraints
         )
+
+    sources_digests = []
+    if request.additional_sources:
+        sources_digests.append(request.additional_sources)
+    if request.include_source_files:
+        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(all_targets))
+    else:
+        sources = PythonSourceFiles.empty()
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            request.addresses,
+            internal_only=request.internal_only,
+            interpreter_constraints=interpreter_constraints,
+            sources=sources,
+        ),
+    )
+
+    remaining_sources_stripped = await Get(
+        StrippedPythonSourceFiles, PythonSourceFiles, local_dists.remaining_sources
+    )
+    sources_digests.append(remaining_sources_stripped.stripped_source_files.snapshot.digest)
+
+    merged_sources_digest, additional_inputs = await MultiGet(
+        Get(Digest, MergeDigests(sources_digests)),
+        Get(
+            Digest,
+            MergeDigests([(request.additional_inputs or EMPTY_DIGEST), local_dists.pex.digest]),
+        ),
+    )
+    additional_args = request.additional_args + ("--requirements-pex", local_dists.pex.name)
 
     requirements = PexRequirements.create_from_requirement_fields(
         (
@@ -308,9 +339,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         main=request.main,
-        sources=merged_input_digest,
-        additional_inputs=request.additional_inputs,
-        additional_args=request.additional_args,
+        sources=merged_sources_digest,
+        additional_inputs=additional_inputs,
+        additional_args=additional_args,
         description=description,
     )
 

@@ -123,6 +123,7 @@ async def package_pex_binary(
         )
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
+
     pex = await Get(
         Pex,
         PexFromTargetsRequest(
