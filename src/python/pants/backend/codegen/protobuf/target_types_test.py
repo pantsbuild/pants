@@ -17,7 +17,7 @@ from pants.engine.target import GeneratedTargets, SingleSourceField, Tags
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-def test_generate_source_and_test_targets() -> None:
+def test_generate_source_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),

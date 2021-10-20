@@ -1,6 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import os
 import tarfile
 import zipfile
 from io import BytesIO
@@ -10,14 +13,20 @@ from pants.backend.python import target_types_rules as python_target_type_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core import target_types as core_target_types
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     ArchiveFieldSet,
     ArchiveTarget,
     FilesGeneratorTarget,
     FileSourceField,
+    FileTarget,
+    GenerateTargetsFromFiles,
+    GenerateTargetsFromResources,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
+    ResourcesGeneratorTarget,
+    ResourceTarget,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules.archive import rules as archive_rules
@@ -27,7 +36,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
 from pants.engine.target import (
     GeneratedSources,
+    GeneratedTargets,
+    SingleSourceField,
     SourcesField,
+    Tags,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -249,3 +261,78 @@ def test_archive() -> None:
         assert get_file("data/d1.json") == b"{'k': 1}"
         assert get_file("data/d2.json") == b"{'k': 2}"
         assert_archive1_is_valid(get_file("archive1.zip"))
+
+
+def test_generate_file_and_resource_targets() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            core_target_types.generate_targets_from_files,
+            core_target_types.generate_targets_from_resources,
+            QueryRule(GeneratedTargets, [GenerateTargetsFromFiles]),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromResources]),
+        ],
+        target_types=[FilesGeneratorTarget, ResourcesGeneratorTarget],
+    )
+    rule_runner.write_files(
+        {
+            "assets/BUILD": dedent(
+                """\
+                files(
+                    name='files',
+                    sources=['**/*.ext'],
+                    overrides={'f1.ext': {'tags': ['overridden']}},
+                )
+
+                resources(
+                    name='resources',
+                    sources=['**/*.ext'],
+                    overrides={'f1.ext': {'tags': ['overridden']}},
+                )
+                """
+            ),
+            "assets/f1.ext": "",
+            "assets/f2.ext": "",
+            "assets/subdir/f.ext": "",
+        }
+    )
+
+    files_generator = rule_runner.get_target(Address("assets", target_name="files"))
+    resources_generator = rule_runner.get_target(Address("assets", target_name="resources"))
+
+    def gen_file_tgt(rel_fp: str, tags: list[str] | None = None) -> FileTarget:
+        return FileTarget(
+            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
+            Address("assets", target_name="files", relative_file_path=rel_fp),
+            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
+        )
+
+    def gen_resource_tgt(rel_fp: str, tags: list[str] | None = None) -> ResourceTarget:
+        return ResourceTarget(
+            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
+            Address("assets", target_name="resources", relative_file_path=rel_fp),
+            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
+        )
+
+    generated_files = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromFiles(files_generator)]
+    )
+    generated_resources = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromResources(resources_generator)]
+    )
+
+    assert generated_files == GeneratedTargets(
+        files_generator,
+        {
+            gen_file_tgt("f1.ext", tags=["overridden"]),
+            gen_file_tgt("f2.ext"),
+            gen_file_tgt("subdir/f.ext"),
+        },
+    )
+    assert generated_resources == GeneratedTargets(
+        resources_generator,
+        {
+            gen_resource_tgt("f1.ext", tags=["overridden"]),
+            gen_resource_tgt("f2.ext"),
+            gen_resource_tgt("subdir/f.ext"),
+        },
+    )
