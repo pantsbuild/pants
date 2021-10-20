@@ -56,8 +56,10 @@ class PythonTestFieldSet(TestFieldSet):
     def opt_out(cls, tgt: Target) -> bool:
         if tgt.get(SkipPythonTestsField).value:
             return True
-        # TODO: Replace this by having `python_tests` generate `python_source` targets for these
-        #  files.
+        # TODO(#13238): Remove once we finish deprecating special-casing of `conftest.py`. For now,
+        #  we need this so that we can run explicitly declared `python_test` targets.
+        if not tgt.address.is_file_target:
+            return False
         file_name = PurePath(tgt.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
