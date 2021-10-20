@@ -1,16 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import textwrap
 from typing import List, Sequence
 
 import pytest
 
 from pants.backend.terraform import style, tool
+from pants.backend.terraform.goals import check
+from pants.backend.terraform.goals.check import TerraformCheckRequest
 from pants.backend.terraform.lint import fmt
-from pants.backend.terraform.lint.validate import validate
-from pants.backend.terraform.lint.validate.validate import ValidateRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -26,11 +28,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *fmt.rules(),
-            *validate.rules(),
+            *check.rules(),
             *tool.rules(),
             *style.rules(),
             *source_files.rules(),
-            QueryRule(LintResults, (ValidateRequest,)),
+            QueryRule(CheckResults, (TerraformCheckRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
@@ -77,18 +79,12 @@ def run_terraform_validate(
     rule_runner: RuleRunner,
     targets: List[Target],
     *,
-    skip: bool = False,
-) -> Sequence[LintResult]:
-    args = [
-        "--backend-packages=pants.backend.experimental.terraform",
-        "--backend-packages=pants.backend.experimental.terraform.lint.validate",
-    ]
-    if skip:
-        args.append("--terraform-validate-skip")
-    rule_runner.set_options(args)
+    args: list[str] | None = None,
+) -> Sequence[CheckResult]:
+    rule_runner.set_options(args or ())
     field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [ValidateRequest(field_sets)])
-    return lint_results.results
+    check_results = rule_runner.request(CheckResults, [TerraformCheckRequest(field_sets)])
+    return check_results.results
 
 
 def get_content(rule_runner: RuleRunner, digest: Digest) -> DigestContents:
@@ -101,27 +97,27 @@ def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Dige
 
 def test_passing_source(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE])
-    lint_results = run_terraform_validate(rule_runner, [target])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert lint_results[0].stderr == ""
+    check_results = run_terraform_validate(rule_runner, [target])
+    assert len(check_results) == 1
+    assert check_results[0].exit_code == 0
+    assert check_results[0].stderr == ""
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    lint_results = run_terraform_validate(rule_runner, [target])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stderr
+    check_results = run_terraform_validate(rule_runner, [target])
+    assert len(check_results) == 1
+    assert check_results[0].exit_code == 1
+    assert "bad.tf" in check_results[0].stderr
 
 
 def test_mixed_sources(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
-    lint_results = run_terraform_validate(rule_runner, [target])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stderr
-    assert "good.tf" not in lint_results[0].stderr
+    check_results = run_terraform_validate(rule_runner, [target])
+    assert len(check_results) == 1
+    assert check_results[0].exit_code == 1
+    assert "bad.tf" in check_results[0].stderr
+    assert "good.tf" not in check_results[0].stderr
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -129,14 +125,14 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         make_target(rule_runner, [GOOD_SOURCE], target_name="tgt_good"),
         make_target(rule_runner, [BAD_SOURCE], target_name="tgt_bad"),
     ]
-    lint_results = run_terraform_validate(rule_runner, targets)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad.tf" in lint_results[0].stderr
-    assert "good.tf" not in lint_results[0].stderr
+    check_results = run_terraform_validate(rule_runner, targets)
+    assert len(check_results) == 1
+    assert check_results[0].exit_code == 1
+    assert "bad.tf" in check_results[0].stderr
+    assert "good.tf" not in check_results[0].stderr
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    lint_results = run_terraform_validate(rule_runner, [target], skip=True)
+    lint_results = run_terraform_validate(rule_runner, [target], args=["--terraform-validate-skip"])
     assert not lint_results
