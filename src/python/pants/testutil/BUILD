@@ -25,7 +25,7 @@ python_sources(
 python_sources(
     name="pants_integration_test",
     sources=["pants_integration_test.py"],
-    dependencies=["//BUILD_ROOT:files", "src/python/pants:entry_point"],
+    dependencies=["//BUILD_ROOT:files", "src/python/pants/__main__.py"],
 )
 
 python_tests(name="tests", sources=["*_test.py", "!pants_integration_test.py"])

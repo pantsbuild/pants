@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
 from pants.engine.addresses import Address
@@ -211,7 +212,7 @@ def test_infer_python_conftests() -> None:
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
-        target_types=[PythonTestsGeneratorTarget, PythonSourcesGeneratorTarget],
+        target_types=[PythonTestsGeneratorTarget, PythonTestUtilsGeneratorTarget],
     )
     rule_runner.set_options(
         ["--source-root-patterns=src/python"],
@@ -219,15 +220,15 @@ def test_infer_python_conftests() -> None:
     )
 
     rule_runner.create_file("src/python/root/conftest.py")
-    rule_runner.add_to_build_file("src/python/root", "python_sources()")
+    rule_runner.add_to_build_file("src/python/root", "python_test_utils()")
 
     rule_runner.create_file("src/python/root/mid/conftest.py")
-    rule_runner.add_to_build_file("src/python/root/mid", "python_sources()")
+    rule_runner.add_to_build_file("src/python/root/mid", "python_test_utils()")
 
     rule_runner.create_file("src/python/root/mid/leaf/conftest.py")
     rule_runner.create_file("src/python/root/mid/leaf/this_is_a_test.py")
     rule_runner.add_to_build_file(
-        "src/python/root/mid/leaf", "python_sources()\npython_tests(name='tests')"
+        "src/python/root/mid/leaf", "python_test_utils()\npython_tests(name='tests')"
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:

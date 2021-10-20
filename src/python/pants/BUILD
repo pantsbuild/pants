@@ -1,14 +1,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
 python_sources(
-    name="entry_point", sources=["__main__.py"], dependencies=["src/python/pants/bin:pants_loader"]
+    overrides={
+        # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
+        "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
+        "version.py": {"dependencies": ["./VERSION:resources"]},
+    },
 )
+
+python_test_utils(name="test_utils")
 
 python_distribution(
     name="pants-packaged",
-    dependencies=[":entry_point", ":resources"],
+    dependencies=["./__main__.py", ":resources"],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp36m-macosx_10_15_x86_64`.
     sdist=False,
@@ -24,10 +29,6 @@ python_distribution(
     ),
     entry_points={"console_scripts": {"pants": "src/python/pants/bin:pants"}},
 )
-
-python_sources(name="conftest", sources=["conftest.py"])
-
-python_sources(name="version", sources=["version.py"], dependencies=["./VERSION:resources"])
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
 # `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we

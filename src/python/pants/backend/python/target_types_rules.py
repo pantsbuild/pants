@@ -32,6 +32,8 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratingSourcesField,
+    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
@@ -68,7 +70,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_sources` and `python_tests` target generation rules
+# `python_sources`, `python_tests`, and `python_test_utils` target generation rules
 # -----------------------------------------------------------------------------------------------
 
 
@@ -121,6 +123,42 @@ async def generate_targets_from_python_sources(
 ) -> GeneratedTargets:
     sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[PythonSourcesGeneratingSourcesField])
+    )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
+    return generate_file_level_targets(
+        PythonSourceTarget,
+        request.generator,
+        sources_paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=not python_infer.imports,
+        overrides=all_overrides,
+    )
+
+
+class GenerateTargetsFromPythonTestUtils(GenerateTargetsRequest):
+    generate_from = PythonTestUtilsGeneratorTarget
+
+
+@rule
+async def generate_targets_from_python_test_utils(
+    request: GenerateTargetsFromPythonTestUtils,
+    python_infer: PythonInferSubsystem,
+    files_not_found_behavior: FilesNotFoundBehavior,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    sources_paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestUtilsGeneratingSourcesField])
     )
 
     all_overrides = {}
@@ -451,6 +489,7 @@ def rules():
         *import_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )

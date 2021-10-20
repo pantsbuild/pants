@@ -24,6 +24,7 @@ from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
@@ -71,6 +72,7 @@ def rule_runner() -> RuleRunner:
             PexBinary,
             PythonSourcesGeneratorTarget,
             PythonTestsGeneratorTarget,
+            PythonTestUtilsGeneratorTarget,
             PythonRequirementTarget,
             PythonDistribution,
         ],
@@ -354,7 +356,7 @@ def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
                     print('In conftest!')
                 """
             ),
-            f"{SOURCE_ROOT}/BUILD": "python_sources()",
+            f"{SOURCE_ROOT}/BUILD": "python_test_utils()",
             f"{PACKAGE}/tests.py": GOOD_TEST,
             f"{PACKAGE}/BUILD": "python_tests()",
         }
