@@ -18,6 +18,7 @@ from pants.engine.fs import Digest, DownloadFile, FileDigest
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -294,8 +295,9 @@ class TemplatedExternalTool(ExternalTool):
             help=(
                 "URL to download the tool, either as a single binary file or a compressed file "
                 "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
-                "work with proxies or for access via the filesystem through a `file:$path` URL (e.g. "
-                "`file:/this/is/absolute` or `file:this/is/relative`).\n\n"
+                "work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g. "
+                "`file:/this/is/absolute`, possibly by [templating the buildroot in a "
+                f"config file]({doc_url('options#config-file-entries')})).\n\n"
                 "Use `{version}` to have the value from --version substituted, and `{platform}` to "
                 "have a value from --url-platform-mapping substituted in, depending on the "
                 "current platform. For example, "
