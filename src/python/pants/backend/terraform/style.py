@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, TypeVar
+from typing import Iterable
 
 from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
@@ -19,8 +19,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
-
-_FS = TypeVar("_FS", bound=TerraformFieldSet)
 
 
 @frozen_after_init
