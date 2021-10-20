@@ -872,7 +872,7 @@ def test_download_file(downloads_rule_runner: RuleRunner) -> None:
         roland.write_text("European Burmese")
         snapshot = downloads_rule_runner.request(
             Snapshot,
-            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
+            [DownloadFile(f"file:{roland}", ROLAND_FILE_DIGEST)],
         )
 
     assert snapshot.files == ("roland",)
@@ -889,7 +889,7 @@ def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
         roland.write_text("European Burmese")
         snapshot = downloads_rule_runner.request(
             Snapshot,
-            [DownloadFile(f"file://ignored.see.13054/{roland}", ROLAND_FILE_DIGEST)],
+            [DownloadFile(f"file:{roland}", ROLAND_FILE_DIGEST)],
         )
 
     assert snapshot.files == ("roland",)
