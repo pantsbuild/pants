@@ -12,7 +12,6 @@ from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacChec
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
-from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
@@ -26,7 +25,7 @@ from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets, Sources
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm import jdk_rules
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
