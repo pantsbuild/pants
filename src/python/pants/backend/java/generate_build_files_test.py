@@ -3,10 +3,13 @@
 
 import pytest
 
-from pants.backend.java import tailor
-from pants.backend.java.tailor import PutativeJavaTargetsRequest, classify_source_files
+from pants.backend.java import generate_build_files
+from pants.backend.java.generate_build_files import (
+    PutativeJavaTargetsRequest,
+    classify_source_files,
+)
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -32,7 +35,7 @@ def test_classify_source_files() -> None:
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *tailor.rules(),
+            *generate_build_files.rules(),
             QueryRule(PutativeTargets, (PutativeJavaTargetsRequest, AllOwnedSources)),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],

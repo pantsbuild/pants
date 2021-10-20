@@ -56,5 +56,5 @@ python_tests(
     timeout=150,
 )
 
-python_tests(name="tailor_test", sources=["tailor_test.py"])
+python_tests(name="generate_build_files_test", sources=["generate_build_files_test.py"])
 python_tests(name="publish_test", sources=["publish_test.py"])

@@ -8,7 +8,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.terraform.target_types import TerraformModulesGeneratorTarget
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,

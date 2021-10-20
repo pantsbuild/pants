@@ -10,13 +10,13 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
+    generate_build_files,
     lockfile,
     package_pex_binary,
     pytest_runner,
     repl,
     run_pex_binary,
     setup_py,
-    tailor,
 )
 from pants.backend.python.macros.pants_requirement import PantsRequirement
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
@@ -62,7 +62,7 @@ def rules():
     return (
         *coverage_py.rules(),
         *lockfile.rules(),
-        *tailor.rules(),
+        *generate_build_files.rules(),
         *ancestor_files.rules(),
         *local_dists.rules(),
         *python_sources.rules(),

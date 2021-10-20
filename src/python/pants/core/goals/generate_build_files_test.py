@@ -14,17 +14,17 @@ from pants.base.specs import (
     FilesystemSpecs,
     Specs,
 )
-from pants.core.goals import tailor
-from pants.core.goals.tailor import (
+from pants.core.goals import generate_build_files
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     DisjointSourcePutativeTarget,
     EditBuildFilesRequest,
     EditedBuildFiles,
+    GenerateBuildFilesSubsystem,
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
     PutativeTargetsSearchPaths,
-    TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
     group_by_dir,
@@ -67,8 +67,9 @@ class FortranTests(Target):
     core_fields = (FortranTestsSources,)
 
 
-# This target intentionally has no `sources` field in order to test how `tailor` interacts with targets that
-# have no sources. An example of this type of target is `GoExternalModule`.
+# This target intentionally has no `sources` field in order to test how `generate-build-files`
+# interacts with targets that have no sources. An example of this type of target is
+# `PythonRequirementTarget`.
 class FortranModule(Target):
     alias = "fortran_module"
     core_fields = ()
@@ -88,7 +89,7 @@ def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) 
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *tailor.rules(),
+            *generate_build_files.rules(),
             *source_files.rules(),
             infer_fortran_module_dependency,
             UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
@@ -396,7 +397,7 @@ def test_specs_to_dirs() -> None:
         )
 
 
-def test_tailor_rule(rule_runner: RuleRunner) -> None:
+def test_generate_build_files_rule(rule_runner: RuleRunner) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
         union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
@@ -404,10 +405,10 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
             address_specs=AddressSpecs(tuple()), filesystem_specs=FilesystemSpecs(tuple())
         )
         run_rule_with_mocks(
-            tailor.tailor,
+            generate_build_files.generate_build_files,
             rule_args=[
                 create_goal_subsystem(
-                    TailorSubsystem,
+                    GenerateBuildFilesSubsystem,
                     build_file_name="BUILD",
                     build_file_header="",
                     build_file_indent="    ",

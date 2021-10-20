@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.docker.target_types import DockerImage
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,

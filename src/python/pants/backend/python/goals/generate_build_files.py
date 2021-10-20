@@ -20,7 +20,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -86,7 +86,7 @@ async def find_putative_targets(
             name = "tests" if tgt_type == PythonTestsGeneratorTarget else os.path.basename(dirname)
             kwargs = {"name": name} if tgt_type == PythonTestsGeneratorTarget else {}
             if (
-                python_setup.tailor_ignore_solitary_init_files
+                python_setup.generate_build_files_ignore_solitary_init_files
                 and tgt_type == PythonSourcesGeneratorTarget
                 and filenames == {"__init__.py"}
             ):
@@ -97,7 +97,7 @@ async def find_putative_targets(
                 )
             )
 
-    if python_setup.tailor_requirements_targets:
+    if python_setup.generate_build_files_requirements_targets:
         # Find requirements files.
         all_requirements_files_globs: PathGlobs = req.search_paths.path_globs("*requirements*.txt")
         all_requirements_files = await Get(Paths, PathGlobs, all_requirements_files_globs)
@@ -118,7 +118,7 @@ async def find_putative_targets(
                 )
             )
 
-    if python_setup.tailor_pex_binary_targets:
+    if python_setup.generate_build_files_pex_binary_targets:
         # Find binary targets.
 
         # Get all files whose content indicates that they are entry points.

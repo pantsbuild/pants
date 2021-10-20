@@ -3,13 +3,16 @@
 
 import pytest
 
-from pants.backend.shell import tailor
-from pants.backend.shell.tailor import PutativeShellTargetsRequest, classify_source_files
+from pants.backend.shell import generate_build_files
+from pants.backend.shell.generate_build_files import (
+    PutativeShellTargetsRequest,
+    classify_source_files,
+)
 from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
     Shunit2TestsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -32,7 +35,7 @@ def test_classify_source_files() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *tailor.rules(),
+            *generate_build_files.rules(),
             QueryRule(PutativeTargets, [PutativeShellTargetsRequest, AllOwnedSources]),
         ],
         target_types=[],

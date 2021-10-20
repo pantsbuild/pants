@@ -2,22 +2,24 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pathlib import PurePath
 
-from pants.backend.terraform.tailor import (
+from pants.backend.terraform.generate_build_files import (
     PutativeTerraformTargetsRequest,
     find_disjoint_longest_common_prefixes,
 )
-from pants.backend.terraform.tailor import rules as terraform_tailor_rules
+from pants.backend.terraform.generate_build_files import (
+    rules as terraform_generate_build_files_rules,
+)
 from pants.backend.terraform.target_types import (
     TerraformModulesGeneratorTarget,
     TerraformModuleTarget,
 )
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsSearchPaths,
 )
-from pants.core.goals.tailor import rules as core_tailor_rules
+from pants.core.goals.generate_build_files import rules as core_generate_build_files_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -25,8 +27,8 @@ from pants.testutil.rule_runner import RuleRunner
 def test_find_putative_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
-            *core_tailor_rules(),
-            *terraform_tailor_rules(),
+            *core_generate_build_files_rules(),
+            *terraform_generate_build_files_rules(),
             QueryRule(PutativeTargets, [PutativeTerraformTargetsRequest, AllOwnedSources]),
             QueryRule(AllOwnedSources, ()),
         ],

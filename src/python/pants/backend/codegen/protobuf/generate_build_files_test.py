@@ -3,10 +3,10 @@
 
 import pytest
 
-from pants.backend.codegen.protobuf.tailor import PutativeProtobufTargetsRequest
-from pants.backend.codegen.protobuf.tailor import rules as tailor_rules
+from pants.backend.codegen.protobuf import generate_build_files
+from pants.backend.codegen.protobuf.generate_build_files import PutativeProtobufTargetsRequest
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -20,7 +20,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *tailor_rules(),
+            *generate_build_files.rules(),
             QueryRule(PutativeTargets, (PutativeProtobufTargetsRequest, AllOwnedSources)),
         ],
         target_types=[],

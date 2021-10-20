@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java import classpath, tailor
+from pants.backend.java import classpath, generate_build_files
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import (
     import_parser,
@@ -53,7 +53,7 @@ def rules():
         *java_parser_launcher.rules(),
         *package_mapper.rules(),
         *dependency_inference_rules.rules(),
-        *tailor.rules(),
+        *generate_build_files.rules(),
         *jvm_util_rules.rules(),
         *jdk_rules.rules(),
         *target_types_rules(),

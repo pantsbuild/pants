@@ -7,7 +7,7 @@ import os.path
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,

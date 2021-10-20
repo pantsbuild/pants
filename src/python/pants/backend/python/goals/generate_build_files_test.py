@@ -5,8 +5,8 @@ import textwrap
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals import tailor
-from pants.backend.python.goals.tailor import (
+from pants.backend.python.goals import generate_build_files
+from pants.backend.python.goals.generate_build_files import (
     PutativePythonTargetsRequest,
     classify_source_files,
     is_entry_point,
@@ -16,7 +16,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -48,7 +48,7 @@ def test_classify_source_files() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *tailor.rules(),
+            *generate_build_files.rules(),
             *target_types_rules.rules(),
             QueryRule(PutativeTargets, (PutativePythonTargetsRequest, AllOwnedSources)),
         ],
@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--no-python-setup-tailor-ignore-solitary-init-files"])
+    rule_runner.set_options(["--no-python-setup-generate-build-files-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
             "3rdparty/requirements.txt": "",

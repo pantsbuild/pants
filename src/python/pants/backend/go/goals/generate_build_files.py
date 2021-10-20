@@ -15,7 +15,7 @@ from pants.backend.go.target_types import (
     GoModTarget,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,

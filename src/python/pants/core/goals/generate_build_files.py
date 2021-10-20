@@ -238,9 +238,12 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
         return cls(all_tgts)
 
 
-class TailorSubsystem(GoalSubsystem):
-    name = "tailor"
-    help = "Auto-generate BUILD file targets for new source files."
+class GenerateBuildFilesSubsystem(GoalSubsystem):
+    name = "generate-build-files"
+    help = "Generate BUILD file targets for new source files."
+
+    deprecated_options_scope = "tailor"
+    deprecated_options_scope_removal_version = "2.9.0.dev0"
 
     required_union_implementations = (PutativeTargetsRequest,)
 
@@ -298,8 +301,8 @@ class TailorSubsystem(GoalSubsystem):
         return cast(str, self.options.alias_mapping.get(standard_type))
 
 
-class Tailor(Goal):
-    subsystem_cls = TailorSubsystem
+class GenerateBuildFilesGoal(Goal):
+    subsystem_cls = GenerateBuildFilesSubsystem
 
 
 def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
@@ -494,7 +497,7 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
             other_specs.append(spec)
     if other_specs:
         raise ValueError(
-            "The tailor goal only accepts literal directories as arguments, but you "
+            "The generate-build-files goal only accepts literal directories as arguments, but you "
             f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
             "specify no arguments to run against the entire repository."
         )
@@ -503,13 +506,13 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
 
 
 @goal_rule
-async def tailor(
-    tailor_subsystem: TailorSubsystem,
+async def generate_build_files(
+    generate_build_files_subsystem: GenerateBuildFilesSubsystem,
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
     specs: Specs,
-) -> Tailor:
+) -> GenerateBuildFilesGoal:
     search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
     putative_target_request_types: Iterable[type[PutativeTargetsRequest]] = union_membership[
         PutativeTargetsRequest
@@ -520,7 +523,8 @@ async def tailor(
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)
     putative_targets = PutativeTargets(
-        pt.realias(tailor_subsystem.alias_for(pt.type_alias)) for pt in putative_targets
+        pt.realias(generate_build_files_subsystem.alias_for(pt.type_alias))
+        for pt in putative_targets
     )
     fixed_names_ptgts = await Get(UniquelyNamedPutativeTargets, PutativeTargets, putative_targets)
     fixed_sources_ptgts = await MultiGet(
@@ -534,14 +538,16 @@ async def tailor(
             EditedBuildFiles,
             EditBuildFilesRequest(
                 PutativeTargets(ptgts),
-                tailor_subsystem.build_file_name,
-                tailor_subsystem.build_file_header,
-                tailor_subsystem.build_file_indent,
+                generate_build_files_subsystem.build_file_name,
+                generate_build_files_subsystem.build_file_header,
+                generate_build_files_subsystem.build_file_indent,
             ),
         )
         updated_build_files = set(edited_build_files.updated_paths)
         workspace.write_digest(edited_build_files.digest)
-        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
+        ptgts_by_build_file = group_by_build_file(
+            generate_build_files_subsystem.build_file_name, ptgts
+        )
         for build_file_path, ptgts in ptgts_by_build_file.items():
             verb = "Updated" if build_file_path in updated_build_files else "Created"
             console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
@@ -550,7 +556,7 @@ async def tailor(
                     f"  - Added {console.green(ptgt.type_alias)} target "
                     f"{console.cyan(ptgt.name)}"
                 )
-    return Tailor(0)
+    return GenerateBuildFilesGoal(0)
 
 
 def rules():

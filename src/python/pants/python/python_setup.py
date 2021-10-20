@@ -14,6 +14,7 @@ from typing import Iterable, List, Optional, Tuple, cast
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
@@ -200,6 +201,20 @@ class PythonSetup(Subsystem):
         )
 
         register(
+            "--generate-build-files-ignore-solitary-init-files",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "When generating BUILD files, don't add a `python_sources` target if there is only "
+                "an `__init__.py` file in the folder and no other `.py` files.\n\n"
+                "This can be useful to set to `True` as `__init__.py` files often only exist as "
+                "import scaffolding, rather than true library code. Set to `False` if you commonly "
+                "have directories containing only a single `__init__.py` file with real code in "
+                "them."
+            ),
+        )
+        register(
             "--tailor-ignore-solitary-init-files",
             type=bool,
             default=True,
@@ -208,22 +223,55 @@ class PythonSetup(Subsystem):
             "those usually exist as import scaffolding rather than true library code.\n\n"
             "Set to False if you commonly have packages containing real code in "
             "`__init__.py` and there are no other .py files in the package.",
+            removal_version="2.9.0.dev0",
+            removal_hint=(
+                "Use `--generate-build-files-ignore-solitary-init-files` instead, which behaves "
+                "the same."
+            ),
         )
 
+        register(
+            "--generate-build-files-requirements-targets",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "When generating BUILD files, add python_requirements() macros for "
+                "requirements.txt files."
+            ),
+        )
         register(
             "--tailor-requirements-targets",
             type=bool,
             default=True,
             advanced=True,
             help="Tailor python_requirements() targets for requirements files.",
+            removal_version="2.9.0.dev0",
+            removal_hint=(
+                "Use `--generate-build-files-requirement-targets` instead, which behaves the same."
+            ),
         )
 
+        register(
+            "--generate-build-files-pex-binary-targets",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "When generating BUILD files, add pex_binary() targets for Python files with "
+                '`if __name__ == "__main__:" present.'
+            ),
+        )
         register(
             "--tailor-pex-binary-targets",
             type=bool,
             default=True,
             advanced=True,
             help="Tailor pex_binary() targets for Python entry point files.",
+            removal_version="2.9.0.dev0",
+            removal_hint=(
+                "Use `--generate-build-files-pex_binary-targets` instead, which behaves the same."
+            ),
         )
 
         register(
@@ -284,16 +332,46 @@ class PythonSetup(Subsystem):
         return cast(int, self.options.resolver_jobs)
 
     @property
-    def tailor_ignore_solitary_init_files(self) -> bool:
-        return cast(bool, self.options.tailor_ignore_solitary_init_files)
+    def generate_build_files_ignore_solitary_init_files(self) -> bool:
+        return cast(
+            bool,
+            resolve_conflicting_options(
+                old_option="tailor_ignore_solitary_init_files",
+                new_option="generate_build_files_ignore_solitary_init_files",
+                old_scope=self.options_scope,
+                new_scope=self.options_scope,
+                old_container=self.options,
+                new_container=self.options,
+            ),
+        )
 
     @property
-    def tailor_requirements_targets(self) -> bool:
-        return cast(bool, self.options.tailor_requirements_targets)
+    def generate_build_files_requirements_targets(self) -> bool:
+        return cast(
+            bool,
+            resolve_conflicting_options(
+                old_option="tailor_requirements_targets",
+                new_option="generate_build_files_requirements_targets",
+                old_scope=self.options_scope,
+                new_scope=self.options_scope,
+                old_container=self.options,
+                new_container=self.options,
+            ),
+        )
 
     @property
-    def tailor_pex_binary_targets(self) -> bool:
-        return cast(bool, self.options.tailor_pex_binary_targets)
+    def generate_build_files_pex_binary_targets(self) -> bool:
+        return cast(
+            bool,
+            resolve_conflicting_options(
+                old_option="tailor_pex_binary_targets",
+                new_option="generate_build_files_pex_binary_targets",
+                old_scope=self.options_scope,
+                new_scope=self.options_scope,
+                old_container=self.options,
+                new_container=self.options,
+            ),
+        )
 
     @property
     def macos_big_sur_compatibility(self) -> bool:

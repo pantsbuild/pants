@@ -6,11 +6,11 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals.tailor import PutativeGoTargetsRequest, has_package_main
-from pants.backend.go.goals.tailor import rules as go_tailor_rules
+from pants.backend.go.goals import generate_build_files
+from pants.backend.go.goals.generate_build_files import PutativeGoTargetsRequest, has_package_main
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
 from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
@@ -24,7 +24,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *go_tailor_rules(),
+            *generate_build_files.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),

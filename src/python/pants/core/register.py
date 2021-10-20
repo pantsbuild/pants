@@ -9,12 +9,12 @@ These are always activated and cannot be disabled.
 from pants.core.goals import (
     check,
     fmt,
+    generate_build_files,
     lint,
     package,
     publish,
     repl,
     run,
-    tailor,
     test,
     update_build_files,
 )
@@ -54,7 +54,7 @@ def rules():
         *publish.rules(),
         *repl.rules(),
         *run.rules(),
-        *tailor.rules(),
+        *generate_build_files.rules(),
         *test.rules(),
         # util_rules
         *anonymous_telemetry.rules(),

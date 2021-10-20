@@ -12,7 +12,7 @@ from pants.backend.java.target_types import (
     JavaTestsGeneratorSourcesField,
     JunitTestsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,

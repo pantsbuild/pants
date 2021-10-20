@@ -10,7 +10,7 @@ from pants.backend.terraform.target_types import (
     TerraformModulesGeneratorTarget,
     TerraformModuleTarget,
 )
-from pants.core.goals.tailor import group_by_dir
+from pants.core.goals.generate_build_files import group_by_dir
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedTargets,

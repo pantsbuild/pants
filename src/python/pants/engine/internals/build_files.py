@@ -251,8 +251,8 @@ async def addresses_from_address_specs(
         )
         raise ResolveError(
             f"No targets found for {glob_description}\n\n"
-            f"Do targets exist in those directories? Maybe run `./pants tailor` to generate "
-            f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
+            f"Do targets exist in those directories? Maybe run `./pants generate-build-files`? "
+            f"See {doc_url('targets')} about targets and BUILD files."
         )
 
     return Addresses(sorted(matched_addresses))

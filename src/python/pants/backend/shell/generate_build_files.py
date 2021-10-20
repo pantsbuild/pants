@@ -12,7 +12,7 @@ from pants.backend.shell.target_types import (
     Shunit2TestsGeneratorSourcesField,
     Shunit2TestsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
+from pants.core.goals.generate_build_files import (
     AllOwnedSources,
     PutativeTarget,
     PutativeTargets,

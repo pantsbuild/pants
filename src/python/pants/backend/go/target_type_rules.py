@@ -36,7 +36,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, AscendantAddresses
-from pants.core.goals.tailor import group_by_dir
+from pants.core.goals.generate_build_files import group_by_dir
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule

@@ -55,6 +55,7 @@ class RunTracker:
             "filedeps",
             "filter",
             "fmt",
+            "generate-build-files",
             "lint",
             "list",
             "package",
@@ -62,9 +63,9 @@ class RunTracker:
             "repl",
             "roots",
             "run",
-            "tailor",
             "test",
             "typecheck",
+            "update-build-files",
             "validate",
         )
     )
