@@ -237,6 +237,14 @@ Destination must not exist before this command is run.",
               .required(false)
         )
         .arg(
+          Arg::with_name("header")
+              .help("Header to add when sending gRPC requests. Format: name=value")
+              .takes_value(true)
+              .multiple(true)
+              .long("header")
+              .required(false)
+        )
+        .arg(
           Arg::with_name("oauth-bearer-token-file")
               .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
               .takes_value(true)
@@ -375,6 +383,17 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         };
 
         let mut headers = BTreeMap::new();
+
+        if let Some(headers_from_flag) = top_match.values_of("header") {
+          for h in headers_from_flag {
+            if let Some((key, value)) = h.split_once('=') {
+              headers.insert(key.to_owned(), value.to_owned());
+            } else {
+              panic!("Expected --header flag to contain = but was {}", h);
+            }
+          }
+        }
+
         if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
           let token = std::fs::read_to_string(oauth_path).map_err(|err| {
             format!(
