@@ -35,7 +35,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgInfoRequest,
 )
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AddressSpecs, SiblingAddresses
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import PathGlobs, Paths
@@ -287,14 +287,9 @@ async def determine_main_pkg_for_go_binary(
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
-    candidate_targets = await Get(Targets, AddressSpecs([AscendantAddresses(addr.spec_path)]))
+    candidate_targets = await Get(Targets, AddressSpecs([SiblingAddresses(addr.spec_path)]))
     relevant_pkg_targets = [
-        tgt
-        for tgt in candidate_targets
-        if (
-            tgt.has_field(GoFirstPartyPackageSubpathField)
-            and tgt[GoFirstPartyPackageSubpathField].full_dir_path == addr.spec_path
-        )
+        tgt for tgt in candidate_targets if tgt.has_field(GoFirstPartyPackageSourcesField)
     ]
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)
@@ -310,7 +305,7 @@ async def determine_main_pkg_for_go_binary(
         )
     raise ResolveError(
         f"There are multiple `go_first_party_package` targets for the same directory of the "
-        "`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
+        f"`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
         "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
         "`go_first_party_package` targets so that only one remains: "
