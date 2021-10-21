@@ -43,8 +43,8 @@ class LocalDistsPexRequest:
     def __init__(
         self,
         addresses: Iterable[Address],
-        internal_only: bool,
         *,
+        internal_only: bool,
         interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
         sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:

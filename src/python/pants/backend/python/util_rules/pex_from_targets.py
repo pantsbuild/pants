@@ -72,6 +72,7 @@ class PexFromTargetsRequest:
     additional_lockfile_args: tuple[str, ...]
     additional_requirements: tuple[str, ...]
     include_source_files: bool
+    include_local_dists: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
     resolve_and_lockfile: tuple[str, str] | None
@@ -93,6 +94,7 @@ class PexFromTargetsRequest:
         additional_lockfile_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
+        include_local_dists: bool = False,
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
@@ -126,6 +128,7 @@ class PexFromTargetsRequest:
             Setting this to `False` and loading the source files by instead populating the chroot
             and setting the environment variable `PEX_EXTRA_SYS_PATH` will result in substantially
             fewer rebuilds of the Pex.
+        :param include_local_dists: Whether to build local dists and include them in the built pex.
         :param additional_sources: Any additional source files to include in the built Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
@@ -146,6 +149,7 @@ class PexFromTargetsRequest:
         self.additional_lockfile_args = tuple(additional_lockfile_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
+        self.include_local_dists = include_local_dists
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
@@ -227,33 +231,39 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     else:
         sources = PythonSourceFiles.empty()
 
-    # Note that LocalDistsPexRequest has no `direct_deps_only` mode, so we will build all
-    # local dists in the transitive closure even if the request was for direct_deps_only.
-    # Since we currently use `direct_deps_only` in one case (building a requirements pex
-    # when running pylint) and it's just a performance optimization, this seems harmless.
-    local_dists = await Get(
-        LocalDistsPex,
-        LocalDistsPexRequest(
-            request.addresses,
-            internal_only=request.internal_only,
-            interpreter_constraints=interpreter_constraints,
-            sources=sources,
-        ),
-    )
+    additional_inputs_digests = []
+    if request.additional_inputs:
+        additional_inputs_digests.append(request.additional_inputs)
+    additional_args = request.additional_args
+    if request.include_local_dists:
+        # Note that LocalDistsPexRequest has no `direct_deps_only` mode, so we will build all
+        # local dists in the transitive closure even if the request was for direct_deps_only.
+        # Since we currently use `direct_deps_only` in one case (building a requirements pex
+        # when running pylint) and in that case include_local_dists=False, this seems harmless.
+        local_dists = await Get(
+            LocalDistsPex,
+            LocalDistsPexRequest(
+                request.addresses,
+                internal_only=request.internal_only,
+                interpreter_constraints=interpreter_constraints,
+                sources=sources,
+            ),
+        )
+        remaining_sources = local_dists.remaining_sources
+        additional_inputs_digests.append(local_dists.pex.digest)
+        additional_args += ("--requirements-pex", local_dists.pex.name)
+    else:
+        remaining_sources = sources
 
     remaining_sources_stripped = await Get(
-        StrippedPythonSourceFiles, PythonSourceFiles, local_dists.remaining_sources
+        StrippedPythonSourceFiles, PythonSourceFiles, remaining_sources
     )
     sources_digests.append(remaining_sources_stripped.stripped_source_files.snapshot.digest)
 
     merged_sources_digest, additional_inputs = await MultiGet(
         Get(Digest, MergeDigests(sources_digests)),
-        Get(
-            Digest,
-            MergeDigests([(request.additional_inputs or EMPTY_DIGEST), local_dists.pex.digest]),
-        ),
+        Get(Digest, MergeDigests(additional_inputs_digests)),
     )
-    additional_args = request.additional_args + ("--requirements-pex", local_dists.pex.name)
 
     requirements = PexRequirements.create_from_requirement_fields(
         (

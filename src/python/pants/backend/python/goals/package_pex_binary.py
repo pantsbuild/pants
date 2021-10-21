@@ -134,6 +134,7 @@ async def package_pex_binary(
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
+            include_local_dists=True,
         ),
     )
     return BuiltPackage(pex.digest, (BuiltPackageArtifact(output_filename),))
