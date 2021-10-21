@@ -65,6 +65,7 @@ class PackageRootedDependencyMap:
         `foo.bar`) and repeat the above process until there is nothing left.  If nothing
         is found, an empty set is returned.
         """
+        # TODO: Consider removing as callers may not need it.
         parts = symbol.split(".")
         for num_parts in range(len(parts), 0, -1):
             prefix = ".".join(parts[:num_parts])
@@ -73,6 +74,10 @@ class PackageRootedDependencyMap:
             if prefix in self._package_map:
                 return frozenset(self._package_map[prefix])
         return frozenset()
+
+    def addresses_for_exact_symbol(self, symbol: str) -> frozenset[Address]:
+        result = self._type_map.get(symbol)
+        return frozenset({result}) if result else frozenset()
 
     def merge(self, other: PackageRootedDependencyMap):
         """Merge 'other' into this dependency map.

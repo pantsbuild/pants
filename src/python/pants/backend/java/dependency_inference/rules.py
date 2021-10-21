@@ -5,15 +5,18 @@ import itertools
 import logging
 from typing import cast
 
-from pants.backend.java.dependency_inference import import_parser, package_mapper
+from pants.backend.java.dependency_inference import import_parser, java_parser, package_mapper
 from pants.backend.java.dependency_inference.import_parser import (
     ParsedJavaImports,
     ParseJavaImportsRequest,
 )
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
+from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -76,18 +79,45 @@ async def infer_java_dependencies_via_imports(
 
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
+    candidate_symbols = list(relevant_imports)
     return InferredDependencies(
         dependencies=itertools.chain.from_iterable(
-            dep_map.addresses_for_symbol(imp) for imp in relevant_imports
+            dep_map.addresses_for_symbol(imp) for imp in candidate_symbols
+        ),
+    )
+
+
+class InferJavaConsumedTypesDependencies(InferDependenciesRequest):
+    infer_from = JavaSourceField
+
+
+@rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
+async def infer_java_dependencies_via_consumed_types(
+    request: InferJavaConsumedTypesDependencies,
+    first_party_dep_map: FirstPartyJavaPackageMapping,
+) -> InferredDependencies:
+    source_files = await Get(SourceFiles, SourceFilesRequest([request.sources_field]))
+    analysis = await Get(JavaSourceDependencyAnalysis, SourceFiles, source_files)
+
+    package = analysis.declared_package
+    dep_map = first_party_dep_map.package_rooted_dependency_map
+    candidate_consumed_types = [
+        f"{package}.{consumed_type}" for consumed_type in analysis.consumed_unqualified_types
+    ]
+    return InferredDependencies(
+        dependencies=itertools.chain.from_iterable(
+            dep_map.addresses_for_exact_symbol(imp) for imp in candidate_consumed_types
         ),
     )
 
 
 def rules():
     return [
-        infer_java_dependencies_via_imports,
+        *collect_rules(),
+        *java_parser.rules(),
         *import_parser.rules(),
         *package_mapper.rules(),
-        SubsystemRule(JavaInferSubsystem),
+        *source_files_rules(),
         UnionRule(InferDependenciesRequest, InferJavaImportDependencies),
+        UnionRule(InferDependenciesRequest, InferJavaConsumedTypesDependencies),
     ]

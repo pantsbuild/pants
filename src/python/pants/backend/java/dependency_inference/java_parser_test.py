@@ -25,7 +25,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
@@ -60,20 +59,11 @@ def rule_runner() -> RuleRunner:
 def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name='lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_source(
                     name='simple-source',
                     source='SimpleSource.java',
-                    dependencies=[':lockfile'],
                 )
                 """
             ),
@@ -132,26 +122,21 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     ]
+    assert analysis.consumed_unqualified_types == [
+        "some.other.Thing",
+        "Date",
+    ]
 
 
 @maybe_skip_jdk_test
 def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name='lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_source(
                     name='simple-source',
                     source='SimpleSource.java',
-                    dependencies=[':lockfile'],
                 )
                 """
             ),
@@ -194,20 +179,11 @@ def test_java_parser_fallible_error(rule_runner: RuleRunner) -> None:
 def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name='lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_source(
                     name='simple-source',
                     source='SimpleSource.java',
-                    dependencies=[':lockfile'],
                 )
                 """
             ),
@@ -242,3 +218,74 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     assert analysis.declared_package == ""
     assert analysis.imports == []
     assert analysis.top_level_types == ["SimpleSource", "Foo"]
+    assert analysis.consumed_unqualified_types == []
+
+
+@maybe_skip_jdk_test
+def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_source(
+                    name='source',
+                    source='SomeUnqualifiedTypes.java',
+                )
+                """
+            ),
+            "SomeUnqualifiedTypes.java": dedent(
+                """
+                package org.pantsbuild.test;
+
+                @ClassAnnotation
+                public class AnImpl implements SomeInterface {
+                    @InnerClassAnnotation
+                    public static class Inner extends SomeGeneric<String> {
+                    }
+
+                    @FieldAnnotation
+                    Provided provided = provided;
+
+                    public AnImpl(Provider<SomeThing> provider) {
+                        this.provided = provider.provide();
+                    }
+
+                    @Override
+                    public int foo() {
+                        return 2;
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(address=Address(spec_path="", target_name="source"))
+
+    source_files = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(
+                (target.get(SourcesField),),
+                for_sources_types=(JavaSourceField,),
+                enable_codegen=True,
+            )
+        ],
+    )
+
+    analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
+    assert analysis.declared_package == "org.pantsbuild.test"
+    assert analysis.imports == []
+    assert analysis.top_level_types == ["org.pantsbuild.test.AnImpl"]
+    assert analysis.consumed_unqualified_types == [
+        "InnerClassAnnotation",
+        "SomeInterface",
+        "FieldAnnotation",
+        "ClassAnnotation",
+        "SomeThing",
+        "SomeGeneric",
+        "String",
+        "Override",
+        "Provided",
+        "Provider",
+    ]

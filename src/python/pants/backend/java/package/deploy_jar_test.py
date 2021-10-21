@@ -11,6 +11,8 @@ from pants.backend.java.classpath import Classpath
 from pants.backend.java.classpath import rules as classpath_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.package.deploy_jar import DeployJarFieldSet
 from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
 from pants.backend.java.target_types import DeployJar, JavaSourcesGeneratorTarget
@@ -51,6 +53,9 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *javac_rules(),
             *jdk_rules.rules(),
+            *java_dep_inf_rules(),
+            *java_parser.rules(),
+            *java_parser_launcher.rules(),
             *source_files.rules(),
             *target_types_rules(),
             *util_rules(),

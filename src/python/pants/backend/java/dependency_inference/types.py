@@ -27,6 +27,7 @@ class JavaSourceDependencyAnalysis:
     declared_package: str
     imports: Sequence[JavaImport]
     top_level_types: Sequence[str]
+    consumed_unqualified_types: Sequence[str]
 
     @classmethod
     def from_json_dict(cls, analysis: dict[str, Any]) -> JavaSourceDependencyAnalysis:
@@ -34,4 +35,5 @@ class JavaSourceDependencyAnalysis:
             declared_package=analysis["declaredPackage"],
             imports=[JavaImport.from_json_dict(imp) for imp in analysis["imports"]],
             top_level_types=analysis["topLevelTypes"],
+            consumed_unqualified_types=analysis["consumedUnqualifiedTypes"],
         )
