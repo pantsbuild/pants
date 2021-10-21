@@ -93,8 +93,6 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
-    print([target_a, target_b])
-
     assert (
         rule_runner.request(
             InferredDependencies,

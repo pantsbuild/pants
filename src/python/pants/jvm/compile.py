@@ -95,7 +95,6 @@ def required_classfiles(fallible_result: FallibleCompiledClassfiles) -> Compiled
         assert fallible_result.output
         return fallible_result.output
     # NB: The compile outputs will already have been streamed as FallibleCompiledClassfiles finish.
-    print(f"fallible_result={fallible_result}")
     raise Exception(
         f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
     )

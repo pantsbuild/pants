@@ -127,11 +127,6 @@ async def analyze_java_source_dependencies(
         ),
     )
 
-    dc = await Get(DigestContents, Digest, process_result.output_digest)
-    for fc in dc:
-        if fc.path == analysis_output_path:
-            print(fc.content.decode("utf-8"))
-
     return FallibleJavaSourceDependencyAnalysisResult(process_result=process_result)
 
 

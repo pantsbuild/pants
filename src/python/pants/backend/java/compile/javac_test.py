@@ -565,13 +565,6 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
     ctgt = expect_single_expanded_coarsened_target(
         rule_runner, Address(spec_path="", target_name="main")
     )
-    print(f"ctgt={ctgt}")
-
-    # source_files = rule_runner.request(SourceFiles, [SourceFilesRequest(tgt.get(Sources) for tgt in ctgt.members)])
-    # analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
-    # print(f"analysis={analysis}")
-
-    # rule_runner.request(JavaSourceDependencyAnalysis, [])
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
