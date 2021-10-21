@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
+from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     Pex,
@@ -226,6 +227,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     else:
         sources = PythonSourceFiles.empty()
 
+    # Note that LocalDistsPexRequest has no `direct_deps_only` mode, so we will build all
+    # local dists in the transitive closure even if the request was for direct_deps_only.
+    # Since we currently use `direct_deps_only` in one case (building a requirements pex
+    # when running pylint) and it's just a performance optimization, this seems harmless.
     local_dists = await Get(
         LocalDistsPex,
         LocalDistsPexRequest(
@@ -426,4 +431,4 @@ async def _setup_constraints_repository_pex(
 
 
 def rules():
-    return (*collect_rules(), *pex_rules(), *python_sources_rules())
+    return (*collect_rules(), *pex_rules(), *local_dists_rules(), *python_sources_rules())
