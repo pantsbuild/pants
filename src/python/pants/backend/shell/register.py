@@ -3,8 +3,8 @@
 
 from pants.backend.shell import dependency_inference, shell_command, shunit2_test_runner, tailor
 from pants.backend.shell.target_types import (
-    ShellCommand,
-    ShellCommandRun,
+    ShellCommandRunTarget,
+    ShellCommandTarget,
     ShellSourcesGeneratorTarget,
     ShellSourceTarget,
     Shunit2TestsGeneratorTarget,
@@ -15,8 +15,8 @@ from pants.backend.shell.target_types import rules as target_types_rules
 
 def target_types():
     return [
-        ShellCommand,
-        ShellCommandRun,
+        ShellCommandTarget,
+        ShellCommandRunTarget,
         ShellSourcesGeneratorTarget,
         Shunit2TestsGeneratorTarget,
         ShellSourceTarget,
