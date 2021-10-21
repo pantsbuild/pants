@@ -13,7 +13,11 @@ import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
+import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.Name;
+import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithType;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
@@ -156,7 +160,7 @@ public class PantsJavaParserLauncher {
                     for (Parameter param : methodDecl.getParameters()) {
                         candidateConsumedTypes.add(param.getType());
                     }
-                    System.out.println("Method type: " + methodDecl.getType());
+                    candidateConsumedTypes.addAll(methodDecl.getThrownExceptions());
                 }
                 if (node instanceof ClassOrInterfaceDeclaration) {
                     ClassOrInterfaceDeclaration classOrIntfDecl = (ClassOrInterfaceDeclaration) node;
@@ -166,6 +170,25 @@ public class PantsJavaParserLauncher {
                 if (node instanceof AnnotationExpr) {
                     AnnotationExpr annoExpr = (AnnotationExpr) node;
                     identifiers.add(annoExpr.getNameAsString());
+                }
+                if (node instanceof MethodCallExpr) {
+                    MethodCallExpr methodCallExpr = (MethodCallExpr) node;
+                    Optional<Expression> scopeExprOpt = methodCallExpr.getScope();
+                    if (scopeExprOpt.isPresent()) {
+                        Expression scope = scopeExprOpt.get();
+                        if (scope instanceof NameExpr) {
+                            NameExpr nameExpr = (NameExpr) scope;
+                            identifiers.add(nameExpr.getNameAsString());
+                        }
+                    }
+                }
+                if (node instanceof FieldAccessExpr) {
+                    FieldAccessExpr fieldAccessExpr = (FieldAccessExpr) node;
+                    Expression scope = fieldAccessExpr.getScope();
+                    if (scope instanceof NameExpr) {
+                        NameExpr nameExpr = (NameExpr) scope;
+                        identifiers.add(nameExpr.getNameAsString());
+                    }
                 }
             }
         });
