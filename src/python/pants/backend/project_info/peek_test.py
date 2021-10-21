@@ -93,6 +93,7 @@ class FilesGeneratorTargetWithOverrides(FilesGeneratorTarget):
                     "dependencies": [],
                     "dependencies_raw": null,
                     "description": null,
+                    "overrides": null,
                     "sources": [],
                     "sources_raw": [],
                     "tags": null
