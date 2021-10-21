@@ -122,9 +122,12 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     ]
-    assert analysis.consumed_unqualified_types == [
-        "some.other.Thing",
+    assert sorted(analysis.consumed_unqualified_types) == [
         "Date",
+        "System",
+        "date",  # note: false positive on a variable identifier
+        "some",
+        "some.other.Thing",
     ]
 
 
@@ -218,7 +221,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     assert analysis.declared_package == ""
     assert analysis.imports == []
     assert analysis.top_level_types == ["SimpleSource", "Foo"]
-    assert analysis.consumed_unqualified_types == []
+    assert analysis.consumed_unqualified_types == ["System"]
 
 
 @maybe_skip_jdk_test
@@ -251,7 +254,8 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
                     }
 
                     @Override
-                    public int foo() {
+                    public int foo() throws AThrownException {
+                        StaticClassRef.someMethod();
                         return 2;
                     }
                 }
@@ -277,15 +281,18 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
     assert analysis.declared_package == "org.pantsbuild.test"
     assert analysis.imports == []
     assert analysis.top_level_types == ["org.pantsbuild.test.AnImpl"]
-    assert analysis.consumed_unqualified_types == [
-        "InnerClassAnnotation",
-        "SomeInterface",
-        "FieldAnnotation",
+    assert sorted(analysis.consumed_unqualified_types) == [
+        "AThrownException",
         "ClassAnnotation",
-        "SomeThing",
-        "SomeGeneric",
-        "String",
+        "FieldAnnotation",
+        "InnerClassAnnotation",
         "Override",
         "Provided",
         "Provider",
+        "SomeGeneric",
+        "SomeInterface",
+        "SomeThing",
+        "StaticClassRef",
+        "String",
+        "provider",  # note: false positive on a variable identifier
     ]
