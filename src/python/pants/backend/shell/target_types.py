@@ -385,7 +385,7 @@ class ShellCommandRunWorkdirField(StringField):
     help = "Sets the current working directory of the command, relative to the project root."
 
 
-class ShellCommand(Target):
+class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -422,7 +422,7 @@ class ShellCommand(Target):
     )
 
 
-class ShellCommandRun(Target):
+class ShellCommandRunTarget(Target):
     alias = "experimental_run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -431,7 +431,7 @@ class ShellCommandRun(Target):
         ShellCommandRunWorkdirField,
     )
     help = (
-        "Run a script in the workspace, with all dependencies packaged/copied into a CHROOT.\n"
+        "Run a script in the workspace, with all dependencies packaged/copied into a chroot.\n"
         + dedent(
             """\
 

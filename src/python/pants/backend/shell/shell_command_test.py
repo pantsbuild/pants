@@ -15,8 +15,8 @@ from pants.backend.shell.shell_command import (
 )
 from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import (
-    ShellCommand,
-    ShellCommandRun,
+    ShellCommandRunTarget,
+    ShellCommandTarget,
     ShellSourcesGeneratorTarget,
 )
 from pants.core.goals.run import RunRequest
@@ -52,8 +52,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[
-            ShellCommand,
-            ShellCommandRun,
+            ShellCommandTarget,
+            ShellCommandRunTarget,
             ShellSourcesGeneratorTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
