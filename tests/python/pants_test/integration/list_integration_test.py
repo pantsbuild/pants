@@ -36,10 +36,15 @@ def test_list_testproject() -> None:
     assert pants_run.stdout.strip() == "\n".join(
         [
             "testprojects/src/python/hello:hello",
+            "testprojects/src/python/hello:hello-dist",
+            "testprojects/src/python/hello:resource",
             "testprojects/src/python/hello/__init__.py",
+            "testprojects/src/python/hello/dist_resource.txt:resource",
             "testprojects/src/python/hello/greet:greet",
+            "testprojects/src/python/hello/greet:greeting",
             "testprojects/src/python/hello/greet/__init__.py",
             "testprojects/src/python/hello/greet/greet.py",
+            "testprojects/src/python/hello/greet/greeting.txt:greeting",
             "testprojects/src/python/hello/main:main",
             "testprojects/src/python/hello/main:lib",
             "testprojects/src/python/hello/main/__init__.py:lib",
