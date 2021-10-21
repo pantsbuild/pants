@@ -947,7 +947,6 @@ async def resolve_dependencies(
             for inference_request_type in relevant_inference_request_types
         )
 
-
     # If it's a target generator, inject dependencies on all of its generated targets.
     generated_addresses: tuple[Address, ...] = ()
     if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
