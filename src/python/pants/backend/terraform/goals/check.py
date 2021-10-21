@@ -1,17 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.terraform.style import StyleRequest, StyleSetup, StyleSetupRequest
+from typing import cast
+
+from pants.backend.terraform.style import StyleSetup, StyleSetupRequest
+from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
-from pants.backend.terraform.tool import rules as tool_rules
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import external_tool
+from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import SubsystemRule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
-from pants.util.logging import LogLevel
 
 
 class TerraformValidateSubsystem(Subsystem):
@@ -26,43 +26,45 @@ class TerraformValidateSubsystem(Subsystem):
             type=bool,
             default=False,
             help=(
-                f"Don't use `terraform validate` when running `{register.bootstrap.pants_bin_name} lint`."
+                f"Don't run `terraform validate` when running `{register.bootstrap.pants_bin_name} check`."
             ),
         )
 
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
 
-class ValidateRequest(StyleRequest):
-    pass
+
+class TerraformCheckRequest(CheckRequest):
+    field_set_type = TerraformFieldSet
 
 
-@rule(desc="Lint with `terraform validate`", level=LogLevel.DEBUG)
-async def run_terraform_validate(
-    request: ValidateRequest, subsystem: TerraformValidateSubsystem
-) -> LintResults:
+@rule
+async def terraform_check(
+    request: TerraformCheckRequest, subsystem: TerraformValidateSubsystem
+) -> CheckResults:
     if subsystem.options.skip:
-        return LintResults([], linter_name="terraform validate")
+        return CheckResults([], checker_name="terraform validate")
 
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("validate",)))
     results = await MultiGet(
         Get(FallibleProcessResult, TerraformProcess, process)
         for _, (process, _) in setup.directory_to_process.items()
     )
-    lint_results = []
+
+    check_results = []
     for directory, result in zip(setup.directory_to_process.keys(), results):
-        lint_results.append(
-            LintResult.from_fallible_process_result(
+        check_results.append(
+            CheckResult.from_fallible_process_result(
                 result, partition_description=f"`terraform validate` on `{directory}`"
             )
         )
 
-    return LintResults(lint_results, linter_name="terraform validate")
+    return CheckResults(check_results, checker_name="terraform validate")
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
-        *external_tool.rules(),
-        *tool_rules(),
-        UnionRule(LintRequest, ValidateRequest),
-        SubsystemRule(TerraformValidateSubsystem),
-    ]
+        UnionRule(CheckRequest, TerraformCheckRequest),
+    )
