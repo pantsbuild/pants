@@ -82,7 +82,7 @@ async def infer_java_dependencies_via_imports(
     candidate_symbols = list(relevant_imports)
     return InferredDependencies(
         dependencies=itertools.chain.from_iterable(
-            dep_map.addresses_for_symbol(imp) for imp in candidate_symbols
+            dep_map.addresses_for_type(imp) for imp in candidate_symbols
         ),
     )
 
@@ -106,7 +106,7 @@ async def infer_java_dependencies_via_consumed_types(
     ]
     return InferredDependencies(
         dependencies=itertools.chain.from_iterable(
-            dep_map.addresses_for_exact_symbol(imp) for imp in candidate_consumed_types
+            dep_map.addresses_for_type(imp) for imp in candidate_consumed_types
         ),
     )
 
