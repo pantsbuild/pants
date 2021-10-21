@@ -684,6 +684,10 @@ async def get_sources(
     # files() targets aren't owned by a single exported target - they aren't code, so
     # we allow them to be in multiple dists. This is helpful for, e.g., embedding
     # a standard license file in a dist.
+    # TODO: This doesn't actually work, the generated setup.py has no way of referencing
+    #  these, since they aren't in a package, so they won't get included in the built dists.
+    # There is a separate `license_files()` setup.py kwarg that we should use for this
+    # special case (see https://setuptools.pypa.io/en/latest/references/keywords.html).
     file_targets = targets_with_sources_types(
         [FileSourceField], transitive_targets.closure, union_membership
     )
