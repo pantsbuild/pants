@@ -503,9 +503,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         store
           .materialize_directory(destination, output_digest)
           .await
-          .map(|metadata| {
-            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
-          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
@@ -529,9 +526,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         store
           .materialize_directory(destination, digest)
           .await
-          .map(|metadata| {
-            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
-          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
