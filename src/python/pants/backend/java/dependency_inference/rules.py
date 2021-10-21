@@ -76,13 +76,10 @@ async def infer_java_dependencies_via_imports(
         ),
     )
     relevant_imports = detected_imports  # TODO: Remove stdlib
-    print(f"{request.sources_field.address}: imports: {', '.join(relevant_imports)}")
 
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
     candidate_symbols = list(relevant_imports)
-    candidate_addresses = [dep_map.addresses_for_symbol(imp) for imp in candidate_symbols]
-    print(f"{request.sources_field.address}: candidate_addresses: {candidate_addresses}")
     return InferredDependencies(
         dependencies=itertools.chain.from_iterable(
             dep_map.addresses_for_symbol(imp) for imp in candidate_symbols
@@ -109,7 +106,7 @@ async def infer_java_dependencies_via_consumed_types(
     ]
     return InferredDependencies(
         dependencies=itertools.chain.from_iterable(
-            dep_map.addresses_for_symbol(imp) for imp in candidate_consumed_types
+            dep_map.addresses_for_exact_symbol(imp) for imp in candidate_consumed_types
         ),
     )
 

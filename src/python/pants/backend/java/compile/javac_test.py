@@ -19,7 +19,7 @@ from pants.core.goals.check import CheckResults
 from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -69,7 +69,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
-            # QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
     )
@@ -299,7 +298,9 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     assert len(coarsened_targets) == 2
     assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
-    coarsened_targets_sorted = sorted(list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address))
+    coarsened_targets_sorted = sorted(
+        list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
+    )
 
     request0 = CompileJavaSourceRequest(component=coarsened_targets_sorted[0])
     compiled_classfiles0 = rule_runner.request(CompiledClassfiles, [request0])
@@ -574,11 +575,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [
-            CompileJavaSourceRequest(
-                component=ctgt
-            )
-        ],
+        [CompileJavaSourceRequest(component=ctgt)],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
