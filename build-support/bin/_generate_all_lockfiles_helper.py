@@ -103,7 +103,7 @@ def main() -> None:
             f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
             f"--yapf-lockfile={Yapf.default_lockfile_path}",
             # PyUpgrade.
-            "--backend-packages=+['pants.backend.python.lint.pyupgrade']",
+            "--backend-packages=+['pants.backend.experimental.python.lint.pyupgrade']",
             f"--pyupgrade-version={PyUpgrade.default_version}",
             f"--pyupgrade-extra-requirements={repr(PyUpgrade.default_extra_requirements)}",
             f"--pyupgrade-interpreter-constraints={repr(PyUpgrade.default_interpreter_constraints)}",
