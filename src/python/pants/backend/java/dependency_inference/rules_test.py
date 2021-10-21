@@ -202,7 +202,7 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_infer_java_imports_ambiguous(rule_runner: RuleRunner) -> None:
+def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     ambiguous_source = dedent(
         """\
                 package org.pantsbuild.a;
@@ -244,9 +244,14 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner) -> None:
 
     # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
     # disambiguates with a `!`, and so gets the appropriate version.
+    caplog.clear()
     assert rule_runner.request(
         InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[])
+    assert len(caplog.records) == 1
+    assert (
+        "The target b/B.java imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+    )
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaSourceDependencies(target_c[JavaSourceField])]
