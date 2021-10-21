@@ -2,5 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 docker_image(
-    name="test-example", version="1.2.5", dependencies=["testprojects/src/python/hello/main"]
+    name="test-example", image_tags=["1.2.5"], dependencies=["testprojects/src/python/hello/main"]
 )
