@@ -32,6 +32,7 @@ from pants.engine.target import (
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -63,7 +64,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
-        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
+        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifact],
     )
     rule_runner.set_options(
         args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
@@ -543,3 +544,44 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
     # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
     # inferred dependencies.
     assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses()
+
+
+@maybe_skip_jdk_test
+def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+
+                java_sources(name = 'lib')
+                """
+            ),
+            "PrintDate.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.DateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new DateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    lib = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time")]
+    )
