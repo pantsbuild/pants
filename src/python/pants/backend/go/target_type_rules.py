@@ -289,7 +289,9 @@ async def determine_main_pkg_for_go_binary(
 
     candidate_targets = await Get(Targets, AddressSpecs([SiblingAddresses(addr.spec_path)]))
     relevant_pkg_targets = [
-        tgt for tgt in candidate_targets if tgt.has_field(GoFirstPartyPackageSourcesField)
+        tgt
+        for tgt in candidate_targets
+        if tgt.has_field(GoFirstPartyPackageSourcesField) and tgt.residence_dir == addr.spec_path
     ]
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)
