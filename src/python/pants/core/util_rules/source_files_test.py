@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from functools import partial
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Type
+from typing import Iterable, NamedTuple
 
 import pytest
 
@@ -52,7 +52,7 @@ def mock_sources_field(
     sources: TargetSources,
     *,
     include_sources: bool = True,
-    sources_field_cls: Type[SourcesField] = MultipleSourcesField,
+    sources_field_cls: type[SourcesField] = MultipleSourcesField,
 ) -> SourcesField:
     sources_field = sources_field_cls(
         sources.source_files if include_sources else [],

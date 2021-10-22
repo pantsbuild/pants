@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 import shlex
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 
@@ -41,10 +41,10 @@ def assert_valid_split(
     splitter: ArgSplitter,
     args_str: str,
     *,
-    expected_goals: List[str],
-    expected_scope_to_flags: Dict[str, List[str]],
-    expected_specs: List[str],
-    expected_passthru: Optional[List[str]] = None,
+    expected_goals: list[str],
+    expected_scope_to_flags: dict[str, list[str]],
+    expected_specs: list[str],
+    expected_passthru: list[str] | None = None,
     expected_is_help: bool = False,
     expected_help_advanced: bool = False,
     expected_help_all: bool = False,
@@ -63,7 +63,7 @@ def assert_valid_split(
     assert expected_help_all == isinstance(splitter.help_request, AllHelp)
 
 
-def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: List[str]) -> None:
+def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: list[str]) -> None:
     splitter.split_args(shlex.split(args_str))
     assert isinstance(splitter.help_request, UnknownGoalHelp)
     assert set(unknown_goals) == set(splitter.help_request.unknown_goals)

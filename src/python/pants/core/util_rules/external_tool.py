@@ -8,7 +8,7 @@ import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Dict, Optional, cast
 
 from pkg_resources import Requirement
 
@@ -96,8 +96,8 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     # The default values for --version and --known-versions, and the supported versions.
     # Subclasses must set appropriately.
     default_version: str
-    default_known_versions: List[str]
-    version_constraints: Optional[str] = None
+    default_known_versions: list[str]
+    version_constraints: str | None = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -179,7 +179,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         return cast(str, self.options.version)
 
     @property
-    def known_versions(self) -> Tuple[str, ...]:
+    def known_versions(self) -> tuple[str, ...]:
         return tuple(self.options.known_versions)
 
     @abstractmethod
@@ -281,7 +281,7 @@ class TemplatedExternalTool(ExternalTool):
     """
 
     default_url_template: str
-    default_url_platform_mapping: Optional[Dict[str, str]] = None
+    default_url_platform_mapping: dict[str, str] | None = None
 
     @classmethod
     def register_options(cls, register):
@@ -326,7 +326,7 @@ class TemplatedExternalTool(ExternalTool):
         return cast(str, self.options.url_template)
 
     @property
-    def url_platform_mapping(self) -> Optional[Dict[str, str]]:
+    def url_platform_mapping(self) -> dict[str, str] | None:
         return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
 
     def generate_url(self, plat: Platform):

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple, cast
+from typing import List, cast
 
 from pants.backend.project_info import dependees
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
@@ -28,7 +28,7 @@ class DependeesOption(Enum):
 
 @dataclass(frozen=True)
 class ChangedRequest:
-    sources: Tuple[str, ...]
+    sources: tuple[str, ...]
     dependees: DependeesOption
 
 
@@ -60,8 +60,8 @@ class ChangedOptions:
     configured, so the normal mechanisms like `SubsystemRule` would not work properly.
     """
 
-    since: Optional[str]
-    diffspec: Optional[str]
+    since: str | None
+    diffspec: str | None
     dependees: DependeesOption
 
     @classmethod
@@ -72,7 +72,7 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git: Git) -> List[str]:
+    def changed_files(self, git: Git) -> list[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
             return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))

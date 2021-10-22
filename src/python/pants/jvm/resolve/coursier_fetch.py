@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Optional, Tuple
+from typing import Any, Iterable, Iterator
 
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -182,7 +182,7 @@ class CoursierLockfileEntry:
 class CoursierResolvedLockfile:
     """An in-memory representation of Pants' Coursier lockfile format."""
 
-    entries: Tuple[CoursierLockfileEntry, ...]
+    entries: tuple[CoursierLockfileEntry, ...]
 
     @classmethod
     def from_json_dict(cls, lockfile) -> CoursierResolvedLockfile:
@@ -495,10 +495,10 @@ class MaterializedClasspathRequest:
         entries (or vice versa).
     """
 
-    prefix: Optional[str] = None
-    lockfiles: Tuple[CoursierResolvedLockfile, ...] = ()
-    resolved_classpaths: Tuple[ResolvedClasspathEntries, ...] = ()
-    artifact_requirements: Tuple[ArtifactRequirements, ...] = ()
+    prefix: str | None = None
+    lockfiles: tuple[CoursierResolvedLockfile, ...] = ()
+    resolved_classpaths: tuple[ResolvedClasspathEntries, ...] = ()
+    artifact_requirements: tuple[ArtifactRequirements, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -514,7 +514,7 @@ class MaterializedClasspath:
     def digest(self) -> Digest:
         return self.content.digest
 
-    def classpath_entries(self, root: Optional[str] = None) -> Iterator[str]:
+    def classpath_entries(self, root: str | None = None) -> Iterator[str]:
         """Returns optionally prefixed classpath entry filenames.
 
         :param prefix: if set, will be prepended to all entries.  This is useful
