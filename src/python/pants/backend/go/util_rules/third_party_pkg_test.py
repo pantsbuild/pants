@@ -333,6 +333,38 @@ def test_determine_pkg_info_missing(rule_runner: RuleRunner) -> None:
         )
 
 
+def test_determine_pkg_info_no_packages(rule_runner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/third-party-module
+                go 1.17
+
+                require github.com/Azure/go-autorest v13.3.2+incompatible
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                github.com/Azure/go-autorest v13.3.2+incompatible h1:VxzPyuhtnlBOzc4IWCZHqpyH2d+QMLQEuy3wREyY4oc=
+                github.com/Azure/go-autorest v13.3.2+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
+                """
+            ),
+            "BUILD": "go_mod(name='mod')",
+        }
+    )
+    input_digest = rule_runner.request(Digest, [PathGlobs(["go.mod", "go.sum"])])
+    module_info = rule_runner.request(
+        ThirdPartyModuleInfo,
+        [
+            ThirdPartyModuleInfoRequest(
+                "github.com/Azure/go-autorest", "v13.3.2+incompatible", input_digest
+            )
+        ],
+    )
+    assert not module_info
+
+
 def test_unsupported_sources(rule_runner: RuleRunner) -> None:
     # `golang.org/x/mobile/bind/objc` uses `.h` files on both Linux and macOS.
     mobile_version = "v0.0.0-20210924032853-1c027f395ef7"

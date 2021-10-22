@@ -60,12 +60,19 @@ def parse_module_descriptors(raw_json: bytes) -> list[ModuleDescriptor]:
     for raw_module_descriptor in ijson.items(raw_json, "", multiple_values=True):
         if raw_module_descriptor.get("Main", False):
             continue
-
-        module_descriptor = ModuleDescriptor(
-            path=raw_module_descriptor["Path"],
-            version=raw_module_descriptor["Version"],
-        )
-        module_descriptors.append(module_descriptor)
+        path = raw_module_descriptor["Path"]
+        if "Replace" in raw_module_descriptor:
+            if raw_module_descriptor["Replace"]["Path"] != raw_module_descriptor["Path"]:
+                raise NotImplementedError(
+                    "Pants does not yet support replace directives that change the import path. "
+                    "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
+                    "with this error message so that we know to prioritize adding support:\n\n"
+                    f"{raw_module_descriptor}"
+                )
+            version = raw_module_descriptor["Replace"]["Version"]
+        else:
+            version = raw_module_descriptor["Version"]
+        module_descriptors.append(ModuleDescriptor(path, version))
     return module_descriptors
 
 

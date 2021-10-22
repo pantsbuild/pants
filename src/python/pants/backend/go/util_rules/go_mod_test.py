@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import go_mod, sdk
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest, ModuleDescriptor
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -73,3 +73,29 @@ def test_go_mod_info(rule_runner: RuleRunner) -> None:
         module_descriptor.path == "github.com/golang/protobuf"
         for module_descriptor in go_mod_info.modules
     )
+
+
+def test_go_mod_replace_version(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                require github.com/google/uuid v1.0.0
+
+                replace github.com/google/uuid => github.com/google/uuid v1.3.0
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                """
+            ),
+            "BUILD": "go_mod(name='mod')",
+        }
+    )
+    go_mod_info = rule_runner.request(GoModInfo, [GoModInfoRequest(Address("", target_name="mod"))])
+    assert go_mod_info.import_path == "go.example.com/foo"
+    assert set(go_mod_info.modules) == {ModuleDescriptor("github.com/google/uuid", "v1.3.0")}
