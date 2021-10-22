@@ -9,8 +9,8 @@ from os import path
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
-    DockerImageTagsField,
     DockerImageSourceField,
+    DockerImageTagsField,
     DockerRegistriesField,
     DockerRepositoryField,
 )
