@@ -9,7 +9,7 @@ import os
 import re
 from collections import OrderedDict
 from pathlib import Path, PurePath
-from typing import Iterable, List, Optional, Tuple, cast
+from typing import Iterable, Optional, cast
 
 from pex.variables import Variables
 
@@ -237,7 +237,7 @@ class PythonSetup(Subsystem):
         )
 
     @property
-    def interpreter_constraints(self) -> Tuple[str, ...]:
+    def interpreter_constraints(self) -> tuple[str, ...]:
         return tuple(self.options.interpreter_constraints)
 
     @property
@@ -273,7 +273,7 @@ class PythonSetup(Subsystem):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths, env)
 
     @property
-    def manylinux(self) -> Optional[str]:
+    def manylinux(self) -> str | None:
         manylinux = cast(Optional[str], self.options.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
@@ -303,9 +303,7 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(
-        self, compatibility: Optional[Iterable[str]]
-    ) -> Tuple[str, ...]:
+    def compatibility_or_constraints(self, compatibility: Iterable[str] | None) -> tuple[str, ...]:
         """Return either the given `compatibility` field or the global interpreter constraints.
 
         If interpreter constraints are supplied by the CLI flag, return those only.
@@ -315,8 +313,8 @@ class PythonSetup(Subsystem):
         return tuple(compatibility or self.interpreter_constraints)
 
     def compatibilities_or_constraints(
-        self, compatibilities: Iterable[Optional[Iterable[str]]]
-    ) -> Tuple[str, ...]:
+        self, compatibilities: Iterable[Iterable[str] | None]
+    ) -> tuple[str, ...]:
         return tuple(
             constraint
             for compatibility in compatibilities
@@ -375,7 +373,7 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
-    def get_asdf_paths(env: Environment, *, asdf_local: bool = False) -> List[str]:
+    def get_asdf_paths(env: Environment, *, asdf_local: bool = False) -> list[str]:
         """Returns a list of paths to Python interpreters managed by ASDF.
 
         :param env: The environment to use to look up ASDF.
@@ -400,7 +398,7 @@ class PythonSetup(Subsystem):
             return []
 
         # Find all installed versions.
-        asdf_installed_paths: List[str] = []
+        asdf_installed_paths: list[str] = []
         for child in asdf_installs_dir.iterdir():
             # Aliases, and non-cpython installs may have odd names.
             # Make sure that the entry is a subdirectory of the installs directory.
@@ -414,7 +412,7 @@ class PythonSetup(Subsystem):
         if not asdf_installed_paths:
             return []
 
-        asdf_paths: List[str] = []
+        asdf_paths: list[str] = []
         asdf_versions: OrderedDict[str, str] = OrderedDict()
         tool_versions_file = None
 
@@ -503,7 +501,7 @@ class PythonSetup(Subsystem):
             return asdf_paths
 
     @staticmethod
-    def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> List[str]:
+    def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> list[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
         :param env: The environment to use to look up pyenv.

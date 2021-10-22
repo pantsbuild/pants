@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
-from typing import Iterable, Set, cast
+from typing import Iterable, cast
 
 import pytest
 
@@ -284,7 +284,7 @@ def address_specs_rule_runner() -> RuleRunner:
 def resolve_address_specs(
     rule_runner: RuleRunner,
     specs: Iterable[AddressSpec],
-) -> Set[Address]:
+) -> set[Address]:
     result = rule_runner.request(Addresses, [AddressSpecs(specs, filter_by_global_options=True)])
     return set(result)
 

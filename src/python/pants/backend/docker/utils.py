@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -12,7 +12,7 @@ _T = TypeVar("_T", bound="KeyValueSequenceUtil")
 
 class KeyValueSequenceUtil(FrozenOrderedSet[str]):
     @classmethod
-    def from_strings(cls: Type[_T], *strings: str) -> _T:
+    def from_strings(cls: type[_T], *strings: str) -> _T:
         """Takes all `KEY`/`KEY=VALUE` strings and dedupes by `KEY`.
 
         The last seen `KEY` wins in case of duplicates.

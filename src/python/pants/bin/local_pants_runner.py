@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -61,7 +60,7 @@ class LocalPantsRunner:
     specs: Specs
     graph_session: GraphSession
     union_membership: UnionMembership
-    profile_path: Optional[str]
+    profile_path: str | None
 
     @classmethod
     def _init_graph_session(
@@ -72,8 +71,8 @@ class LocalPantsRunner:
         env: CompleteEnvironment,
         run_id: str,
         options: Options,
-        scheduler: Optional[GraphScheduler] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        scheduler: GraphScheduler | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
         if scheduler is None:
@@ -103,9 +102,9 @@ class LocalPantsRunner:
         cls,
         env: CompleteEnvironment,
         options_bootstrapper: OptionsBootstrapper,
-        options_initializer: Optional[OptionsInitializer] = None,
-        scheduler: Optional[GraphScheduler] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        options_initializer: OptionsInitializer | None = None,
+        scheduler: GraphScheduler | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> LocalPantsRunner:
         """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -169,7 +168,7 @@ class LocalPantsRunner:
             profile_path=profile_path,
         )
 
-    def _perform_run(self, goals: Tuple[str, ...]) -> ExitCode:
+    def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
         global_options = self.options.for_global_scope()
         if not global_options.get("loop", False):
             return self._perform_run_body(goals, poll=False)
@@ -188,7 +187,7 @@ class LocalPantsRunner:
 
         return exit_code
 
-    def _perform_run_body(self, goals: Tuple[str, ...], poll: bool) -> ExitCode:
+    def _perform_run_body(self, goals: tuple[str, ...], poll: bool) -> ExitCode:
         return self.graph_session.run_goal_rules(
             union_membership=self.union_membership,
             goals=goals,
@@ -217,7 +216,7 @@ class LocalPantsRunner:
         )
         return help_printer.print_help()
 
-    def _get_workunits_callbacks(self) -> Tuple[WorkunitsCallback, ...]:
+    def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(

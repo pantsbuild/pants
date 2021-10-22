@@ -11,7 +11,7 @@ import time
 import traceback
 from abc import ABCMeta
 from hashlib import sha256
-from typing import Callable, Optional, cast
+from typing import Callable, cast
 
 import psutil
 
@@ -328,7 +328,7 @@ class ProcessManager:
             ),
         )
 
-    def write_pid(self, pid: Optional[int] = None):
+    def write_pid(self, pid: int | None = None):
         """Write the current process's PID."""
         pid = os.getpid() if pid is None else pid
         self.write_metadata_by_name(self.PID_KEY, str(pid))
@@ -338,7 +338,7 @@ class ProcessManager:
         cmdline = proc.cmdline()
         return cast(str, cmdline[0] if cmdline else proc.name())
 
-    def write_process_name(self, process_name: Optional[str] = None):
+    def write_process_name(self, process_name: str | None = None):
         """Write the current process's name."""
         process_name = process_name or self._get_process_name()
         self.write_metadata_by_name(self.PROCESS_NAME_KEY, process_name)
