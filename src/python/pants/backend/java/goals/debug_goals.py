@@ -3,6 +3,7 @@
 
 import json
 
+from pants.backend.experimental.java.register import rules as java_rules
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
@@ -29,4 +30,7 @@ async def dump_dep_inference_data(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *java_rules(),
+    ]
