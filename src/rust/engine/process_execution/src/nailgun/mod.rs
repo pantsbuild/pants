@@ -56,6 +56,8 @@ fn construct_nailgun_server_request(
     level: log::Level::Info,
     use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
+    env: client_request.env,
+    append_only_caches: client_request.append_only_caches,
     ..client_request
   }
 }

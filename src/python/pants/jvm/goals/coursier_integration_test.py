@@ -26,7 +26,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -37,7 +37,7 @@ HAMCREST_COORD = Coordinate(
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         preserve_tmpdirs=True,
         rules=[
             *core_rules(),
@@ -51,6 +51,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmDependencyLockfile, JvmArtifact, ResourcesGeneratorTarget],
     )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
 
 
 @maybe_skip_jdk_test
@@ -81,7 +83,9 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
             ),
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=["::"])
+    result = rule_runner.run_goal_rule(
+        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
@@ -148,7 +152,9 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
             "coursier_resolve.lockfile": expected_lockfile.to_json().decode("utf-8"),
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=["::"])
+    result = rule_runner.run_goal_rule(
+        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     assert result.exit_code == 0
     assert result.stderr == ""
 
@@ -182,7 +188,9 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": "[]",
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=["::"])
+    result = rule_runner.run_goal_rule(
+        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
@@ -234,7 +242,9 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
             "coursier_resolve.lockfile": "]bad json[",
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=["::"])
+    result = rule_runner.run_goal_rule(
+        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(

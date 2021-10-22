@@ -23,7 +23,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -34,7 +34,7 @@ HAMCREST_COORD = Coordinate(
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -48,6 +48,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmDependencyLockfile, JvmArtifact],
     )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
 
 
 @maybe_skip_jdk_test

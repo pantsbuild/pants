@@ -33,14 +33,14 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 # TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         preserve_tmpdirs=True,
         rules=[
             *config_files.rules(),
@@ -63,11 +63,13 @@ def rule_runner() -> RuleRunner:
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
         ],
-        bootstrap_args=[
-            # Makes JUnit output predictable and parseable across versions (#12933):
-            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
-        ],
     )
+    rule_runner.set_options(
+        # Makes JUnit output predictable and parseable across versions (#12933):
+        args=["--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    return rule_runner
 
 
 # This is hard-coded to make the test somewhat more hermetic.

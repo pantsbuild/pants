@@ -86,6 +86,7 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
         ),
     )
 
+    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
         Process(
@@ -99,8 +100,8 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
                 _LAUNCHER_BASENAME,
             ],
             input_digest=merged_digest,
-            use_nailgun=jdk_setup.digest,
             append_only_caches=jdk_setup.append_only_caches,
+            env=jdk_setup.env,
             output_directories=(dest_dir,),
             description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
             level=LogLevel.DEBUG,
