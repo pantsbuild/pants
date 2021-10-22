@@ -10,7 +10,10 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgInfo,
+    FirstPartyPkgInfoRequest,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
@@ -26,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
-            QueryRule(FirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
+            QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -84,10 +87,12 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         test_files: list[str],
         xtest_files: list[str],
     ) -> None:
-        info = rule_runner.request(
-            FirstPartyPkgInfo,
+        maybe_info = rule_runner.request(
+            FallibleFirstPartyPkgInfo,
             [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{subpath}"))],
         )
+        assert maybe_info.info is not None
+        info = maybe_info.info
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
         expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{subpath}/*.go"])])
         assert actual_snapshot == expected_snapshot
@@ -118,6 +123,28 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         test_files=["bar_test.go"],
         xtest_files=[],
     )
+
+
+def test_invalid_package(rule_runner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "bad.go": "invalid!!!",
+        }
+    )
+    maybe_info = rule_runner.request(
+        FallibleFirstPartyPkgInfo,
+        [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+    )
+    assert maybe_info.info is None
+    assert maybe_info.exit_code == 1
+    assert maybe_info.stderr == "bad.go:1:1: expected 'package', found invalid\n"
 
 
 def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
@@ -151,6 +178,6 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     )
     with engine_error(NotImplementedError):
         rule_runner.request(
-            FirstPartyPkgInfo,
+            FallibleFirstPartyPkgInfo,
             [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
         )

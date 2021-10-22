@@ -205,6 +205,45 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
     assert "FAIL: TestAdd" in result.stdout
 
 
+def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
+    """A compilation failure should not cause Pants to error, only the test to fail."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod()",
+            "foo/go.mod": "module foo",
+            # Test itself is bad.
+            "foo/bad_test.go": "invalid!!!",
+            # A dependency of the test is bad.
+            "foo/dep/f.go": "invalid!!!",
+            "foo/uses_dep/f_test.go": textwrap.dedent(
+                """
+                package uses_dep
+
+                import (
+                  "foo/dep"
+                  "testing"
+                )
+
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 1
+    assert result.stderr == "bad_test.go:1:1: expected 'package', found invalid\n"
+
+    tgt = rule_runner.get_target(Address("foo", generated_name="./uses_dep"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 1
+    assert result.stderr == "dep/f.go:1:1: expected 'package', found invalid\n"
+
+
 def test_external_test_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

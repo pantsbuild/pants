@@ -18,7 +18,7 @@ from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
 
@@ -50,6 +50,16 @@ class FirstPartyPkgInfo:
 
 
 @dataclass(frozen=True)
+class FallibleFirstPartyPkgInfo:
+    """Info needed to build a first-party Go package, but fallible if `go list` failed."""
+
+    info: FirstPartyPkgInfo | None
+    import_path: str
+    exit_code: int = 0
+    stderr: str | None = None
+
+
+@dataclass(frozen=True)
 class FirstPartyPkgInfoRequest(EngineAwareParameter):
     address: Address
 
@@ -60,7 +70,7 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 @rule
 async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest,
-) -> FirstPartyPkgInfo:
+) -> FallibleFirstPartyPkgInfo:
     go_mod_address = request.address.maybe_convert_to_target_generator()
     wrapped_target, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
@@ -78,7 +88,7 @@ async def compute_first_party_package_info(
     )
 
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=input_digest,
             command=("list", "-json", f"./{subpath}"),
@@ -86,6 +96,14 @@ async def compute_first_party_package_info(
             working_dir=request.address.spec_path,
         ),
     )
+    if result.exit_code != 0:
+        return FallibleFirstPartyPkgInfo(
+            info=None,
+            import_path=import_path,
+            exit_code=result.exit_code,
+            stderr=result.stderr.decode("utf-8"),
+        )
+
     metadata = json.loads(result.stdout)
 
     if "CgoFiles" in metadata:
@@ -96,7 +114,7 @@ async def compute_first_party_package_info(
             "prioritize adding support."
         )
 
-    return FirstPartyPkgInfo(
+    info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
         subpath=os.path.join(target.address.spec_path, subpath),
         import_path=import_path,
@@ -108,6 +126,7 @@ async def compute_first_party_package_info(
         xtest_files=tuple(metadata.get("XTestGoFiles", [])),
         s_files=tuple(metadata.get("SFiles", [])),
     )
+    return FallibleFirstPartyPkgInfo(info, import_path)
 
 
 def rules():
