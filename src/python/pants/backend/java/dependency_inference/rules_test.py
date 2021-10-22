@@ -10,7 +10,7 @@ from pants.backend.java.dependency_inference.java_parser import rules as java_pa
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
-from pants.backend.java.dependency_inference.rules import InferJavaImportDependencies
+from pants.backend.java.dependency_inference.rules import InferJavaSourceDependencies
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
     JavaSourceField,
@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            QueryRule(InferredDependencies, [InferJavaImportDependencies]),
+            QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
@@ -96,7 +96,7 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     assert (
         rule_runner.request(
             InferredDependencies,
-            [InferJavaImportDependencies(target_a[JavaSourceField])],
+            [InferJavaSourceDependencies(target_a[JavaSourceField])],
         )
         == InferredDependencies(dependencies=[])
     )
@@ -104,7 +104,7 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     assert (
         rule_runner.request(
             InferredDependencies,
-            [InferJavaImportDependencies(target_b[JavaSourceField])],
+            [InferJavaSourceDependencies(target_b[JavaSourceField])],
         )
         == InferredDependencies(dependencies=[])
     )
@@ -146,11 +146,11 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[])
 
 
@@ -193,12 +193,69 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_a.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
+    ambiguous_source = dedent(
+        """\
+                package org.pantsbuild.a;
+                public class A {}
+                """
+    )
+    rule_runner.write_files(
+        {
+            "a_one/BUILD": "java_sources()",
+            "a_one/A.java": ambiguous_source,
+            "a_two/BUILD": "java_sources()",
+            "a_two/A.java": ambiguous_source,
+            "b/BUILD": "java_sources()",
+            "b/B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+                import org.pantsbuild.a.A;
+                public class B {}
+                """
+            ),
+            "c/BUILD": dedent(
+                """\
+                java_sources(
+                  dependencies=["!a_two/A.java"],
+                )
+                """
+            ),
+            "c/C.java": dedent(
+                """\
+                package org.pantsbuild.c;
+                import org.pantsbuild.a.A;
+                public class C {}
+                """
+            ),
+        }
+    )
+    target_b = rule_runner.get_target(Address("b", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("c", relative_file_path="C.java"))
+
+    # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
+    # disambiguates with a `!`, and so gets the appropriate version.
+    caplog.clear()
+    assert rule_runner.request(
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+    ) == InferredDependencies(dependencies=[])
+    assert len(caplog.records) == 1
+    assert (
+        "The target b/B.java imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+    )
+
+    assert rule_runner.request(
+        InferredDependencies, [InferJavaSourceDependencies(target_c[JavaSourceField])]
+    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.java")])
 
 
 @maybe_skip_jdk_test
@@ -222,7 +279,7 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[])
 
 
@@ -260,11 +317,11 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_a.address])
 
 

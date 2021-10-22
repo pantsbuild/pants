@@ -1953,7 +1953,7 @@ class ExplicitlyProvidedDependencies:
     ignores: FrozenOrderedSet[Address]
 
     @memoized_method
-    def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
+    def any_are_covered_by_includes(self, addresses: Iterable[Address]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
         Note that if the input addresses are generated targets, they will still be marked as covered
@@ -1966,7 +1966,7 @@ class ExplicitlyProvidedDependencies:
 
     @memoized_method
     def remaining_after_disambiguation(
-        self, addresses: Tuple[Address, ...], owners_must_be_ancestors: bool
+        self, addresses: Iterable[Address], owners_must_be_ancestors: bool
     ) -> frozenset[Address]:
         """All addresses that remain after ineligible candidates are discarded.
 
@@ -1996,7 +1996,7 @@ class ExplicitlyProvidedDependencies:
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
-        ambiguous_addresses: Tuple[Address, ...],
+        ambiguous_addresses: Iterable[Address],
         original_address: Address,
         *,
         context: str,
@@ -2030,7 +2030,7 @@ class ExplicitlyProvidedDependencies:
         )
 
     def disambiguated(
-        self, ambiguous_addresses: Tuple[Address, ...], owners_must_be_ancestors: bool = False
+        self, ambiguous_addresses: Iterable[Address], owners_must_be_ancestors: bool = False
     ) -> Address | None:
         """If exactly one of the input addresses remains after disambiguation, return it.
 
