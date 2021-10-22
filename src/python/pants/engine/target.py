@@ -855,6 +855,7 @@ def generate_file_level_targets(
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
     use_source_field: bool = True,
+    overrides: dict[str, dict[str, Any]] | None = None,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -869,6 +870,9 @@ def generate_file_level_targets(
 
     Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
     finer-grained.
+
+    `overrides` allows changing the fields for particular targets. It expects the full file path
+     as the key.
     """
     if not generator.has_field(Dependencies) or not generator.has_field(SourcesField):
         raise AssertionError(
@@ -896,6 +900,9 @@ def generate_file_level_targets(
         else FrozenOrderedSet()
     )
 
+    used_overrides = set()
+    normalized_overrides = overrides or {}
+
     def gen_tgt(full_fp: str, address: Address) -> Target:
         generated_target_fields: dict[str, ImmutableValue] = {}
         for field in generator.field_values.values():
@@ -915,8 +922,14 @@ def generate_file_level_targets(
                 generated_target_fields[Dependencies.alias] = (field.value or ()) + tuple(
                     all_generated_address_specs - {address.spec}
                 )
-            else:
+            elif isinstance(field, OverridesField):
+                continue
+            elif field.value != field.default:
                 generated_target_fields[field.alias] = field.value
+
+        if full_fp in normalized_overrides:
+            used_overrides.add(full_fp)
+            generated_target_fields.update(normalized_overrides[full_fp])
 
         return generated_target_cls(
             generated_target_fields,
@@ -925,9 +938,26 @@ def generate_file_level_targets(
             residence_dir=os.path.dirname(full_fp),
         )
 
-    return GeneratedTargets(
-        generator, (gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
-    )
+    result = tuple(gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
+
+    unused_overrides = set(normalized_overrides.keys()) - used_overrides
+    if unused_overrides:
+        unused_relative_paths = sorted(
+            fast_relpath(fp, generator.address.spec_path) for fp in unused_overrides
+        )
+        all_valid_relative_paths = sorted(
+            cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
+            for tgt in result
+        )
+        raise InvalidFieldException(
+            f"Unused file paths in the `overrides` field for {generator.address}: "
+            f"{sorted(unused_relative_paths)}"
+            f"\n\nDid you mean one of these valid paths?\n\n"
+            f"{all_valid_relative_paths}\n\n"
+            f"Tip: if you want to override a value for all generated targets, set the ..."
+        )
+
+    return GeneratedTargets(generator, result)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1923,7 +1953,7 @@ class ExplicitlyProvidedDependencies:
     ignores: FrozenOrderedSet[Address]
 
     @memoized_method
-    def any_are_covered_by_includes(self, addresses: Tuple[Address, ...]) -> bool:
+    def any_are_covered_by_includes(self, addresses: Iterable[Address]) -> bool:
         """Return True if every address is in the explicitly provided includes.
 
         Note that if the input addresses are generated targets, they will still be marked as covered
@@ -1936,7 +1966,7 @@ class ExplicitlyProvidedDependencies:
 
     @memoized_method
     def remaining_after_disambiguation(
-        self, addresses: Tuple[Address, ...], owners_must_be_ancestors: bool
+        self, addresses: Iterable[Address], owners_must_be_ancestors: bool
     ) -> frozenset[Address]:
         """All addresses that remain after ineligible candidates are discarded.
 
@@ -1966,7 +1996,7 @@ class ExplicitlyProvidedDependencies:
 
     def maybe_warn_of_ambiguous_dependency_inference(
         self,
-        ambiguous_addresses: Tuple[Address, ...],
+        ambiguous_addresses: Iterable[Address],
         original_address: Address,
         *,
         context: str,
@@ -2000,7 +2030,7 @@ class ExplicitlyProvidedDependencies:
         )
 
     def disambiguated(
-        self, ambiguous_addresses: Tuple[Address, ...], owners_must_be_ancestors: bool = False
+        self, ambiguous_addresses: Iterable[Address], owners_must_be_ancestors: bool = False
     ) -> Address | None:
         """If exactly one of the input addresses remains after disambiguation, return it.
 
@@ -2184,8 +2214,129 @@ class DescriptionField(StringField):
 COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 
-# TODO: figure out what support looks like for this with the Target API. The expected value is an
-#  Artifact, there is no common Artifact interface.
+class OverridesField(AsyncFieldMixin, Field):
+    """A mapping of keys (e.g. target names, source globs) to field names with their overridden
+    values.
+
+    This is meant for target generators to reduce boilerplate. It's up to the corresponding target
+    generator rule to determine how to implement the field, such as how users specify the key. For
+    example, `{"f.ext": {"tags": ['my_tag']}}`.
+    """
+
+    alias = "overrides"
+    value: dict[tuple[str, ...], dict[str, Any]] | None
+    default: ClassVar[None] = None  # A default does not make sense for this field.
+
+    @classmethod
+    def compute_value(
+        cls,
+        raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
+        address: Address,
+    ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
+        )
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception
+
+        result: dict[tuple[str, ...], dict[str, Any]] = {}
+        for outer_key, nested_value in value_or_default.items():
+            if isinstance(outer_key, str):
+                outer_key = (outer_key,)
+            if not isinstance(outer_key, collections.abc.Sequence) or not all(
+                isinstance(elem, str) for elem in outer_key
+            ):
+                raise invalid_type_exception
+            if not isinstance(nested_value, collections.abc.Mapping):
+                raise invalid_type_exception
+            if not all(isinstance(inner_key, str) for inner_key in nested_value):
+                raise invalid_type_exception
+            result[tuple(outer_key)] = dict(nested_value)
+
+        return result
+
+    def __hash__(self) -> int:
+        # The value might have unhashable elements like `list`, so we stringify it.
+        return hash((self.__class__, repr(self.value)))
+
+    def _relativize_globs(self, globs: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(
+            f"!{os.path.join(self.address.spec_path, glob[1:])}"
+            if glob.startswith("!")
+            else os.path.join(self.address.spec_path, glob)
+            for glob in globs
+        )
+
+    def to_path_globs(
+        self, files_not_found_behavior: FilesNotFoundBehavior
+    ) -> tuple[PathGlobs, ...]:
+        """Create a `PathGlobs` for each key.
+
+        This should only be used if the keys are file globs.
+        """
+        if not self.value:
+            return ()
+        return tuple(
+            PathGlobs(
+                self._relativize_globs(globs),
+                glob_match_error_behavior=files_not_found_behavior.to_glob_match_error_behavior(),
+                description_of_origin=f"the `overrides` field for {self.address}",
+            )
+            for globs in self.value
+        )
+
+    def flatten_paths(
+        self, paths_to_overrides: Mapping[Paths, dict[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
+        """Combine all overrides for each file into a single dictionary."""
+        result: dict[str, dict[str, Any]] = {}
+        for paths, override in paths_to_overrides.items():
+            for path in paths.files:
+                for field, value in override.items():
+                    if path not in result:
+                        result[path] = {field: value}
+                        continue
+                    if field not in result[path]:
+                        result[path][field] = value
+                        continue
+                    relpath = fast_relpath(path, self.address.spec_path)
+                    raise InvalidFieldException(
+                        f"Conflicting overrides in the `{self.alias}` field of "
+                        f"`{self.address}` for the relative path `{relpath}` for "
+                        f"the field `{field}`. You cannot specify the same field name "
+                        "multiple times for the same path.\n\n"
+                        f"(One override sets the field to `{repr(result[path][field])}` "
+                        f"but another sets to `{repr(value)}`.)"
+                    )
+        return result
+
+
+def generate_file_based_overrides_field_help_message(
+    generated_target_name: str, example: str
+) -> str:
+    return (
+        f"Override the field values for generated `{generated_target_name}` targets.\n\n"
+        "Expects a dictionary of relative file paths and globs to a dictionary for the "
+        "overrides. You may either use a string for a single path / glob, "
+        "or a string tuple for multiple paths / globs. Each override is a dictionary of "
+        "field names to the overridden value.\n\n"
+        f"For example:\n\n{example}\n\n"
+        "File paths and globs are relative to the BUILD file's directory. Every overridden file is "
+        "validated to belong to this target's `sources` field.\n\n"
+        f"If you'd like to override a field's value for every `{generated_target_name}` target "
+        "generated by this target, change the field directly on this target rather than using the "
+        "`overrides` field.\n\n"
+        "You can specify the same file name in multiple keys, so long as you don't override the "
+        "same field more than one time for the file."
+    )
+
+
 class ProvidesField(Field):
     """An `artifact` that describes how to represent this target to the outside world."""
 

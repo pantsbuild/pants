@@ -62,6 +62,7 @@ DEFAULT_MODULE_MAPPING = {
     "google-cloud-functions": ("google.cloud.functions_v1", "google.cloud.functions"),
     "google-cloud-iam": ("google.cloud.iam_credentials_v1",),
     "google-cloud-iot": ("google.cloud.iot_v1",),
+    "google-cloud-logging": ("google.cloud.logging_v2", "google.cloud.logging"),
     "google-cloud-pubsub": ("google.cloud.pubsub_v1", "google.cloud.pubsub"),
     "google-cloud-secret-manager": ("google.cloud.secretmanager",),
     "google-cloud-storage": ("google.cloud.storage",),

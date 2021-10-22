@@ -52,7 +52,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.55.0-*
+        path: '~/.rustup/toolchains/1.56.0-*
 
           ~/.rustup/update-hashes
 
@@ -206,7 +206,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.55.0-*
+        path: '~/.rustup/toolchains/1.56.0-*
 
           ~/.rustup/update-hashes
 
@@ -407,7 +407,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.55.0-*
+        path: '~/.rustup/toolchains/1.56.0-*
 
           ~/.rustup/update-hashes
 
@@ -524,6 +524,8 @@ jobs:
         '
     - name: Lint
       run: './pants validate ''**''
+
+        ./pants update-build-files --check
 
         ./pants lint check ::
 

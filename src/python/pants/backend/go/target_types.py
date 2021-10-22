@@ -152,17 +152,6 @@ class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
     required = True
     value: str
 
-    @property
-    def full_dir_path(self) -> str:
-        """The full path to this package's directory, relative to the build root."""
-        # NB: The `spec_path` points to the `go_mod` target used to generate the
-        # `go_first_party_package` target.
-        assert self.address.is_generated_target
-        go_mod_path = self.address.spec_path
-        if not self.value:
-            return go_mod_path
-        return os.path.join(go_mod_path, self.value)
-
 
 class GoFirstPartyPackageTarget(Target):
     alias = "go_first_party_package"

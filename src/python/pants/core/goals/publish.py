@@ -19,15 +19,18 @@ Example rule:
 
 from __future__ import annotations
 
+import collections
+import json
 import logging
 from abc import ABCMeta
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar
+from typing import ClassVar, Generic, Type, TypeVar, cast
 
 from typing_extensions import final
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
@@ -35,16 +38,22 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
+    ImmutableValue,
     NoApplicableTargetsBehavior,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionRule, union
+from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
 
 _F = TypeVar("_F", bound=FieldSet)
+
+
+class PublishOutputData(FrozenDict[str, ImmutableValue]):
+    pass
 
 
 @union
@@ -102,6 +111,9 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
             UnionRule(PublishRequest, cls.publish_request_type),
         )
 
+    def get_output_data(self) -> PublishOutputData:
+        return PublishOutputData({"target": self.address})
+
 
 @dataclass(frozen=True)
 class PublishPackages:
@@ -119,6 +131,16 @@ class PublishPackages:
     names: tuple[str, ...]
     process: InteractiveProcess | None = None
     description: str | None = None
+    data: PublishOutputData = field(default_factory=PublishOutputData)
+
+    def get_output_data(self, **extra_data) -> PublishOutputData:
+        return PublishOutputData(
+            {
+                "names": self.names,
+                **self.data,
+                **extra_data,
+            }
+        )
 
 
 class PublishProcesses(Collection[PublishPackages]):
@@ -149,13 +171,26 @@ class PublishSubsystem(GoalSubsystem):
         PublishFieldSet,
     )
 
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--output",
+            type=str,
+            help="Filename for JSON structured publish information.",
+        )
+
+    @property
+    def output(self) -> str | None:
+        return cast("str|None", self.options.output)
+
 
 class Publish(Goal):
     subsystem_cls = PublishSubsystem
 
 
 @goal_rule
-async def run_publish(console: Console) -> Publish:
+async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
             TargetRootsToFieldSets,
@@ -189,8 +224,10 @@ async def run_publish(console: Console) -> Publish:
     )
 
     # Run all processes interactively.
-    exit_code = 0
-    results = []
+    exit_code: int = 0
+    outputs: list[PublishOutputData] = []
+    results: list[str] = []
+
     for pub in chain.from_iterable(processes):
         if not pub.process:
             sigil = console.sigil_skipped()
@@ -199,6 +236,7 @@ async def run_publish(console: Console) -> Publish:
                 status += f" {pub.description}"
             for name in pub.names:
                 results.append(f"{sigil} {name} {status}.")
+            outputs.append(pub.get_output_data(published=False, status=status))
             continue
 
         res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
@@ -218,6 +256,14 @@ async def run_publish(console: Console) -> Publish:
         for name in pub.names:
             results.append(f"{sigil} {name} {status}.")
 
+        outputs.append(
+            pub.get_output_data(
+                exit_code=res.exit_code,
+                published=res.exit_code == 0,
+                status=status,
+            )
+        )
+
     console.print_stderr("")
     if not results:
         sigil = console.sigil_skipped()
@@ -228,7 +274,31 @@ async def run_publish(console: Console) -> Publish:
     for line in results:
         console.print_stderr(line)
 
+    # Log structured output
+    output_data = json.dumps(outputs, cls=_PublishJsonEncoder, indent=2, sort_keys=True)
+    logger.debug(f"Publish result data:\n{output_data}")
+    if publish.output:
+        with open(publish.output, mode="w") as fd:
+            fd.write(output_data)
+
     return Publish(exit_code)
+
+
+class _PublishJsonEncoder(json.JSONEncoder):
+    safe_to_str_types = (Address,)
+
+    def default(self, o):
+        """Return a serializable object for o."""
+        if is_dataclass(o):
+            return asdict(o)
+        if isinstance(o, collections.abc.Mapping):
+            return dict(o)
+        if isinstance(o, collections.abc.Sequence):
+            return list(o)
+        try:
+            return super().default(o)
+        except TypeError:
+            return str(o)
 
 
 @rule
@@ -253,8 +323,17 @@ async def package_for_publish(request: PublishProcessesRequest) -> PublishProces
         for field_set in request.publish_field_sets
     )
 
-    # Merge all PublishProcesses into one.
-    return PublishProcesses(chain.from_iterable(publish))
+    # Flatten and dress each publish processes collection with data about its origin.
+    publish_processes = [
+        replace(
+            publish_process,
+            data=PublishOutputData({**publish_process.data, **field_set.get_output_data()}),
+        )
+        for processes, field_set in zip(publish, request.publish_field_sets)
+        for publish_process in processes
+    ]
+
+    return PublishProcesses(publish_processes)
 
 
 def rules():

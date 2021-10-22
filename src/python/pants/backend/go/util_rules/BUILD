@@ -2,6 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":analyzer_sources"])
-python_tests(name='tests', timeout=120)
+python_tests(name="tests", timeout=120)
 
 resource(name="analyzer_sources", source="generate_testmain.go")

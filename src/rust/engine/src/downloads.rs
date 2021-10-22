@@ -100,6 +100,16 @@ async fn start_download(
   file_name: String,
 ) -> Result<Box<dyn StreamingDownload>, String> {
   if url.scheme() == "file" {
+    if let Some(host) = url.host_str() {
+      return Err(format!(
+        "The file Url `{}` has a host component. Instead, use `file:$path`, \
+        which in this case might be either `file:{}{}` or `file:{}`.",
+        url,
+        host,
+        url.path(),
+        url.path(),
+      ));
+    }
     return Ok(Box::new(FileDownload::start(url.path(), file_name).await?));
   }
   Ok(Box::new(NetDownload::start(core, url, file_name).await?))

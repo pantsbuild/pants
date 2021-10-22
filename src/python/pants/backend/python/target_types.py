@@ -46,6 +46,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OverridesField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -54,6 +55,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TriBoolField,
+    generate_file_based_overrides_field_help_message,
 )
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
@@ -631,25 +633,34 @@ class PythonTestTarget(Target):
 
 
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = (
-        "test_*.py",
-        "*_test.py",
-        "tests.py",
-        "conftest.py",
-        "test_*.pyi",
-        "*_test.pyi",
-        "tests.pyi",
+    default = ("test_*.py", "*_test.py", "tests.py")
+
+
+class PythonTestsOverrideField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        PythonTestTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo_test.py": {"timeout": 120]},\n'
+            '    "bar_test.py": {"timeout": 200]},\n'
+            '    ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
+            "  }"
+        ),
     )
 
 
 class PythonTestsGeneratorTarget(Target):
     alias = "python_tests"
-    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestsGeneratingSourcesField)
+    core_fields = (
+        *_PYTHON_TEST_COMMON_FIELDS,
+        PythonTestsGeneratingSourcesField,
+        PythonTestsOverrideField,
+    )
     help = "Generate a `python_test` target for each file in the `sources` field."
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_source` and `python_sources` targets
+# `python_source`, `python_sources`, and `python_test_utils` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -664,21 +675,66 @@ class PythonSourceTarget(Target):
     help = "A single Python source file."
 
 
+class PythonSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        PythonSourceTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.py": {"skip_pylint": True]},\n'
+            '    "bar.py": {"skip_flake8": True]},\n'
+            '    ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
+            "  }"
+        ),
+    )
+
+
+class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
+    default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+
+
 class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = ("*.py", "*.pyi") + tuple(
-        f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default
+    default = (
+        ("*.py", "*.pyi")
+        + tuple(f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default)
+        + tuple(f"!{pat}" for pat in PythonTestUtilsGeneratingSourcesField.default)
+    )
+
+
+class PythonTestUtilsGeneratorTarget(Target):
+    alias = "python_test_utils"
+    # Keep in sync with `PythonSourcesGeneratorTarget`, outside of the `sources` field.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        PythonTestUtilsGeneratingSourcesField,
+        PythonSourcesOverridesField,
+    )
+    help = (
+        "Generate a `python_source` target for each file in the `sources` field.\n\n"
+        "This target generator is intended for test utility files like `conftest.py`, although it "
+        "behaves identically to the `python_sources` target generator and you can safely use that "
+        "instead. This target only exists to help you better model and keep separate test support "
+        "files vs. production files."
     )
 
 
 class PythonSourcesGeneratorTarget(Target):
     alias = "python_sources"
+    # Keep in sync with `PythonTestUtilsGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
         PythonSourcesGeneratingSourcesField,
+        PythonSourcesOverridesField,
     )
-    help = "Generate a `python_source` target for each file in the `sources` field."
+    help = (
+        "Generate a `python_source` target for each file in the `sources` field.\n\n"
+        "You can either use this target generator or `python_test_utils` for test utility files "
+        "like `conftest.py`. They behave identically, but can help to better model and keep "
+        "separate test support files vs. production files."
+    )
 
     deprecated_alias = "python_library"
     deprecated_alias_removal_version = "2.9.0.dev0"

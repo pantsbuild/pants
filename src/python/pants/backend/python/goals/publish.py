@@ -11,6 +11,7 @@ from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.publish import (
     PublishFieldSet,
+    PublishOutputData,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
@@ -50,6 +51,14 @@ class PublishToPyPiFieldSet(PublishFieldSet):
 
     repositories: PyPiRepositories
     skip_twine: SkipTwineUploadField
+
+    def get_output_data(self) -> PublishOutputData:
+        return PublishOutputData(
+            {
+                "publisher": "twine",
+                **super().get_output_data(),
+            }
+        )
 
     # I'd rather opt out early here, so we don't build unnecessarily, however the error feedback is
     # misleading and not very helpful in that case.
@@ -182,6 +191,7 @@ async def twine_upload(
             names=dists,
             process=InteractiveProcess.from_process(process),
             description=process.description,
+            data=PublishOutputData({"repository": process.description}),
         )
         for process in processes
     )

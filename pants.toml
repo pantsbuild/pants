@@ -5,7 +5,7 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
-  "pants.backend.python.lint.autoflake",
+  "pants.backend.experimental.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -24,7 +24,7 @@ backend_packages.add = [
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
   # NOTE: Keep this version in sync with `generate_docs.py`!
-  "toolchain.pants.plugin==0.14.0",
+  "toolchain.pants.plugin==0.15.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -66,7 +66,7 @@ repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependees=transitive"
-run-pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 
 
 [source]

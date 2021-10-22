@@ -10,6 +10,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerFieldSet,
+    DockerImageTagValueError,
     DockerRepositoryNameError,
     build_docker_image,
     rules,
@@ -28,7 +29,6 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerVersionContext,
-    DockerVersionContextError,
 )
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
@@ -138,26 +138,26 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
 
                 docker_image(
                   name="test1",
-                  version="1.2.3",
+                  image_tags=["1.2.3"],
                   repository="{directory}/{name}",
                 )
                 docker_image(
                   name="test2",
-                  version="1.2.3"
+                  image_tags=["1.2.3"],
                 )
                 docker_image(
                   name="test3",
-                  version="1.2.3",
+                  image_tags=["1.2.3"],
                   repository="{parent_directory}/{directory}/{name}",
                 )
                 docker_image(
                   name="test4",
-                  version="1.2.3",
+                  image_tags=["1.2.3"],
                   repository="{directory}/four/test-four",
                 )
                 docker_image(
                   name="test5",
-                  image_tags=["alpha-1.0", "alpha-1"],
+                  image_tags=["latest", "alpha-1.0", "alpha-1"],
                 )
                 docker_image(
                   name="err1",
@@ -203,7 +203,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
 
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
-        r"docker/test:err1: '{bad_template}'\. Unknown key: 'bad_template'\.\n\n"
+        r"docker/test:err1: '{bad_template}'\. Unknown placeholder: 'bad_template'\.\n\n"
         r"You may only reference any of `name`, `directory` or `parent_directory`\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
@@ -218,15 +218,15 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         {
             "docker/test/BUILD": dedent(
                 """\
-                docker_image(name="addr1", version="1.2.3", registries=["myregistry1domain:port"])
-                docker_image(name="addr2", version="1.2.3", registries=["myregistry2domain:port"])
-                docker_image(name="addr3", version="1.2.3", registries=["myregistry3domain:port"])
-                docker_image(name="alias1", version="1.2.3", registries=["@reg1"])
-                docker_image(name="alias2", version="1.2.3", registries=["@reg2"])
-                docker_image(name="alias3", version="1.2.3", registries=["reg3"])
-                docker_image(name="unreg", version="1.2.3", registries=[])
-                docker_image(name="def", version="1.2.3")
-                docker_image(name="multi", version="1.2.3", registries=["@reg2", "@reg1"])
+                docker_image(name="addr1", image_tags=["1.2.3"], registries=["myregistry1domain:port"])
+                docker_image(name="addr2", image_tags=["1.2.3"], registries=["myregistry2domain:port"])
+                docker_image(name="addr3", image_tags=["1.2.3"], registries=["myregistry3domain:port"])
+                docker_image(name="alias1", image_tags=["1.2.3"], registries=["@reg1"])
+                docker_image(name="alias2", image_tags=["1.2.3"], registries=["@reg2"])
+                docker_image(name="alias3", image_tags=["1.2.3"], registries=["reg3"])
+                docker_image(name="unreg", image_tags=["1.2.3"], registries=[])
+                docker_image(name="def", image_tags=["1.2.3"])
+                docker_image(name="multi", image_tags=["1.2.3"], registries=["@reg2", "@reg1"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -329,11 +329,10 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
                 docker_image(name="ver_1")
                 docker_image(
                   name="ver_2",
-                  version="{baseimage.tag}-{stage2.tag}",
-                  image_tags=["beta"]
+                  image_tags=["{baseimage.tag}-{stage2.tag}", "beta"]
                 )
-                docker_image(name="err_1", version="{unknown_stage}")
-                docker_image(name="err_2", version="{stage0.unknown_value}")
+                docker_image(name="err_1", image_tags=["{unknown_stage}"])
+                docker_image(name="err_2", image_tags=["{stage0.unknown_value}"])
                 """
             ),
         }
@@ -343,25 +342,27 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     assert_tags("ver_2", "image:3.8-latest", "image:beta")
 
     err_1 = (
-        r"Invalid format string for the `version` field of the `docker_image` target at "
+        r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_1: '{unknown_stage}'\.\n\n"
-        r"The key 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, interim, "
-        r"stage2, output\."
+        r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, "
+        r"interim, stage2, output\."
     )
-    with pytest.raises(DockerVersionContextError, match=err_1):
+    with pytest.raises(DockerImageTagValueError, match=err_1):
         assert_tags("err_1")
 
     err_2 = (
-        r"Invalid format string for the `version` field of the `docker_image` target at "
+        r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_2: '{stage0.unknown_value}'\.\n\n"
-        r"The key 'unknown_value' is unknown\. Try with one of: tag\."
+        r"The placeholder 'unknown_value' is unknown\. Try with one of: tag\."
     )
-    with pytest.raises(DockerVersionContextError, match=err_2):
+    with pytest.raises(DockerImageTagValueError, match=err_2):
         assert_tags("err_2")
 
 
 def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="env1", version="1.2.3")'})
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="env1", image_tags=["1.2.3"])'}
+    )
     rule_runner.set_options(
         [],
         env={
@@ -395,7 +396,9 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_build_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", version="1.2.3")'})
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="args1", image_tags=["1.2.3"])'}
+    )
     rule_runner.set_options(
         [],
         env={
@@ -435,7 +438,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
 
 def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"docker/test/BUILD": 'docker_image(name="ver1", version="{build_args.VERSION}")'}
+        {"docker/test/BUILD": 'docker_image(name="ver1", image_tags=["{build_args.VERSION}"])'}
     )
     rule_runner.set_options(
         [],

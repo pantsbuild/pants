@@ -78,7 +78,9 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
     )
     sources_snapshot = rule_runner.request(Snapshot, [sources_digest])
     sources = PythonSourceFiles(SourceFiles(sources_snapshot, tuple()), ("srcroot",))
-    request = LocalDistsPexRequest([Address("foo", target_name="dist")], sources=sources)
+    request = LocalDistsPexRequest(
+        [Address("foo", target_name="dist")], internal_only=True, sources=sources
+    )
     result = rule_runner.request(LocalDistsPex, [request])
 
     assert result.pex is not None

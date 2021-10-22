@@ -171,6 +171,26 @@ to this directory.",
           ),
       )
       .subcommand(
+        SubCommand::with_name("tree")
+            .about("Operate on REAPI Tree protos.")
+            .subcommand(
+              SubCommand::with_name("materialize")
+                  .about(
+                    "Materialize an REAPI Tree by fingerprint to the filesystem. \
+Destination must not exist before this command is run.",
+                  )
+                  .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                    true,
+                  ))
+                  .arg(Arg::with_name("size_bytes").required(true).takes_value(
+                    true,
+                  ))
+                  .arg(Arg::with_name("destination").required(true).takes_value(
+                    true,
+                  )),
+            )
+      )
+      .subcommand(
         SubCommand::with_name("cat")
           .about(
             "Output the contents of a file or Directory proto addressed by fingerprint.",
@@ -464,6 +484,35 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (_, _) => unimplemented!(),
       }
     }
+    ("tree", Some(sub_match)) => match sub_match.subcommand() {
+      ("materialize", Some(args)) => {
+        let destination = PathBuf::from(args.value_of("destination").unwrap());
+        let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+        let size_bytes = args
+          .value_of("size_bytes")
+          .unwrap()
+          .parse::<usize>()
+          .expect("size_bytes must be a non-negative number");
+        let digest = Digest::new(fingerprint, size_bytes);
+        let output_digest_opt = store
+          .load_tree_from_remote(digest)
+          .await
+          .expect("protocol error");
+        let output_digest =
+          output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
+        store
+          .materialize_directory(destination, output_digest)
+          .await
+          .map_err(|err| {
+            if err.contains("not found") {
+              ExitError(err, ExitCode::NotFound)
+            } else {
+              err.into()
+            }
+          })
+      }
+      (_, _) => unimplemented!(),
+    },
     ("directory", Some(sub_match)) => match sub_match.subcommand() {
       ("materialize", Some(args)) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
@@ -477,9 +526,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         store
           .materialize_directory(destination, digest)
           .await
-          .map(|metadata| {
-            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
-          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
