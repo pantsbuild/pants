@@ -3,7 +3,7 @@
 
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerDependencies, DockerImageSources
+from pants.backend.docker.target_types import DockerDependenciesField, DockerImageSources
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
@@ -17,7 +17,7 @@ from pants.engine.unions import UnionRule
 
 
 class InjectDockerDependencies(InjectDependenciesRequest):
-    inject_for = DockerDependencies
+    inject_for = DockerDependenciesField
 
 
 @rule

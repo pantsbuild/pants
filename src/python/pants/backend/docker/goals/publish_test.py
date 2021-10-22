@@ -17,13 +17,13 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImage
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_build_context import DockerVersionContext
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def build(tgt: DockerImage, options: DockerOptions):
                     fs.image_refs(
                         options.default_repository,
                         options.registries(),
-                        FrozenDict(),
+                        DockerVersionContext(),
                     ),
                 ),
             ),
