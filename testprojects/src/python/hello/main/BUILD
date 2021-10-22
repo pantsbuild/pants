@@ -2,4 +2,4 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(name="lib")
-pex_binary(name="main", entry_point='main.py')
+pex_binary(name="main", entry_point="main.py")

@@ -33,21 +33,18 @@ class DockerImageSources(MultipleSourcesField):
     help = "The Dockerfile to use when building the Docker image."
 
 
-class DockerImageVersion(StringField):
-    alias = "version"
-    default = "latest"
-    help = "Image tag to apply to built images."
-
-
-class DockerImageTags(StringSequenceField):
+class DockerImageTagsField(StringSequenceField):
     alias = "image_tags"
+    default = ("latest",)
     help = (
-        "Any tags to apply to the Docker image name, in addition to the default from the "
-        "`version` field."
+        "Any tags to apply to the Docker image name (the version is usually applied as a tag).\n\n"
+        "Each tag may use placeholders in curly braces to be interpolated. The placeholders are "
+        "derived from various sources, such as the Dockerfile FROM instructions tags and build "
+        "args.\n\nSee {doc_url('tagging-docker-images')}."
     )
 
 
-class DockerDependencies(Dependencies):
+class DockerDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -112,10 +109,9 @@ class DockerImage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerBuildArgsField,
-        DockerDependencies,
+        DockerDependenciesField,
         DockerImageSources,
-        DockerImageTags,
-        DockerImageVersion,
+        DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
         DockerSkipPushField,

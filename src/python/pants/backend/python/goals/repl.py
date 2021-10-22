@@ -41,6 +41,7 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
         LocalDistsPex,
         LocalDistsPexRequest(
             Addresses(tgt.address for tgt in repl.targets),
+            internal_only=True,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
         ),
     )
@@ -117,6 +118,7 @@ async def create_ipython_repl_request(
         LocalDistsPex,
         LocalDistsPexRequest(
             [tgt.address for tgt in repl.targets],
+            internal_only=True,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             sources=sources,
         ),

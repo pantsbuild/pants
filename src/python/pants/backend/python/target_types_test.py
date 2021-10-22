@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os.path
 from textwrap import dedent
 from typing import Iterable
 
@@ -28,7 +29,11 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+    PythonTestsGeneratorTarget,
     PythonTestsTimeout,
+    PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
@@ -37,6 +42,9 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
+    GenerateTargetsFromPythonSources,
+    GenerateTargetsFromPythonTests,
+    GenerateTargetsFromPythonTestUtils,
     InjectPexBinaryEntryPointDependency,
     InjectPythonDistributionDependencies,
     resolve_pex_entry_point,
@@ -45,10 +53,13 @@ from pants.backend.python.util_rules import python_sources
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
+    GeneratedTargets,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
+    SingleSourceField,
+    Tags,
 )
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -569,3 +580,114 @@ def test_unrecognized_resolve_names_error(
         f"Unrecognized resolve {name_str} from foo: "
         f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
     ) in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# Generate targets
+# -----------------------------------------------------------------------------------------------
+
+
+def test_generate_source_and_test_targets() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_types_rules.rules(),
+            *import_rules(),
+            *python_sources.rules(),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTests]),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonSources]),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTestUtils]),
+        ],
+        target_types=[
+            PythonTestsGeneratorTarget,
+            PythonSourcesGeneratorTarget,
+            PythonTestUtilsGeneratorTarget,
+        ],
+    )
+    rule_runner.write_files(
+        {
+            "src/py/BUILD": dedent(
+                """\
+                python_sources(
+                    name='lib',
+                    sources=['**/*.py', '!**/*_test.py', '!**/conftest.py'],
+                    overrides={'f1.py': {'tags': ['overridden']}},
+                )
+
+                python_tests(
+                    name='tests',
+                    sources=['**/*_test.py'],
+                    overrides={'f1_test.py': {'tags': ['overridden']}},
+                )
+
+                python_test_utils(
+                    name='test_utils',
+                    sources=['**/conftest.py'],
+                    overrides={'conftest.py': {'tags': ['overridden']}},
+                )
+                """
+            ),
+            "src/py/f1.py": "",
+            "src/py/f1_test.py": "",
+            "src/py/conftest.py": "",
+            "src/py/f2.py": "",
+            "src/py/f2_test.py": "",
+            "src/py/subdir/f.py": "",
+            "src/py/subdir/f_test.py": "",
+            "src/py/subdir/conftest.py": "",
+        }
+    )
+
+    sources_generator = rule_runner.get_target(Address("src/py", target_name="lib"))
+    tests_generator = rule_runner.get_target(Address("src/py", target_name="tests"))
+    test_utils_generator = rule_runner.get_target(Address("src/py", target_name="test_utils"))
+
+    def gen_source_tgt(
+        rel_fp: str, tags: list[str] | None = None, *, tgt_name: str
+    ) -> PythonSourceTarget:
+        return PythonSourceTarget(
+            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
+            Address("src/py", target_name=tgt_name, relative_file_path=rel_fp),
+            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
+        )
+
+    def gen_test_tgt(rel_fp: str, tags: list[str] | None = None) -> PythonTestTarget:
+        return PythonTestTarget(
+            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
+            Address("src/py", target_name="tests", relative_file_path=rel_fp),
+            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
+        )
+
+    sources_generated = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromPythonSources(sources_generator)]
+    )
+    tests_generated = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromPythonTests(tests_generator)]
+    )
+    test_utils_generated = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromPythonTestUtils(test_utils_generator)]
+    )
+
+    assert sources_generated == GeneratedTargets(
+        sources_generator,
+        {
+            gen_source_tgt("f1.py", tags=["overridden"], tgt_name="lib"),
+            gen_source_tgt("f2.py", tgt_name="lib"),
+            gen_source_tgt("subdir/f.py", tgt_name="lib"),
+        },
+    )
+    assert tests_generated == GeneratedTargets(
+        tests_generator,
+        {
+            gen_test_tgt("f1_test.py", tags=["overridden"]),
+            gen_test_tgt("f2_test.py"),
+            gen_test_tgt("subdir/f_test.py"),
+        },
+    )
+
+    assert test_utils_generated == GeneratedTargets(
+        test_utils_generator,
+        {
+            gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
+            gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
+        },
+    )

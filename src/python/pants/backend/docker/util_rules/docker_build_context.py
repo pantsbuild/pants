@@ -41,7 +41,8 @@ class DockerVersionContextValue(FrozenDict[str, str]):
     def __getattr__(self, attribute: str) -> str:
         if attribute not in self:
             raise DockerVersionContextError(
-                f"The key {attribute!r} is unknown. Try with one of: " f'{", ".join(self.keys())}.'
+                f"The placeholder {attribute!r} is unknown. Try with one of: "
+                f'{", ".join(self.keys())}.'
             )
         return self[attribute]
 

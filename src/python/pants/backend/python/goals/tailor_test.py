@@ -15,6 +15,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -31,17 +32,23 @@ def test_classify_source_files() -> None:
         "foo/bar/baz_test.py",
         "foo/test_bar.py",
         "foo/tests.py",
+    }
+    source_files = {
+        "foo/bar/baz.py",
+        "foo/bar_baz.py",
+        "foo.pyi",
+    }
+    test_util_files = {
         "conftest.py",
         "foo/bar/baz_test.pyi",
         "foo/test_bar.pyi",
         "tests.pyi",
     }
-    lib_files = {"foo/bar/baz.py", "foo/bar_baz.py", "foo.pyi"}
-
     assert {
         PythonTestsGeneratorTarget: test_files,
-        PythonSourcesGeneratorTarget: lib_files,
-    } == classify_source_files(test_files | lib_files)
+        PythonSourcesGeneratorTarget: source_files,
+        PythonTestUtilsGeneratorTarget: test_util_files,
+    } == classify_source_files(test_files | source_files | test_util_files)
 
 
 @pytest.fixture
@@ -72,6 +79,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "bar/baz2.py",
                     "bar/baz2_test.py",
                     "bar/baz3.py",
+                    "bar/conftest.py",
                 )
             },
         }
@@ -116,6 +124,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "tests",
                     ["baz1_test.py", "baz2_test.py"],
                     kwargs={"name": "tests"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonTestUtilsGeneratorTarget,
+                    "src/python/foo/bar",
+                    "test_utils",
+                    ["conftest.py"],
+                    kwargs={"name": "test_utils"},
                 ),
             ]
         )

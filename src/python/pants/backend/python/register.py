@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import (
     ancestor_files,
@@ -94,4 +95,5 @@ def target_types():
         PythonRequirementsFile,
         PythonTestTarget,
         PythonTestsGeneratorTarget,
+        PythonTestUtilsGeneratorTarget,
     ]

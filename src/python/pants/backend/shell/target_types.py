@@ -11,8 +11,9 @@ from typing import Optional
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
 from pants.engine.addresses import Address
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.process import BinaryPathTest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -22,15 +23,18 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     StringField,
     StringSequenceField,
     Target,
+    generate_file_based_overrides_field_help_message,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.enums import match
 
 
@@ -154,6 +158,19 @@ class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBases):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
 
 
+class Shunit2TestsOverrideField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        Shunit2TestTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo_test.sh": {"timeout": 120]},\n'
+            '    "bar_test.sh": {"timeout": 200]},\n'
+            '    ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},\n'
+            "  }"
+        ),
+    )
+
+
 class Shunit2TestsGeneratorTarget(Target):
     alias = "shunit2_tests"
     core_fields = (
@@ -163,6 +180,7 @@ class Shunit2TestsGeneratorTarget(Target):
         Shunit2TestTimeoutField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
+        Shunit2TestsOverrideField,
     )
     help = "Generate a `shunit2_test` target for each file in the `sources` field."
 
@@ -174,18 +192,32 @@ class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
 @rule
 async def generate_targets_from_shunit2_tests(
     request: GenerateTargetsFromShunit2Tests,
+    files_not_found_behavior: FilesNotFoundBehavior,
     shell_setup: ShellSetup,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsGeneratorSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         Shunit2TestTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
+        overrides=all_overrides,
     )
 
 
@@ -204,9 +236,27 @@ class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
 
 
+class ShellSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        ShellSourceTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.sh": {"skip_shellcheck": True]},\n'
+            '    "bar.sh": {"skip_shfmt": True]},\n'
+            '    ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},\n'
+            "  }"
+        ),
+    )
+
+
 class ShellSourcesGeneratorTarget(Target):
     alias = "shell_sources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourcesGeneratingSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ShellSourcesGeneratingSourcesField,
+        ShellSourcesOverridesField,
+    )
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
     deprecated_alias = "shell_library"
@@ -220,18 +270,32 @@ class GenerateTargetsFromShellSources(GenerateTargetsRequest):
 @rule
 async def generate_targets_from_shell_sources(
     request: GenerateTargetsFromShellSources,
+    files_not_found_behavior: FilesNotFoundBehavior,
     shell_setup: ShellSetup,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[ShellSourcesGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         ShellSourceTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
+        overrides=all_overrides,
     )
 
 
@@ -302,7 +366,7 @@ class ShellCommandRunWorkdirField(StringField):
     help = "Sets the current working directory of the command, relative to the project root."
 
 
-class ShellCommand(Target):
+class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -339,7 +403,7 @@ class ShellCommand(Target):
     )
 
 
-class ShellCommandRun(Target):
+class ShellCommandRunTarget(Target):
     alias = "experimental_run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -348,7 +412,7 @@ class ShellCommandRun(Target):
         ShellCommandRunWorkdirField,
     )
     help = (
-        "Run a script in the workspace, with all dependencies packaged/copied into a CHROOT.\n"
+        "Run a script in the workspace, with all dependencies packaged/copied into a chroot.\n"
         + dedent(
             """\
 

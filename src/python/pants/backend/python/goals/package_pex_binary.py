@@ -123,6 +123,7 @@ async def package_pex_binary(
         )
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
+
     pex = await Get(
         Pex,
         PexFromTargetsRequest(
@@ -133,6 +134,7 @@ async def package_pex_binary(
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
+            include_local_dists=True,
         ),
     )
     return BuiltPackage(pex.digest, (BuiltPackageArtifact(output_filename),))

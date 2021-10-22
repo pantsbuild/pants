@@ -5,14 +5,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from os import path
-from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageSources,
-    DockerImageTags,
-    DockerImageVersion,
+    DockerImageTagsField,
     DockerRegistriesField,
     DockerRepositoryField,
 )
@@ -20,18 +18,20 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContextError,
-    DockerVersionContextValue,
+    DockerVersionContext,
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
+
+
+class DockerImageTagValueError(ValueError):
+    pass
 
 
 class DockerRepositoryNameError(ValueError):
@@ -61,8 +61,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     registries: DockerRegistriesField
     repository: DockerRepositoryField
     sources: DockerImageSources
-    tags: DockerImageTags
-    version: DockerImageVersion
+    tags: DockerImageTagsField
 
     @property
     def dockerfile_relpath(self) -> str:
@@ -74,11 +73,54 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     def dockerfile_path(self) -> str:
         return path.join(self.address.spec_path, self.dockerfile_relpath)
 
+    def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
+        try:
+            return tag.format(**version_context)
+        except (KeyError, ValueError) as e:
+            msg = (
+                "Invalid tag value for the `image_tags` field of the `docker_image` target at "
+                f"{self.address}: {tag!r}.\n\n"
+            )
+            if isinstance(e, KeyError):
+                msg += f"The placeholder {e} is unknown."
+                if version_context:
+                    msg += f' Try with one of: {", ".join(version_context.keys())}.'
+                else:
+                    msg += (
+                        " There are currently no known placeholders to use. These placeholders "
+                        "can come from `[docker].build_args` or parsed FROM instructions of "
+                        "your `Dockerfile`."
+                    )
+            else:
+                msg += str(e)
+            raise DockerImageTagValueError(msg) from e
+
+    def format_repository(self, default_repository: str) -> str:
+        directory = path.basename(self.address.spec_path)
+        parent_directory = path.basename(path.dirname(self.address.spec_path))
+        repository_fmt = self.repository.value or default_repository
+        try:
+            return repository_fmt.format(
+                name=self.address.target_name,
+                directory=directory,
+                parent_directory=parent_directory,
+            )
+        except KeyError as e:
+            if self.repository.value:
+                source = "`repository` field of the `docker_image` target " f"at {self.address}"
+            else:
+                source = "`[docker].default_repository` configuration option"
+
+            raise DockerRepositoryNameError(
+                f"Invalid value for the {source}: {repository_fmt!r}. Unknown placeholder: {e}.\n\n"
+                f"You may only reference any of `name`, `directory` or `parent_directory`."
+            ) from e
+
     def image_refs(
         self,
         default_repository: str,
         registries: DockerRegistries,
-        version_context: FrozenDict[str, DockerVersionContextValue],
+        version_context: DockerVersionContext,
     ) -> tuple[str, ...]:
         """The image refs are the full image name, including any registry and version tag.
 
@@ -97,51 +139,11 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         This method will always return a non-empty tuple.
         """
-        directory = path.basename(self.address.spec_path)
-        parent_directory = path.basename(path.dirname(self.address.spec_path))
-        repository_fmt = self.repository.value or default_repository
-        try:
-            repository = repository_fmt.format(
-                name=self.address.target_name,
-                directory=directory,
-                parent_directory=parent_directory,
-            )
-        except KeyError as e:
-            if self.repository.value:
-                source = "`repository` field of the `docker_image` target " f"at {self.address}"
-            else:
-                source = "`[docker].default_repository` configuration option"
-
-            raise DockerRepositoryNameError(
-                f"Invalid value for the {source}: {repository_fmt!r}. Unknown key: {e}.\n\n"
-                f"You may only reference any of `name`, `directory` or `parent_directory`."
-            ) from e
-
-        try:
-            image_names = tuple(
-                ":".join(s for s in [repository, tag] if s)
-                for tag in [
-                    cast(str, self.version.value).format(**version_context),
-                    *(self.tags.value or []),
-                ]
-            )
-        except (KeyError, ValueError) as e:
-            msg = (
-                "Invalid format string for the `version` field of the `docker_image` target at "
-                f"{self.address}: {self.version.value!r}.\n\n"
-            )
-            if isinstance(e, KeyError):
-                msg += f"The key {e} is unknown."
-                if version_context:
-                    msg += f' Try with one of: {", ".join(version_context.keys())}.'
-                else:
-                    msg += (
-                        " There are currently no known keys to use. These keys can come from "
-                        "`[docker].build_args` or parsed FROM instructions of your `Dockerfile`."
-                    )
-            else:
-                msg += str(e)
-            raise DockerVersionContextError(msg) from e
+        repository = self.format_repository(default_repository)
+        image_names = tuple(
+            ":".join(s for s in [repository, self.format_tag(tag, version_context)] if s)
+            for tag in self.tags.value or ()
+        )
 
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
