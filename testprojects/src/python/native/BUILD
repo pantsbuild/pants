@@ -18,4 +18,9 @@ python_distribution(
 
 python_sources(name="main_lib", sources=["main.py"])
 
-pex_binary(name="main", entry_point="main.py", dependencies=[":dist", ":main_lib"])
+pex_binary(
+    name="main",
+    entry_point="main.py",
+    dependencies=[":dist", ":main_lib"],
+    interpreter_constraints=["==3.7.*"],
+)

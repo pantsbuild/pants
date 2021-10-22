@@ -219,6 +219,7 @@ async def setup_pytest_for_target(
         LocalDistsPex,
         LocalDistsPexRequest(
             [request.field_set.address],
+            internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=prepared_sources,
         ),
