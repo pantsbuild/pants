@@ -25,7 +25,10 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgInfo,
+    FirstPartyPkgInfoRequest,
+)
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
@@ -97,7 +100,14 @@ async def infer_go_dependencies(
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
     addr = request.sources_field.address
-    pkg_info = await Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
+    maybe_pkg_info = await Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
+    if maybe_pkg_info.info is None:
+        logger.error(
+            f"Failed to analyze {maybe_pkg_info.import_path} for dependency inference:\n"
+            f"{maybe_pkg_info.stderr}"
+        )
+        return InferredDependencies([])
+    pkg_info = maybe_pkg_info.info
 
     inferred_dependencies = []
     for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):

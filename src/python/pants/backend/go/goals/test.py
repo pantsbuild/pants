@@ -11,9 +11,13 @@ from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImp
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuildGoPackageTargetRequest,
-    BuiltGoPackage,
+    FallibleBuildGoPackageRequest,
+    FallibleBuiltGoPackage,
 )
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgInfo,
+    FirstPartyPkgInfoRequest,
+)
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
@@ -113,10 +117,23 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
-    pkg_info, wrapped_target = await MultiGet(
-        Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
+    maybe_pkg_info, wrapped_target = await MultiGet(
+        Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
         Get(WrappedTarget, Address, field_set.address),
     )
+
+    if maybe_pkg_info.info is None:
+        assert maybe_pkg_info.stderr is not None
+        return TestResult(
+            exit_code=maybe_pkg_info.exit_code,
+            stdout="",
+            stderr=maybe_pkg_info.stderr,
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=field_set.address,
+            output_setting=test_subsystem.output,
+        )
+    pkg_info = maybe_pkg_info.info
 
     target = wrapped_target.target
     import_path = target[GoImportPathField].value
@@ -141,17 +158,30 @@ async def run_go_tests(
         return TestResult(
             exit_code=0,
             stdout="",
-            stdout_digest=EMPTY_FILE_DIGEST,
             stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
             output_setting=test_subsystem.output,
         )
 
     # Construct the build request for the package under test.
-    test_pkg_build_request = await Get(
-        BuildGoPackageRequest, BuildGoPackageTargetRequest(field_set.address, for_tests=True)
+    maybe_test_pkg_build_request = await Get(
+        FallibleBuildGoPackageRequest,
+        BuildGoPackageTargetRequest(field_set.address, for_tests=True),
     )
+    if maybe_test_pkg_build_request.request is None:
+        assert maybe_test_pkg_build_request.stderr is not None
+        return TestResult(
+            exit_code=maybe_test_pkg_build_request.exit_code,
+            stdout="",
+            stderr=maybe_test_pkg_build_request.stderr,
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=field_set.address,
+            output_setting=test_subsystem.output,
+        )
+    test_pkg_build_request = maybe_test_pkg_build_request.request
     main_direct_deps = [test_pkg_build_request]
 
     if testmain.has_xtests:
@@ -183,8 +213,8 @@ async def run_go_tests(
         main_direct_deps.append(xtest_pkg_build_request)
 
     # Generate the synthetic main package which imports the test and/or xtest packages.
-    built_main_pkg = await Get(
-        BuiltGoPackage,
+    maybe_built_main_pkg = await Get(
+        FallibleBuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
             digest=testmain.digest,
@@ -194,6 +224,18 @@ async def run_go_tests(
             direct_dependencies=tuple(main_direct_deps),
         ),
     )
+    if maybe_built_main_pkg.output is None:
+        assert maybe_built_main_pkg.stderr is not None
+        return TestResult(
+            exit_code=maybe_built_main_pkg.exit_code,
+            stdout="",
+            stderr=maybe_built_main_pkg.stderr,
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=field_set.address,
+            output_setting=test_subsystem.output,
+        )
+    built_main_pkg = maybe_built_main_pkg.output
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
     import_config = await Get(

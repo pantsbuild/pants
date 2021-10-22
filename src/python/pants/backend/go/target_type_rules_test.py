@@ -110,6 +110,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                         fmt.Printf("%s\n", pkg.Grok())
                     }"""
             ),
+            "foo/bad/f.go": "invalid!!!",
         }
     )
     tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
@@ -126,6 +127,13 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     )
     assert inferred_deps2.dependencies == FrozenOrderedSet(
         [Address("foo", generated_name="github.com/google/go-cmp/cmp")]
+    )
+
+    # Compilation failures should not blow up Pants.
+    bad_tgt = rule_runner.get_target(Address("foo", generated_name="./bad"))
+    assert not rule_runner.request(
+        InferredDependencies,
+        [InferGoPackageDependenciesRequest(bad_tgt[GoFirstPartyPackageSourcesField])],
     )
 
 
