@@ -274,10 +274,12 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
     for line in results:
         console.print_stderr(line)
 
-    # Print structured output to file in requested format, if any.
+    # Log structured output
+    output_data = json.dumps(outputs, cls=_PublishJsonEncoder, indent=2, sort_keys=True)
+    logger.debug(f"Publish result data:\n{output_data}")
     if publish.output:
         with open(publish.output, mode="w") as fd:
-            json.dump(outputs, fp=fd, cls=_PublishJsonEncoder, indent=2, sort_keys=True)
+            fd.write(output_data)
 
     return Publish(exit_code)
 
