@@ -25,7 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar, cast
+from typing import ClassVar, Generic, TypeVar, cast
 
 from typing_extensions import final
 
@@ -95,7 +95,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[Type[_T]]
+    publish_request_type: ClassVar[type[_T]]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:

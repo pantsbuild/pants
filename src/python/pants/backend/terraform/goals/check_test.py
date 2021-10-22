@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import List, Sequence
+from typing import Sequence
 
 import pytest
 
@@ -65,7 +65,7 @@ BAD_SOURCE = FileContent(
 
 
 def make_target(
-    rule_runner: RuleRunner, source_files: List[FileContent], *, target_name="target"
+    rule_runner: RuleRunner, source_files: list[FileContent], *, target_name="target"
 ) -> Target:
     files = {
         "BUILD": f"terraform_module(name='{target_name}')\n",
@@ -77,7 +77,7 @@ def make_target(
 
 def run_terraform_validate(
     rule_runner: RuleRunner,
-    targets: List[Target],
+    targets: list[Target],
     *,
     args: list[str] | None = None,
 ) -> Sequence[CheckResult]:
@@ -91,7 +91,7 @@ def get_content(rule_runner: RuleRunner, digest: Digest) -> DigestContents:
     return rule_runner.request(DigestContents, [digest])
 
 
-def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
+def get_digest(rule_runner: RuleRunner, source_files: list[FileContent]) -> Digest:
     return rule_runner.request(Digest, [CreateDigest(source_files)])
 
 

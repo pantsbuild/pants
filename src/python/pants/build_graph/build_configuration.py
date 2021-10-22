@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, DefaultDict, Dict, List, Set, Tuple, Type
+from typing import Any, DefaultDict
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
@@ -32,7 +32,7 @@ _RESERVED_NAMES = {"global", "goals", "targets", "tools"}
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: Set[Type[Subsystem]] = {GlobalOptions, Changed, CliOptions}
+_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions}
 
 
 @dataclass(frozen=True)
@@ -40,14 +40,14 @@ class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 
     registered_aliases: BuildFileAliases
-    subsystem_to_providers: FrozenDict[Type[Subsystem], Tuple[str, ...]]
-    target_type_to_providers: FrozenDict[Type[Target], Tuple[str, ...]]
+    subsystem_to_providers: FrozenDict[type[Subsystem], tuple[str, ...]]
+    target_type_to_providers: FrozenDict[type[Target], tuple[str, ...]]
     rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     allow_unknown_options: bool
 
     @property
-    def all_subsystems(self) -> Tuple[Type[Subsystem], ...]:
+    def all_subsystems(self) -> tuple[type[Subsystem], ...]:
         """Return all subsystems in the system: global and those registered via rule usage."""
         # Sort by options_scope, for consistency.
         return tuple(
@@ -58,7 +58,7 @@ class BuildConfiguration:
         )
 
     @property
-    def target_types(self) -> Tuple[Type[Target], ...]:
+    def target_types(self) -> tuple[type[Target], ...]:
         return tuple(sorted(self.target_type_to_providers.keys(), key=lambda x: x.alias))
 
     def __post_init__(self) -> None:
@@ -68,8 +68,8 @@ class BuildConfiguration:
             subsystem = "subsystem"
             target_type = "target type"
 
-        name_to_categories: DefaultDict[str, Set[Category]] = defaultdict(set)
-        normalized_to_orig_name: Dict[str, str] = {}
+        name_to_categories: DefaultDict[str, set[Category]] = defaultdict(set)
+        normalized_to_orig_name: dict[str, str] = {}
 
         for opt in self.all_subsystems:
             scope = opt.options_scope
@@ -99,12 +99,12 @@ class BuildConfiguration:
 
     @dataclass
     class Builder:
-        _exposed_object_by_alias: Dict[Any, Any] = field(default_factory=dict)
-        _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
-        _subsystem_to_providers: Dict[Type[Subsystem], List[str]] = field(
+        _exposed_object_by_alias: dict[Any, Any] = field(default_factory=dict)
+        _exposed_context_aware_object_factory_by_alias: dict[Any, Any] = field(default_factory=dict)
+        _subsystem_to_providers: dict[type[Subsystem], list[str]] = field(
             default_factory=lambda: defaultdict(list)
         )
-        _target_type_to_providers: Dict[Type[Target], List[str]] = field(
+        _target_type_to_providers: dict[type[Target], list[str]] = field(
             default_factory=lambda: defaultdict(list)
         )
         _rules: OrderedSet = field(default_factory=OrderedSet)
@@ -167,7 +167,7 @@ class BuildConfiguration:
             ] = context_aware_object_factory
 
         def register_subsystems(
-            self, plugin_or_backend: str, subsystems: Iterable[Type[Subsystem]]
+            self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]
         ):
             """Registers the given subsystem types."""
             if not isinstance(subsystems, Iterable):
@@ -212,7 +212,7 @@ class BuildConfiguration:
         # I.e., this is an impure function that reads from the outside world. So, we use the type
         # hint `Any` and perform runtime type checking.
         def register_target_types(
-            self, plugin_or_backend: str, target_types: Iterable[Type[Target]] | Any
+            self, plugin_or_backend: str, target_types: Iterable[type[Target]] | Any
         ) -> None:
             """Registers the given target types."""
             if not isinstance(target_types, Iterable):

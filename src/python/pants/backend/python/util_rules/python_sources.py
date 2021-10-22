@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Tuple, Type
+from typing import Iterable
 
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import ancestor_files
@@ -39,7 +39,7 @@ class PythonSourceFiles:
     """
 
     source_files: SourceFiles
-    source_roots: Tuple[str, ...]  # Source roots for the specified source files.
+    source_roots: tuple[str, ...]  # Source roots for the specified source files.
 
     @classmethod
     def empty(cls) -> PythonSourceFiles:
@@ -56,7 +56,7 @@ class StrippedPythonSourceFiles:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PythonSourceFilesRequest:
-    targets: Tuple[Target, ...]
+    targets: tuple[Target, ...]
     include_resources: bool
     include_files: bool
 
@@ -72,8 +72,8 @@ class PythonSourceFilesRequest:
         self.include_files = include_files
 
     @property
-    def valid_sources_types(self) -> Tuple[Type[SourcesField], ...]:
-        types: List[Type[SourcesField]] = [PythonSourceField]
+    def valid_sources_types(self) -> tuple[type[SourcesField], ...]:
+        types: list[type[SourcesField]] = [PythonSourceField]
         if self.include_resources:
             types.append(ResourceSourceField)
         if self.include_files:
