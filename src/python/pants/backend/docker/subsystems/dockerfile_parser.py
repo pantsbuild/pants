@@ -114,6 +114,7 @@ async def setup_process_for_parse_dockerfile(
 
 @dataclass(frozen=True)
 class DockerfileInfo:
+    source: str = ""
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
 
@@ -141,7 +142,11 @@ async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
 
     output = result.stdout.decode("utf-8").strip().split("\n")
     version_tags, putative_targets = split_iterable("---", output)
+
+    # There can only be a single file in the snapshot, due to the
+    # DockerImageSourceField.expected_num_files == 1.
     return DockerfileInfo(
+        source=hydrated_sources.snapshot.files[0],
         putative_target_addresses=putative_targets,
         version_tags=version_tags,
     )

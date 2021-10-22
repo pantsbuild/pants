@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from os import path
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.backend.docker.subsystems.docker_options import DockerEnvironmentVars, DockerOptions
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageSourceField,
     DockerImageTagsField,
@@ -151,7 +151,6 @@ async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
     docker: DockerBinary,
-    env: DockerEnvironmentVars,
 ) -> BuiltPackage:
     context = await Get(
         DockerBuildContext,
@@ -161,29 +160,20 @@ async def build_docker_image(
         ),
     )
 
-    build_args_context = {
-        build_arg_name: build_arg_value or env.vars[build_arg_name]
-        for build_arg_name, _, build_arg_value in [
-            build_arg.partition("=") for build_arg in options.build_args
-        ]
-    }
-
-    version_context = context.version_context.merge({"build_args": build_args_context})
-
     tags = field_set.image_refs(
         default_repository=options.default_repository,
         registries=options.registries(),
-        version_context=version_context,
+        version_context=context.version_context,
     )
 
     result = await Get(
         ProcessResult,
         Process,
         docker.build_image(
-            build_args=options.build_args,
+            build_args=context.build_args,
             digest=context.digest,
             dockerfile=context.dockerfile,
-            env=env.vars,
+            env=context.env,
             tags=tags,
         ),
     )
