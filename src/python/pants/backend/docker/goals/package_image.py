@@ -9,7 +9,7 @@ from os import path
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
-    DockerImageSources,
+    DockerImageSourceField,
     DockerImageTagsField,
     DockerRegistriesField,
     DockerRepositoryField,
@@ -56,22 +56,11 @@ class BuiltDockerImage(BuiltPackageArtifact):
 
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (DockerImageSources,)
+    required_fields = (DockerImageSourceField,)
 
     registries: DockerRegistriesField
     repository: DockerRepositoryField
-    sources: DockerImageSources
     tags: DockerImageTagsField
-
-    @property
-    def dockerfile_relpath(self) -> str:
-        # DockerImageSources.expected_num_files==1 ensures this is non-empty
-        assert self.sources.value
-        return self.sources.value[0]
-
-    @property
-    def dockerfile_path(self) -> str:
-        return path.join(self.address.spec_path, self.dockerfile_relpath)
 
     def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
         try:
@@ -183,7 +172,7 @@ async def build_docker_image(
         docker.build_image(
             build_args=context.build_args,
             digest=context.digest,
-            dockerfile=field_set.dockerfile_path,
+            dockerfile=context.dockerfile,
             env=context.env,
             tags=tags,
         ),

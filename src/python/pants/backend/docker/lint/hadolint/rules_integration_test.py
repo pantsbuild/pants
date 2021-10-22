@@ -81,8 +81,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             "Dockerfile.bad": BAD_FILE,
             "BUILD": dedent(
                 """
-                docker_image(name="good", sources=("Dockerfile.good",))
-                docker_image(name="bad", sources=("Dockerfile.bad",))
+                docker_image(name="good", source="Dockerfile.good")
+                docker_image(name="bad", source="Dockerfile.bad")
                 """
             ),
         }

@@ -9,7 +9,7 @@ from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
@@ -78,6 +78,7 @@ class DockerBuildContext:
     build_args: DockerBuildArgs
     digest: Digest
     env: DockerBuildEnvironment
+    dockerfile: str
     version_context: DockerVersionContext
 
     @classmethod
@@ -86,12 +87,12 @@ class DockerBuildContext:
         build_args: DockerBuildArgs,
         digest: Digest,
         env: DockerBuildEnvironment,
-        dockerfile: DockerfileInfo,
+        dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
         version_context: dict[str, dict[str, str]] = {}
 
         # FROM tags for all stages.
-        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile.version_tags]:
+        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
             value = {"tag": tag}
             if not version_context:
                 # Refer to the first FROM directive as the "baseimage".
@@ -110,6 +111,7 @@ class DockerBuildContext:
         return cls(
             build_args=build_args,
             digest=digest,
+            dockerfile=dockerfile_info.source,
             env=env,
             version_context=DockerVersionContext.from_dict(version_context),
         )
@@ -125,11 +127,11 @@ async def create_docker_build_context(
     docker_image = transitive_targets.roots[0]
 
     # Get the Dockerfile from the root target.
-    dockerfiles_request = Get(
+    dockerfile_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[t.get(SourcesField) for t in transitive_targets.roots],
-            for_sources_types=(DockerImageSources,),
+            for_sources_types=(DockerImageSourceField,),
         ),
     )
 
@@ -153,11 +155,15 @@ async def create_docker_build_context(
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    dockerfiles, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
-        dockerfiles_request,
+    dockerfile, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+        dockerfile_request,
         sources_request,
         embedded_pkgs_per_target_request,
-        Get(DockerfileInfo, DockerImageSources, docker_image[DockerImageSources]),
+        Get(
+            DockerfileInfo,
+            DockerImageSourceField,
+            transitive_targets.roots[0][DockerImageSourceField],
+        ),
     )
 
     # Package binary dependencies for build context.
@@ -166,14 +172,14 @@ async def create_docker_build_context(
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if request.build_upstream_images
-        or not isinstance(getattr(field_set, "sources", None), DockerImageSources)
+        or not isinstance(getattr(field_set, "sources", None), DockerImageSourceField)
     )
 
     packages_str = ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath)
     logger.debug(f"Packages for Docker image: {packages_str}")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
-    all_digests = (dockerfiles.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
+    all_digests = (dockerfile.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
     context_request = Get(Digest, MergeDigests(d for d in all_digests if d))
@@ -186,8 +192,8 @@ async def create_docker_build_context(
     return DockerBuildContext.create(
         build_args=build_args,
         digest=context,
+        dockerfile_info=dockerfile_info,
         env=env,
-        dockerfile=dockerfile_info,
     )
 
 

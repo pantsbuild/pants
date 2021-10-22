@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -23,9 +23,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class HadolintFieldSet(FieldSet):
-    required_fields = (DockerImageSources,)
+    required_fields = (DockerImageSourceField,)
 
-    sources: DockerImageSources
+    source: DockerImageSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -55,8 +55,8 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
         Get(
             SourceFiles,
             SourceFilesRequest(
-                [field_set.sources for field_set in request.field_sets],
-                for_sources_types=(DockerImageSources,),
+                [field_set.source for field_set in request.field_sets],
+                for_sources_types=(DockerImageSourceField,),
                 enable_codegen=True,
             ),
         ),

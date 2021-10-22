@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generator
 
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -114,6 +114,7 @@ async def setup_process_for_parse_dockerfile(
 
 @dataclass(frozen=True)
 class DockerfileInfo:
+    source: str = ""
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
 
@@ -129,8 +130,8 @@ def split_iterable(
 
 
 @rule
-async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources))
+async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(source))
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
@@ -141,7 +142,11 @@ async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
 
     output = result.stdout.decode("utf-8").strip().split("\n")
     version_tags, putative_targets = split_iterable("---", output)
+
+    # There can only be a single file in the snapshot, due to the
+    # DockerImageSourceField.expected_num_files == 1.
     return DockerfileInfo(
+        source=hydrated_sources.snapshot.files[0],
         putative_target_addresses=putative_targets,
         version_tags=version_tags,
     )

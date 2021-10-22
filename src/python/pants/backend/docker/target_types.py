@@ -9,7 +9,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    MultipleSourcesField,
+    SingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -27,9 +27,9 @@ class DockerBuildArgsField(StringSequenceField):
     )
 
 
-class DockerImageSources(MultipleSourcesField):
-    default = ("Dockerfile",)
-    expected_num_files = 1
+class DockerImageSourceField(SingleSourceField):
+    default = "Dockerfile"
+    required = False
     help = "The Dockerfile to use when building the Docker image."
 
 
@@ -110,7 +110,7 @@ class DockerImage(Target):
         *COMMON_TARGET_FIELDS,
         DockerBuildArgsField,
         DockerDependenciesField,
-        DockerImageSources,
+        DockerImageSourceField,
         DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
