@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import gzip
 import tarfile
 import zipfile
 from io import BytesIO
@@ -59,6 +60,21 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
     extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
+
+def test_extract_gz(rule_runner: RuleRunner) -> None:
+    # NB: `gz` files are only compressed, and are not archives: they represent a single file.
+    name = "test"
+    content = b"Hello world!\n"
+    io = BytesIO()
+    with gzip.GzipFile(fileobj=io, mode="w") as gzf:
+        gzf.write(content)
+    io.flush()
+    input_snapshot = rule_runner.make_snapshot({f"{name}.gz": io.getvalue()})
+
+    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == DigestContents([FileContent(name, content)])
 
 
 def test_extract_non_archive(rule_runner: RuleRunner) -> None:
