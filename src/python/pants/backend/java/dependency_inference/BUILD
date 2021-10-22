@@ -16,7 +16,6 @@ java_sources(
         "pants_java_parser",
     ],
     dependencies=[
-        ":javaparser_lockfile",
         ":com.github.javaparser_javaparser-symbol-solver-core",
         ":com.fasterxml.jackson.core_jackson-databind",
     ],

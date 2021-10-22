@@ -460,11 +460,10 @@ async def get_coursier_lockfile_for_target(
 ) -> CoursierResolvedLockfile:
     """Determine the lockfile that applies to a given JVM target.
 
-    This walks the target's transitive dependencies to find the set of resolve names that
-    are compatible with the entirety of this build (defined as the intersection of all
-    `compatible_resolves` fields). This is then compared with the JVM subsystem's `resolves` flag
-    to determine which resolve to use for this scenario.
-
+    This walks the target's transitive dependencies to find the set of resolve names that are
+    compatible with the entirety of this build (defined as the intersection of all
+    `compatible_resolves` fields). This is then compared with the JVM subsystem's `resolves` flag to
+    determine which resolve to use for this scenario.
     """
 
     transitive_targets = await Get(
