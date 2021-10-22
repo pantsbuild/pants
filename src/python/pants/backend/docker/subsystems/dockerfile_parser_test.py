@@ -9,7 +9,7 @@ import pytest
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.subsystems.dockerfile_parser import split_iterable
-from pants.backend.docker.target_types import DockerImage, DockerImageSources
+from pants.backend.docker.target_types import DockerImage, DockerImageSourceField
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
@@ -22,7 +22,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *parser_rules(),
             *pex_rules(),
-            QueryRule(DockerfileInfo, (DockerImageSources,)),
+            QueryRule(DockerfileInfo, (DockerImageSourceField,)),
         ],
         target_types=[DockerImage, PexBinary],
     )
@@ -48,7 +48,7 @@ def test_putative_target_addresses(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("test"))
-    info = rule_runner.request(DockerfileInfo, [tgt[DockerImageSources]])
+    info = rule_runner.request(DockerfileInfo, [tgt[DockerImageSourceField]])
     assert info.putative_target_addresses == (
         "some/target:binary",
         "some/target:tool",

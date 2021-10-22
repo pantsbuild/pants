@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generator
 
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -129,8 +129,8 @@ def split_iterable(
 
 
 @rule
-async def parse_dockerfile(sources: DockerImageSources) -> DockerfileInfo:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources))
+async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(source))
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
