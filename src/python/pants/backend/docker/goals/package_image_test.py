@@ -55,7 +55,11 @@ def assert_build(
     tgt = rule_runner.get_target(address)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
-        return DockerBuildContext(digest=EMPTY_DIGEST, version_context=DockerVersionContext())
+        return DockerBuildContext(
+            digest=EMPTY_DIGEST,
+            dockerfile="docker/test/Dockerfile",
+            version_context=DockerVersionContext(),
+        )
 
     def run_process_mock(process: Process) -> ProcessResult:
         if process_assertions:

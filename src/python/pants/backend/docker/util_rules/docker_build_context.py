@@ -8,7 +8,7 @@ from itertools import chain
 from typing import Mapping
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerImageSources
+from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -57,6 +57,7 @@ class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
 @dataclass(frozen=True)
 class DockerBuildContext:
     digest: Digest
+    dockerfile: str
     version_context: DockerVersionContext
 
 
@@ -72,11 +73,11 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
 
     # Get the Dockerfile from the root target.
-    dockerfiles_request = Get(
+    dockerfile_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[t.get(SourcesField) for t in transitive_targets.roots],
-            for_sources_types=(DockerImageSources,),
+            for_sources_types=(DockerImageSourceField,),
         ),
     )
 
@@ -100,11 +101,15 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    dockerfiles, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
-        dockerfiles_request,
+    dockerfile, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+        dockerfile_request,
         sources_request,
         embedded_pkgs_per_target_request,
-        Get(DockerfileInfo, DockerImageSources, transitive_targets.roots[0][DockerImageSources]),
+        Get(
+            DockerfileInfo,
+            DockerImageSourceField,
+            transitive_targets.roots[0][DockerImageSourceField],
+        ),
     )
 
     # Package binary dependencies for build context.
@@ -113,14 +118,14 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if request.build_upstream_images
-        or not isinstance(getattr(field_set, "sources", None), DockerImageSources)
+        or not isinstance(getattr(field_set, "sources", None), DockerImageSourceField)
     )
 
     packages_str = ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath)
     logger.debug(f"Packages for Docker image: {packages_str}")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
-    all_digests = (dockerfiles.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
+    all_digests = (dockerfile.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context.
     context = await Get(
@@ -138,6 +143,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     return DockerBuildContext(
         digest=context,
+        dockerfile=dockerfile.snapshot.files[0],
         version_context=DockerVersionContext(version_context),
     )
 
