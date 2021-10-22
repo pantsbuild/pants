@@ -9,23 +9,23 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import collect_rules, goal_rule
 
 
-class DumpDepInferenceDataSubsystem(GoalSubsystem):
-    name = "x-java-dump-dep-inf-data"
+class DumpFirstPartyDepMapSubsystem(GoalSubsystem):
+    name = "java-dump-first-party-dep-map"
     help = "Dump dependency inference data for Java dep inference."
 
 
-class DumpDepInferenceData(Goal):
-    subsystem_cls = DumpDepInferenceDataSubsystem
+class DumpFirstPartyDepMap(Goal):
+    subsystem_cls = DumpFirstPartyDepMapSubsystem
 
 
 @goal_rule
 async def dump_dep_inference_data(
     console: Console, first_party_dep_map: FirstPartyJavaPackageMapping
-) -> DumpDepInferenceData:
+) -> DumpFirstPartyDepMap:
     console.write_stdout(
         json.dumps(first_party_dep_map.package_rooted_dependency_map.to_json_dict())
     )
-    return DumpDepInferenceData(exit_code=0)
+    return DumpFirstPartyDepMap(exit_code=0)
 
 
 def rules():
