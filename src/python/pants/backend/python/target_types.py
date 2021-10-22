@@ -19,6 +19,7 @@ from typing import (
     Iterator,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
@@ -553,6 +554,8 @@ class PexBinary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
+#  message to use `python_source`/`python_test_utils` instead.
 class PythonTestSourceField(PythonSourceField):
     pass
 
@@ -632,8 +635,35 @@ class PythonTestTarget(Target):
     )
 
 
+# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
+#  message to use `python_test_utils` instead.
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     default = ("test_*.py", "*_test.py", "tests.py")
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        super().validate_resolved_files(files)
+        deprecated_files = []
+        for fp in files:
+            file_name = os.path.basename(fp)
+            if file_name == "conftest.py" or file_name.endswith(".pyi"):
+                deprecated_files.append(fp)
+
+        if deprecated_files:
+            # NOTE: Update `pytest.py` to stop special-casing file targets once this is removed!
+            warn_or_error(
+                "2.9.0.dev0",
+                entity=(
+                    "including `conftest.py` and `.pyi` stubs in a `python_tests` target's "
+                    "`sources` field"
+                ),
+                hint=(
+                    f"The `python_tests` target {self.address} includes these bad files in its "
+                    f"`sources` field: {deprecated_files}. "
+                    "To fix, please remove these files from the `sources` field and instead add "
+                    "them to a `python_test_utils` target. You can run `./pants tailor` after "
+                    "removing the files from the `sources` field to auto-generate this new target."
+                ),
+            )
 
 
 class PythonTestsOverrideField(OverridesField):
