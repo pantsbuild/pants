@@ -8,6 +8,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.core.target_types import ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_rules
 from pants.core.util_rules import config_files, source_files
@@ -35,6 +36,12 @@ HAMCREST_COORD = Coordinate(
 )
 
 
+ARGS = [
+    """--jvm-resolves={"test": "coursier_resolve.lockfile"}""",
+    """--coursier-resolve-names=["test"]""",
+]
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
@@ -49,7 +56,12 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *util_rules(),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact, ResourcesGeneratorTarget],
+        target_types=[
+            JvmDependencyLockfile,
+            JvmArtifact,
+            ResourcesGeneratorTarget,
+            JavaSourcesGeneratorTarget,
+        ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -61,13 +73,12 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
         {
             "BUILD": dedent(
                 """\
-                resources(
+                java_sources(
                     name = 'here_to_provide_dependencies',
+                    compatible_resolves=["test"],
                     dependencies = [
-                        ':example-lockfile',
                         ':org.hamcrest_hamcrest-core',
                     ],
-                    sources = ["*.txt"],
                 )
 
                 jvm_artifact(
@@ -76,16 +87,11 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
                     artifact = 'hamcrest-core',
                     version = "1.3",
                 )
-                coursier_lockfile(
-                    name = 'example-lockfile',
-                )
                 """
             ),
         }
     )
-    result = rule_runner.run_goal_rule(
-        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
@@ -128,13 +134,12 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
         {
             "BUILD": dedent(
                 """\
-                resources(
+                java_sources(
                     name = 'here_to_provide_dependencies',
+                    compatible_resolves=["test"],
                     dependencies = [
-                        ':example-lockfile',
                         ':org.hamcrest_hamcrest-core',
                     ],
-                    sources = ["*.txt"],
                 )
 
                 jvm_artifact(
@@ -152,9 +157,7 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
             "coursier_resolve.lockfile": expected_lockfile.to_json().decode("utf-8"),
         }
     )
-    result = rule_runner.run_goal_rule(
-        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert result.exit_code == 0
     assert result.stderr == ""
 
@@ -165,10 +168,10 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                resources(
+                java_sources(
                     name = 'here_to_provide_dependencies',
+                    compatible_resolves=["test"],
                     dependencies = [
-                        ':example-lockfile',
                         ':org.hamcrest_hamcrest-core',
                     ],
                     sources = ["*.txt"],
@@ -188,9 +191,7 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
             "coursier_resolve.lockfile": "[]",
         }
     )
-    result = rule_runner.run_goal_rule(
-        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
@@ -219,10 +220,10 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
         {
             "BUILD": dedent(
                 """\
-                resources(
+                java_sources(
                     name = 'here_to_provide_dependencies',
+                    compatible_resolves=["test"],
                     dependencies = [
-                        ':example-lockfile',
                         ':org.hamcrest_hamcrest-core',
                     ],
                     sources = ["*.txt"],
@@ -242,9 +243,7 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
             "coursier_resolve.lockfile": "]bad json[",
         }
     )
-    result = rule_runner.run_goal_rule(
-        CoursierResolve, args=["::"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(

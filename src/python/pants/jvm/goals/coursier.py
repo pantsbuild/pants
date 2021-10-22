@@ -130,10 +130,7 @@ async def get_jvm_targets_by_resolve_name(
     # TODO: simplify this with Py3.9 walrus operator
     flat_targets_ = ((tgt, tgt[JvmCompatibleResolveNamesField].value) for tgt in targets)
     flat_targets = [
-        (name, tgt) 
-        for (tgt, names) in flat_targets_ 
-        if names is not None 
-        for name in names
+        (name, tgt) for (tgt, names) in flat_targets_ if names is not None for name in names
     ]
 
     targets_by_resolve_name = {
