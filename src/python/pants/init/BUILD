@@ -13,6 +13,7 @@ target(
         "src/python/pants/backend/experimental/docker/lint/hadolint",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/java",
+        "src/python/pants/backend/experimental/java/debug_goals",
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/google_cloud_function/python",
