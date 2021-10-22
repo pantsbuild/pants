@@ -8,4 +8,3 @@ deploy_jar(
 )
 
 java_sources(compatible_resolves=["exampleapp"])
-coursier_lockfile(name="lockfile", source="coursier_resolve.lockfile")

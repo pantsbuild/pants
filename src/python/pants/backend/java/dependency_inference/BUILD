@@ -35,5 +35,3 @@ jvm_artifact(
     artifact="jackson-databind",
     version="2.12.4",
 )
-
-coursier_lockfile(name="javaparser_lockfile", source="coursier_resolve.lockfile")
