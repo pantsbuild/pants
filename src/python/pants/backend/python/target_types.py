@@ -642,7 +642,12 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
-        deprecated_files = [fp for fp in files if fp.endswith(("conftest.py", ".pyi"))]
+        deprecated_files = []
+        for fp in files:
+            file_name = os.path.basename(fp)
+            if file_name == "conftest.py" or file_name.endswith(".pyi"):
+                deprecated_files.append(fp)
+
         if deprecated_files:
             # NOTE: Update `pytest.py` to stop special-casing file targets once this is removed!
             warn_or_error(
