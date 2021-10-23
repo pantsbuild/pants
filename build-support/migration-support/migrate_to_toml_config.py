@@ -7,17 +7,17 @@ some issues remaining which require manual fixes, but this script will automate 
 
 Run `python3 migrate_to_toml_config.py --help`.
 """
-from __future__ import annotations
 
 import argparse
 import logging
 import re
 from pathlib import Path
+from typing import Dict, List
 
 
 def main() -> None:
     args = create_parser().parse_args()
-    updates: dict[Path, list[str]] = {}
+    updates: Dict[Path, List[str]] = {}
     for config in args.files:
         if config.suffix not in [".ini", ".cfg"]:
             logging.warning(f"This script may only be run on INI files. Skipping {config}.")
@@ -72,7 +72,7 @@ def update_primitive_value(original: str) -> str:
     return f'"{original}"'
 
 
-def generate_new_config(config: Path) -> list[str]:
+def generate_new_config(config: Path) -> List[str]:
     original_text = config.read_text()
     original_text_lines = original_text.splitlines()
     updated_text_lines = original_text_lines.copy()
