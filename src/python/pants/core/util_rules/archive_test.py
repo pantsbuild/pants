@@ -72,6 +72,7 @@ def test_extract_gz(rule_runner: RuleRunner) -> None:
     io.flush()
     input_snapshot = rule_runner.make_snapshot({f"{name}.gz": io.getvalue()})
 
+    rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == DigestContents([FileContent(name, content)])

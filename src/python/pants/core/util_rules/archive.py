@@ -4,13 +4,12 @@
 from __future__ import annotations
 
 import os
-import shlex
 from dataclasses import dataclass
 from enum import Enum
+from textwrap import dedent
 
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
-    BashBinary,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
@@ -19,6 +18,8 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.python import binaries as python_binaries
+from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
 
 
@@ -51,21 +52,24 @@ class UnzipBinary(BinaryPath):
         return (self.path, archive_path, "-d", extract_path)
 
 
-@dataclass(unsafe_hash=True)
-class GunzipBinary(BinaryPath):
-    bash: BashBinary
+@dataclass(frozen=True)
+class Gunzip:
+    python: PythonBinary
 
     def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         archive_name = os.path.basename(archive_path)
         dest_file_name = os.path.splitext(archive_name)[0]
-        args = [
-            shlex.quote(self.path),
-            "-c",
-            shlex.quote(archive_path),
-            ">",
-            shlex.quote(os.path.join(extract_path, dest_file_name)),
-        ]
-        return (self.bash.path, "-c", " ".join(args))
+        dest_path = os.path.join(extract_path, dest_file_name)
+        script = dedent(
+            f"""
+            import gzip
+            import shutil
+            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
+                with open({dest_path!r}, "wb") as dest:
+                    shutil.copyfileobj(source, dest)
+            """
+        )
+        return (self.python.path, "-c", script)
 
 
 class TarBinary(BinaryPath):
@@ -108,16 +112,9 @@ async def find_unzip() -> UnzipBinary:
     return UnzipBinary(first_path.path, first_path.fingerprint)
 
 
-@rule(desc="Finding the `gunzip` binary", level=LogLevel.DEBUG)
-async def find_gunzip(bash: BashBinary) -> GunzipBinary:
-    request = BinaryPathRequest(
-        binary_name="gunzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-V"])
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(
-        request, rationale="download the tools Pants needs to run"
-    )
-    return GunzipBinary(first_path.path, first_path.fingerprint, bash=bash)
+@rule
+def prepare_gunzip(python: PythonBinary) -> Gunzip:
+    return Gunzip(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -141,7 +138,7 @@ class _UnzipBinaryRequest:
     pass
 
 
-class _GunzipBinaryRequest:
+class _GunzipRequest:
     pass
 
 
@@ -160,8 +157,8 @@ async def find_unzip_wrapper(_: _UnzipBinaryRequest, unzip_binary: UnzipBinary) 
 
 
 @rule
-async def find_gunzip_wrapper(_: _GunzipBinaryRequest, unzip_binary: GunzipBinary) -> GunzipBinary:
-    return unzip_binary
+async def find_gunzip_wrapper(_: _GunzipRequest, gunzip: Gunzip) -> Gunzip:
+    return gunzip
 
 
 @rule
@@ -267,11 +264,11 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
     else:
-        input_digest, gunzip_binary = await MultiGet(
+        input_digest, gunzip = await MultiGet(
             merge_digest_get,
-            Get(GunzipBinary, _GunzipBinaryRequest()),
+            Get(Gunzip, _GunzipRequest()),
         )
-        argv = gunzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
+        argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
         env = {}
 
     result = await Get(
@@ -290,4 +287,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *python_binaries.rules(),
+    ]
