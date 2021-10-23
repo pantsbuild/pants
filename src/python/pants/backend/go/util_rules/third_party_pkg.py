@@ -97,6 +97,7 @@ async def download_third_party_modules(
             description="Download all third-party Go modules",
             output_files=("go.mod", "go.sum"),
             output_directories=("gopath",),
+            allow_downloads=True,
         ),
     )
 
@@ -272,7 +273,6 @@ async def compute_third_party_module_metadata(
         GoSdkProcess(
             input_digest=downloaded_module.digest,
             command=("list", "-mod=readonly", "-json", "./..."),
-            env={"GOPROXY": "off"},
             description=(
                 "Determine metadata for Go third-party module "
                 f"{request.module_path}@{request.version}"
