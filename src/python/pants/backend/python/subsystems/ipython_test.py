@@ -37,7 +37,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         "python_sources(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_ics("target()", [global_constraint])
 
     # If there are multiple distinct ICs in the repo, we OR them. Even though the user might AND

@@ -16,7 +16,7 @@ def typecheck_file(filename: str) -> PantsResult:
             filename,
         ],
         # Match the wheel_config_settings --python-tag of src/python/pants/testutil:testutil_wheel.
-        config={"python-setup": {"interpreter_constraints": ["CPython>=3.7<=3.9"]}},
+        config={"python": {"interpreter_constraints": ["CPython>=3.7<=3.9"]}},
     )
 
 

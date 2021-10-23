@@ -9,6 +9,7 @@ from typing import Iterable, cast
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -16,7 +17,6 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 

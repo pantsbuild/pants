@@ -28,6 +28,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -58,7 +59,6 @@ from pants.engine.target import (
     generate_file_based_overrides_field_help_message,
 )
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
 from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
@@ -91,7 +91,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "`CPython` as a shorthand, e.g. `>=2.7` will be expanded to `CPython>=2.7`.\n\nSpecify "
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
-        "the option `[python-setup].interpreter_constraints`.\n\n"
+        "the option `[python].interpreter_constraints`.\n\n"
         f"See {doc_url('python-interpreter-compatibility')} for how these interpreter "
         "constraints are merged with the constraints of dependencies."
     )
@@ -130,7 +130,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     # TODO(#12314): Figure out how to model the default and disabling lockfile, e.g. if we
     #  hardcode to `default` or let the user set it.
     help = (
-        "The resolve from `[python-setup].experimental_resolves_to_lockfiles` to use, if any.\n\n"
+        "The resolve from `[python].experimental_resolves_to_lockfiles` to use, if any.\n\n"
         "This field is highly experimental and may change without the normal deprecation policy."
     )
 

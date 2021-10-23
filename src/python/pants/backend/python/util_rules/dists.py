@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 import toml
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -37,7 +38,6 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.osutil import is_macos_big_sur

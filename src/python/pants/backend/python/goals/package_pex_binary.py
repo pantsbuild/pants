@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexAlwaysWriteCacheField,
     PexBinaryDefaults,
@@ -43,7 +44,6 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 

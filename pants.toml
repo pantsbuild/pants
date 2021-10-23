@@ -81,7 +81,7 @@ root_patterns = [
   "/pants-plugins",
 ]
 
-[python-setup]
+[python]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true

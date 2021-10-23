@@ -135,7 +135,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         "python_sources(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.

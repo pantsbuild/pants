@@ -37,7 +37,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         )
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
-    # If no dependencies for python_distribution, fall back to global python-setup constraints.
+    # If no dependencies for python_distribution, fall back to global [python] constraints.
     assert_ics("python_distribution(provides=setup_py(name='dist'))", [global_constraint])
 
     assert_ics(
@@ -80,7 +80,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         ["==2.7.*", "==3.5.*"],
     )
 
-    # If no python_distribution targets in repo, fall back to global python-setup constraints.
+    # If no python_distribution targets in repo, fall back to global [python] constraints.
     assert_ics("python_sources()", [global_constraint])
 
     # If there are multiple distinct ICs in the repo, we OR them. This is because setup_py.py will

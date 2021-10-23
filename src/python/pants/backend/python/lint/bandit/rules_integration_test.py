@@ -13,13 +13,13 @@ from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
-from pants.python.python_setup import PythonSetup
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -84,7 +84,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
 
 

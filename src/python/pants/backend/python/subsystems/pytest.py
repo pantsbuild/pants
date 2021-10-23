@@ -14,6 +14,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     PythonResolveField,
@@ -36,7 +37,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method

@@ -7,6 +7,7 @@ from typing import Tuple
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -20,7 +21,6 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 

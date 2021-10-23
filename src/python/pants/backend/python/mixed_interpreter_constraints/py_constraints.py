@@ -8,6 +8,7 @@ from textwrap import fill, indent
 from typing import cast
 
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.addresses import Addresses
@@ -22,7 +23,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
 

@@ -18,6 +18,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.setup import InvalidLockfileBehavior
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
@@ -47,7 +48,6 @@ from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.python.python_setup import InvalidLockfileBehavior
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
@@ -444,7 +444,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
         requirements=PexRequirements(direct_deps, apply_constraints=True),
-        additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
+        additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
     assert {
@@ -547,7 +547,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         rule_runner,
         pex_type=pex_type,
         requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
-        additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
+        additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     ).pex
     dists = rule_runner.request(PexResolveInfo, [pex])
     assert dists[0] == PexDistributionInfo("certifi", Version("2020.12.5"), None, ())
@@ -758,8 +758,8 @@ ansicolors==1.1.8
         interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=requirements,
         additional_pants_args=(
-            "--python-setup-experimental-lockfile=lockfile.txt",
-            f"--python-setup-invalid-lockfile-behavior={behavior}",
+            "--python-experimental-lockfile=lockfile.txt",
+            f"--python-invalid-lockfile-behavior={behavior}",
         ),
     )
 

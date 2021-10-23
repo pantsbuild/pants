@@ -11,6 +11,7 @@ from pants.backend.python.dependency_inference.import_parser import (
     ParsePythonImportsRequest,
 )
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField, PythonTestSourceField
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
@@ -32,7 +33,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
 

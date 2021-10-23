@@ -8,13 +8,13 @@ import pytest
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.engine.process import Process
-from pants.python.python_setup import PythonSetup
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import GoalRuleResult, QueryRule, RuleRunner, mock_console
 
@@ -73,7 +73,7 @@ def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
             rule_runner,
             extra_args=[
                 "--repl-shell=ipython",
-                f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']",
+                f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']",
             ],
         ).exit_code
         == 0
