@@ -3,6 +3,7 @@
 
 import os
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Iterable, List, Sequence, TypeVar
 
@@ -10,8 +11,11 @@ import pytest
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.engine.environment import Environment
-from pants.python.binaries import PythonBootstrap, get_asdf_data_dir, get_pyenv_root
-from pants.testutil.rule_runner import RuleRunner
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import Get, rule
+from pants.python import binaries as python_binaries
+from pants.python.binaries import PythonBinary, PythonBootstrap, get_asdf_data_dir, get_pyenv_root
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
 
@@ -109,9 +113,34 @@ def test_get_pex_python_paths() -> None:
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
+@dataclass(frozen=True)
+class PythonBinaryVersion:
+    version: str
+
+
+@rule
+async def python_binary_version(python_binary: PythonBinary) -> PythonBinaryVersion:
+    process_result = await Get(
+        ProcessResult,
+        Process(
+            argv=(python_binary.path, "--version"),
+            description=r"Running `{python_binary.path} --version`",
+        ),
+    )
+    return PythonBinaryVersion(process_result.stdout.decode())
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner()
+    return RuleRunner(
+        rules=[*python_binaries.rules(), python_binary_version, QueryRule(PythonBinaryVersion, [])]
+    )
+
+
+def test_python_binary(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options((), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    python_binary_version = rule_runner.request(PythonBinaryVersion, [])
+    assert python_binary_version.version.startswith("Python 3.")
 
 
 def test_get_pyenv_root() -> None:

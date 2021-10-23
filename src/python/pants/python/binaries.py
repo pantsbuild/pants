@@ -372,21 +372,19 @@ class PythonBinary(BinaryPath):
 @rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
 
-    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
-    # code will then re-exec itself if the underlying PEX user code needs a more specific python
-    # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
-    # maximum flexibility.
+    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
+    # for maximum compatibility with internal scripts.
+    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
     all_python_binary_paths = await MultiGet(
         Get(
             BinaryPaths,
             BinaryPathRequest(
-                search_path=python_bootstrap.interpreter_search_paths(),
+                search_path=interpreter_search_paths,
                 binary_name=binary_name,
                 test=BinaryPathTest(
                     args=[
                         "-c",
-                        # N.B.: The following code snippet must be compatible with Python 2.7 and
-                        # Python 3.5+.
+                        # N.B.: The following code snippet must be compatible with Python 3.6+.
                         #
                         # We hash the underlying Python interpreter executable to ensure we detect
                         # changes in the real interpreter that might otherwise be masked by Pyenv
@@ -403,7 +401,7 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
                             import sys
 
                             major, minor = sys.version_info[:2]
-                            if (major, minor) != (2, 7) and not (major == 3 and minor >= 5):
+                            if not (major == 3 and minor >= 6):
                                 sys.exit(1)
 
                             import hashlib
@@ -433,7 +431,8 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
     raise BinaryNotFoundError(
         "Was not able to locate a Python interpreter to execute rule code.\n"
         "Please ensure that Python is available in one of the locations identified by "
-        "`[python-bootstrap] search_path`."
+        "`[python-bootstrap] search_path`, which currently expands to:\n"
+        f"  {interpreter_search_paths}"
     )
 
 
