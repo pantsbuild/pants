@@ -48,8 +48,7 @@ class ShellSetup(Subsystem):
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
-                        for path_entry in path.split(os.pathsep):
-                            yield path_entry
+                        yield from path.split(os.pathsep)
                 else:
                     yield entry
 
