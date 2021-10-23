@@ -280,6 +280,10 @@ async def compute_third_party_module_metadata(
         ),
     )
 
+    # Some modules don't have any Go code in them, meaning they have no packages.
+    if not json_result.stdout:
+        return ThirdPartyModuleInfo()
+
     import_path_to_info = {}
     for metadata in ijson.items(json_result.stdout, "", multiple_values=True):
         import_path = metadata["ImportPath"]
