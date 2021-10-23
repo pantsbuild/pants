@@ -1612,7 +1612,7 @@ class GlobalOptionsFlags:
     short_flags: FrozenOrderedSet[str]
 
     @classmethod
-    def create(cls, GlobalOptionsType: Type[GlobalOptions]) -> GlobalOptionsFlags:
+    def create(cls, GlobalOptionsType: type[GlobalOptions]) -> GlobalOptionsFlags:
         flags = set()
         short_flags = set()
 

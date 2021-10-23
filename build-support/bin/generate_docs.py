@@ -27,7 +27,7 @@ import re
 import subprocess
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
-from typing import Any, Dict, Iterable, Optional, cast
+from typing import Any, Dict, Iterable, cast
 
 import pystache
 import requests
@@ -290,7 +290,7 @@ class ReferenceGenerator:
                 "target": target_tpl,
             }
         )
-        self._category_id: Optional[str] = None  # Fetched lazily.
+        self._category_id: str | None = None  # Fetched lazily.
 
         # Load the data.
         self._options_info = self.process_options_input(help_info, sync=self._args.sync)
@@ -372,9 +372,7 @@ class ReferenceGenerator:
             self._category_id = self._readme_api.get_category("reference").id
         return self._category_id
 
-    def _create(
-        self, parent_doc_id: Optional[str], slug_suffix: str, title: str, body: str
-    ) -> None:
+    def _create(self, parent_doc_id: str | None, slug_suffix: str, title: str, body: str) -> None:
         """Create a new docsite reference page.
 
         Operates by creating a placeholder page, and then populating it via _update().
@@ -406,7 +404,7 @@ class ReferenceGenerator:
     def _render_target(self, alias: str) -> str:
         return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
 
-    def _render_options_body(self, scope_help_info: Dict) -> str:
+    def _render_options_body(self, scope_help_info: dict) -> str:
         """Renders the body of a single options help page."""
         return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
 

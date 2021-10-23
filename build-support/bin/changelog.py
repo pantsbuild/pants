@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import argparse
 import datetime
 import re
 import subprocess
 from textwrap import dedent
-from typing import List
 
 from common import die
 from packaging.version import Version
@@ -48,7 +48,7 @@ def determine_release_branch(new_version_str: str) -> str:
     return release_branch
 
 
-def relevant_shas(prior: str, release_branch: str) -> List[str]:
+def relevant_shas(prior: str, release_branch: str) -> list[str]:
     prior_tag = f"release_{prior}"
     return (
         subprocess.run(

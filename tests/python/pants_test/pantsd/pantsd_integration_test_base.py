@@ -9,7 +9,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterator, Mapping
 
 from colors import bold, cyan, magenta
 
@@ -57,7 +57,7 @@ def attempts(
 
 def launch_waiter(
     *, workdir: str, config: Mapping | None = None
-) -> Tuple[PantsJoinHandle, int, str]:
+) -> tuple[PantsJoinHandle, int, str]:
     """Launch a process that will wait forever for a file to be created.
 
     Returns the pid of the pants client, the pid of the waiting child process, and the file to
@@ -140,7 +140,7 @@ class PantsdRunContext:
     runner: Callable[..., Any]
     checker: PantsDaemonMonitor
     workdir: str
-    pantsd_config: Dict[str, Any]
+    pantsd_config: dict[str, Any]
 
 
 class PantsDaemonIntegrationTestBase(unittest.TestCase):
@@ -161,8 +161,8 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
 
     @contextmanager
     def pantsd_test_context(
-        self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
-    ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
+        self, *, log_level: str = "info", extra_config: dict[str, Any] | None = None
+    ) -> Iterator[tuple[str, dict[str, Any], PantsDaemonMonitor]]:
         with temporary_dir(root_dir=os.getcwd()) as workdir_base:
             pid_dir = os.path.join(workdir_base, ".pids")
             workdir = os.path.join(workdir_base, ".workdir.pants.d")
@@ -205,8 +205,8 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
     def pantsd_run_context(
         self,
         log_level: str = "info",
-        extra_config: Optional[Dict[str, Any]] = None,
-        extra_env: Optional[Dict[str, str]] = None,
+        extra_config: dict[str, Any] | None = None,
+        extra_env: dict[str, str] | None = None,
         success: bool = True,
     ) -> Iterator[PantsdRunContext]:
         with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (

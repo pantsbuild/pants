@@ -13,7 +13,6 @@ import time
 import unittest
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Optional
 
 import psutil
 import pytest
@@ -520,7 +519,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             rm_rf(test_path)
 
     def _assert_pantsd_keyboardinterrupt_signal(
-        self, signum: int, regexps: Optional[List[str]] = None
+        self, signum: int, regexps: list[str] | None = None
     ):
         """Send a signal to the thin pailgun client and observe the error messaging.
 

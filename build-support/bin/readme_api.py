@@ -24,7 +24,7 @@ import dataclasses
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Type, TypeVar, Union, cast
+from typing import Any, TypeVar, Union, cast
 
 import requests
 
@@ -50,7 +50,7 @@ class ReadmeEntity:
         return self._id
 
     @classmethod
-    def from_api_response(cls: Type[T], data: dict) -> T:
+    def from_api_response(cls: type[T], data: dict) -> T:
         init_kwargs = {}
         for field in dataclasses.fields(cls):
             if field.name not in data and field.default == dataclasses.MISSING:
@@ -61,7 +61,7 @@ class ReadmeEntity:
         return cls(**init_kwargs)
 
     @classmethod
-    def field_value_from_api_response(cls, field_name: str, field_type: Type[F], val: Any) -> F:
+    def field_value_from_api_response(cls, field_name: str, field_type: type[F], val: Any) -> F:
         """Subclasses can override to handle specific fields specially."""
         return cast(F, val)
 
@@ -87,7 +87,7 @@ class DocRef(ReadmeEntity):
     children: tuple[DocRef, ...] = tuple()
 
     @classmethod
-    def field_value_from_api_response(cls, field_name: str, field_type: Type[F], val: Any) -> F:
+    def field_value_from_api_response(cls, field_name: str, field_type: type[F], val: Any) -> F:
         # A DocRef can have children that are themselves DocRefs. Currently readme.com only
         # supports one level of nesting, but this code will work for any depth.
         if field_name == "children":

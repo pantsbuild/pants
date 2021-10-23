@@ -17,10 +17,11 @@ We want to allow direct invocation of scripts for these reasons:
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
 may be called via `./pants run` instead of direct invocation if desired.
 """
+from __future__ import annotations
 
 import subprocess
 import time
-from typing import NoReturn, Tuple
+from typing import NoReturn
 
 _SCRIPT_START_TIME = time.time()
 
@@ -44,7 +45,7 @@ def banner(message: str) -> None:
     print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
 
 
-def elapsed_time() -> Tuple[int, int]:
+def elapsed_time() -> tuple[int, int]:
     now = time.time()
     elapsed_seconds = int(now - _SCRIPT_START_TIME)
     return elapsed_seconds // 60, elapsed_seconds % 60

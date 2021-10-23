@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, Optional, Set, Tuple
+from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -35,7 +35,7 @@ class SourceRoot:
 
 @dataclass(frozen=True)
 class OptionalSourceRoot:
-    source_root: Optional[SourceRoot]
+    source_root: SourceRoot | None
 
 
 class SourceRootError(Exception):
@@ -66,7 +66,7 @@ _repo_root = PurePath(os.path.sep)
 
 @dataclass(frozen=True)
 class SourceRootPatternMatcher:
-    root_patterns: Tuple[str, ...]
+    root_patterns: tuple[str, ...]
 
     def __post_init__(self) -> None:
         for root_pattern in self.root_patterns:
@@ -75,7 +75,7 @@ class SourceRootPatternMatcher:
                     f"`..` disallowed in source root pattern: {root_pattern}. "
                 )
 
-    def get_patterns(self) -> Tuple[str, ...]:
+    def get_patterns(self) -> tuple[str, ...]:
         return tuple(self.root_patterns)
 
     def matches_root_patterns(self, relpath: PurePath) -> bool:
@@ -136,8 +136,8 @@ class SourceRootConfig(Subsystem):
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
-    files: Tuple[PurePath, ...]
-    dirs: Tuple[PurePath, ...]
+    files: tuple[PurePath, ...]
+    dirs: tuple[PurePath, ...]
 
     def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
         self.files = tuple(sorted(files))
@@ -211,18 +211,18 @@ async def get_optional_source_roots(
     # A file cannot be a source root, so request for its parent.
     # In the typical case, where we have multiple files with the same parent, this can
     # dramatically cut down on the number of engine requests.
-    dirs: Set[PurePath] = set(source_roots_request.dirs)
-    file_to_dir: Dict[PurePath, PurePath] = {
+    dirs: set[PurePath] = set(source_roots_request.dirs)
+    file_to_dir: dict[PurePath, PurePath] = {
         file: file.parent for file in source_roots_request.files
     }
     dirs.update(file_to_dir.values())
 
-    dir_to_root: Dict[PurePath, OptionalSourceRoot] = {}
+    dir_to_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in dirs:
         root = await Get(OptionalSourceRoot, SourceRootRequest(d))
         dir_to_root[d] = root
 
-    path_to_optional_root: Dict[PurePath, OptionalSourceRoot] = {}
+    path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in source_roots_request.dirs:
         path_to_optional_root[d] = dir_to_root[d]
     for f, d in file_to_dir.items():
@@ -307,7 +307,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 
     # Create globs corresponding to all source root patterns.
-    pattern_matches: Set[str] = set()
+    pattern_matches: set[str] = set()
     for path in source_root_pattern_matcher.get_patterns():
         if path == "/":
             pattern_matches.add("**")
@@ -317,7 +317,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
             pattern_matches.add(f"**/{path}/")
 
     # Create globs for any marker files.
-    marker_file_matches: Set[str] = set()
+    marker_file_matches: set[str] = set()
     for marker_filename in source_root_config.options.marker_filenames:
         marker_file_matches.add(f"**/{marker_filename}")
 
