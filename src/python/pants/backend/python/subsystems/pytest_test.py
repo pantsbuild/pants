@@ -35,7 +35,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     global_constraint = "==3.9.*"
     rule_runner.set_options(
         ["--pytest-lockfile=lockfile.txt"],
-        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+        env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 

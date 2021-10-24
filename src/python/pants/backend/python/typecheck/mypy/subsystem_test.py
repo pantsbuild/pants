@@ -155,7 +155,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         rule_runner.set_options(
             ["--mypy-lockfile=lockfile.txt", *(extra_args or [])],
-            env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [MyPyLockfileSentinel()])

@@ -54,7 +54,7 @@ def write_files(rule_runner: RuleRunner) -> None:
 def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
     return rule_runner.run_goal_rule(
         PyConstraintsGoal,
-        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": "['>=3.6']"},
+        env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": "['>=3.6']"},
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         args=args,
     )
@@ -64,6 +64,7 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files({"f.txt": "", "BUILD": "file(name='tgt', source='f.txt')"})
     result = run_goal(rule_runner, ["f.txt"])
     assert result.exit_code == 0
+    print(caplog.records)
     assert len(caplog.records) == 1
     assert (
         "No Python files/targets matched for the `py-constraints` goal. All target types with "
