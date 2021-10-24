@@ -10,6 +10,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
@@ -34,7 +35,6 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel

@@ -12,6 +12,7 @@ from pants.backend.python.goals.coverage_py import (
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
@@ -58,7 +59,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()

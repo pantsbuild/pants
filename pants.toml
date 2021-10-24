@@ -81,7 +81,7 @@ root_patterns = [
   "/pants-plugins",
 ]
 
-[python-setup]
+[python]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
@@ -119,7 +119,7 @@ execution_slot_var = "EXECUTION_SLOT"
 [test]
 extra_env_vars = [
   # TODO: These are exposed to tests in order to allow for python interpreter discovery when
-  # Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
+  # Pants-tests-Pants: in particular, the [python] subsystem consumes them.
   #   see https://github.com/pantsbuild/pants/issues/11638
   "PYENV_ROOT",
   "HOME",

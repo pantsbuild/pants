@@ -17,6 +17,8 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.repos import PythonRepos
+from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -56,8 +58,6 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, collect_rules, rule
-from pants.python.python_repos import PythonRepos
-from pants.python.python_setup import InvalidLockfileBehavior, PythonSetup
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -469,7 +469,7 @@ async def build_pex(
                 PathGlobs(
                     [python_setup.requirement_constraints],
                     glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin="the option `[python-setup].requirement_constraints`",
+                    description_of_origin="the option `[python].requirement_constraints`",
                 ),
             )
 

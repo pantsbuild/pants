@@ -4,6 +4,7 @@
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
     ResolvedPexEntryPoint,
@@ -22,7 +23,6 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 

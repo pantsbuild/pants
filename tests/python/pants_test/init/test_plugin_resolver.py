@@ -136,7 +136,7 @@ def plugin_resolution(
             env.update(
                 PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
                 PANTS_PYTHON_REPOS_INDEXES="[]",
-                PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
+                PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
             )
             plugin_list = []
             for plugin in plugins:

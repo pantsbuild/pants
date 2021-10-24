@@ -12,6 +12,7 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PythonRequirementsField,
@@ -44,7 +45,6 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -290,8 +290,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             and python_setup.resolve_all_constraints_was_set_explicitly()
         ):
             raise ValueError(
-                "`[python-setup].resolve_all_constraints` is enabled, so "
-                "`[python-setup].requirement_constraints` must also be set."
+                "`[python].resolve_all_constraints` is enabled, so "
+                "`[python].requirement_constraints` must also be set."
             )
         elif request.resolve_and_lockfile:
             resolve, lockfile = request.resolve_and_lockfile
@@ -305,7 +305,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         file_path=lockfile,
                         file_path_description_of_origin=(
                             f"the resolve `{resolve}` (from "
-                            "`[python-setup].experimental_resolves_to_lockfiles`)"
+                            "`[python].experimental_resolves_to_lockfiles`)"
                         ),
                         # TODO(#12314): Hook up lockfile staleness check.
                         lockfile_hex_digest=None,
@@ -326,7 +326,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     requirements=Lockfile(
                         file_path=python_setup.lockfile,
                         file_path_description_of_origin=(
-                            "the option `[python-setup].experimental_lockfile`"
+                            "the option `[python].experimental_lockfile`"
                         ),
                         # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
                         # are supported.
@@ -371,7 +371,7 @@ async def _setup_constraints_repository_pex(
         PathGlobs(
             [constraints_path],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[python-setup].requirement_constraints`",
+            description_of_origin="the option `[python].requirement_constraints`",
         ),
     )
     constraints_file_reqs = set(

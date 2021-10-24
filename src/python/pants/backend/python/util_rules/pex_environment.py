@@ -9,6 +9,7 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Mapping, cast
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
@@ -18,7 +19,6 @@ from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, Bin
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -57,7 +57,7 @@ class PexRuntimeEnvironment(Subsystem):
                 "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
                 "does not impact which Python interpreter is used to run your code, only what is "
                 "used to run the PEX tool. See the `interpreter_search_paths` option in "
-                "`[python-setup]` to influence where interpreters are searched for."
+                "`[python]` to influence where interpreters are searched for."
             ),
         )
         register(
@@ -119,7 +119,7 @@ class PexEnvironment(EngineAwareReturnType):
         if not self.bootstrap_python:
             return (
                 "No bootstrap Python executable could be found from the option "
-                "`interpreter_search_paths` in the `[python-setup]` scope. Will attempt to run "
+                "`interpreter_search_paths` in the `[python]` scope. Will attempt to run "
                 "PEXes directly."
             )
         return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."

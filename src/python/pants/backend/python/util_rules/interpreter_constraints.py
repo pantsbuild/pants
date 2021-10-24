@@ -11,11 +11,11 @@ from typing import Iterable, Iterator, Sequence, TypeVar
 from pkg_resources import Requirement
 from typing_extensions import Protocol
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
-from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -283,7 +283,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             if major == 2:
                 if minor != 7:
                     raise AssertionError(
-                        "Unexpected value in `[python-setup].interpreter_versions_universe`: "
+                        "Unexpected value in `[python].interpreter_versions_universe`: "
                         f"{major_minor}. Expected the only Python 2 value to be '2.7', given that "
                         f"all other versions are unmaintained or do not exist."
                     )
@@ -292,7 +292,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 minors.append((3, minor))
             else:
                 raise AssertionError(
-                    "Unexpected value in `[python-setup].interpreter_versions_universe`: "
+                    "Unexpected value in `[python].interpreter_versions_universe`: "
                     f"{major_minor}. Expected to only include '2.7' and/or Python 3 versions, "
                     "given that Python 3 will be the last major Python version. Please open an "
                     "issue at https://github.com/pantsbuild/pants/issues/new if this is no longer "
@@ -308,10 +308,10 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         if not valid_patches:
             raise ValueError(
                 f"The interpreter constraints `{self}` are not compatible with any of the "
-                "interpreter versions from `[python-setup].interpreter_versions_universe`.\n\n"
+                "interpreter versions from `[python].interpreter_versions_universe`.\n\n"
                 "Please either change these interpreter constraints or update the "
                 "`interpreter_versions_universe` to include the interpreters set in these "
-                "constraints. Run `./pants help-advanced python-setup` for more information on the "
+                "constraints. Run `./pants help-advanced python` for more information on the "
                 "`interpreter_versions_universe` option."
             )
 

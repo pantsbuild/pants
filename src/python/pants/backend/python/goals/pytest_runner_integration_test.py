@@ -17,6 +17,7 @@ from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPl
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.pytest import rules as pytest_subsystem_rules
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import (
     PexBinary,
@@ -39,7 +40,6 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -127,7 +127,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     result = run_pytest(
         rule_runner,
         tgt,
-        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
     assert result.xml_results is not None
     assert result.exit_code == 0

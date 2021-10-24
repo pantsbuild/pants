@@ -196,9 +196,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             additional_lockfile_args=additional_lockfile_args,
         )
         if resolve_all_constraints is not None:
-            args.append(f"--python-setup-resolve-all-constraints={resolve_all_constraints!r}")
+            args.append(f"--python-resolve-all-constraints={resolve_all_constraints!r}")
         if constraints_file:
-            args.append(f"--python-setup-requirement-constraints={constraints_file}")
+            args.append(f"--python-requirement-constraints={constraints_file}")
         args.append("--python-repos-indexes=[]")
         args.append(f"--python-repos-repos={find_links}")
         rule_runner.set_options(args, env_inherit={"PATH"})
@@ -263,8 +263,8 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert len(err.value.wrapped_exceptions) == 1
     assert isinstance(err.value.wrapped_exceptions[0], ValueError)
     assert (
-        "`[python-setup].resolve_all_constraints` is enabled, so "
-        "`[python-setup].requirement_constraints` must also be set."
+        "`[python].resolve_all_constraints` is enabled, so "
+        "`[python].requirement_constraints` must also be set."
     ) in str(err.value)
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
@@ -292,8 +292,8 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         [
-            "--python-setup-requirement-constraints=constraints.txt",
-            "--python-setup-resolve-all-constraints",
+            "--python-requirement-constraints=constraints.txt",
+            "--python-resolve-all-constraints",
         ]
     )
     result = rule_runner.request(PexRequest, [request])

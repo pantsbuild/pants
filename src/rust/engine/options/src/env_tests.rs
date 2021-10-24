@@ -31,11 +31,11 @@ fn test_display() {
 
 #[test]
 fn test_scope() {
-  let env = env([("PANTS_PYTHON_SETUP_EXAMPLE", "true")]);
+  let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
   assert_eq!(
     true,
     env
-      .get_bool(&option_id!(["python-setup"], "example"))
+      .get_bool(&option_id!(["python"], "example"))
       .unwrap()
       .unwrap()
   );

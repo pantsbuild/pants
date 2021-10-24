@@ -122,7 +122,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
                 "Format BUILD files using Black.\n\n"
                 "Set `[black].args`, `[black].config`, and `[black].config_discovery` to change "
                 "Black's behavior. Set `[black].interpreter_constraints` and "
-                "`[python-setup].interpreter_search_path` to change which interpreter is used to "
+                "`[python].interpreter_search_path` to change which interpreter is used to "
                 "run Black."
             ),
         )

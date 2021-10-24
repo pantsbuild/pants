@@ -9,6 +9,7 @@ from typing import Iterable
 import pytest
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import (
     _EXPECTED_LAST_PATCH_VERSION,
@@ -16,7 +17,6 @@ from pants.backend.python.util_rules.interpreter_constraints import (
 )
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
-from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet

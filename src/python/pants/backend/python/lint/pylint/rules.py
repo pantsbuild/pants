@@ -10,6 +10,7 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFieldSet,
     PylintFirstPartyPlugins,
 )
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -28,7 +29,6 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Target, Targets
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize

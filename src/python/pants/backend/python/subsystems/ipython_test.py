@@ -23,7 +23,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     global_constraint = "==3.9.*"
     rule_runner.set_options(
         ["--ipython-lockfile=lockfile.txt"],
-        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+        env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
@@ -37,7 +37,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         "python_sources(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_ics("target()", [global_constraint])
 
     # If there are multiple distinct ICs in the repo, we OR them. Even though the user might AND

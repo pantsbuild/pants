@@ -58,7 +58,7 @@ def run(args: list[str]) -> PantsResult:
         [
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.experimental.go",
-            "--python-setup-interpreter-constraints=['==3.9.*']",
+            "--python-interpreter-constraints=['==3.9.*']",
             "--pants-ignore=__pycache__",
             *args,
         ]

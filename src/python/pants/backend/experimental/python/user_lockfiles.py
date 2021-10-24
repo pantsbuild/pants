@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 
 from pants.backend.python.goals.lockfile import PythonLockfile, PythonLockfileRequest
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
@@ -14,7 +15,6 @@ from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
-from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ async def generate_user_lockfile_goal(
 ) -> GenerateUserLockfileGoal:
     if python_setup.lockfile is None:
         logger.warning(
-            "You ran `./pants generate-user-lockfile`, but `[python-setup].experimental_lockfile` "
+            "You ran `./pants generate-user-lockfile`, but `[python].experimental_lockfile` "
             "is not set. Please set this option to the path where you'd like the lockfile for "
             "your code's dependencies to live."
         )

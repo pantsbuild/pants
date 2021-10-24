@@ -253,7 +253,7 @@ def setup_primary_python() -> Sequence[Step]:
             "run": dedent(
                 """\
                 echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-                echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
+                echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
                 """
             ),
         },

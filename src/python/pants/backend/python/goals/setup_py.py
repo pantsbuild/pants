@@ -15,6 +15,7 @@ from functools import partial
 from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     GenerateSetupField,
@@ -78,7 +79,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel

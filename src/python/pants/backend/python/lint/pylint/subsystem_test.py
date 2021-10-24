@@ -116,7 +116,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         rule_runner.set_options(
             ["--pylint-lockfile=lockfile.txt", *(extra_args or [])],
-            env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         lockfile_request = rule_runner.request(PythonLockfileRequest, [PylintLockfileSentinel()])
@@ -135,7 +135,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         "python_sources(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.
