@@ -240,15 +240,12 @@ def value_strs_iter(help_info: dict[str, Any]) -> Iterable[str]:
             yield val
         if isinstance(val, dict):
             for v in val.values():
-                for x in _recurse(v):
-                    yield x
+                yield from _recurse(v)
         if isinstance(val, list):
             for v in val:
-                for x in _recurse(v):
-                    yield x
+                yield from _recurse(v)
 
-    for x in _recurse(help_info):
-        yield x
+    yield from _recurse(help_info)
 
 
 def rewrite_value_strs(help_info: dict[str, Any], slug_to_title: dict[str, str]) -> dict[str, Any]:
