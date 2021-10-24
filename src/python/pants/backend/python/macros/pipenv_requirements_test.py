@@ -6,9 +6,9 @@ from textwrap import dedent
 from typing import Iterable
 
 import pytest
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.engine.addresses import Address
 from pants.engine.target import AllTargets
@@ -59,7 +59,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
         expected_targets=[
             PythonRequirementTarget(
                 {
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
                     "modules": ["colors"],
                 },
@@ -68,7 +68,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "requirements": [
-                        Requirement.parse("cachetools==4.1.1;python_version ~= '3.5'")
+                        PipRequirement.parse("cachetools==4.1.1;python_version ~= '3.5'")
                     ],
                     "dependencies": [":Pipfile.lock"],
                 },
@@ -99,7 +99,7 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
         expected_targets=[
             PythonRequirementTarget(
                 {
-                    "requirements": [Requirement.parse("ansicolors[neon]>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors[neon]>=1.18.0")],
                     "dependencies": [":Pipfile.lock"],
                 },
                 Address("", target_name="ansicolors"),
@@ -107,7 +107,9 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "requirements": [
-                        Requirement.parse("cachetools[ring,mongo]==4.1.1;python_version ~= '3.5'")
+                        PipRequirement.parse(
+                            "cachetools[ring,mongo]==4.1.1;python_version ~= '3.5'"
+                        )
                     ],
                     "dependencies": [":Pipfile.lock"],
                 },
@@ -143,7 +145,7 @@ def test_supply_python_requirements_file(source_arg: str, rule_runner: RuleRunne
         expected_targets=[
             PythonRequirementTarget(
                 {
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                     "dependencies": ["//:custom_pipfile_target"],
                 },
                 Address("", target_name="ansicolors"),

@@ -10,11 +10,11 @@ from typing import Iterable
 
 import pytest
 from _pytest.logging import LogCaptureFixture
-from pkg_resources import Requirement
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -342,11 +342,11 @@ def test_requirements_field() -> None:
         "configparser ; python_version<'3'",
         "pip@ git+https://github.com/pypa/pip.git",
     )
-    parsed_value = tuple(Requirement.parse(v) for v in raw_value)
+    parsed_value = tuple(PipRequirement.parse(v) for v in raw_value)
 
     assert PythonRequirementsField(raw_value, Address("demo")).value == parsed_value
 
-    # Macros can pass pre-parsed Requirement objects.
+    # Macros can pass pre-parsed PipRequirement objects.
     assert PythonRequirementsField(parsed_value, Address("demo")).value == parsed_value
 
     # Reject invalid types.
@@ -381,10 +381,10 @@ def test_parse_requirements_file() -> None:
         """
     )
     assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
-        Requirement.parse("ansicolors>=1.18.0"),
-        Requirement.parse("Django==3.2 ; python_version>'3'"),
-        Requirement.parse("Un-Normalized-PROJECT"),
-        Requirement.parse("pip@ git+https://github.com/pypa/pip.git"),
+        PipRequirement.parse("ansicolors>=1.18.0"),
+        PipRequirement.parse("Django==3.2 ; python_version>'3'"),
+        PipRequirement.parse("Un-Normalized-PROJECT"),
+        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git"),
     }
 
 

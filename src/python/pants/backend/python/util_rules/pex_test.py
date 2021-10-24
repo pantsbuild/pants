@@ -18,6 +18,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -60,7 +61,7 @@ class ExactRequirement:
 
     @classmethod
     def parse(cls, requirement: str) -> ExactRequirement:
-        req = Requirement.parse(requirement)
+        req = PipRequirement.parse(requirement)
         assert len(req.specs) == 1, (
             f"Expected an exact requirement with only 1 specifier, given {requirement} with "
             f"{len(req.specs)} specifiers"
@@ -421,8 +422,8 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
     def assert_direct_requirements(pex_info):
-        assert {Requirement.parse(r) for r in pex_info["requirements"]} == {
-            Requirement.parse(d) for d in direct_deps
+        assert {PipRequirement.parse(r) for r in pex_info["requirements"]} == {
+            PipRequirement.parse(d) for d in direct_deps
         }
 
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
@@ -557,6 +558,8 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     )
     assert dists[3].project_name == "requests"
     assert dists[3].version == Version("2.23.0")
+    # requires_dists is parsed from metadata written by the pex tool, and is always
+    #   a set of valid pkg_resources.Requirements.
     assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
     assert dists[4].project_name == "urllib3"
 
@@ -827,7 +830,7 @@ def test_validate_metadata(
             InterpreterConstraints([expected_constraints]), expected_digest
         )
     elif version == 2:
-        expected_requirements = {Requirement.parse(i) for i in expected_requirements_}
+        expected_requirements = {PipRequirement.parse(i) for i in expected_requirements_}
         metadata = LockfileMetadataV2(
             InterpreterConstraints([expected_constraints]), expected_requirements
         )

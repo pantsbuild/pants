@@ -9,7 +9,6 @@ from typing import Any, Iterable
 
 import pytest
 from packaging.version import Version
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirements,
@@ -23,6 +22,7 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_single_dependency,
     parse_str_version,
 )
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -303,8 +303,8 @@ def test_multi_version_const(empty_pyproject_toml: PyProjectToml) -> None:
     lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
     retval = tuple(parse_single_dependency("foo", lst_attr, empty_pyproject_toml))
     actual_reqs = (
-        Requirement.parse("foo ==1.2.3; python_version == '3.6'"),
-        Requirement.parse("foo ==1.2.4; python_version == '3.7'"),
+        PipRequirement.parse("foo ==1.2.3; python_version == '3.6'"),
+        PipRequirement.parse("foo ==1.2.4; python_version == '3.7'"),
     )
     assert retval == actual_reqs
 
@@ -321,7 +321,7 @@ def test_extended_form() -> None:
     pyproject_toml_black = create_pyproject_toml(toml_contents=toml_black_str)
     retval = parse_pyproject_toml(pyproject_toml_black)
     actual_req = {
-        Requirement.parse(
+        PipRequirement.parse(
             "black==19.10b0; "
             'platform_python_implementation == "CPython" and python_version == "3.6"'
         )
@@ -364,18 +364,18 @@ def test_parse_multi_reqs() -> None:
     pyproject_toml = create_pyproject_toml(toml_contents=toml_str)
     retval = parse_pyproject_toml(pyproject_toml)
     actual_reqs = {
-        Requirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
-        Requirement.parse("myrequirement==1.2.3"),
-        Requirement.parse("myrequirement2==1.2.3"),
-        Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
-        Requirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
-        Requirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
-        Requirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
-        Requirement.parse(
+        PipRequirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
+        PipRequirement.parse("myrequirement==1.2.3"),
+        PipRequirement.parse("myrequirement2==1.2.3"),
+        PipRequirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
+        PipRequirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
+        PipRequirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
+        PipRequirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
+        PipRequirement.parse(
             "black==19.10b0; "
             'platform_python_implementation == "CPython" and python_version == "3.6"'
         ),
-        Requirement.parse("isort<5.6,>=5.5.1"),
+        PipRequirement.parse("isort<5.6,>=5.5.1"),
     }
     assert retval == actual_reqs
 
@@ -438,7 +438,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                     "modules": ["colors"],
                 },
                 address=Address("", target_name="ansicolors"),
@@ -446,14 +446,14 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Django==3.2 ; python_version == '3'")],
+                    "requirements": [PipRequirement.parse("Django==3.2 ; python_version == '3'")],
                 },
                 address=Address("", target_name="Django"),
             ),
             PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Django-types==2")],
+                    "requirements": [PipRequirement.parse("Django-types==2")],
                     "type_stub_modules": ["django"],
                 },
                 address=Address("", target_name="Django-types"),
@@ -461,7 +461,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Un_Normalized_PROJECT == 1.0.0")],
+                    "requirements": [PipRequirement.parse("Un_Normalized_PROJECT == 1.0.0")],
                 },
                 address=Address("", target_name="Un-Normalized-PROJECT"),
             ),
@@ -490,7 +490,7 @@ def test_source_override(source_arg: str, rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":subdir_pyproject.toml"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                 },
                 address=Address("", target_name="ansicolors"),
             ),
