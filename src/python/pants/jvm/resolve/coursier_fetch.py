@@ -47,6 +47,9 @@ class Coordinate:
     artifact: str
     version: str
     packaging: str = "jar"
+    # True to enforce that the exact declared version of a coordinate is fetched, rather than
+    # allowing dependency resolution to adjust the version when conflicts occur.
+    strict: bool = True
 
     @staticmethod
     def from_json_dict(data: dict) -> Coordinate:
@@ -75,8 +78,10 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
-    def to_coord_str(self) -> str:
-        return f"{self.group}:{self.artifact}:{self.version}"
+    def to_coord_str(self, versioned: bool = True) -> str:
+        if versioned:
+            return f"{self.group}:{self.artifact}:{self.version}"
+        return f"{self.group}:{self.artifact}"
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
@@ -239,7 +244,17 @@ async def coursier_resolve_lockfile(
         ProcessResult,
         Process(
             argv=coursier.args(
-                [coursier_report_file_name, *(req.to_coord_str() for req in artifact_requirements)],
+                [
+                    coursier_report_file_name,
+                    *(req.to_coord_str() for req in artifact_requirements),
+                    # Request strict resolution of all requirements, so that deps declared directly
+                    # as artifacts in
+                    *(
+                        f"--strict-include={req.to_coord_str(versioned=False)}"
+                        for req in artifact_requirements
+                        if req.strict
+                    ),
+                ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
             input_digest=coursier.digest,
