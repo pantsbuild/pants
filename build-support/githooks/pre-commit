@@ -17,14 +17,14 @@ fi
 MERGE_BASE="$(git_merge_base)"
 
 if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-  ./build-support/bin/check_rust_pre_commit.sh || exit 1
+  ./build-support/bin/check_rust_pre_commit.sh
 fi
 
 echo "* Checking MyPy"
-./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' check || exit 1
+./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive check
 
-echo "* Checking linters and formatters"
-./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint ||
+echo "* Checking linters, formatters, and headers"
+./pants --changed-since="${MERGE_BASE}" lint validate ||
   die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
 if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
@@ -33,10 +33,7 @@ if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github
 fi
 
 echo "* Checking __init__.py files"
-./build-support/bin/check_inits.py || exit 1
-
-echo "* Checking headers"
-./pants validate '**' || exit 1
+./pants run build-support/bin/check_inits.py
 
 echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.py || exit 1
+./pants run build-support/bin/check_banned_imports.py
