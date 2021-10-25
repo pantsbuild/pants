@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Tuple
@@ -24,10 +25,64 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_v2_chroot_path
+
+logger = logging.getLogger(__name__)
+
+
+class _TestSubystem(GoalSubsystem):
+    name = "test-go"
+    help = "foo"
+
+
+class _TestGoal(Goal):
+    subsystem_cls = _TestSubystem
+
+
+@goal_rule
+async def experiment() -> _TestGoal:
+    # TODO: Clean this up.
+    input_digest = await Get(Digest, PathGlobs(["go.mod", "go.sum"]))
+    download_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=("mod", "download", "-json", "all"),
+            input_digest=input_digest,
+            description="Download all third-party Go modules",
+            output_files=("go.mod", "go.sum"),
+            output_directories=("gopath",),
+            allow_downloads=True,
+        ),
+    )
+    subdigest = await Get(
+        Digest,
+        DigestSubset(
+            download_result.output_digest,
+            PathGlobs(
+                [
+                    "go.mod",
+                    "go.sum",
+                    "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0/**",
+                    "pkg/mod/cache/download/github.com/hashicorp/consul/api/@v/v1.3.0.mod",
+                ]
+            ),
+        ),
+    )
+    json_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            input_digest=subdigest,
+            command=("list", "-mod=readonly", "-json", "github.com/hashicorp/consul/api/..."),
+            description=("Determine metadata for Go third-party module "),
+        ),
+    )
+    logger.info(json_result.stdout.decode())
+    return _TestGoal(0)
+
 
 # -----------------------------------------------------------------------------------------------
 # Download modules
