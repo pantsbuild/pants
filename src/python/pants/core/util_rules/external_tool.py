@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import textwrap
 from abc import ABCMeta, abstractmethod
@@ -14,7 +15,7 @@ from pkg_resources import Requirement
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
-from pants.engine.fs import Digest, DownloadFile, FileDigest
+from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
@@ -336,9 +337,25 @@ class TemplatedExternalTool(ExternalTool):
 
 @rule(level=LogLevel.DEBUG)
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    digest = await Get(Digest, DownloadFile, request.download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, digest)
-    return DownloadedExternalTool(extracted_archive.digest, request.exe)
+    # Download and extract.
+    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
+    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+
+    # Confirm executable.
+    exe_path = request.exe.lstrip("./")
+    digest = extracted_archive.digest
+    is_not_executable = False
+    digest_entries = []
+    for entry in await Get(DigestEntries, Digest, digest):
+        if isinstance(entry, FileEntry) and entry.path == exe_path and not entry.is_executable:
+            # We should recreate the digest with the executable bit set.
+            is_not_executable = True
+            entry = dataclasses.replace(entry, is_executable=True)
+        digest_entries.append(entry)
+    if is_not_executable:
+        digest = await Get(Digest, CreateDigest(digest_entries))
+
+    return DownloadedExternalTool(digest, request.exe)
 
 
 def rules():

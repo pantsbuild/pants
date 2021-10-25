@@ -6,10 +6,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from enum import Enum
+from textwrap import dedent
 
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
-    BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
@@ -18,6 +18,8 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.python import binaries as python_binaries
+from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
 
 
@@ -50,6 +52,26 @@ class UnzipBinary(BinaryPath):
         return (self.path, archive_path, "-d", extract_path)
 
 
+@dataclass(frozen=True)
+class Gunzip:
+    python: PythonBinary
+
+    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
+        archive_name = os.path.basename(archive_path)
+        dest_file_name = os.path.splitext(archive_name)[0]
+        dest_path = os.path.join(extract_path, dest_file_name)
+        script = dedent(
+            f"""
+            import gzip
+            import shutil
+            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
+                with open({dest_path!r}, "wb") as dest:
+                    shutil.copyfileobj(source, dest)
+            """
+        )
+        return (self.python.path, "-c", script)
+
+
 class TarBinary(BinaryPath):
     def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
@@ -74,9 +96,7 @@ async def find_zip() -> ZipBinary:
         binary_name="zip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(request, rationale="create `.zip` archives")
+    first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
     return ZipBinary(first_path.path, first_path.fingerprint)
 
 
@@ -86,12 +106,15 @@ async def find_unzip() -> UnzipBinary:
         binary_name="unzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(
-            request, rationale="download the tools Pants needs to run"
-        )
+    first_path = paths.first_path_or_raise(
+        request, rationale="download the tools Pants needs to run"
+    )
     return UnzipBinary(first_path.path, first_path.fingerprint)
+
+
+@rule
+def prepare_gunzip(python: PythonBinary) -> Gunzip:
+    return Gunzip(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -100,11 +123,9 @@ async def find_tar() -> TarBinary:
         binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(
-            request, rationale="download the tools Pants needs to run"
-        )
+    first_path = paths.first_path_or_raise(
+        request, rationale="download the tools Pants needs to run"
+    )
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
@@ -114,6 +135,10 @@ class _ZipBinaryRequest:
 
 
 class _UnzipBinaryRequest:
+    pass
+
+
+class _GunzipRequest:
     pass
 
 
@@ -129,6 +154,11 @@ async def find_zip_wrapper(_: _ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBi
 @rule
 async def find_unzip_wrapper(_: _UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
     return unzip_binary
+
+
+@rule
+async def find_gunzip_wrapper(_: _GunzipRequest, gunzip: Gunzip) -> Gunzip:
+    return gunzip
 
 
 @rule
@@ -213,7 +243,8 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     is_tar = archive_path.endswith(
         (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
     )
-    if not is_zip and not is_tar:
+    is_gz = not is_tar and archive_path.endswith(".gz")
+    if not is_zip and not is_tar and not is_gz:
         return ExtractedArchive(digest)
 
     merge_digest_get = Get(Digest, MergeDigests((digest, output_dir_digest)))
@@ -224,7 +255,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
         )
         argv = unzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
         env = {}
-    else:
+    elif is_tar:
         input_digest, tar_binary = await MultiGet(
             merge_digest_get,
             Get(TarBinary, _TarBinaryRequest()),
@@ -232,6 +263,13 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
         argv = tar_binary.extract_archive_argv(archive_path, extract_archive_dir)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+    else:
+        input_digest, gunzip = await MultiGet(
+            merge_digest_get,
+            Get(Gunzip, _GunzipRequest()),
+        )
+        argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
+        env = {}
 
     result = await Get(
         ProcessResult,
@@ -249,4 +287,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *python_binaries.rules(),
+    ]
