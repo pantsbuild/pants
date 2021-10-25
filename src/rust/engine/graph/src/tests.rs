@@ -11,13 +11,18 @@ use async_trait::async_trait;
 use futures::future;
 use parking_lot::Mutex;
 use rand::{self, Rng};
+use task_executor::Executor;
 use tokio::time::{error::Elapsed, sleep, timeout};
 
 use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, Stats};
 
+fn empty_graph() -> Arc<Graph<TNode>> {
+  Arc::new(Graph::new(Executor::new()))
+}
+
 #[tokio::test]
 async fn create() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
@@ -27,7 +32,7 @@ async fn create() {
 
 #[tokio::test]
 async fn invalidate_and_clean() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -62,7 +67,7 @@ async fn invalidate_and_clean() {
 
 #[tokio::test]
 async fn invalidate_and_rerun() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -96,7 +101,7 @@ async fn invalidate_and_rerun() {
 
 #[tokio::test]
 async fn invalidate_with_changed_dependencies() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -136,7 +141,7 @@ async fn invalidate_with_changed_dependencies() {
 #[ignore] // flaky: https://github.com/pantsbuild/pants/issues/10839
 #[tokio::test]
 async fn invalidate_randomly() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let invalidations = 10;
   let sleep_per_invalidation = Duration::from_millis(100);
@@ -202,7 +207,7 @@ async fn invalidate_randomly() {
 
 #[tokio::test]
 async fn poll_cacheable() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Poll with an empty graph should succeed.
@@ -240,7 +245,7 @@ async fn poll_cacheable() {
 #[tokio::test]
 async fn poll_uncacheable() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   // Create a context where the middle node is uncacheable.
   let context = {
     let mut uncacheable = HashSet::new();
@@ -273,7 +278,7 @@ async fn poll_uncacheable() {
 
 #[tokio::test]
 async fn uncacheable_dependents_of_uncacheable_node() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   // Create a context for which the bottommost Node is not cacheable.
   let context = {
@@ -316,7 +321,7 @@ async fn uncacheable_dependents_of_uncacheable_node() {
 #[tokio::test]
 async fn non_restartable_node_only_runs_once() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let mut non_restartable = HashSet::new();
@@ -353,7 +358,7 @@ async fn non_restartable_node_only_runs_once() {
 #[tokio::test]
 async fn uncacheable_deps_is_cleaned_for_the_session() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -388,7 +393,7 @@ async fn uncacheable_deps_is_cleaned_for_the_session() {
 #[tokio::test]
 async fn dirtied_uncacheable_deps_node_re_runs() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -448,7 +453,7 @@ async fn dirtied_uncacheable_deps_node_re_runs() {
 #[tokio::test]
 async fn retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let sleep_root = Duration::from_millis(100);
@@ -481,7 +486,10 @@ async fn retries() {
 async fn canceled_on_invalidation() {
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(10);
-  let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
+  let graph = Arc::new(Graph::new_with_invalidation_delay(
+    Executor::new(),
+    invalidation_delay,
+  ));
 
   let sleep_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
@@ -529,7 +537,7 @@ async fn canceled_on_invalidation() {
 #[tokio::test]
 async fn canceled_on_loss_of_interest() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let sleep_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
@@ -563,7 +571,7 @@ async fn canceled_on_loss_of_interest() {
 #[tokio::test]
 async fn clean_speculatively() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   // Create a graph with a node with two dependencies, one of which takes much longer
   // to run.
@@ -607,7 +615,7 @@ async fn clean_speculatively() {
 #[tokio::test]
 async fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let top = TNode::new(2);
   let context = TContext::new(graph.clone()).with_dependencies(
     // Request creation of a cycle by sending the bottom most node to the top.
@@ -622,9 +630,10 @@ async fn cyclic_failure() {
 
 #[tokio::test]
 async fn cyclic_dirtying() {
+  let _logger = env_logger::try_init();
   // Confirms that a dirtied path between two nodes is able to reverse direction while being
   // cleaned.
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let initial_top = TNode::new(2);
   let initial_bot = TNode::new(0);
 
@@ -702,7 +711,7 @@ async fn critical_path() {
     |entry: &super::entry::Entry<TNode>| Duration::from_secs(node_and_duration_from_entry(entry).1);
 
   // Construct a graph and populate it with the nodes and edges prettily defined above.
-  let graph = Graph::new();
+  let graph = Graph::new(Executor::new());
   {
     let inner = &mut graph.inner.lock();
     for (node, _) in &nodes {
