@@ -29,8 +29,8 @@ from pants.engine.fs import (
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
-from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmCompatibleResolveNamesField,
     JvmLockfileSources,
@@ -448,16 +448,17 @@ async def load_coursier_lockfile_from_source(
 
 
 @dataclass(frozen=True)
-class CoursierLockfileForTargetRequest:
-    targets: Targets
+class CoursierResolve:
+    name: str
+    path: str
+    digest: Digest
 
 
 @rule
-async def get_coursier_lockfile_for_target(
-    request: CoursierLockfileForTargetRequest,
-    jvm: JvmSubsystem,
-) -> CoursierResolvedLockfile:
-    """Determine the lockfile that applies to a given JVM target.
+async def select_coursier_resolve_for_targets(
+    targets: Targets, jvm: JvmSubsystem
+) -> CoursierResolve:
+    """Determine the lockfile that applies for given JVM targets and resolve configuration.
 
     This walks the target's transitive dependencies to find the set of resolve names that are
     compatible with the entirety of this build (defined as the intersection of all
@@ -466,7 +467,7 @@ async def get_coursier_lockfile_for_target(
     """
 
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(target.address for target in request.targets)
+        TransitiveTargets, TransitiveTargetsRequest(target.address for target in targets)
     )
 
     transitive_jvm_resolve_names = [
@@ -519,7 +520,24 @@ async def get_coursier_lockfile_for_target(
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         description_of_origin=f"Path associated with the JVM resolve with name '{resolve_name}'",
     )
-    lockfile_digest_contents = await Get(DigestContents, PathGlobs, lockfile_source)
+    resolve_digest = await Get(Digest, PathGlobs, lockfile_source)
+
+    return CoursierResolve(resolve_name, resolve_path, resolve_digest)
+
+
+@dataclass(frozen=True)
+class CoursierLockfileForTargetRequest:
+    targets: Targets
+
+
+@rule
+async def get_coursier_lockfile_for_target(
+    request: CoursierLockfileForTargetRequest,
+) -> CoursierResolvedLockfile:
+
+    coursier_resolve = await Get(CoursierResolve, Targets, request.targets)
+
+    lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
 
     return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
