@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from textwrap import dedent
 from typing import Mapping, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -14,11 +13,13 @@ from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.environment import Environment
+from pants.engine.process import BinaryPath
+from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.option.subsystem import Subsystem
+from pants.python import binaries as python_binaries
+from pants.python.binaries import PythonBinary, PythonBootstrap
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -53,6 +54,8 @@ class PexRuntimeEnvironment(Subsystem):
             type=list,
             default=["python", "python3", "python2"],
             metavar="<bootstrap-python-names>",
+            removal_version="2.10.0.dev0",
+            removal_hint="Moved to `[python-bootstrap] names`.",
             help=(
                 "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
                 "does not impact which Python interpreter is used to run your code, only what is "
@@ -101,6 +104,16 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
     def message(self) -> str:
         return f"Selected {self.path} to run PEXes with."
 
+    @classmethod
+    def from_python_binary(cls, python_binary: PythonBinary) -> PythonExecutable:
+        """Converts from PythonBinary to PythonExecutable.
+
+        The PythonBinary type is a singleton representing the Python that is used for script
+        execution by `@rule`s. On the other hand, there may be multiple PythonExecutables, since
+        they are subject to a user's interpreter constraints.
+        """
+        return cls(path=python_binary.path, fingerprint=python_binary.fingerprint)
+
 
 @dataclass(frozen=True)
 class PexEnvironment(EngineAwareReturnType):
@@ -148,85 +161,25 @@ class PexEnvironment(EngineAwareReturnType):
         )
 
 
-@rule(desc="Find Python interpreter to bootstrap PEX", level=LogLevel.DEBUG)
+@rule(desc="Prepare environment for running PEXes", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_setup: PythonSetup,
+    python_bootstrap: PythonBootstrap,
+    python_binary: PythonBinary,
     pex_runtime_env: PexRuntimeEnvironment,
     subprocess_env_vars: SubprocessEnvironmentVars,
     global_options: GlobalOptions,
 ) -> PexEnvironment:
-    pex_relevant_environment = await Get(
-        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT", "ASDF_DIR", "ASDF_DATA_DIR"])
-    )
-    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+. The bootstrap
-    # code will then re-exec itself if the underlying PEX user code needs a more specific python
-    # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
-    # maximum flexibility.
-    all_python_binary_paths = await MultiGet(
-        Get(
-            BinaryPaths,
-            BinaryPathRequest(
-                search_path=python_setup.interpreter_search_paths(pex_relevant_environment),
-                binary_name=binary_name,
-                test=BinaryPathTest(
-                    args=[
-                        "-c",
-                        # N.B.: The following code snippet must be compatible with Python 2.7 and
-                        # Python 3.5+.
-                        #
-                        # We hash the underlying Python interpreter executable to ensure we detect
-                        # changes in the real interpreter that might otherwise be masked by Pyenv
-                        # shim scripts found on the search path. Naively, just printing out the full
-                        # version_info would be enough, but that does not account for supported abi
-                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
-                        # interpreter.)
-                        #
-                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                        # (writes) since it's a common OS buffer size and an even multiple of the
-                        # hash block size.
-                        dedent(
-                            """\
-                            import sys
-
-                            major, minor = sys.version_info[:2]
-                            if (major, minor) != (2, 7) and not (major == 3 and minor >= 5):
-                                sys.exit(1)
-
-                            import hashlib
-                            hasher = hashlib.sha256()
-                            with open(sys.executable, "rb") as fp:
-                                for chunk in iter(lambda: fp.read(8192), b""):
-                                    hasher.update(chunk)
-                            sys.stdout.write(hasher.hexdigest())
-                            """
-                        ),
-                    ],
-                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
-                ),
-            ),
-        )
-        for binary_name in pex_runtime_env.bootstrap_interpreter_names
-    )
-
-    def first_python_binary() -> PythonExecutable | None:
-        for binary_paths in all_python_binary_paths:
-            if binary_paths.first_path:
-                return PythonExecutable(
-                    path=binary_paths.first_path.path,
-                    fingerprint=binary_paths.first_path.fingerprint,
-                )
-        return None
-
     return PexEnvironment(
-        path=pex_runtime_env.path(pex_relevant_environment),
+        path=pex_runtime_env.path(python_bootstrap.environment),
         interpreter_search_paths=tuple(
-            python_setup.interpreter_search_paths(pex_relevant_environment)
+            python_setup.interpreter_search_paths(python_bootstrap.environment)
         ),
         subprocess_environment_dict=subprocess_env_vars.vars,
         # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
         #  the normalization only once, via the options system?
         named_caches_dir=Path(global_options.options.named_caches_dir).resolve(),
-        bootstrap_python=first_python_binary(),
+        bootstrap_python=PythonExecutable.from_python_binary(python_binary),
     )
 
 
@@ -281,4 +234,9 @@ class CompletePexEnvironment:
 
 
 def rules():
-    return [*collect_rules(), *process.rules(), *subprocess_environment.rules()]
+    return [
+        *collect_rules(),
+        *process.rules(),
+        *subprocess_environment.rules(),
+        *python_binaries.rules(),
+    ]

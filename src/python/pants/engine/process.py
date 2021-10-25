@@ -458,7 +458,7 @@ class BinaryNotFoundError(EnvironmentError):
             "download the tools Pants needs" or "run Python programs".
         :param alternative_solution: A description of what else users can do to fix the issue,
             beyond installing the program. For example, "Alternatively, you can set the option
-            `--python-interpreter-search-path` to change the paths searched."
+            `--python-bootstrap-search-path` to change the paths searched."
         """
         msg = (
             f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "

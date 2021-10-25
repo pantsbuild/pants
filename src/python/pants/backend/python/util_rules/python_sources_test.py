@@ -74,7 +74,8 @@ def get_stripped_sources(
     extra_args: list[str] | None = None,
 ) -> StrippedPythonSourceFiles:
     rule_runner.set_options(
-        [f"--source-root-patterns={source_roots or ['src/python']}", *(extra_args or [])]
+        [f"--source-root-patterns={source_roots or ['src/python']}", *(extra_args or [])],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner.request(
         StrippedPythonSourceFiles,
@@ -99,7 +100,8 @@ def get_unstripped_sources(
         [
             f"--source-root-patterns={source_roots or ['src/python']}",
             *(extra_args or []),
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner.request(
         PythonSourceFiles,
