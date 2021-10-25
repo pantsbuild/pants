@@ -94,6 +94,7 @@ async def compute_first_party_package_info(
             command=("list", "-json", f"./{subpath}"),
             description=f"Determine metadata for {request.address}",
             working_dir=request.address.spec_path,
+            allow_downloads=True,
         ),
     )
     if result.exit_code != 0:

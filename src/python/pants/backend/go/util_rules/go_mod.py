@@ -105,6 +105,8 @@ async def determine_go_mod_info(
             input_digest=sources_digest,
             working_dir=go_mod_dir,
             description=f"List modules in {go_mod_path}",
+            # TODO: Fix this!
+            allow_downloads=True,
         ),
     )
 

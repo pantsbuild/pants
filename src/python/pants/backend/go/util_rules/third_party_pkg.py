@@ -277,6 +277,8 @@ async def compute_third_party_module_metadata(
                 "Determine metadata for Go third-party module "
                 f"{request.module_path}@{request.version}"
             ),
+            # TODO: Fix this!
+            allow_downloads=True,
         ),
     )
 
