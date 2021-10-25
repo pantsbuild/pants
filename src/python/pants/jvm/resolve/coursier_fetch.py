@@ -247,8 +247,6 @@ async def coursier_resolve_lockfile(
                 [
                     coursier_report_file_name,
                     *(req.to_coord_str() for req in artifact_requirements),
-                    # Request strict resolution of all requirements, so that deps declared directly
-                    # as artifacts in
                     *(
                         f"--strict-include={req.to_coord_str(versioned=False)}"
                         for req in artifact_requirements
