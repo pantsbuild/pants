@@ -79,7 +79,7 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 't',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -128,7 +128,7 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -145,7 +145,7 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -178,7 +178,7 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -195,7 +195,7 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -290,7 +290,7 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -316,7 +316,7 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
                 """\
                 java_sources(
                     name = 't',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -361,7 +361,7 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 't',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -445,7 +445,7 @@ def test_package_private_dep(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 't',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -497,11 +497,11 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 junit_tests(
                     name = 'tests',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),

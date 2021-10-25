@@ -164,7 +164,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -211,7 +211,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -252,7 +252,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -341,7 +341,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'b/B.java',
                     ]
@@ -360,7 +360,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'a/A.java',
                     ]
@@ -406,7 +406,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'a:a',
                     ]
@@ -427,7 +427,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'b/B.java',
                     ]
@@ -446,7 +446,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'a:a',
                     ]
@@ -490,7 +490,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'lib:lib',
                     ]
@@ -513,7 +513,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -558,7 +558,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'lib:lib',
                     ]
@@ -573,7 +573,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -602,7 +602,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -642,7 +642,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -691,7 +691,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         ':joda-time_joda-time',
                     ]
@@ -733,7 +733,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),

@@ -113,7 +113,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -163,7 +163,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         'lib:lib',
                     ]
@@ -178,7 +178,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 'lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -210,7 +210,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -262,7 +262,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 scala_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -303,7 +303,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 scala_sources(
                     name = 'main',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),

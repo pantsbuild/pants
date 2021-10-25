@@ -140,7 +140,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
                     dependencies= [
                         ':junit_junit',
                     ],
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
                 """
             ),
@@ -183,7 +183,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 junit_tests(
                     name='example-test',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies= [
                         ':junit_junit',
                     ],
@@ -239,12 +239,12 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name='example-lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         ':junit_junit',
                         '//:example-lib',
@@ -396,7 +396,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.junit.jupiter_junit-jupiter-api',
                     ],
@@ -445,7 +445,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 junit_tests(
                     name='example-test',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies= [
                         ':org.junit.jupiter_junit-jupiter-api',
                     ],
@@ -502,12 +502,12 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name='example-lib',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                 )
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test", ],
+                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.junit.jupiter_junit-jupiter-api',
                         '//:example-lib',

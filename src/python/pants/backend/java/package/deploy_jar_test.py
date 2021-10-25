@@ -253,7 +253,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
-                        compatible_resolves=["test", ],
+                        compatible_resolves=["test"],
                     )
                 """
             ),
@@ -285,7 +285,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     java_sources(
                         name="example",
                         sources=["**/*.java", ],
-                        compatible_resolves=["test", ],
+                        compatible_resolves=["test"],
                     )
                 """
             ),
@@ -317,7 +317,7 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
-                        compatible_resolves=["test", ],
+                        compatible_resolves=["test"],
                         sources=["**/*.java", ],
                         dependencies=[
                             ":com.fasterxml.jackson.core_jackson-databind",

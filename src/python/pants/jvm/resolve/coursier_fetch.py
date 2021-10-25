@@ -29,7 +29,7 @@ from pants.engine.fs import (
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
-from pants.jvm.jvm_subsystem import JvmSubsystem
+from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.target_types import (
     JvmCompatibleResolveNamesField,
@@ -456,7 +456,6 @@ class CoursierLockfileForTargetRequest:
 async def get_coursier_lockfile_for_target(
     request: CoursierLockfileForTargetRequest,
     jvm: JvmSubsystem,
-    # TODO: inject JVM subsystem for [resolves] option
 ) -> CoursierResolvedLockfile:
     """Determine the lockfile that applies to a given JVM target.
 

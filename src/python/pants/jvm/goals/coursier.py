@@ -30,13 +30,13 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.jvm.jvm_subsystem import JvmSubsystem
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
     CoursierError,
     CoursierResolvedLockfile,
 )
+from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
