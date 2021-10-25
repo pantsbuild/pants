@@ -36,8 +36,9 @@ class PythonBootstrapSubsystem(Subsystem):
     help = (
         "Options used to locate Python interpreters used by all Pants backends."
         "\n\n"
-        "This subsystem controls how Pants locates Python, but it otherwise does not control which "
-        "Python interpreters are used for your code: see the `python` subsystem for that."
+        "This subsystem controls where and how Pants will locate Python, but beyond that it does "
+        "not control which Python interpreter versions are actually used for your code: see the "
+        "`python` subsystem for that."
     )
 
     @classmethod
@@ -51,9 +52,9 @@ class PythonBootstrapSubsystem(Subsystem):
             metavar="<binary-paths>",
             help=(
                 "A list of paths to search for Python interpreters.\n\n"
-                "Which intrepeters are actually used from these paths is context specific: "
+                "Which interpeters are actually used from these paths is context-specific: "
                 "the Python backend selects interpreters using options on the `python` subsystem, "
-                "in particular, the `[python] interpreter_constraints` option.\n\n"
+                "in particular, the `[python].interpreter_constraints` option.\n\n"
                 "You can specify absolute paths to interpreter binaries "
                 "and/or to directories containing interpreter binaries. The order of entries does "
                 "not matter.\n\n"
