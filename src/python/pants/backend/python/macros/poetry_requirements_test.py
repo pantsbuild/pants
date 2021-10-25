@@ -191,6 +191,14 @@ def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     )
 
 
+def test_handle_git_ssh(empty_pyproject_toml: PyProjectToml) -> None:
+    attr = PyprojectAttr({"git": "git@github.com:requests/requests.git"})
+    assert (
+        handle_dict_attr("requests", attr, empty_pyproject_toml)
+        == "requests @ git+ssh://git@github.com/requests/requests.git"
+    )
+
+
 def test_handle_path_arg(tmp_path: Path) -> None:
     build_root = tmp_path / "build_root"
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Iterable, Iterator, Mapping, Sequence, cast
@@ -239,6 +240,10 @@ def handle_dict_attr(
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
+        # If no URL scheme (e.g., `{git = "git@github.com:foo/bar.git"}`) we assume ssh,
+        # i.e., we convert to git+ssh://git@github.com/foo/bar.git.
+        if not urllib.parse.urlsplit(git_lookup).scheme:
+            git_lookup = f"ssh://{git_lookup.replace(':', '/', 1)}"
         rev_lookup = produce_match("#", attributes.get("rev"))
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
