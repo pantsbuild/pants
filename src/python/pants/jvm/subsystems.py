@@ -22,3 +22,13 @@ class JvmSubsystem(Subsystem):
             type=dict,
             help=("A dictionary, mapping resolve names to the path of their lockfile. "),
         )
+
+        register(
+            "--default-resolve",
+            type=str,
+            help=(
+                "The name of the resolve to use by default, if a specific one is not specified "
+                "using `--coursier-resolve-name`. This name must be one of the keys specified in "
+                "`--jvm-resolves`."
+            ),
+        )

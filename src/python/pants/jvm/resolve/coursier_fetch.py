@@ -466,6 +466,8 @@ async def select_coursier_resolve_for_targets(
     determine which resolve to use for this scenario.
     """
 
+    default_resolve_name: str = jvm.options.default_resolve
+
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest(target.address for target in targets)
     )
@@ -476,12 +478,17 @@ async def select_coursier_resolve_for_targets(
         if target.has_field(JvmCompatibleResolveNamesField)
     ]
 
-    if any(i is None for i in transitive_jvm_resolve_names):
+    any_unspecified_resolves = any(i is None for i in transitive_jvm_resolve_names)
+
+    if not default_resolve_name and any_unspecified_resolves:
         raise CoursierError(
-            # TODO: tidy up error messages -- specify the targets that do not have resolves.
-            "All JVM source targets must specify their `compatible_resolves` in order to "
-            "materialize the classpath."
+            "Either the `--jvm-default-resolve` must be set, or all JVM source targets must "
+            "specify their `compatible_resolves` in order to materialize the classpath."
         )
+
+    # If any resolves are unspecified, the only acceptable resolve will be the default one
+    if any_unspecified_resolves:
+        transitive_jvm_resolve_names = [(default_resolve_name,)]
 
     transitive_jvm_resolve_names_ = (set(i) for i in transitive_jvm_resolve_names if i is not None)
     compatible_resolves = reduce(operator.iand, transitive_jvm_resolve_names_)
@@ -499,9 +506,9 @@ async def select_coursier_resolve_for_targets(
             "No values were set for `--jvm-resolves`, so we can't fulfil any dependencies for the "
             "build. You can fix this by specifying `--jvm-resolves`."
         )
-
     available_resolve_names = set(available_resolves.keys())
     usable_resolve_names = compatible_resolves & available_resolve_names
+
     if not usable_resolve_names:
         raise CoursierError(
             "None of the resolves specified in the `--jvm-resolves` option are compatible with "
@@ -510,9 +517,18 @@ async def select_coursier_resolve_for_targets(
             f"{compatible_resolves}."
         )
 
-    # If there's more than one usable resolve, we'll need to select that one consistently.
-    # This is defined as the first workable resolve alphabetically.
-    resolve_name = min(usable_resolve_names)
+    # Resolve to use is:
+    # - The resolve name that is specifically requested (e.g. by the `deploy_jar` target)
+    # - The default resolve name
+
+    # TODO: resolve specified by target name
+    resolve_name: str
+    if default_resolve_name in usable_resolve_names:
+        resolve_name = default_resolve_name
+    else:
+        # Pick a consistent default resolve name
+        resolve_name = min(usable_resolve_names)
+
     resolve_path = available_resolves[resolve_name]
 
     lockfile_source = PathGlobs(
@@ -528,6 +544,7 @@ async def select_coursier_resolve_for_targets(
 @dataclass(frozen=True)
 class CoursierLockfileForTargetRequest:
     targets: Targets
+    resolve_name: str | None = None
 
 
 @rule
