@@ -40,12 +40,12 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             render_classpath,
             QueryRule(RenderedClasspath, (Digest,)),
@@ -72,6 +72,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
     )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
 
 
 JAVA_LIB_SOURCE = dedent(
@@ -234,14 +236,14 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="lib")
         )
     )
-    rule_runner.set_options(["--javac-jdk=zulu:1.8"])
+    rule_runner.set_options(["--javac-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
-    rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
+    rule_runner.set_options(["--javac-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(CompiledClassfiles, [request])

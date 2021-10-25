@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shlex
 import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable
@@ -40,6 +41,10 @@ class JdkSetup:
         )
 
     @property
+    def env(self) -> dict[str, str]:
+        return self.coursier.env
+
+    @property
     def append_only_caches(self) -> dict[str, str]:
         return self.coursier.append_only_caches
 
@@ -63,10 +68,10 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
     if javac.options.jdk == "system":
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = f"--jvm={javac.options.jdk}"
-    java_home_command = " ".join(
-        coursier.args(["java-home", coursier_jdk_option, "--jvm-dir", f"{coursier.cache_dir}/jdk"])
-    )
+        coursier_jdk_option = shlex.quote(f"--jvm={javac.options.jdk}")
+    # NB: We `set +e` in the subshell to ensure that it exits as well.
+    #  see https://unix.stackexchange.com/a/23099
+    java_home_command = " ".join(("set +e;", *coursier.args(["java-home", coursier_jdk_option])))
 
     java_version_result = await Get(
         FallibleProcessResult,
@@ -78,6 +83,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
             ),
             input_digest=coursier.digest,
             append_only_caches=coursier.append_only_caches,
+            env=coursier.env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
             level=LogLevel.DEBUG,

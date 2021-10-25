@@ -210,6 +210,7 @@ async def compile_scala_source(
             description=f"Compile {request.component.members} with scalac",
             level=LogLevel.DEBUG,
             append_only_caches=jdk_setup.append_only_caches,
+            env=jdk_setup.env,
         ),
     )
     output: CompiledClassfiles | None = None

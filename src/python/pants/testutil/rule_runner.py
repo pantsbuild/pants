@@ -130,6 +130,12 @@ _O = TypeVar("_O")
 _EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
 
 
+# Environment variable names required for locating Python interpreters, for use with RuleRunner's
+# env_inherit arguments.
+# TODO: This is verbose and redundant: see https://github.com/pantsbuild/pants/issues/13350.
+PYTHON_BOOTSTRAP_ENV = {"PATH", "PYENV_ROOT", "HOME"}
+
+
 @dataclass(frozen=True)
 class GoalRuleResult:
     exit_code: int

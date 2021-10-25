@@ -315,6 +315,8 @@ impl NailgunProcess {
       .args(&startup_options.argv[1..])
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
+      .env_clear()
+      .envs(&startup_options.env)
       .current_dir(&workdir)
       .spawn()
       .map_err(|e| {
