@@ -8,7 +8,7 @@ from pants.backend.terraform.style import StyleSetup, StyleSetupRequest
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import external_tool
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -102,6 +102,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *tool_rules(),
-        UnionRule(LintRequest, TffmtRequest),
         UnionRule(TerraformFmtRequest, TffmtRequest),
     ]
