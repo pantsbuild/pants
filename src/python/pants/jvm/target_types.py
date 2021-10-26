@@ -9,6 +9,7 @@ from pants.engine.target import (
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
+    StringSequenceField,
     Target,
 )
 
@@ -62,6 +63,26 @@ class JvmArtifact(Target):
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
         "that is, its `group`, `artifact`, and `version` components."
+    )
+
+
+class JvmCompatibleResolveNamesField(StringSequenceField):
+    alias = "compatible_resolves"
+    required = False
+    help = (
+        "The set of resolve names that this target is compatible with. Any targets which depend on "
+        "one another must have at least one compatible resolve in common. Which resolves are actually "
+        "used in a build is calculated based on a target's dependees."
+    )
+
+
+class JvmResolveName(StringField):
+    alias = "resolve"
+    required = False
+    help = (
+        "The name of the resolve to use when building this target. The name must be defined as "
+        "one of the resolves in `--jvm-resolves`. If not supplied, the default resolve will be "
+        "used, otherwise, one resolve that is compatible with all dependency targets will be used."
     )
 
 

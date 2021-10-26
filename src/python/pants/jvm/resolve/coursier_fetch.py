@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import json
 import logging
+import operator
 import os
 from dataclasses import dataclass
+from functools import reduce
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -27,7 +30,12 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.target_types import JvmLockfileSources, JvmRequirementsField
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import (
+    JvmCompatibleResolveNamesField,
+    JvmLockfileSources,
+    JvmRequirementsField,
+)
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -440,6 +448,119 @@ async def load_coursier_lockfile_from_source(
 
 
 @dataclass(frozen=True)
+class CoursierResolve:
+    name: str
+    path: str
+    digest: Digest
+
+
+@rule
+async def select_coursier_resolve_for_targets(
+    targets: Targets,
+    jvm: JvmSubsystem,
+    coursier: Coursier,
+) -> CoursierResolve:
+    """Determine the lockfile that applies for given JVM targets and resolve configuration.
+
+    This walks the target's transitive dependencies to find the set of resolve names that are
+    compatible with the entirety of this build (defined as the intersection of all
+    `compatible_resolves` fields). This is then compared with the JVM subsystem's `resolves` flag to
+    determine which resolve to use for this scenario.
+    """
+
+    default_resolve_name: str | None = jvm.options.default_resolve
+
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest(target.address for target in targets)
+    )
+
+    transitive_jvm_resolve_names = [
+        target[JvmCompatibleResolveNamesField].value
+        for target in transitive_targets.closure
+        if target.has_field(JvmCompatibleResolveNamesField)
+    ]
+
+    any_unspecified_resolves = any(i is None for i in transitive_jvm_resolve_names)
+
+    if not default_resolve_name and any_unspecified_resolves:
+        raise CoursierError(
+            "Either the `--jvm-default-resolve` must be set, or all JVM source targets must "
+            "specify their `compatible_resolves` in order to materialize the classpath."
+        )
+
+    transitive_jvm_resolve_names_ = (
+        # If any resolves are unspecified, the only acceptable resolve will be the default one,
+        # but individual targets must also support the default resolve if they specify _any_
+        # compatible resolves.
+        set(resolves)
+        if resolves is not None
+        else {default_resolve_name}
+        if default_resolve_name is not None
+        else set()
+        for resolves in transitive_jvm_resolve_names
+    )
+    compatible_resolves = reduce(operator.iand, transitive_jvm_resolve_names_)
+
+    if not compatible_resolves:
+        raise CoursierError(
+            "There are no resolve names that are compatible with all of the targets in this build. "
+            "At least one resolve must be compatible with every target -- including dependencies "
+            "and transitive dependencies in order to complete the build."
+        )
+
+    available_resolves = jvm.options.resolves
+    if not available_resolves:
+        raise CoursierError(
+            "No values were set for `--jvm-resolves`, so we can't fulfil any dependencies for the "
+            "build. You can fix this by specifying `--jvm-resolves`."
+        )
+    available_resolve_names = set(available_resolves.keys())
+    usable_resolve_names = compatible_resolves & available_resolve_names
+
+    if not usable_resolve_names:
+        raise CoursierError(
+            "None of the resolves specified in the `--jvm-resolves` option are compatible with "
+            "all of the targets (including dependencies) in this build. You supplied the following "
+            f"resolve names: {available_resolve_names}, but the compatible resolve names are: "
+            f"{compatible_resolves}."
+        )
+
+    # Resolve to use is:
+    # - The resolve name that is specifically requested (by `--jvm-use-resolve`; eventually by
+    #     the `deploy_jar` target, but not yet)
+    # - The default resolve name
+
+    # See if any target has a specified resolve:
+
+    specified_resolve: str | None = jvm.options.use_resolve
+    if specified_resolve is not None and specified_resolve not in available_resolve_names:
+        raise CoursierError(
+            f"You specified the resolve name `{specified_resolve}`, however, that resolve does not "
+            f"exist. The available resolve names are `{available_resolve_names}`."
+        )
+
+    resolve_name: str
+    if specified_resolve:
+        resolve_name = specified_resolve
+    if default_resolve_name is not None and default_resolve_name in usable_resolve_names:
+        resolve_name = default_resolve_name
+    else:
+        # Pick a consistent default resolve name
+        resolve_name = min(usable_resolve_names)
+
+    resolve_path = available_resolves[resolve_name]
+
+    lockfile_source = PathGlobs(
+        [resolve_path],
+        glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin=f"Path associated with the JVM resolve with name '{resolve_name}'",
+    )
+    resolve_digest = await Get(Digest, PathGlobs, lockfile_source)
+
+    return CoursierResolve(resolve_name, resolve_path, resolve_digest)
+
+
+@dataclass(frozen=True)
 class CoursierLockfileForTargetRequest:
     targets: Targets
 
@@ -448,54 +569,13 @@ class CoursierLockfileForTargetRequest:
 async def get_coursier_lockfile_for_target(
     request: CoursierLockfileForTargetRequest,
 ) -> CoursierResolvedLockfile:
-    """Determine the lockfile that applies to a given JVM target.
 
-    Presently this just walks the target's transitive dependencies to find a dependency
-    that provides `JvmLockfileSources`.
+    coursier_resolve = await Get(CoursierResolve, Targets, request.targets)
 
-    This rule asserts that at most 1 such dependency may be in the JVM target's transitive
-    dependencies.
-    """
+    lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
+    lockfile_contents = lockfile_digest_contents[0].content
 
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(target.address for target in request.targets)
-    )
-    transitive_jvm_lockfile_sources = [
-        target[JvmLockfileSources]
-        for target in transitive_targets.closure
-        if target.has_field(JvmLockfileSources)
-    ]
-    if len(transitive_jvm_lockfile_sources) == 0:
-        raise CoursierError(
-            "Exactly 1 target with a coursier_lockfile should appear in the transitive closure"
-            " of a JVM target, but none were found."
-        )
-
-    if len(transitive_jvm_lockfile_sources) > 1:
-        raise CoursierError(
-            f"Exactly 1 target with a coursier_lockfile should appear in the transitive closure"
-            f" of a JVM library, but {len(transitive_jvm_lockfile_sources)} were found."
-        )
-    jvm_lockfile_sources = transitive_jvm_lockfile_sources[0]
-    lockfile_sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [jvm_lockfile_sources],
-            for_sources_types=[JvmLockfileSources],
-            enable_codegen=False,
-        ),
-    )
-    if len(lockfile_sources.files) != 1:
-        raise CoursierError(
-            f"JvmLockfileSources must have exactly 1 source file, but {jvm_lockfile_sources}"
-            f" has {len(lockfile_sources.files)}"
-        )
-
-    source_lockfile_digest_contents = await Get(
-        DigestContents, Digest, lockfile_sources.snapshot.digest
-    )
-    source_lockfile_content = source_lockfile_digest_contents[0]
-    return CoursierResolvedLockfile.from_json_dict(json.loads(source_lockfile_content.content))
+    return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
 
 
 @dataclass(frozen=True)

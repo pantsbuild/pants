@@ -136,6 +136,10 @@ config = "@build-support/regexes/config.yaml"
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
+[jvm.resolves]
+exampleapp = "testprojects/src/java/org/pantsbuild/example/app/coursier_resolve.lockfile"
+pants_java_parser = "src/python/pants/backend/java/dependency_inference/coursier_resolve.lockfile"
+
 [toolchain-setup]
 repo = "pants"
 
