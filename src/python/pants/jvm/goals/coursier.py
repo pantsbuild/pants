@@ -163,7 +163,7 @@ class CoursierGenerateLockfileRequest:
     have changed, or to regenerate it to check if the resolve has changed (e.g. due to newer
     versions of dependencies being published).
 
-    resolves: The name of the resolve config to compare
+    resolve: The name of the resolve config to compare
     """
 
     resolve: str
