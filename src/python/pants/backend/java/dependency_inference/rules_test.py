@@ -555,7 +555,7 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time': 'joda-time:joda-time'}"],
+        ["--java-infer-third-party-import-mapping={'org.joda.time.*': 'joda-time:joda-time'}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
@@ -564,7 +564,15 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             "org": FrozenDict(
                 {
                     "joda": FrozenDict(
-                        {"time": UnversionedCoordinate(group="joda-time", artifact="joda-time")}
+                        {
+                            "time": FrozenDict(
+                                {
+                                    "*": UnversionedCoordinate(
+                                        group="joda-time", artifact="joda-time"
+                                    )
+                                }
+                            )
+                        }
                     )
                 }
             )
@@ -575,7 +583,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time': 'joda-time:joda-time'}"],
+        ["--java-infer-third-party-import-mapping={'org.joda.time.*': 'joda-time:joda-time'}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(

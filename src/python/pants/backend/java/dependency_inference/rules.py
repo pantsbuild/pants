@@ -252,10 +252,6 @@ async def compute_java_third_party_artifact_mapping(
         )
         insert(mapping, imp_name, value)
 
-    import pprint
-
-    print(f"IMPORT_MAPPING={pprint.pformat(mapping)}")
-
     return ThirdPartyJavaPackageToArtifactMapping(freeze(mapping))
 
 
@@ -264,30 +260,40 @@ def find_artifact_mapping(
 ) -> UnversionedCoordinate | None:
     imp_parts = imp.split(".")
     current_node: Any = mapping.mapping
-    candidate: Any = None
 
     for imp_part in imp_parts:
-        candidate = None
-        if imp_part in current_node:
-            next_node = current_node[imp_part]
-            if isinstance(next_node, dict):
-                current_node = next_node
-                continue
-            candidate = next_node
-        elif jvm_artifact_mappings.DEFAULT in current_node:
-            candidate = current_node[jvm_artifact_mappings.DEFAULT]
-        break
+        # If the current node is not searchable, then return None since there is no way to
+        # continue the search.
+        if not isinstance(current_node, FrozenDict):
+            return None
 
-    if not candidate or candidate is jvm_artifact_mappings.SKIP:
+        # If the package component is missing from the dictionary, then the search has failed.
+        if imp_part not in current_node:
+            if "*" in current_node:
+                # Unless there is a "*" key which matches any symbol.
+                # TODO: Consider how we want to do partial package matches.
+                imp_part = "*"
+            else:
+                return None
+
+        # Otherwise, use the node that has been found as the next node of the search.
+        current_node = current_node[imp_part]
+
+    # The search fails if the SKIP direction was found.
+    if current_node is jvm_artifact_mappings.SKIP:
         return None
 
-    if not isinstance(candidate, UnversionedCoordinate):
+    # Extract any default entry if the candidate is a dictionary with a DEFAULT key.
+    if isinstance(current_node, FrozenDict) and jvm_artifact_mappings.DEFAULT in current_node:
+        current_node = current_node[jvm_artifact_mappings.DEFAULT]
+
+    if isinstance(current_node, UnversionedCoordinate):
+        return current_node
+    else:
         raise ValueError(
             f"Illegal state: The state computed from --java-infer-third-party-import-mapping contained an "
-            f"unexpected value: {candidate}"
+            f"unexpected value: {current_node}"
         )
-
-    return candidate
 
 
 @rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
