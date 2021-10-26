@@ -38,6 +38,7 @@ HAMCREST_COORD = Coordinate(
 
 ARGS = [
     """--jvm-resolves={"test": "coursier_resolve.lockfile"}""",
+    """--jvm-default-resolve=test""",
     """--coursier-resolve-names=["test"]""",
 ]
 
@@ -63,7 +64,7 @@ def rule_runner() -> RuleRunner:
             JavaSourcesGeneratorTarget,
         ],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -75,7 +76,6 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
                 """\
                 java_sources(
                     name = 'here_to_provide_dependencies',
-                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.hamcrest_hamcrest-core',
                     ],
@@ -136,7 +136,6 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
                 """\
                 java_sources(
                     name = 'here_to_provide_dependencies',
-                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.hamcrest_hamcrest-core',
                     ],
@@ -170,7 +169,6 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'here_to_provide_dependencies',
-                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.hamcrest_hamcrest-core',
                     ],
@@ -222,7 +220,6 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
                 """\
                 java_sources(
                     name = 'here_to_provide_dependencies',
-                    compatible_resolves=["test"],
                     dependencies = [
                         ':org.hamcrest_hamcrest-core',
                     ],

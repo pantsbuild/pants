@@ -122,15 +122,29 @@ class JvmTargetsByResolveName:
 @rule
 async def get_jvm_targets_by_resolve_name(
     all_targets: AllTargets,
+    jvm: JvmSubsystem,
 ) -> JvmTargetsByResolveName:
     # Get all targets that depend on JVM resolves
 
     targets = [tgt for tgt in all_targets if tgt.has_field(JvmCompatibleResolveNamesField)]
 
+    default_resolve: str | None = jvm.options.default_resolve
+
     # TODO: simplify this with Py3.9 walrus operator
     flat_targets_ = ((tgt, tgt[JvmCompatibleResolveNamesField].value) for tgt in targets)
+    flat_targets__ = (
+        (
+            tgt,
+            names
+            if names is not None
+            else (default_resolve,)
+            if default_resolve is not None
+            else None,
+        )
+        for (tgt, names) in flat_targets_
+    )
     flat_targets = [
-        (name, tgt) for (tgt, names) in flat_targets_ if names is not None for name in names
+        (name, tgt) for (tgt, names) in flat_targets__ if names is not None for name in names
     ]
 
     targets_by_resolve_name = {
