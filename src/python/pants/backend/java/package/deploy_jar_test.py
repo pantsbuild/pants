@@ -250,7 +250,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     )
 
                     java_sources(
-                        name="example",   
+                        name="example",
                     )
                 """
             ),
