@@ -92,6 +92,7 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
         }
     )
     result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
+    print(result)
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
