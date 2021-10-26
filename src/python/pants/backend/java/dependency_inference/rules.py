@@ -65,6 +65,17 @@ class JavaInferSubsystem(Subsystem):
             type=bool,
             help="Infer a target's third-party dependencies using Java import statements.",
         )
+        register(
+            "--third-party-import-mapping",
+            type=dict,
+            default=JVM_ARTIFACT_MAPPINGS,
+            help=(
+                "Dictionary mapping a Java package prefix to either (1) a JVM artifact coordinate (GROUP:ARTIFACT) "
+                "without the version; or (2) the value `SKIP` which causes that prefix to not be used for "
+                "inference. (This dictionary is a flattened trie. Internally, Pants will convert the dictionary "
+                "into the trie data structure actually used for dependency inference.)"
+            ),
+        )
 
     @property
     def imports(self) -> bool:
@@ -77,6 +88,10 @@ class JavaInferSubsystem(Subsystem):
     @property
     def third_party_imports(self) -> bool:
         return cast(bool, self.options.third_party_imports)
+
+    @property
+    def third_party_import_mapping(self) -> dict:
+        return cast(dict, self.options.third_party_import_mapping)
 
 
 class InferJavaSourceDependencies(InferDependenciesRequest):
@@ -138,6 +153,13 @@ class UnversionedCoordinate:
     group: str
     artifact: str
 
+    @classmethod
+    def from_coord_str(cls, coord: str) -> UnversionedCoordinate:
+        coordinate_parts = coord.split(":")
+        if len(coordinate_parts) != 2:
+            raise ValueError(f"Invalid coordinate specifier: {coord}")
+        return UnversionedCoordinate(group=coordinate_parts[0], artifact=coordinate_parts[1])
+
 
 @dataclass(frozen=True)
 class AvailableThirdPartyArtifacts:
@@ -145,6 +167,12 @@ class AvailableThirdPartyArtifacts:
     target specifying that coordinate."""
 
     artifacts: FrozenDict[UnversionedCoordinate, FrozenOrderedSet[Address]]
+
+
+@dataclass(frozen=True)
+class ThirdPartyJavaPackageToArtifactMapping:
+    # TODO: Find a way to specify the nested trie dictionary structure in mypy.
+    mapping: FrozenDict[Any, Any]
 
 
 class InferJavaThirdPartyImportDependencies(InferDependenciesRequest):
@@ -182,9 +210,60 @@ async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts
     )
 
 
-def find_artifact_mapping(imp: str) -> UnversionedCoordinate | None:
+@rule
+async def compute_java_third_party_artifact_mapping(
+    java_infer_subsystem: JavaInferSubsystem,
+) -> ThirdPartyJavaPackageToArtifactMapping:
+    def insert(mapping: dict, imp: str, value: Any) -> None:
+        imp_parts = imp.split(".")
+        current_node = mapping
+        for imp_part in imp_parts[0:-1]:
+            if imp_part not in current_node:
+                current_node[imp_part] = {}
+            elif isinstance(current_node[imp_part], str):
+                # Existing node is a string. Convert it to a dict with default key set.
+                existing_value = current_node[imp_part]
+                current_node[imp_part] = {
+                    jvm_artifact_mappings.DEFAULT: existing_value,
+                }
+            current_node = current_node[imp_part]
+
+        final_imp_part = imp_parts[-1]
+        if final_imp_part in current_node:
+            raise ValueError(
+                f"There is a conflicting entry in the third-party Java package mapping for `{imp}`. "
+                f"The existing entry is `{current_node[final_imp_part]}`. "
+                f"The conflicting entry is `{value}`."
+            )
+        current_node[final_imp_part] = value
+
+    def freeze(d: dict) -> FrozenDict[Any, Any]:
+        result = {}
+        for k, v in d.items():
+            result[k] = freeze(v) if isinstance(v, dict) else v
+        return FrozenDict(result)
+
+    mapping: dict[Any, Any] = {}
+    for imp_name, imp_action in java_infer_subsystem.third_party_import_mapping.items():
+        value = (
+            UnversionedCoordinate.from_coord_str(imp_action)
+            if imp_action != "SKIP"
+            else jvm_artifact_mappings.SKIP
+        )
+        insert(mapping, imp_name, value)
+
+    import pprint
+
+    print(f"IMPORT_MAPPING={pprint.pformat(mapping)}")
+
+    return ThirdPartyJavaPackageToArtifactMapping(freeze(mapping))
+
+
+def find_artifact_mapping(
+    imp: str, mapping: ThirdPartyJavaPackageToArtifactMapping
+) -> UnversionedCoordinate | None:
     imp_parts = imp.split(".")
-    current_node: Any = JVM_ARTIFACT_MAPPINGS
+    current_node: Any = mapping.mapping
     candidate: Any = None
 
     for imp_part in imp_parts:
@@ -202,13 +281,13 @@ def find_artifact_mapping(imp: str) -> UnversionedCoordinate | None:
     if not candidate or candidate is jvm_artifact_mappings.SKIP:
         return None
 
-    coordinate_parts = candidate.split(":")
-    if len(coordinate_parts) != 2:
+    if not isinstance(candidate, UnversionedCoordinate):
         raise ValueError(
-            f"JVM_ARTIFACT_MAPPINGS table has invalid coordinate specifier: {candidate}"
+            f"Illegal state: The state computed from --java-infer-third-party-import-mapping contained an "
+            f"unexpected value: {candidate}"
         )
 
-    return UnversionedCoordinate(group=coordinate_parts[0], artifact=coordinate_parts[1])
+    return candidate
 
 
 @rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
@@ -216,6 +295,7 @@ async def infer_java_dependencies_via_third_party_imports(
     request: InferJavaThirdPartyImportDependencies,
     java_infer_subsystem: JavaInferSubsystem,
     available_artifacts: AvailableThirdPartyArtifacts,
+    artifact_package_mapping: ThirdPartyJavaPackageToArtifactMapping,
 ) -> InferredDependencies:
     if not java_infer_subsystem.third_party_imports:
         return InferredDependencies([])
@@ -230,7 +310,7 @@ async def infer_java_dependencies_via_third_party_imports(
     dependencies: OrderedSet[Address] = OrderedSet()
 
     for imp in analysis.imports:
-        artifact_mapping_opt = find_artifact_mapping(imp.name)
+        artifact_mapping_opt = find_artifact_mapping(imp.name, artifact_package_mapping)
         if not artifact_mapping_opt:
             continue
 

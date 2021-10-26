@@ -6,10 +6,5 @@ DEFAULT = object()
 SKIP = object()
 
 JVM_ARTIFACT_MAPPINGS = {
-    "org": {
-        "joda": {
-            "time": "joda-time:joda-time",
-        },
-        "junit": "junit:junit",
-    },
+    "org.junit": "junit:junit",
 }

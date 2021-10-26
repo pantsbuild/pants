@@ -10,7 +10,11 @@ from pants.backend.java.dependency_inference.java_parser import rules as java_pa
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
-from pants.backend.java.dependency_inference.rules import InferJavaSourceDependencies
+from pants.backend.java.dependency_inference.rules import (
+    InferJavaSourceDependencies,
+    ThirdPartyJavaPackageToArtifactMapping,
+    UnversionedCoordinate,
+)
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
     JavaSourceField,
@@ -36,6 +40,7 @@ from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
@@ -63,6 +68,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
+            QueryRule(ThirdPartyJavaPackageToArtifactMapping, []),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifact],
     )
@@ -547,7 +553,31 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--java-infer-third-party-import-mapping={'org.joda.time': 'joda-time:joda-time'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+    assert mapping.mapping == FrozenDict(
+        {
+            "org": FrozenDict(
+                {
+                    "joda": FrozenDict(
+                        {"time": UnversionedCoordinate(group="joda-time", artifact="joda-time")}
+                    )
+                }
+            )
+        }
+    )
+
+
+@maybe_skip_jdk_test
 def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--java-infer-third-party-import-mapping={'org.joda.time': 'joda-time:joda-time'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     rule_runner.write_files(
         {
             "BUILD": dedent(
