@@ -38,6 +38,7 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 # TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
+DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 
 
 @pytest.fixture
@@ -71,6 +72,7 @@ def rule_runner() -> RuleRunner:
         args=[
             "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
             NAMED_RESOLVE_OPTIONS,
+            DEFAULT_RESOLVE_OPTION,
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -140,7 +142,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
                     dependencies= [
                         ':junit_junit',
                     ],
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -183,7 +185,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 junit_tests(
                     name='example-test',
-                    compatible_resolves=["test"],
+
                     dependencies= [
                         ':junit_junit',
                     ],
@@ -239,12 +241,12 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name='example-lib',
-                    compatible_resolves=["test"],
+
                 )
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         ':junit_junit',
                         '//:example-lib',
@@ -396,7 +398,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         ':org.junit.jupiter_junit-jupiter-api',
                     ],
@@ -445,7 +447,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
                 )
                 junit_tests(
                     name='example-test',
-                    compatible_resolves=["test"],
+
                     dependencies= [
                         ':org.junit.jupiter_junit-jupiter-api',
                     ],
@@ -502,12 +504,12 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name='example-lib',
-                    compatible_resolves=["test"],
+
                 )
 
                 junit_tests(
                     name = 'example-test',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         ':org.junit.jupiter_junit-jupiter-api',
                         '//:example-lib',

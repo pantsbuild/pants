@@ -43,6 +43,7 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
+DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 
 
 @pytest.fixture
@@ -75,9 +76,12 @@ def rule_runner() -> RuleRunner:
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
         bootstrap_args=[
             NAMED_RESOLVE_OPTIONS,
+            DEFAULT_RESOLVE_OPTION,
         ],
     )
-    rule_runner.set_options(args=[NAMED_RESOLVE_OPTIONS], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     return rule_runner
 
 
@@ -164,7 +168,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -211,7 +215,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -228,7 +232,8 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         )
     )
     rule_runner.set_options(
-        ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS], env_inherit=PYTHON_BOOTSTRAP_ENV
+        ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
@@ -237,7 +242,8 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     }
 
     rule_runner.set_options(
-        ["--javac-jdk=bogusjdk:999", NAMED_RESOLVE_OPTIONS], env_inherit=PYTHON_BOOTSTRAP_ENV
+        ["--javac-jdk=bogusjdk:999", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
@@ -252,7 +258,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -341,7 +347,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'b/B.java',
                     ]
@@ -360,7 +366,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'a/A.java',
                     ]
@@ -406,7 +412,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'a:a',
                     ]
@@ -427,7 +433,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'b/B.java',
                     ]
@@ -446,7 +452,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'a:a',
                     ]
@@ -490,7 +496,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'lib:lib',
                     ]
@@ -513,7 +519,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -558,7 +564,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         'lib:lib',
                     ]
@@ -573,7 +579,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -602,7 +608,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -642,7 +648,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),
@@ -691,7 +697,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                     dependencies = [
                         ':joda-time_joda-time',
                     ]
@@ -733,7 +739,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'main',
-                    compatible_resolves=["test"],
+
                 )
                 """
             ),

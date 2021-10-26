@@ -77,9 +77,7 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        args=[
-            '--jvm-resolves={"test": "coursier_resolve.lockfile"}',
-        ],
+        args=['--jvm-resolves={"test": "coursier_resolve.lockfile"}', "--jvm-default-resolve=test"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
@@ -252,8 +250,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     )
 
                     java_sources(
-                        name="example",
-                        compatible_resolves=["test"],
+                        name="example",   
                     )
                 """
             ),
@@ -285,7 +282,6 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     java_sources(
                         name="example",
                         sources=["**/*.java", ],
-                        compatible_resolves=["test"],
                     )
                 """
             ),
@@ -317,7 +313,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
-                        compatible_resolves=["test"],
                         sources=["**/*.java", ],
                         dependencies=[
                             ":com.fasterxml.jackson.core_jackson-databind",
