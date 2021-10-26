@@ -78,6 +78,16 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     )
 
 
+class JvmResolveName(StringField):
+    alias = "resolve"
+    required = False
+    help = (
+        "The name of the resolve to use when building this target. The name must be defined as "
+        "one of the resolves in `--jvm-resolves`. If not supplied, the default resolve will be "
+        "used, otherwise, one resolve that is compatible with all dependency targets will be used."
+    )
+
+
 class JvmRequirementsField(SpecialCasedDependencies):
     alias = "requirements"
     required = True

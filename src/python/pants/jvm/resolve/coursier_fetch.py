@@ -456,7 +456,9 @@ class CoursierResolve:
 
 @rule
 async def select_coursier_resolve_for_targets(
-    targets: Targets, jvm: JvmSubsystem
+    targets: Targets,
+    jvm: JvmSubsystem,
+    coursier: Coursier,
 ) -> CoursierResolve:
     """Determine the lockfile that applies for given JVM targets and resolve configuration.
 
@@ -466,7 +468,7 @@ async def select_coursier_resolve_for_targets(
     determine which resolve to use for this scenario.
     """
 
-    default_resolve_name: str = jvm.options.default_resolve
+    default_resolve_name: str | None = jvm.options.default_resolve
 
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest(target.address for target in targets)
@@ -486,11 +488,17 @@ async def select_coursier_resolve_for_targets(
             "specify their `compatible_resolves` in order to materialize the classpath."
         )
 
-    # If any resolves are unspecified, the only acceptable resolve will be the default one
-    if any_unspecified_resolves:
-        transitive_jvm_resolve_names = [(default_resolve_name,)]
-
-    transitive_jvm_resolve_names_ = (set(i) for i in transitive_jvm_resolve_names if i is not None)
+    transitive_jvm_resolve_names_ = (
+        # If any resolves are unspecified, the only acceptable resolve will be the default one,
+        # but individual targets must also support the default resolve if they specify _any_
+        # compatible resolves.
+        set(resolves)
+        if resolves is not None
+        else {default_resolve_name}
+        if default_resolve_name is not None
+        else set()
+        for resolves in transitive_jvm_resolve_names
+    )
     compatible_resolves = reduce(operator.iand, transitive_jvm_resolve_names_)
 
     if not compatible_resolves:
@@ -518,12 +526,23 @@ async def select_coursier_resolve_for_targets(
         )
 
     # Resolve to use is:
-    # - The resolve name that is specifically requested (e.g. by the `deploy_jar` target)
+    # - The resolve name that is specifically requested (by `--jvm-use-resolve`; eventually by
+    #     the `deploy_jar` target, but not yet)
     # - The default resolve name
 
-    # TODO: resolve specified by target name
+    # See if any target has a specified resolve:
+
+    specified_resolve: str | None = jvm.options.use_resolve
+    if specified_resolve is not None and specified_resolve not in available_resolve_names:
+        raise CoursierError(
+            f"You specified the resolve name `{specified_resolve}`, however, that resolve does not "
+            f"exist. The available resolve names are `{available_resolve_names}`."
+        )
+
     resolve_name: str
-    if default_resolve_name in usable_resolve_names:
+    if specified_resolve:
+        resolve_name = specified_resolve
+    if default_resolve_name is not None and default_resolve_name in usable_resolve_names:
         resolve_name = default_resolve_name
     else:
         # Pick a consistent default resolve name
@@ -544,7 +563,6 @@ async def select_coursier_resolve_for_targets(
 @dataclass(frozen=True)
 class CoursierLockfileForTargetRequest:
     targets: Targets
-    resolve_name: str | None = None
 
 
 @rule

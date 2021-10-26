@@ -28,7 +28,17 @@ class JvmSubsystem(Subsystem):
             type=str,
             help=(
                 "The name of the resolve to use by default, if a specific one is not specified "
-                "using `--coursier-resolve-name`. This name must be one of the keys specified in "
+                "using `--jvm-use-resolve`. This name must be one of the keys specified in "
                 "`--jvm-resolves`."
+            ),
+        )
+
+        register(
+            "--use-resolve",
+            type=str,
+            help=(
+                "The name of the resolve to use for this build. This name must be one of the keys "
+                "specified in `--jvm-resolves`. If this or `--default-resolve` is not specified, "
+                "one compatible resolve will be used instead."
             ),
         )

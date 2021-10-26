@@ -19,7 +19,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.target_types import JvmCompatibleResolveNamesField
+from pants.jvm.target_types import JvmCompatibleResolveNamesField, JvmResolveName
 
 
 class JavaSourceField(SingleSourceField):
@@ -157,6 +157,7 @@ class DeployJar(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassName,
+        JvmResolveName,
     )
     help = (
         "A `jar` file that contains the compiled source code along with its dependency class "
