@@ -28,6 +28,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.rule_runner import logging
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -68,6 +69,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@logging
 @maybe_skip_jdk_test
 def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
