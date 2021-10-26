@@ -114,7 +114,6 @@ extra_requirements.add = [
 ]
 lockfile = "3rdparty/python/lockfiles/pytest.txt"
 timeout_default = 60
-execution_slot_var = "EXECUTION_SLOT"
 
 [test]
 extra_env_vars = [
