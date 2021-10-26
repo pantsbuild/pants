@@ -370,7 +370,7 @@ async def coursier_fetch_one_coord(
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
             env=coursier.env,
-            description="Run coursier resolve",
+            description=f"Resolving with coursier: {request.coord.to_coord_str()}",
             level=LogLevel.DEBUG,
         ),
     )
