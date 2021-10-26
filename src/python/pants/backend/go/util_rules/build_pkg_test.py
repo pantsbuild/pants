@@ -293,7 +293,7 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=import_path),
         expected_import_path=import_path,
-        expected_subpath="",
+        expected_subpath="github.com/google/uuid@v1.3.0",
         expected_go_file_names=[
             "dce.go",
             "doc.go",
@@ -378,7 +378,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
         expected_import_path=xerrors_internal_import_path,
-        expected_subpath="internal",
+        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543/internal",
         expected_go_file_names=["internal.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
@@ -389,7 +389,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_import_path),
         expected_import_path=xerrors_import_path,
-        expected_subpath="",
+        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543",
         expected_go_file_names=[
             "adaptor.go",
             "doc.go",

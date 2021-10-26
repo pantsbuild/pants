@@ -9,8 +9,7 @@ from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
     GoFirstPartyPackageSubpathField,
     GoImportPathField,
-    GoThirdPartyModulePathField,
-    GoThirdPartyModuleVersionField,
+    GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -32,7 +31,6 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
-from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import path_safe
 
@@ -262,22 +260,17 @@ async def setup_build_go_package_target_request(
             go_file_names += _first_party_pkg_info.test_files
         s_file_names = _first_party_pkg_info.s_files
 
-    elif target.has_field(GoThirdPartyModulePathField):
-        _module_path = target[GoThirdPartyModulePathField].value
-        subpath = fast_relpath(import_path, _module_path)
-
+    elif target.has_field(GoThirdPartyPackageDependenciesField):
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgInfo,
             ThirdPartyPkgInfoRequest(
-                import_path=import_path,
-                module_path=_module_path,
-                version=target[GoThirdPartyModuleVersionField].value,
-                go_mod_stripped_digest=_go_mod_info.stripped_digest,
+                import_path=import_path, go_mod_stripped_digest=_go_mod_info.stripped_digest
             ),
         )
 
+        subpath = _third_party_pkg_info.subpath
         digest = _third_party_pkg_info.digest
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
@@ -297,7 +290,7 @@ async def setup_build_go_package_target_request(
         for tgt in all_deps
         if (
             tgt.has_field(GoFirstPartyPackageSourcesField)
-            or tgt.has_field(GoThirdPartyModulePathField)
+            or tgt.has_field(GoThirdPartyPackageDependenciesField)
         )
     )
     direct_dependencies = []

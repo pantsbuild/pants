@@ -19,8 +19,6 @@ from pants.backend.go.target_types import (
     GoImportPathField,
     GoModPackageSourcesField,
     GoModTarget,
-    GoThirdPartyModulePathField,
-    GoThirdPartyModuleVersionField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
@@ -32,8 +30,8 @@ from pants.backend.go.util_rules.first_party_pkg import (
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
-    ThirdPartyModuleInfo,
-    ThirdPartyModuleInfoRequest,
+    AllThirdPartyPackages,
+    AllThirdPartyPackagesRequest,
     ThirdPartyPkgInfo,
     ThirdPartyPkgInfoRequest,
 )
@@ -153,12 +151,7 @@ async def inject_go_third_party_package_dependencies(
     tgt = wrapped_target.target
     pkg_info = await Get(
         ThirdPartyPkgInfo,
-        ThirdPartyPkgInfoRequest(
-            module_path=tgt[GoThirdPartyModulePathField].value,
-            version=tgt[GoThirdPartyModuleVersionField].value,
-            import_path=tgt[GoImportPathField].value,
-            go_mod_stripped_digest=go_mod_info.stripped_digest,
-        ),
+        ThirdPartyPkgInfoRequest(tgt[GoImportPathField].value, go_mod_info.stripped_digest),
     )
 
     inferred_dependencies = []
@@ -214,16 +207,9 @@ async def generate_targets_from_go_mod(
             request.generator[GoModPackageSourcesField].path_globs(files_not_found_behavior),
         ),
     )
-    all_module_info = await MultiGet(
-        Get(
-            ThirdPartyModuleInfo,
-            ThirdPartyModuleInfoRequest(
-                module_path=module_descriptor.path,
-                version=module_descriptor.version,
-                go_mod_stripped_digest=go_mod_info.stripped_digest,
-            ),
-        )
-        for module_descriptor in go_mod_info.modules
+    all_third_party_packages = await Get(
+        AllThirdPartyPackages,
+        AllThirdPartyPackagesRequest(go_mod_info.stripped_digest),
     )
 
     dir_to_filenames = group_by_dir(go_paths.files)
@@ -251,11 +237,7 @@ async def generate_targets_from_go_mod(
 
     def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {
-                GoThirdPartyModulePathField.alias: pkg_info.module_path,
-                GoThirdPartyModuleVersionField.alias: pkg_info.version,
-                GoImportPathField.alias: pkg_info.import_path,
-            },
+            {GoImportPathField.alias: pkg_info.import_path},
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
             union_membership,
@@ -263,9 +245,7 @@ async def generate_targets_from_go_mod(
         )
 
     third_party_pkgs = (
-        create_third_party_package_tgt(pkg_info)
-        for module_info in all_module_info
-        for pkg_info in module_info.values()
+        create_third_party_package_tgt(pkg_info) for pkg_info in all_third_party_packages.values()
     )
     return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
 

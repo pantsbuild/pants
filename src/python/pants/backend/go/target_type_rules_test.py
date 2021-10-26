@@ -24,8 +24,6 @@ from pants.backend.go.target_types import (
     GoFirstPartyPackageTarget,
     GoImportPathField,
     GoModTarget,
-    GoThirdPartyModulePathField,
-    GoThirdPartyModuleVersionField,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
@@ -79,23 +77,21 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     module go.example.com/foo
                     go 1.17
 
-                    require github.com/google/go-cmp v0.4.0
+                    require github.com/google/uuid v1.3.0
                     """
             ),
             "foo/go.sum": dedent(
                 """\
-                    github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
-                    github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
-                    golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
-                    golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
-                    """
+                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                """
             ),
             "foo/pkg/foo.go": dedent(
                 """\
                     package pkg
-                    import "github.com/google/go-cmp/cmp"
-                    func grok(left, right string) bool {
-                        return cmp.Equal(left, right)
+                    import "github.com/google/uuid"
+                    func Grok() string {
+                        return uuid.Foo()
                     }
                     """
             ),
@@ -126,7 +122,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         [InferGoPackageDependenciesRequest(tgt2[GoFirstPartyPackageSourcesField])],
     )
     assert inferred_deps2.dependencies == FrozenOrderedSet(
-        [Address("foo", generated_name="github.com/google/go-cmp/cmp")]
+        [Address("foo", generated_name="github.com/google/uuid")]
     )
 
     # Compilation failures should not blow up Pants.
@@ -154,6 +150,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                 require (
                     github.com/google/go-cmp v0.4.0
                     github.com/google/uuid v1.2.0
+                    golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
                 )
                 """
             ),
@@ -189,15 +186,9 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             residence_dir=os.path.join("src/go", rel_dir).rstrip("/"),
         )
 
-    def gen_third_party_tgt(
-        mod_path: str, version: str, import_path: str
-    ) -> GoThirdPartyPackageTarget:
+    def gen_third_party_tgt(import_path: str) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {
-                GoImportPathField.alias: import_path,
-                GoThirdPartyModulePathField.alias: mod_path,
-                GoThirdPartyModuleVersionField.alias: version,
-            },
+            {GoImportPathField.alias: import_path},
             Address("src/go", generated_name=import_path),
         )
 
@@ -207,44 +198,21 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             gen_first_party_tgt("", ["hello.go"]),
             gen_first_party_tgt("subdir", ["subdir/f.go", "subdir/f2.go"]),
             gen_first_party_tgt("another_dir/subdir", ["another_dir/subdir/f.go"]),
-            gen_third_party_tgt("github.com/google/uuid", "v1.2.0", "github.com/google/uuid"),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp"
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/cmpopts"
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/diff"
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/flags"
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp",
-                "v0.4.0",
-                "github.com/google/go-cmp/cmp/internal/function",
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp",
-                "v0.4.0",
-                "github.com/google/go-cmp/cmp/internal/testprotos",
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp",
-                "v0.4.0",
-                "github.com/google/go-cmp/cmp/internal/teststructs",
-            ),
-            gen_third_party_tgt(
-                "github.com/google/go-cmp", "v0.4.0", "github.com/google/go-cmp/cmp/internal/value"
-            ),
-            gen_third_party_tgt(
-                "golang.org/x/xerrors", "v0.0.0-20191204190536-9bdfabe68543", "golang.org/x/xerrors"
-            ),
-            gen_third_party_tgt(
-                "golang.org/x/xerrors",
-                "v0.0.0-20191204190536-9bdfabe68543",
-                "golang.org/x/xerrors/internal",
+            *(
+                gen_third_party_tgt(pkg)
+                for pkg in (
+                    "github.com/google/uuid",
+                    "github.com/google/go-cmp/cmp",
+                    "github.com/google/go-cmp/cmp/cmpopts",
+                    "github.com/google/go-cmp/cmp/internal/diff",
+                    "github.com/google/go-cmp/cmp/internal/flags",
+                    "github.com/google/go-cmp/cmp/internal/function",
+                    "github.com/google/go-cmp/cmp/internal/testprotos",
+                    "github.com/google/go-cmp/cmp/internal/teststructs",
+                    "github.com/google/go-cmp/cmp/internal/value",
+                    "golang.org/x/xerrors",
+                    "golang.org/x/xerrors/internal",
+                )
             ),
         },
     )
@@ -261,11 +229,7 @@ def test_package_targets_cannot_be_manually_created() -> None:
         )
     with pytest.raises(InvalidTargetException):
         GoThirdPartyPackageTarget(
-            {
-                GoImportPathField.alias: "foo",
-                GoThirdPartyModulePathField.alias: "foo",
-                GoThirdPartyModuleVersionField.alias: "foo",
-            },
+            {GoImportPathField.alias: "foo"},
             Address("foo"),
         )
 
