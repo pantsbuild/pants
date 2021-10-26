@@ -70,11 +70,9 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
     help = (
-        # TODO: make this far less mathsy.
-        "The set of resolve names that this target is compatible with. The intersection of the "
-        "`compatible_resolves` fields for each target in the transitive closure of dependencies "
-        "must be non-empty. This is required for all goals where 3rd-party dependencies are "
-        "consumed."
+        "The set of resolve names that this target is compatible with. Any targets which depend on "
+        "one another must have at least one compatible resolve in common. Which resolves are actually "
+        "used in a build is calculated based on a target's dependees."
     )
 
 
