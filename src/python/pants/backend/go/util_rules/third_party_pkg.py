@@ -136,10 +136,17 @@ async def download_and_analyze_third_party_packages(
                 raise AssertionError(
                     "`go list` included the import path `...`, but there was no `Error` attached. "
                     "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
-                    f"with this error message: \n\n{pkg_json}"
+                    f"with this error message:\n\n{pkg_json}"
                 )
             # TODO: Improve this error message, such as better instructions if `go.sum` is stale.
             raise Exception(pkg_json["Error"]["Err"])
+
+        if "Error" in pkg_json:
+            raise AssertionError(
+                f"`go list` failed for the import path `{import_path}`. Please open an issue at "
+                f"https://github.com/pantsbuild/pants/issues/new/choose so that we can figure out "
+                f"how to support this:\n\n{pkg_json['Error']['Err']}"
+            )
 
         dir_path = strip_prefix(strip_v2_chroot_path(pkg_json["Dir"]), "gopath/pkg/mod/")
         all_pkg_info_kwargs.append(
