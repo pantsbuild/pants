@@ -258,7 +258,7 @@ class TailorSubsystem(GoalSubsystem):
         register(
             "--build-file-header",
             advanced=True,
-            type=Optional[str],
+            type=str,
             default=None,
             help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
         )
