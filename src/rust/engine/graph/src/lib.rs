@@ -57,7 +57,7 @@ pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Sta
 
 type Fnv = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
+type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
@@ -194,94 +194,6 @@ impl<N: Node> InnerGraph<N> {
         let node = self.pg[candidate].node().clone();
         self.invalidate_from_roots(|n| &node == n);
       }
-    }
-  }
-
-  ///
-  /// Compute the critical path for this graph.
-  ///
-  /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
-  /// shortest path algorithm.
-  ///
-  /// Modify the graph we have to fit into the expectations of the Bellman-Ford shortest graph
-  /// algorithm and use that to calculate the critical path.
-  ///
-  fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
-  where
-    F: Fn(&Entry<N>) -> Duration,
-  {
-    fn duration_into_weight(d: Duration) -> f64 {
-      -(d.as_nanos() as f64)
-    }
-
-    // First, let's map nodes to edges
-    let mut graph = self.pg.filter_map(
-      |_node_idx, node_weight| Some(Some(node_weight)),
-      |edge_idx, _edge_weight| {
-        let target_node = self.pg.raw_edges()[edge_idx.index()].target();
-        self
-          .pg
-          .node_weight(target_node)
-          .map(duration)
-          .map(duration_into_weight)
-      },
-    );
-
-    // Add a single source that's a parent to all roots
-    let srcs = roots
-      .iter()
-      .filter_map(|n| self.entry_id(n))
-      .cloned()
-      .collect::<Vec<_>>();
-    let src = graph.add_node(None);
-    for node in srcs {
-      graph.add_edge(
-        src,
-        node,
-        graph
-          .node_weight(node)
-          .map(|maybe_weight| {
-            maybe_weight
-              .map(duration)
-              .map(duration_into_weight)
-              .unwrap_or(0.)
-          })
-          .unwrap(),
-      );
-    }
-
-    let (weights, paths) =
-      petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
-    if let Some((index, total_duration)) = weights
-      .into_iter()
-      .enumerate()
-      .filter_map(|(i, weight)| {
-        // INFINITY is used for missing entries.
-        if weight == std::f64::INFINITY {
-          None
-        } else {
-          Some((i, Duration::from_nanos(-weight as u64)))
-        }
-      })
-      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(right_duration))
-    {
-      let critical_path = {
-        let mut next = paths[index];
-        let mut path = vec![graph
-          .node_weight(petgraph::graph::NodeIndex::new(index))
-          .unwrap()
-          .unwrap()];
-        while next != Some(src) && next != None {
-          if let Some(entry) = graph.node_weight(next.unwrap()).unwrap() {
-            path.push(*entry);
-          }
-          next = paths[next.unwrap().index()];
-        }
-        path.into_iter().rev().cloned().collect()
-      };
-      (total_duration, critical_path)
-    } else {
-      (Duration::from_nanos(0), vec![])
     }
   }
 
@@ -538,10 +450,7 @@ impl<N: Node> Graph<N> {
           inner.entry_for_id(src_id).unwrap().node(),
           inner.entry_for_id(dst_id).unwrap().node()
         );
-        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
-        // edge as having equal weight.
-        // TODO: Remove.
-        inner.pg.add_edge(src_id, dst_id, 1.0);
+        inner.pg.add_edge(src_id, dst_id, ());
 
         // We should retry the dst Node if the src Node is not restartable. If the src is not
         // restartable, it is only allowed to run once, and so Node invalidation does not pass
@@ -642,17 +551,6 @@ impl<N: Node> Graph<N> {
     // Re-request the Node.
     let (res, generation) = self.get_inner(None, context, node).await?;
     Ok((res, LastObserved(generation)))
-  }
-
-  ///
-  /// Calculate the critical path for the subset of the graph that descends from these roots,
-  /// assuming this mapping between entries and durations.
-  ///
-  pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
-  where
-    F: Fn(&Entry<N>) -> Duration,
-  {
-    self.inner.lock().critical_path(roots, duration)
   }
 
   ///
