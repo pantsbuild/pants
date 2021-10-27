@@ -28,6 +28,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.util.logging import LogLevel
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -46,7 +47,6 @@ ARGS = [
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        preserve_tmpdirs=True,
         rules=[
             *core_rules(),
             *config_files.rules(),
@@ -68,7 +68,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@logging
+@logging(level=LogLevel.DEBUG)
 @maybe_skip_jdk_test
 def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -93,7 +93,6 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
         }
     )
     result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    print(result)
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
     expected_lockfile = CoursierResolvedLockfile(
@@ -116,6 +115,7 @@ def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> N
     )
 
 
+@logging(level=LogLevel.DEBUG)
 @maybe_skip_jdk_test
 def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     expected_lockfile = CoursierResolvedLockfile(
@@ -163,6 +163,7 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
     assert result.stderr == ""
 
 
+@logging(level=LogLevel.DEBUG)
 @maybe_skip_jdk_test
 def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -214,6 +215,7 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
     )
 
 
+@logging(level=LogLevel.DEBUG)
 @maybe_skip_jdk_test
 def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(

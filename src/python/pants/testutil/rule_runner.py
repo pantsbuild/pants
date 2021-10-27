@@ -59,20 +59,42 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-def logging(func):
-    """A decorator that enables logging (optionally at the given level)."""
+def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
+    """A decorator that enables logging (optionally at the given level).
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
-        with temporary_dir() as tempdir, initialize_stdio_raw(
-            LogLevel.INFO, False, False, {}, True, [], tempdir
-        ), stdin_context() as stdin, stdio_destination(
-            stdin.fileno(), stdout_fileno, stderr_fileno
-        ):
-            return func(*args, **kwargs)
+    May be used without a parameter list:
 
-    return wrapper
+        ```
+        @logging
+        def test_function():
+            ...
+        ```
+
+    ...or with a level argument:
+
+        ```
+        @logging(level=LogLevel.DEBUG)
+        def test_function():
+            ...
+        ```
+    """
+
+    def _decorate(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
+            with temporary_dir() as tempdir, initialize_stdio_raw(
+                level, False, False, {}, True, [], tempdir
+            ), stdin_context() as stdin, stdio_destination(
+                stdin.fileno(), stdout_fileno, stderr_fileno
+            ):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    if original_function:
+        return _decorate(original_function)
+    return _decorate
 
 
 @contextmanager
