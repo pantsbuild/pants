@@ -15,6 +15,10 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.third_party_pkg import (
+    AllThirdPartyPackages,
+    AllThirdPartyPackagesRequest,
+)
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, MergeDigests
@@ -80,11 +84,15 @@ async def compute_first_party_package_info(
     import_path = target[GoImportPathField].value
     subpath = target[GoFirstPartyPackageSubpathField].value
 
-    pkg_sources = await Get(
-        HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
+    pkg_sources, all_third_party_packages = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])),
+        Get(AllThirdPartyPackages, AllThirdPartyPackagesRequest(go_mod_info.stripped_digest)),
     )
     input_digest = await Get(
-        Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])
+        Digest,
+        MergeDigests(
+            [pkg_sources.snapshot.digest, go_mod_info.digest, all_third_party_packages.digest]
+        ),
     )
 
     result = await Get(
@@ -93,7 +101,7 @@ async def compute_first_party_package_info(
             input_digest=input_digest,
             command=("list", "-json", f"./{subpath}"),
             description=f"Determine metadata for {request.address}",
-            working_dir=request.address.spec_path,
+            working_dir=request.address.spec_path,  # i.e. the `go.mod`'s directory.
         ),
     )
     if result.exit_code != 0:
