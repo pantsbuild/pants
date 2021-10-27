@@ -387,25 +387,10 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-
-    # Nothing should error when computing `AllThirdPartyPackages`, we only create an exception to
-    # maybe raise later.
-    all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)]
+    pkg_info = rule_runner.request(
+        ThirdPartyPkgInfo, [AllThirdPartyPackagesRequest("golang.org/x/mobile/bind/objc", digest)]
     )
-    assert (
-        all_packages.import_paths_to_pkg_info[
-            "golang.org/x/mobile/bind/objc"
-        ].unsupported_sources_error
-        is not None
-    )
-
-    # Error when requesting the `ThirdPartyPkgInfo`.
-    with engine_error(NotImplementedError):
-        rule_runner.request(
-            ThirdPartyPkgInfo,
-            [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest)],
-        )
+    assert pkg_info.unsupported_sources_error is not None
 
 
 def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunner) -> None:
