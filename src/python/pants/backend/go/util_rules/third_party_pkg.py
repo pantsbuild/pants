@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import ijson
 
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     AddPrefix,
     Digest,
@@ -48,7 +49,7 @@ class ThirdPartyPkgInfo:
 
 
 @dataclass(frozen=True)
-class ThirdPartyPkgInfoRequest:
+class ThirdPartyPkgInfoRequest(EngineAwareParameter):
     """Request the info and digest needed to build a third-party package.
 
     The package's module must be included in the input `go.mod`/`go.sum`.
@@ -108,8 +109,8 @@ async def download_and_analyze_third_party_packages(
         # though we should not error on that package.
         "-e",
         "-json",
-        # This matches all packages, including std-lib. `all` only matches first-party packages
-        # and complains that there are no `.go` files.
+        # This matches all packages. `all` only matches first-party packages and complains that
+        # there are no `.go` files.
         "...",
     )
     list_result = await Get(
@@ -135,7 +136,7 @@ async def download_and_analyze_third_party_packages(
             continue
         import_path = pkg_json["ImportPath"]
         if import_path == "...":
-            if "Error" not in pkg_json or "Err" not in pkg_json["Error"]:
+            if "Error" not in pkg_json:
                 raise AssertionError(
                     "`go list` included the import path `...`, but there was no `Error` attached. "
                     "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
@@ -147,7 +148,10 @@ async def download_and_analyze_third_party_packages(
         if "Error" in pkg_json:
             err = pkg_json["Error"]["Err"]
             if "build constraints exclude all Go files" in err:
-                logger.debug(f"Skipping the Go third-party package `{import_path}` because")
+                logger.debug(
+                    f"Skipping the Go third-party package `{import_path}` because of this "
+                    f"error: {err}"
+                )
                 continue
 
             raise AssertionError(
