@@ -96,6 +96,7 @@ async def setup_go_sdk_process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env={
             GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+            **request.env,
         },
         input_digest=input_digest,
         description=request.description,
