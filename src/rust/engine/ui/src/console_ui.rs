@@ -25,18 +25,17 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::HashMap;
+use std::fmt;
 use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::mpsc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use futures::future::{self, FutureExt, TryFutureExt};
-use indexmap::IndexMap;
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
-use parking_lot::Mutex;
-
+use prodash::progress::Step;
+use prodash::render::line;
+use prodash::{Root, TreeOptions};
 use task_executor::Executor;
-use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, SpanId, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
@@ -67,7 +66,7 @@ impl ConsoleUI {
 
   pub async fn with_console_ui_disabled<T>(&mut self, f: impl Future<Output = T>) -> T {
     if self.instance.is_some() {
-      self.teardown().await.unwrap();
+      self.teardown().await;
       f.await
     } else {
       f.await
@@ -75,87 +74,79 @@ impl ConsoleUI {
   }
 
   ///
-  /// Setup progress bars, and return them along with a running task that will drive them.
+  /// Setup an Instance of the UI renderer.
   ///
   /// NB: This method must be very careful to avoid logging. Between the point where we have taken
   /// exclusive access to the Console and when the UI has actually been initialized, attempts to
   /// log from this method would deadlock (by causing the method to wait for _itself_ to finish).
   ///
-  fn setup_bars(
-    &self,
-    executor: Executor,
-  ) -> Result<(Vec<ProgressBar>, MultiProgressTask), String> {
-    // We take exclusive access to stdio by registering a callback that is used to render stderr
-    // while we're holding access. See the method doc.
-    let stderr_dest_bar: Arc<Mutex<Option<WeakProgressBar>>> = Arc::new(Mutex::new(None));
-    // We acquire the lock before taking exclusive access, and don't release it until after
-    // initialization. That way, the exclusive callback can always assume that the destination
-    // is initialized (i.e., can `unwrap` it).
-    let mut stderr_dest_bar_guard = stderr_dest_bar.lock();
-    let (term_read, _, term_stderr_write) = {
-      let stderr_dest_bar = stderr_dest_bar.clone();
-      stdio::get_destination().exclusive_start(Box::new(move |msg: &str| {
-        // Acquire a handle to the destination bar in the UI. If we fail to upgrade, it's because
-        // the UI has shut down: we fail the callback to have the logging module directly log to
-        // stderr at that point.
-        let dest_bar = {
-          let stderr_dest_bar = stderr_dest_bar.lock();
-          // We can safely unwrap here because the Mutex is held until the bar is initialized.
-          stderr_dest_bar.as_ref().unwrap().upgrade().ok_or(())?
-        };
-        dest_bar.println(msg);
-        Ok(())
-      }))?
-    };
+  fn setup_renderer(&self, executor: Executor) -> Result<Instance, String> {
+    // Stderr is propagated across a channel to remove lock interleavings between stdio and the UI.
+    // TODO: Apply a fix similar to #14093 before landing.
+    let (stderr_sender, stderr_receiver) = mpsc::sync_channel(0);
+    let (_term_read, _term_stdout_write, term_stderr_write) = stdio::get_destination()
+      .exclusive_start(Box::new(move |msg: &str| {
+        // If we fail to send, it's because the UI has shut down: we fail the callback to
+        // have the logging module directly log to stderr at that point.
+        stderr_sender.send(msg.to_owned()).map_err(|_| ())
+      }))?;
 
-    let stderr_use_color = term_stderr_write.use_color;
-    let term = console::Term::read_write_pair_with_style(
-      term_read,
-      term_stderr_write,
-      console::Style::new().force_styling(stderr_use_color),
-    );
+    let colored = term_stderr_write.use_color;
+    let tree = TreeOptions {
+      initial_capacity: 1024,
+      // This is the capacity in terms of lines that will be buffered between frames: writing more
+      // than this amount per frame will drop some on the floor.
+      message_buffer_capacity: 65536,
+    }
+    .create();
     // NB: We render more frequently than we receive new data in order to minimize aliasing where a
     // render might barely miss a data refresh.
-    let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
-    let multi_progress = MultiProgress::with_draw_target(draw_target);
+    let handle = line::render(
+      term_stderr_write,
+      tree.clone(),
+      line::Options {
+        colored,
+        // This is confirmed before creating a UI.
+        output_is_terminal: true,
+        hide_cursor: true,
+        // TODO: Adjust this.
+        frames_per_second: Self::render_rate_hz() as f32,
+        // TODO: We only render items with duration, so is probably currently a noop. But in
+        // the future, we would want to render progress.
+        throughput: true,
+        // TODO: Set this.
+        // terminal_dimensions,
+        ..Default::default()
+      },
+    );
 
-    let bars = (0..self.local_parallelism)
-      .map(|_n| {
-        let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
-        multi_progress.add(ProgressBar::new(50).with_style(style))
-      })
-      .collect::<Vec<_>>();
-    *stderr_dest_bar_guard = Some(bars[0].downgrade());
+    // Spawn a task to propagate stderr, which will exit automatically when the channel closes.
+    // TODO: There is a shutdown race here, where if the UI is torn down before exclusive access is
+    // dropped, we might drop stderr on the floor. That likely causes:
+    //   https://github.com/pantsbuild/pants/issues/13276
+    let _stderr_task = executor.spawn_blocking({
+      let mut tree = tree.clone();
+      move || {
+        while let Ok(stderr) = stderr_receiver.recv() {
+          tree.message_raw(stderr);
+        }
+      }
+    });
 
-    // Spawn a task to drive the multi progress.
-    let multi_progress_task = executor
-      .spawn_blocking(move || multi_progress.join())
-      .boxed();
-
-    Ok((bars, multi_progress_task))
-  }
-
-  fn get_label_from_heavy_hitters(
-    tasks_to_display: &IndexMap<SpanId, (String, Option<Duration>)>,
-    index: usize,
-  ) -> Option<String> {
-    tasks_to_display
-      .get_index(index)
-      .map(|(_, (label, maybe_duration))| {
-        let duration_label = match maybe_duration {
-          None => "(Waiting) ".to_string(),
-          Some(duration) => format_workunit_duration(*duration),
-        };
-        format!("{}{}", duration_label, label)
-      })
+    Ok(Instance {
+      tasks_to_display: HashMap::new(),
+      tree,
+      handle,
+      executor,
+    })
   }
 
   ///
-  /// Updates all of the swimlane ProgressBars with new data from the WorkunitStore. For this
+  /// Updates all of prodash items with new data from the WorkunitStore. For this
   /// method to have any effect, the `initialize` method must have been called first.
   ///
-  /// *Technically this method does not do the "render"ing: rather, the `MultiProgress` instance
-  /// running on a background thread is drives rendering, while this method feeds it new data.
+  /// *Technically this method does not do the "render"ing: rather, the background prodash task
+  /// drives rendering, while this method feeds it new data.
   ///
   pub fn render(&mut self) {
     let instance = if let Some(i) = &mut self.instance {
@@ -164,26 +155,46 @@ impl ConsoleUI {
       return;
     };
 
-    let num_swimlanes = instance.bars.len();
-    let heavy_hitters = self.workunit_store.heavy_hitters(num_swimlanes);
+    let heavy_hitters = self.workunit_store.heavy_hitters(self.local_parallelism);
     let tasks_to_display = &mut instance.tasks_to_display;
 
-    // Insert every one in the set of tasks to display.
-    // For tasks already here, the durations are overwritten.
-    tasks_to_display.extend(heavy_hitters.clone().into_iter());
-
-    // And remove the tasks that no longer should be there.
-    for (task, _) in tasks_to_display.clone().into_iter() {
-      if !heavy_hitters.contains_key(&task) {
-        tasks_to_display.swap_remove(&task);
+    // Finish any items that are no longer relevant.
+    for span_id in tasks_to_display.keys().cloned().collect::<Vec<_>>() {
+      if heavy_hitters.contains_key(&span_id) {
+        continue;
       }
+      // Drop the item to cause it to be removed from the Tree.
+      let _ = tasks_to_display.remove(&span_id).unwrap();
     }
 
-    for (n, pbar) in instance.bars.iter().enumerate() {
-      match Self::get_label_from_heavy_hitters(tasks_to_display, n) {
-        Some(label) => pbar.set_message(label),
-        None => pbar.set_message(""),
+    // Start any new items.
+    let now = SystemTime::now();
+    for (span_id, (description, duration)) in heavy_hitters {
+      if tasks_to_display.contains_key(&span_id) {
+        // We're already rendering this item, and our dynamic `unit` instance will continue to
+        // handle rendering elapsed time for it.
+        continue;
       }
+
+      // Else, it's new.
+      // TODO: This should be based dynamically on the current width of the terminal.
+      let max_len = 100;
+      let description: String = if description.len() < max_len {
+        description
+      } else {
+        description
+          .chars()
+          .take(max_len - 3)
+          .chain(std::iter::repeat('.').take(3))
+          .collect()
+      };
+      let mut item = instance.tree.add_child(description);
+      item.init(
+        None,
+        Some(prodash::unit::dynamic(MillisAsFloatingPointSecs)),
+      );
+      item.set(MillisAsFloatingPointSecs::duration_to_step(&now, duration));
+      tasks_to_display.insert(span_id, item);
     }
   }
 
@@ -198,40 +209,62 @@ impl ConsoleUI {
       return Err("A ConsoleUI cannot render multiple UIs concurrently.".to_string());
     }
 
-    // Setup bars (which will take ownership of the current Console), and then spawn rendering
-    // of the bars into a background task.
-    let (bars, multi_progress_task) = self.setup_bars(executor)?;
+    self.instance = Some(self.setup_renderer(executor)?);
 
-    self.instance = Some(Instance {
-      tasks_to_display: IndexMap::new(),
-      multi_progress_task,
-      bars,
-    });
     Ok(())
   }
 
   ///
   /// If the ConsoleUI is running, completes it.
   ///
-  pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
+  pub async fn teardown(&mut self) {
     if let Some(instance) = self.instance.take() {
-      // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
-      // direct access to the Console.
       instance
-        .multi_progress_task
-        .map_err(|e| format!("Failed to render UI: {}", e))
-        .boxed()
-    } else {
-      future::ok(()).boxed()
+        .executor
+        .clone()
+        .spawn_blocking(move || {
+          // TODO: Necessary to do this on Drop as well? Or do we guarantee that teardown is called?
+          instance.handle.shutdown_and_wait();
+        })
+        .await
     }
   }
 }
 
-type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>;
-
 /// The state for one run of the ConsoleUI.
 struct Instance {
-  tasks_to_display: IndexMap<SpanId, (String, Option<Duration>)>,
-  multi_progress_task: MultiProgressTask,
-  bars: Vec<ProgressBar>,
+  tasks_to_display: HashMap<SpanId, prodash::tree::Item>,
+  tree: prodash::Tree,
+  handle: line::JoinHandle,
+  executor: Executor,
+}
+
+/// Renders a millis-since-epoch unit as floating point seconds.
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Debug)]
+struct MillisAsFloatingPointSecs;
+
+impl MillisAsFloatingPointSecs {
+  /// Computes a static Step value from the given Duration by converting it to "millis-since-epoch".
+  fn duration_to_step(now: &SystemTime, duration: Option<Duration>) -> Step {
+    // TODO: Use workunit start SystemTimes directly rather than calculating them.
+    let start_time = duration.and_then(|d| now.checked_sub(d)).unwrap_or(*now);
+    start_time.duration_since(UNIX_EPOCH).unwrap().as_millis() as usize
+  }
+}
+
+impl prodash::unit::DisplayValue for MillisAsFloatingPointSecs {
+  fn display_current_value(
+    &self,
+    w: &mut dyn fmt::Write,
+    value: Step,
+    _upper: Option<Step>,
+  ) -> fmt::Result {
+    // Convert back from millis-since-epoch to millis elapsed.
+    let start_time = UNIX_EPOCH + Duration::from_millis(value as u64);
+    let elapsed_ms = start_time.elapsed().map(|d| d.as_millis()).unwrap_or(0);
+    w.write_fmt(format_workunit_duration_ms!(elapsed_ms))
+  }
+  fn display_unit(&self, _w: &mut dyn fmt::Write, _value: Step) -> fmt::Result {
+    Ok(())
+  }
 }

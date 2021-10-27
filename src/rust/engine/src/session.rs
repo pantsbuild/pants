@@ -13,7 +13,6 @@ use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable};
-use futures::FutureExt;
 use graph::LastObserved;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
@@ -21,7 +20,7 @@ use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration, RunId, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, RunId, UserMetadataPyValue, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -304,19 +303,15 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.handle.display.lock().await {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
+    match *self.handle.display.lock().await {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().await,
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..
       } => {
         *straggler_deadline = None;
-        async { Ok(()) }.boxed()
       }
     };
-    if let Err(e) = teardown.await {
-      warn!("{}", e);
-    }
   }
 
   pub fn maybe_display_render(&self) {
@@ -346,7 +341,11 @@ impl Session {
               "Long running tasks:\n  {}",
               straggling_workunits
                 .into_iter()
-                .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
+                .map(|(duration, desc)| format!(
+                  "{}\t{}",
+                  format_workunit_duration_ms!(duration.as_millis()),
+                  desc
+                ))
                 .collect::<Vec<_>>()
                 .join("\n  ")
             );
