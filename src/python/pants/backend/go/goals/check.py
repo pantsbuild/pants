@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import (
@@ -15,6 +14,7 @@ from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class GoCheckRequest(CheckRequest):
     field_set_type = GoCheckFieldSet
 
 
-@rule
+@rule(desc="Check Go compilation", level=LogLevel.DEBUG)
 async def check_go(request: GoCheckRequest) -> CheckResults:
     build_requests = await MultiGet(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(field_set.address))
@@ -46,30 +46,16 @@ async def check_go(request: GoCheckRequest) -> CheckResults:
         Get(FallibleBuiltGoPackage, BuildGoPackageRequest, request) for request in valid_requests
     )
 
-    # TODO: Update `build_pkg.py` to use streaming workunits to log compilation results, which has
-    #  the benefit of other contexts like `test.py` using it. Switch this to only preserve the
-    #  exit code.
-    check_results = [
-        *(
-            CheckResult(
-                result.exit_code,
-                "",
-                cast(str, result.stderr),
-                partition_description=result.import_path,
-            )
-            for result in invalid_requests
+    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
+    exit_code = next(
+        (
+            result.exit_code  # type: ignore[attr-defined]
+            for result in (*build_results, *invalid_requests)
+            if result.exit_code != 0  # type: ignore[attr-defined]
         ),
-        *(
-            CheckResult(
-                result.exit_code,
-                result.stdout or "",
-                result.stderr or "",
-                partition_description=result.import_path,
-            )
-            for result in build_results
-        ),
-    ]
-    return CheckResults(check_results, checker_name="go")
+        0,
+    )
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name="go")
 
 
 def rules():
