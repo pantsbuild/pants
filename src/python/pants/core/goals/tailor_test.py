@@ -1,8 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import textwrap
 from dataclasses import dataclass
+from textwrap import dedent
 
 import pytest
 
@@ -123,19 +125,18 @@ def test_make_content_str() -> None:
         ],
     )
     assert (
-        "\n".join(
-            [
-                """fortran_library()""",
-                "",
-                """fortran_tests(""",
-                """    name="tests",""",
-                """    sources=[""",
-                """        "test1.f90",""",
-                """        "test2.f90",""",
-                """    ],""",
-                """)""",
-                "",
-            ]
+        dedent(
+            """\
+            fortran_library()
+
+            fortran_tests(
+                name="tests",
+                sources=[
+                    "test1.f90",
+                    "test2.f90",
+                ],
+            )
+            """
         )
         == content
     )
@@ -286,39 +287,35 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
     expected = [
         FileContent(
             f"src/fortran/baz/{name}.pants",
-            "\n".join(
-                [
-                    "Copyright © 2021 FooCorp.",
-                    "",
-                    "fortran_library()",
-                    "",
-                ]
+            dedent(
+                """\
+            Copyright © 2021 FooCorp.
+
+            fortran_library()
+            """
             ).encode(),
         ),
         FileContent(
             f"src/fortran/foo/{name}",
             textwrap.dedent(
-                "\n".join(
-                    [
-                        """fortran_library(sources=["bar1.f90"])""",
-                        "",
-                        """# A comment spread""",
-                        """# over multiple lines.""",
-                        """fortran_library(""",
-                        """    name="foo0",""",
-                        """    sources=[""",
-                        """        "bar2.f90",""",
-                        """        "bar3.f90",""",
-                        """    ],""",
-                        """)""",
-                        "",
-                        """fortran_tests(""",
-                        """    name="tests",""",
-                        """    life_the_universe_and_everything=42,""",
-                        """)""",
-                        "",
-                    ]
-                ),
+                """\
+                fortran_library(sources=["bar1.f90"])
+
+                # A comment spread
+                # over multiple lines.
+                fortran_library(
+                    name="foo0",
+                    sources=[
+                        "bar2.f90",
+                        "bar3.f90",
+                    ],
+                )
+
+                fortran_tests(
+                    name="tests",
+                    life_the_universe_and_everything=42,
+                )
+                """
             ).encode(),
         ),
     ]
@@ -354,11 +351,10 @@ def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
     expected = [
         FileContent(
             "src/fortran/baz/BUILD.pants",
-            "\n".join(
-                [
-                    "fortran_library()",
-                    "",
-                ]
+            dedent(
+                """\
+               fortran_library()
+               """
             ).encode(),
         ),
     ]
@@ -370,6 +366,34 @@ def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
         assert efc.path == afc.path
         assert efc.content.decode() == afc.content.decode()
         assert efc.is_executable == afc.is_executable
+
+
+@pytest.mark.parametrize("header", [None, "I am some header text"])
+def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: str | None) -> None:
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
+    req = EditBuildFilesRequest(
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                ),
+            ]
+        ),
+        name="BUILD",
+        header=header,
+        indent="    ",
+    )
+    edited_build_files = rule_runner.request(EditedBuildFiles, [req])
+
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
+
+    contents = rule_runner.request(DigestContents, [edited_build_files.digest])
+    actual = list(contents)
+    # We do these more laborious asserts instead of just comparing the lists so that
+    # on a text mismatch we see the actual string diff on the decoded strings.
+    for afc in actual:
+        content = afc.content.decode()
+        assert content.lstrip() == content
 
 
 def test_group_by_dir() -> None:
