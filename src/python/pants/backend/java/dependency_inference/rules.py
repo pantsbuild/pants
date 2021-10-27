@@ -169,6 +169,48 @@ class AvailableThirdPartyArtifacts:
     artifacts: FrozenDict[UnversionedCoordinate, FrozenOrderedSet[Address]]
 
 
+class ArtifactTrieNode:
+    def __init__(self):
+        self._children: dict[str, ArtifactTrieNode] = {}
+        self._recursive: bool = False
+        self._coordinate: UnversionedCoordinate | None = None
+        self._hash_value = None
+
+    def find_child(self, name: str) -> ArtifactTrieNode | None:
+        return self._children.get(name)
+
+    def ensure_child(self, name: str) -> ArtifactTrieNode:
+        if name in self._children:
+            return self._children[name]
+        self._hash_value = None
+        node = ArtifactTrieNode()
+        self._children[name] = node
+        return node
+
+    @property
+    def recursive(self) -> bool:
+        return self._recursive
+
+    def set_recusrive(self, recursive: bool) -> None:
+        self._recursive = recursive
+        self._hash_value = None
+
+    @property
+    def coordinate(self) -> UnversionedCoordinate | None:
+        return self._coordinate
+
+    def __hash__(self) -> int:
+        if self._hash_value is None:
+            children = sorted(self._children.items())
+            self._hash_value = hash((children, self._recursive, self._coordinate))
+        return self._hash_value
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, ArtifactTrieNode):
+            return False
+        return self._children == other._children and self._recursive == other._recursive and self._coordinate == other.coordinate
+
+
 @dataclass(frozen=True)
 class ThirdPartyJavaPackageToArtifactMapping:
     # TODO: Find a way to specify the nested trie dictionary structure in mypy.
@@ -214,11 +256,12 @@ async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
 ) -> ThirdPartyJavaPackageToArtifactMapping:
-    def insert(mapping: dict, imp: str, value: Any) -> None:
+    def insert(mapping: ArtifactTrieNode, imp: str, value: Any) -> None:
         imp_parts = imp.split(".")
         current_node = mapping
         for imp_part in imp_parts[0:-1]:
-            if imp_part not in current_node:
+            child_node = current_node.find_child(imp_part)
+            if not child_node:
                 current_node[imp_part] = {}
             elif isinstance(current_node[imp_part], str):
                 # Existing node is a string. Convert it to a dict with default key set.
