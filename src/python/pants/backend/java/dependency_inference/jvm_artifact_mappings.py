@@ -6,5 +6,5 @@ DEFAULT = object()
 SKIP = object()
 
 JVM_ARTIFACT_MAPPINGS = {
-    "org.junit.*": "junit:junit",
+    "org.junit.**": "junit:junit",
 }
