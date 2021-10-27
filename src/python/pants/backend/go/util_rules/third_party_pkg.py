@@ -62,8 +62,10 @@ class ThirdPartyPkgInfoRequest(EngineAwareParameter):
         return self.import_path
 
 
+@dataclass(frozen=True)
 class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgInfo]):
-    pass
+    digest: Digest
+    import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgInfo]
 
 
 @dataclass(frozen=True)
@@ -192,7 +194,7 @@ async def download_and_analyze_third_party_packages(
         pkg_info_kwargs["import_path"]: ThirdPartyPkgInfo(digest=digest_subset, **pkg_info_kwargs)
         for pkg_info_kwargs, digest_subset in zip(all_pkg_info_kwargs, all_digest_subsets)
     }
-    return AllThirdPartyPackages(import_path_to_info)
+    return AllThirdPartyPackages(list_result.output_digest, FrozenDict(import_path_to_info))
 
 
 @rule
@@ -200,7 +202,7 @@ async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyP
     all_packages = await Get(
         AllThirdPartyPackages, AllThirdPartyPackagesRequest(request.go_mod_stripped_digest)
     )
-    pkg_info = all_packages.get(request.import_path)
+    pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info is None:
         raise AssertionError(
             f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "

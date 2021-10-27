@@ -74,7 +74,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     all_packages = rule_runner.request(
         AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest)]
     )
-    assert set(all_packages) == {
+    assert set(all_packages.import_paths_to_pkg_info.keys()) == {
         "golang.org/x/text/encoding/japanese",
         "golang.org/x/text/message/catalog",
         "golang.org/x/text/internal/testtext",
@@ -140,8 +140,8 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         go_files: tuple[str, ...],
         extra_files: tuple[str, ...],
     ) -> None:
-        assert import_path in all_packages
-        pkg_info = all_packages[import_path]
+        assert import_path in all_packages.import_paths_to_pkg_info
+        pkg_info = all_packages.import_paths_to_pkg_info[import_path]
         assert pkg_info.import_path == import_path
         assert pkg_info.subpath == subpath
         assert pkg_info.imports == imports
@@ -315,7 +315,10 @@ def test_module_with_no_packages(rule_runner) -> None:
             """
         ),
     )
-    assert not rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)])
+    all_packages = rule_runner.request(
+        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)]
+    )
+    assert not all_packages.import_paths_to_pkg_info
 
 
 def test_unsupported_sources(rule_runner: RuleRunner) -> None:
@@ -390,7 +393,12 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
     all_packages = rule_runner.request(
         AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)]
     )
-    assert all_packages["golang.org/x/mobile/bind/objc"].unsupported_sources_error is not None
+    assert (
+        all_packages.import_paths_to_pkg_info[
+            "golang.org/x/mobile/bind/objc"
+        ].unsupported_sources_error
+        is not None
+    )
 
     # Error when requesting the `ThirdPartyPkgInfo`.
     with engine_error(NotImplementedError):

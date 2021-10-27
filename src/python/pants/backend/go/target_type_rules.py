@@ -245,7 +245,8 @@ async def generate_targets_from_go_mod(
         )
 
     third_party_pkgs = (
-        create_third_party_package_tgt(pkg_info) for pkg_info in all_third_party_packages.values()
+        create_third_party_package_tgt(pkg_info)
+        for pkg_info in all_third_party_packages.import_paths_to_pkg_info.values()
     )
     return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
 
