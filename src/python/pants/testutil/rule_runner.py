@@ -322,14 +322,14 @@ class RuleRunner:
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
 
         stdout, stderr = StringIO(), StringIO()
-        console = Console(stdout=stdout, stderr=stderr, use_colors=False)
+        console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)
 
         exit_code = self.scheduler.run_goal_rule(
             goal,
             Params(
                 specs,
                 console,
-                Workspace(self.scheduler, _enforce_effects=False),
+                Workspace(self.scheduler),
             ),
         )
 
