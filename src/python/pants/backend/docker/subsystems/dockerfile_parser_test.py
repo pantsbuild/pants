@@ -9,7 +9,7 @@ import pytest
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.subsystems.dockerfile_parser import split_iterable
-from pants.backend.docker.target_types import DockerImage, DockerImageSourceField
+from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *pex_rules(),
             QueryRule(DockerfileInfo, (DockerImageSourceField,)),
         ],
-        target_types=[DockerImage, PexBinary],
+        target_types=[DockerImageTarget, PexBinary],
     )
     rule_runner.set_options(
         [],

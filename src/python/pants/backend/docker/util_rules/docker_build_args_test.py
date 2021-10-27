@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
@@ -69,7 +69,7 @@ def test_docker_build_args_rule(
     extra_build_args: tuple[str, ...] | None,
     expected_build_args: tuple[str, ...],
 ) -> None:
-    tgt = DockerImage({"extra_build_args": extra_build_args}, address=Address("test"))
+    tgt = DockerImageTarget({"extra_build_args": extra_build_args}, address=Address("test"))
     rule_runner.set_options([f"--docker-build-args={build_arg}" for build_arg in build_args])
     res = rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)])
     assert tuple(res) == expected_build_args
