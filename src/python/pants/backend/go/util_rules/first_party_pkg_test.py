@@ -44,12 +44,33 @@ def test_package_info(rule_runner: RuleRunner) -> None:
             "foo/go.mod": dedent(
                 """\
                 module go.example.com/foo
-                go 1.17
+                go 1.16
+                require github.com/google/uuid v1.3.0
+                require (
+                    rsc.io/quote v1.5.2
+                    golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c // indirect
+                    rsc.io/sampler v1.3.0 // indirect
+                )
+                """
+            ),
+            "foo/go.sum": dedent(
+                """\
+                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+                rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+                rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+                rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+                rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
                 """
             ),
             "foo/pkg/foo.go": dedent(
                 """\
                 package pkg
+                import "github.com/google/uuid"
+                import "rsc.io/quote"
+
                 func Grok() string {
                     return "Hello World"
                 }
@@ -107,7 +128,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
 
     assert_info(
         "pkg",
-        imports=[],
+        imports=["github.com/google/uuid", "rsc.io/quote"],
         test_imports=[],
         xtest_imports=[],
         go_files=["foo.go"],

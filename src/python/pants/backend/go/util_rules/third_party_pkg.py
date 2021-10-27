@@ -64,6 +64,13 @@ class ThirdPartyPkgInfoRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgInfo]):
+    """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
+
+    The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
+    to. This means that you can include the digest in a process and Go will properly consume it as
+    the `GOPATH`.
+    """
+
     digest: Digest
     import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgInfo]
 
