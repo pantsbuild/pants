@@ -123,19 +123,20 @@ def test_make_content_str() -> None:
         ],
     )
     assert (
-        textwrap.dedent(
-            """
-    fortran_library()
-
-    fortran_tests(
-        name="tests",
-        sources=[
-            "test1.f90",
-            "test2.f90",
-        ],
-    )
-    """
-        ).lstrip()
+        "\n".join(
+            [
+                """fortran_library()""",
+                "",
+                """fortran_tests(""",
+                """    name="tests",""",
+                """    sources=[""",
+                """        "test1.f90",""",
+                """        "test2.f90",""",
+                """    ],""",
+                """)""",
+                "",
+            ]
+        )
         == content
     )
 
@@ -285,40 +286,40 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
     expected = [
         FileContent(
             f"src/fortran/baz/{name}.pants",
-            textwrap.dedent(
-                """
-                Copyright © 2021 FooCorp.
-
-                fortran_library()
-            """
-            )
-            .lstrip()
-            .encode(),
+            "\n".join(
+                [
+                    "Copyright © 2021 FooCorp.",
+                    "",
+                    "fortran_library()",
+                    "",
+                ]
+            ).encode(),
         ),
         FileContent(
             f"src/fortran/foo/{name}",
             textwrap.dedent(
-                """
-            fortran_library(sources=["bar1.f90"])
-
-            # A comment spread
-            # over multiple lines.
-            fortran_library(
-                name="foo0",
-                sources=[
-                    "bar2.f90",
-                    "bar3.f90",
-                ],
-            )
-
-            fortran_tests(
-                name="tests",
-                life_the_universe_and_everything=42,
-            )
-            """
-            )
-            .lstrip()
-            .encode(),
+                "\n".join(
+                    [
+                        """fortran_library(sources=["bar1.f90"])""",
+                        "",
+                        """# A comment spread""",
+                        """# over multiple lines.""",
+                        """fortran_library(""",
+                        """    name="foo0",""",
+                        """    sources=[""",
+                        """        "bar2.f90",""",
+                        """        "bar3.f90",""",
+                        """    ],""",
+                        """)""",
+                        "",
+                        """fortran_tests(""",
+                        """    name="tests",""",
+                        """    life_the_universe_and_everything=42,""",
+                        """)""",
+                        "",
+                    ]
+                ),
+            ).encode(),
         ),
     ]
     actual = list(contents)
