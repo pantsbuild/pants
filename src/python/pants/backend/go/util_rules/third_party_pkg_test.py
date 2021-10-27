@@ -388,7 +388,7 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo, [AllThirdPartyPackagesRequest("golang.org/x/mobile/bind/objc", digest)]
+        ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest)]
     )
     assert pkg_info.unsupported_sources_error is not None
 
