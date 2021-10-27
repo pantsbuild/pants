@@ -11,7 +11,9 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
 from pants.backend.java.dependency_inference.rules import (
+    FrozenTrieNode,
     InferJavaSourceDependencies,
+    MutableTrieNode,
     ThirdPartyJavaPackageToArtifactMapping,
     UnversionedCoordinate,
 )
@@ -40,7 +42,6 @@ from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
@@ -555,35 +556,23 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time.*': 'joda-time:joda-time'}"],
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
-    assert mapping.mapping == FrozenDict(
-        {
-            "org": FrozenDict(
-                {
-                    "joda": FrozenDict(
-                        {
-                            "time": FrozenDict(
-                                {
-                                    "*": UnversionedCoordinate(
-                                        group="joda-time", artifact="joda-time"
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-        }
-    )
+    actual_mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+    root_node = MutableTrieNode()
+    node = root_node.ensure_child("org")
+    node = node.ensure_child("joda")
+    node = node.ensure_child("time")
+    node.coordinate = UnversionedCoordinate(group="joda-time", artifact="joda-time")
+    node.recursive = True
+    assert actual_mapping.mapping_root == FrozenTrieNode(root_node)
 
 
 @maybe_skip_jdk_test
 def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time.*': 'joda-time:joda-time'}"],
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(

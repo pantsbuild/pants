@@ -7,12 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, cast
 
-from pants.backend.java.dependency_inference import (
-    import_parser,
-    java_parser,
-    jvm_artifact_mappings,
-    package_mapper,
-)
+from pants.backend.java.dependency_inference import import_parser, java_parser, package_mapper
 from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
@@ -35,6 +30,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.target_types import JvmArtifactArtifactField, JvmArtifactGroupField
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -169,52 +165,60 @@ class AvailableThirdPartyArtifacts:
     artifacts: FrozenDict[UnversionedCoordinate, FrozenOrderedSet[Address]]
 
 
-class ArtifactTrieNode:
+class MutableTrieNode:
     def __init__(self):
-        self._children: dict[str, ArtifactTrieNode] = {}
-        self._recursive: bool = False
-        self._coordinate: UnversionedCoordinate | None = None
-        self._hash_value = None
+        self.children: dict[str, MutableTrieNode] = {}
+        self.recursive: bool = False
+        self.coordinate: UnversionedCoordinate | None = None
 
-    def find_child(self, name: str) -> ArtifactTrieNode | None:
-        return self._children.get(name)
-
-    def ensure_child(self, name: str) -> ArtifactTrieNode:
-        if name in self._children:
-            return self._children[name]
-        self._hash_value = None
-        node = ArtifactTrieNode()
-        self._children[name] = node
+    def ensure_child(self, name: str) -> MutableTrieNode:
+        if name in self.children:
+            return self.children[name]
+        node = MutableTrieNode()
+        self.children[name] = node
         return node
+
+
+@frozen_after_init
+class FrozenTrieNode:
+    def __init__(self, node: MutableTrieNode) -> None:
+        children = {}
+        for key, child in node.children.items():
+            children[key] = FrozenTrieNode(child)
+        self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
+        self._recursive: bool = node.recursive
+        self._coordinate: UnversionedCoordinate | None = node.coordinate
+
+    def find_child(self, name: str) -> FrozenTrieNode | None:
+        return self._children.get(name)
 
     @property
     def recursive(self) -> bool:
         return self._recursive
-
-    def set_recusrive(self, recursive: bool) -> None:
-        self._recursive = recursive
-        self._hash_value = None
 
     @property
     def coordinate(self) -> UnversionedCoordinate | None:
         return self._coordinate
 
     def __hash__(self) -> int:
-        if self._hash_value is None:
-            children = sorted(self._children.items())
-            self._hash_value = hash((children, self._recursive, self._coordinate))
-        return self._hash_value
+        return hash((self._children, self._recursive, self._coordinate))
 
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, ArtifactTrieNode):
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, FrozenTrieNode):
             return False
-        return self._children == other._children and self._recursive == other._recursive and self._coordinate == other.coordinate
+        return (
+            self._children == other._children
+            and self.recursive == other.recursive
+            and self.coordinate == other.coordinate
+        )
+
+    def __repr__(self):
+        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, coordinate={self._coordinate})"
 
 
 @dataclass(frozen=True)
 class ThirdPartyJavaPackageToArtifactMapping:
-    # TODO: Find a way to specify the nested trie dictionary structure in mypy.
-    mapping: FrozenDict[Any, Any]
+    mapping_root: FrozenTrieNode
 
 
 class InferJavaThirdPartyImportDependencies(InferDependenciesRequest):
@@ -256,87 +260,60 @@ async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
 ) -> ThirdPartyJavaPackageToArtifactMapping:
-    def insert(mapping: ArtifactTrieNode, imp: str, value: Any) -> None:
+    def insert(
+        mapping: MutableTrieNode, imp: str, coordinate: UnversionedCoordinate | None
+    ) -> None:
         imp_parts = imp.split(".")
+        recursive = False
+        if imp_parts[-1] == "**":
+            recursive = True
+            imp_parts = imp_parts[0:-1]
+
         current_node = mapping
-        for imp_part in imp_parts[0:-1]:
-            child_node = current_node.find_child(imp_part)
-            if not child_node:
-                current_node[imp_part] = {}
-            elif isinstance(current_node[imp_part], str):
-                # Existing node is a string. Convert it to a dict with default key set.
-                existing_value = current_node[imp_part]
-                current_node[imp_part] = {
-                    jvm_artifact_mappings.DEFAULT: existing_value,
-                }
-            current_node = current_node[imp_part]
+        for imp_part in imp_parts:
+            child_node = current_node.ensure_child(imp_part)
+            current_node = child_node
 
-        final_imp_part = imp_parts[-1]
-        if final_imp_part in current_node:
-            raise ValueError(
-                f"There is a conflicting entry in the third-party Java package mapping for `{imp}`. "
-                f"The existing entry is `{current_node[final_imp_part]}`. "
-                f"The conflicting entry is `{value}`."
-            )
-        current_node[final_imp_part] = value
+        current_node.coordinate = coordinate
+        current_node.recursive = recursive
 
-    def freeze(d: dict) -> FrozenDict[Any, Any]:
-        result = {}
-        for k, v in d.items():
-            result[k] = freeze(v) if isinstance(v, dict) else v
-        return FrozenDict(result)
-
-    mapping: dict[Any, Any] = {}
+    mapping = MutableTrieNode()
     for imp_name, imp_action in java_infer_subsystem.third_party_import_mapping.items():
-        value = (
-            UnversionedCoordinate.from_coord_str(imp_action)
-            if imp_action != "SKIP"
-            else jvm_artifact_mappings.SKIP
-        )
+        value = UnversionedCoordinate.from_coord_str(imp_action) if imp_action != "SKIP" else None
         insert(mapping, imp_name, value)
 
-    return ThirdPartyJavaPackageToArtifactMapping(freeze(mapping))
+    return ThirdPartyJavaPackageToArtifactMapping(FrozenTrieNode(mapping))
 
 
 def find_artifact_mapping(
     imp: str, mapping: ThirdPartyJavaPackageToArtifactMapping
 ) -> UnversionedCoordinate | None:
     imp_parts = imp.split(".")
-    current_node: Any = mapping.mapping
+    current_node = mapping.mapping_root
 
+    found_nodes = []
     for imp_part in imp_parts:
-        # If the current node is not searchable, then return None since there is no way to
-        # continue the search.
-        if not isinstance(current_node, FrozenDict):
-            return None
+        child_node_opt = current_node.find_child(imp_part)
+        if not child_node_opt:
+            break
+        found_nodes.append(child_node_opt)
+        current_node = child_node_opt
 
-        # If the package component is missing from the dictionary, then the search has failed.
-        if imp_part not in current_node:
-            if "*" in current_node:
-                # Unless there is a "*" key which matches any symbol.
-                # TODO: Consider how we want to do partial package matches.
-                imp_part = "*"
-            else:
-                return None
-
-        # Otherwise, use the node that has been found as the next node of the search.
-        current_node = current_node[imp_part]
-
-    # The search fails if the SKIP direction was found.
-    if current_node is jvm_artifact_mappings.SKIP:
+    if not found_nodes:
         return None
 
-    # Extract any default entry if the candidate is a dictionary with a DEFAULT key.
-    if isinstance(current_node, FrozenDict) and jvm_artifact_mappings.DEFAULT in current_node:
-        current_node = current_node[jvm_artifact_mappings.DEFAULT]
+    # If the length of the found nodes equals the number of parts of the package path, then there
+    # is an exact match.
+    if len(found_nodes) == len(imp_parts):
+        return found_nodes[-1].coordinate
 
-    if isinstance(current_node, UnversionedCoordinate):
-        return current_node
-    else:
-        raise ValueError(
-            f"Illegal state: The state computed from --java-infer-third-party-import-mapping contained an "
-            f"unexpected value: {current_node}"
-        )
+    # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
+    for found_node in reversed(found_nodes):
+        if found_node.recursive:
+            return found_node.coordinate
+
+    # Nothing matched so return no match.
+    return None
 
 
 @rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
