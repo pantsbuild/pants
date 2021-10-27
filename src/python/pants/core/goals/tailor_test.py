@@ -332,6 +332,46 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
         assert efc.is_executable == afc.is_executable
 
 
+def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
+    req = EditBuildFilesRequest(
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                ),
+            ]
+        ),
+        name="BUILD",
+        header=None,
+        indent="    ",
+    )
+    edited_build_files = rule_runner.request(EditedBuildFiles, [req])
+
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
+
+    contents = rule_runner.request(DigestContents, [edited_build_files.digest])
+    expected = [
+        FileContent(
+            "src/fortran/baz/BUILD.pants",
+            "\n".join(
+                [
+                    "fortran_library()",
+                    "",
+                ]
+            ).encode(),
+        ),
+    ]
+    actual = list(contents)
+    # We do these more laborious asserts instead of just comparing the lists so that
+    # on a text mismatch we see the actual string diff on the decoded strings.
+    assert len(expected) == len(actual)
+    for efc, afc in zip(expected, actual):
+        assert efc.path == afc.path
+        assert efc.content.decode() == afc.content.decode()
+        assert efc.is_executable == afc.is_executable
+
+
 def test_group_by_dir() -> None:
     paths = {
         "foo/bar/baz1.ext",
