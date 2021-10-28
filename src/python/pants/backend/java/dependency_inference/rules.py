@@ -71,7 +71,7 @@ class JavaInferSubsystem(Subsystem):
             help=(
                 "A dictionary mapping a Java package path to a JVM artifact coordinate (GROUP:ARTIFACT) "
                 "without the version. The package path may be made recursive to match symbols in subpackages "
-                "by adding `.**` to the end of the package path. For example, specify `{'org.junit.**': 'junit:jnit'} `"
+                "by adding `.**` to the end of the package path. For example, specify `{'org.junit.**': 'junit:junit'} `"
                 "to infer a dependency on junit:junit for any file importing a symbol from org.junit or its "
                 f"subpackages. Pants also supplies a default package mapping ({_default_package_mapping_url})."
             ),
