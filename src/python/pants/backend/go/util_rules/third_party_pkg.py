@@ -50,6 +50,8 @@ class ThirdPartyPkgInfo:
     go_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    minimum_go_version: str | None
+
     error: GoThirdPartyPkgError | None = None
 
 
@@ -166,6 +168,7 @@ async def download_and_analyze_third_party_packages(
                 imports=tuple(pkg_json.get("Imports", ())),
                 go_files=tuple(pkg_json.get("GoFiles", ())),
                 s_files=tuple(pkg_json.get("SFiles", ())),
+                minimum_go_version=pkg_json.get("Module", {}).get("GoVersion"),
                 error=maybe_error,
             )
         )
@@ -245,6 +248,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             imports=(),
             go_files=(),
             s_files=(),
+            minimum_go_version=None,
             error=error,
         )
 

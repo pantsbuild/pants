@@ -52,6 +52,8 @@ class FirstPartyPkgInfo:
 
     s_files: tuple[str, ...]
 
+    minimum_go_version: str | None
+
 
 @dataclass(frozen=True)
 class FallibleFirstPartyPkgInfo:
@@ -133,6 +135,7 @@ async def compute_first_party_package_info(
         test_files=tuple(metadata.get("TestGoFiles", [])),
         xtest_files=tuple(metadata.get("XTestGoFiles", [])),
         s_files=tuple(metadata.get("SFiles", [])),
+        minimum_go_version=go_mod_info.minimum_go_version,
     )
     return FallibleFirstPartyPkgInfo(info, import_path)
 

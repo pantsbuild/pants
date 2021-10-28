@@ -65,6 +65,7 @@ async def setup_analyzer() -> AnalyzerSetup:
             go_file_names=(source_entry.path,),
             s_file_names=(),
             direct_dependencies=(),
+            minimum_go_version=None,
         ),
     )
     main_pkg_a_file_path = built_analyzer_pkg.import_paths_to_pkg_a_files["main"]

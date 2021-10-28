@@ -126,6 +126,8 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         assert info.xtest_files == tuple(xtest_files)
         assert not info.s_files
 
+        assert info.minimum_go_version == "1.16"
+
     assert_info(
         "pkg",
         imports=["github.com/google/uuid", "rsc.io/quote"],

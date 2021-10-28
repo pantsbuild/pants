@@ -142,6 +142,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
         ).digest,
         s_file_names=("add_amd64.s", "add_arm64.s"),
         direct_dependencies=(),
+        minimum_go_version=None,
     )
     result = rule_runner.request(FallibleBuiltGoPackage, [request])
     assert result.output is None

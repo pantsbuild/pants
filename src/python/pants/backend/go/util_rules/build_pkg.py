@@ -52,6 +52,9 @@ class BuildGoPackageRequest(EngineAwareParameter):
     # These dependencies themselves often have dependencies, such that we recursively build.
     direct_dependencies: tuple[BuildGoPackageRequest, ...]
 
+    # In the form `1.16`. This is declared in the `go` directive of `go.mod`.
+    minimum_go_version: str | None
+
     for_tests: bool = False
 
     def debug_hint(self) -> str | None:
@@ -184,7 +187,11 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         request.import_path,
         "-importcfg",
         import_config.CONFIG_PATH,
+        # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
+        # for why Go sets the default to 1.16.
+        f"-lang=go{request.minimum_go_version or '1.16'}",
     ]
+
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
     relativized_sources = (
@@ -291,6 +298,8 @@ async def setup_build_go_package_target_request(
         subpath = os.path.join(
             target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
         )
+        minimum_go_version = _first_party_pkg_info.minimum_go_version
+
         go_file_names = _first_party_pkg_info.go_files
         if request.for_tests:
             # TODO: Build the test sources separately and link the two object files into the package archive?
@@ -316,6 +325,7 @@ async def setup_build_go_package_target_request(
 
         subpath = _third_party_pkg_info.subpath
         digest = _third_party_pkg_info.digest
+        minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
 
@@ -349,6 +359,7 @@ async def setup_build_go_package_target_request(
         subpath=subpath,
         go_file_names=go_file_names,
         s_file_names=s_file_names,
+        minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,
     )

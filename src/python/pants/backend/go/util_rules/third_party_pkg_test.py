@@ -139,6 +139,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         imports: tuple[str, ...],
         go_files: tuple[str, ...],
         extra_files: tuple[str, ...],
+        minimum_go_version: str | None,
     ) -> None:
         assert import_path in all_packages.import_paths_to_pkg_info
         pkg_info = all_packages.import_paths_to_pkg_info[import_path]
@@ -151,6 +152,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert set(snapshot.files) == {
             os.path.join(subpath, file_name) for file_name in (*go_files, *extra_files)
         }
+        assert pkg_info.minimum_go_version == minimum_go_version
 
     assert_pkg_info(
         import_path="github.com/google/uuid",
@@ -203,6 +205,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
             "sql_test.go",
             "uuid_test.go",
         ),
+        minimum_go_version=None,
     )
     assert_pkg_info(
         import_path="golang.org/x/text/unicode/bidi",
@@ -217,6 +220,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
             "ranges_test.go",
             "tables_test.go",
         ),
+        minimum_go_version=None,
     )
 
 
