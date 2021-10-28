@@ -621,3 +621,82 @@ def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(
         [Address("", target_name="joda-time_joda-time")]
     )
+
+
+@maybe_skip_jdk_test
+def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}"
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+
+                jvm_artifact(
+                    name = "joda-time_joda-time-2",
+                    group = "joda-time",
+                    artifact = "joda-time-2",  # doesn't really exist, but useful for this test
+                    version = "2.10.10",
+                )
+
+                java_sources(name = 'lib')
+                """
+            ),
+            "PrintDate.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.DateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new DateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+            "PrintDate2.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.LocalDateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new LocalDateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    # First test whether the specific import mapping for org.joda.time.DateTime takes effect over the recursive
+    # mapping.
+    lib1 = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib1[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time-2")]
+    )
+
+    # Then try a file which should not match the specific import mapping and which will then match the
+    # recursive mapping.
+    lib2 = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate2.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib2[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time")]
+    )
