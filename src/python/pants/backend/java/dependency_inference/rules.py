@@ -10,7 +10,7 @@ from typing import Any, Iterable, Set, cast
 from pants.backend.java.dependency_inference import import_parser, java_parser, package_mapper
 from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
-from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
+from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.specs import AddressSpecs, MaybeEmptyDescendantAddresses
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -101,7 +101,7 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
 @dataclass(frozen=True)
 class MapThirdPartyJavaImportsToArtifactsAddressesRequest:
     analysis: JavaSourceDependencyAnalysis
-    import_name: JavaImport
+    import_name: str
 
 
 @dataclass(frozen=True)
@@ -143,9 +143,18 @@ async def infer_java_dependencies_via_imports(
     dependencies: OrderedSet[Address] = OrderedSet()
 
     for typ in types:
-        matches = dep_map.addresses_for_type(typ)
+        first_party_matches = dep_map.addresses_for_type(typ)
+        third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
+        if java_infer_subsystem.third_party_imports:
+            mapped_third_party_addresses = await Get(
+                MappedThirdPartyJavaImportsToArtifactsAddresses,
+                MapThirdPartyJavaImportsToArtifactsAddressesRequest(analysis, typ),
+            )
+            third_party_matches = mapped_third_party_addresses.addresses
+        matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
+
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             matches,
             address,
@@ -155,32 +164,6 @@ async def infer_java_dependencies_via_imports(
         maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
         if maybe_disambiguated:
             dependencies.add(maybe_disambiguated)
-
-    if java_infer_subsystem.third_party_imports:
-        mapped_third_party_artifact_addresses_for_imports = await MultiGet(
-            Get(
-                MappedThirdPartyJavaImportsToArtifactsAddresses,
-                MapThirdPartyJavaImportsToArtifactsAddressesRequest(analysis, imp),
-            )
-            for imp in analysis.imports
-        )
-
-        for imp, mapped_third_party_artifact_addresses in zip(
-            analysis.imports, mapped_third_party_artifact_addresses_for_imports
-        ):
-            if not mapped_third_party_artifact_addresses.addresses:
-                continue
-            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-                mapped_third_party_artifact_addresses.addresses,
-                address,
-                import_reference="import",
-                context=f"The target {address} imports `{imp.name}`",
-            )
-            maybe_disambiguated = explicitly_provided_deps.disambiguated(
-                mapped_third_party_artifact_addresses.addresses
-            )
-            if maybe_disambiguated:
-                dependencies.add(maybe_disambiguated)
 
     return InferredDependencies(dependencies)
 
@@ -345,7 +328,7 @@ async def find_artifact_mapping(
     mapping: ThirdPartyJavaPackageToArtifactMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
 ) -> MappedThirdPartyJavaImportsToArtifactsAddresses:
-    imp_parts = request.import_name.name.split(".")
+    imp_parts = request.import_name.split(".")
     current_node = mapping.mapping_root
 
     found_nodes = []
