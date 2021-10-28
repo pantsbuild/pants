@@ -77,9 +77,4 @@ def test_check(rule_runner: RuleRunner) -> None:
     results = rule_runner.request(
         CheckResults, [GoCheckRequest(GoCheckFieldSet.create(tgt) for tgt in targets)]
     ).results
-    assert set(results) == {
-        CheckResult(0, "", "", "example.com/greeter/good"),
-        CheckResult(
-            1, "", "bad/f.go:1:1: expected 'package', found invalid\n", "example.com/greeter/bad"
-        ),
-    }
+    assert set(results) == {CheckResult(1, "", "")}
