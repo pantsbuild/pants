@@ -29,6 +29,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessCacheSco
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
@@ -113,7 +114,7 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
-@rule
+@rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
@@ -265,6 +266,7 @@ async def run_go_tests(
             input_digest=binary.digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
+            level=LogLevel.INFO,
         ),
     )
     return TestResult.from_fallible_process_result(result, field_set.address, test_subsystem.output)

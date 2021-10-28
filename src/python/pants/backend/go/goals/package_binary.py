@@ -23,6 +23,7 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
     output_path: OutputPathField
 
 
-@rule
+@rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
     built_package = await Get(
