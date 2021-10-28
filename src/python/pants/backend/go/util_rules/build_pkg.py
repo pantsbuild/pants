@@ -309,10 +309,10 @@ async def setup_build_go_package_target_request(
             ),
         )
 
-        # We error if trying to _build_ a package with unsupported sources (vs. only generating the
-        # target and using in project introspection).
-        if _third_party_pkg_info.unsupported_sources_error:
-            raise _third_party_pkg_info.unsupported_sources_error
+        # We error if trying to _build_ a package with issues (vs. only generating the target and
+        # using in project introspection).
+        if _third_party_pkg_info.error:
+            raise _third_party_pkg_info.error
 
         subpath = _third_party_pkg_info.subpath
         digest = _third_party_pkg_info.digest
