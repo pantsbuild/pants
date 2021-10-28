@@ -560,12 +560,21 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     actual_mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+
     root_node = MutableTrieNode()
+
+    # Supplied by JVM_ARTIFACT_MAPPINGS
+    node = root_node.ensure_child("org")
+    node = node.ensure_child("junit")
+    node.coordinates = {UnversionedCoordinate(group="junit", artifact="junit")}
+    node.recursive = True
+
     node = root_node.ensure_child("org")
     node = node.ensure_child("joda")
     node = node.ensure_child("time")
     node.coordinates = {UnversionedCoordinate(group="joda-time", artifact="joda-time")}
     node.recursive = True
+
     assert actual_mapping.mapping_root == FrozenTrieNode(root_node)
 
 

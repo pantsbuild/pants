@@ -29,6 +29,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import JvmArtifactArtifactField, JvmArtifactGroupField
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -61,15 +62,18 @@ class JavaInferSubsystem(Subsystem):
             type=bool,
             help="Infer a target's third-party dependencies using Java import statements.",
         )
+        _default_package_mapping_url = git_url(
+            "src/python/pants/backend/java/dependency_inference/jvm_artifact_mappings.py"
+        )
         register(
             "--third-party-import-mapping",
             type=dict,
-            default=JVM_ARTIFACT_MAPPINGS,
             help=(
-                "Dictionary mapping a Java package prefix to either (1) a JVM artifact coordinate (GROUP:ARTIFACT) "
-                "without the version; or (2) the value `SKIP` which causes that prefix to not be used for "
-                "inference. (This dictionary is a flattened trie. Internally, Pants will convert the dictionary "
-                "into the trie data structure actually used for dependency inference.)"
+                "A dictionary mapping a Java package path to a JVM artifact coordinate (GROUP:ARTIFACT) "
+                "without the version. The package path may be made recursive to match symbols in subpackages "
+                "by adding `.**` to the end of the package path. For example, specify `{'org.junit.**': 'junit:jnit'} `"
+                "to infer a dependency on junit:junit for any file importing a symbol from org.junit or its "
+                f"subpackages. Pants also supplies a default package mapping ({_default_package_mapping_url})."
             ),
         )
 
@@ -325,7 +329,10 @@ async def compute_java_third_party_artifact_mapping(
         current_node.recursive = recursive
 
     mapping = MutableTrieNode()
-    for imp_name, imp_action in java_infer_subsystem.third_party_import_mapping.items():
+    for imp_name, imp_action in {
+        **JVM_ARTIFACT_MAPPINGS,
+        **java_infer_subsystem.third_party_import_mapping,
+    }.items():
         value = UnversionedCoordinate.from_coord_str(imp_action)
         insert(mapping, imp_name, value)
 
