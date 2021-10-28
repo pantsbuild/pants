@@ -33,7 +33,7 @@ class JavaSourceDependencyAnalysis:
     def from_json_dict(cls, analysis: dict[str, Any]) -> JavaSourceDependencyAnalysis:
         return cls(
             declared_package=analysis["declaredPackage"],
-            imports=[JavaImport.from_json_dict(imp) for imp in analysis["imports"]],
-            top_level_types=analysis["topLevelTypes"],
-            consumed_unqualified_types=analysis["consumedUnqualifiedTypes"],
+            imports=tuple(JavaImport.from_json_dict(imp) for imp in analysis["imports"]),
+            top_level_types=tuple(analysis["topLevelTypes"]),
+            consumed_unqualified_types=tuple(analysis["consumedUnqualifiedTypes"]),
         )
