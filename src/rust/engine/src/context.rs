@@ -420,7 +420,7 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    let graph = Arc::new(InvalidatableGraph(Graph::new()));
+    let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
     let ca_certs = Self::load_certificates(ca_certs_path)?;
