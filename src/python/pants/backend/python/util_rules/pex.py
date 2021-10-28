@@ -104,6 +104,11 @@ class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
     apply_constraints: bool
+    # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as part of
+    # #12314, but in the meantime, it "acts like" a lockfile, but isn't actually typed as a Lockfile
+    # because the constraints are modified in memory first. This flag marks a `PexRequirements`
+    # resolve as being a request for the entire constraints file.
+    is_all_constraints_resolve: bool
     repository_pex: Pex | None
 
     def __init__(
@@ -111,6 +116,7 @@ class PexRequirements:
         req_strings: Iterable[str] = (),
         *,
         apply_constraints: bool = False,
+        is_all_constraints_resolve: bool = False,
         repository_pex: Pex | None = None,
     ) -> None:
         """
@@ -122,6 +128,7 @@ class PexRequirements:
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.apply_constraints = apply_constraints
+        self.is_all_constraints_resolve = is_all_constraints_resolve
         self.repository_pex = repository_pex
 
     @classmethod
@@ -424,6 +431,7 @@ async def build_pex(
     )
 
     if isinstance(request.requirements, Lockfile):
+        is_monolithic_resolve = True
         argv.extend(["--requirement", request.requirements.file_path])
         argv.append("--no-transitive")
         globs = PathGlobs(
@@ -445,6 +453,7 @@ async def build_pex(
         requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
     elif isinstance(request.requirements, LockfileContent):
+        is_monolithic_resolve = True
         file_content = request.requirements.file_content
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
@@ -459,6 +468,7 @@ async def build_pex(
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
         assert isinstance(request.requirements, PexRequirements)
+        is_monolithic_resolve = request.requirements.is_all_constraints_resolve
 
         if (
             request.requirements.apply_constraints
@@ -492,7 +502,7 @@ async def build_pex(
 
     output_files: Iterable[str] | None = None
     output_directories: Iterable[str] | None = None
-    if request.internal_only:
+    if request.internal_only or is_monolithic_resolve:
         # This is a much friendlier layout for the CAS than the default zipapp.
         argv.extend(["--layout", "packed"])
         output_directories = [request.output_filename]

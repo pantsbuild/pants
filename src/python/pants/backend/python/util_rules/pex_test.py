@@ -418,6 +418,22 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.parametrize("is_all_constraints_resolve", [True, False])
+@pytest.mark.parametrize("internal_only", [True, False])
+def test_use_packed_pex_requirements(
+    rule_runner: RuleRunner, is_all_constraints_resolve: bool, internal_only: bool
+) -> None:
+    requirements = PexRequirements(
+        ["six==1.12.0"], is_all_constraints_resolve=is_all_constraints_resolve
+    )
+    pex_data = create_pex_and_get_all_data(
+        rule_runner, requirements=requirements, internal_only=internal_only
+    )
+    # If this is either internal_only, or an all_constraints resolve, we should use packed.
+    should_use_packed = is_all_constraints_resolve or internal_only
+    assert (not pex_data.is_zipapp) == should_use_packed
+
+
 def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     direct_deps = ["requests>=1.0.0,<=2.23.0"]
 
