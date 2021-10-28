@@ -6,17 +6,17 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
-from pants.backend.java.dependency_inference.java_parser_launcher import (
-    rules as java_parser_launcher_rules,
-)
-from pants.backend.java.dependency_inference.rules import (
+from pants.backend.java.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
-    InferJavaSourceDependencies,
     MutableTrieNode,
     ThirdPartyJavaPackageToArtifactMapping,
     UnversionedCoordinate,
 )
+from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
+from pants.backend.java.dependency_inference.java_parser_launcher import (
+    rules as java_parser_launcher_rules,
+)
+from pants.backend.java.dependency_inference.rules import InferJavaSourceDependencies
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
     JavaSourceField,
