@@ -133,7 +133,7 @@ async def download_and_analyze_third_party_packages(
         GoSdkProcess(
             command=list_argv,
             # TODO: make this more descriptive: point to the actual `go_mod` target or path.
-            description="Download and analyze all third-party Go packages",
+            description="Run `go list` to download and analyze all third-party Go packages",
             input_digest=go_mod_prefixed_digest,
             output_directories=("gopath/pkg/mod",),
             working_dir=go_mod_prefix,
