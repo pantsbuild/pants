@@ -7,8 +7,8 @@ import itertools
 from typing import Iterable
 
 import pytest
-from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileMetadata,
@@ -20,8 +20,8 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
 
-def reqset(*a) -> set[Requirement]:
-    return {Requirement.parse(i) for i in a}
+def reqset(*a) -> set[PipRequirement]:
+    return {PipRequirement.parse(i) for i in a}
 
 
 def test_metadata_header_round_trip() -> None:

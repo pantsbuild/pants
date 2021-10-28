@@ -17,6 +17,7 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import MainSpecification
@@ -543,7 +544,7 @@ def _validate_metadata(
     # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
     # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
     req_strings = (
-        {Requirement.parse(i) for i in requirements.req_strings}
+        {PipRequirement.parse(i) for i in requirements.req_strings}
         if requirements.req_strings is not None
         else None
     )
@@ -1071,6 +1072,8 @@ class PexDistributionInfo:
     project_name: str
     version: packaging.version.Version
     requires_python: packaging.specifiers.SpecifierSet | None
+    # Note: These are parsed from metadata written by the pex tool, and are always
+    #   a valid pkg_resources.Requirement.
     requires_dists: tuple[Requirement, ...]
 
 
