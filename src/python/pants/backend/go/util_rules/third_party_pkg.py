@@ -12,6 +12,7 @@ import ijson
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     Digest,
     DigestSubset,
@@ -144,11 +145,19 @@ async def download_and_analyze_third_party_packages(
 
     all_digest_subset_gets = []
     all_pkg_info_kwargs = []
+    all_failed_pkg_info = []
     for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):
         if "Standard" in pkg_json:
             continue
         import_path = pkg_json["ImportPath"]
-        error = maybe_raise_or_create_error(pkg_json, import_path)
+
+        maybe_error, maybe_failed_pkg_info = maybe_raise_or_create_error_or_create_failed_pkg_info(
+            pkg_json, import_path
+        )
+        if maybe_failed_pkg_info:
+            all_failed_pkg_info.append(maybe_failed_pkg_info)
+            continue
+
         dir_path = strip_prefix(strip_v2_chroot_path(pkg_json["Dir"]), "gopath/pkg/mod/")
         all_pkg_info_kwargs.append(
             dict(
@@ -157,7 +166,7 @@ async def download_and_analyze_third_party_packages(
                 imports=tuple(pkg_json.get("Imports", ())),
                 go_files=tuple(pkg_json.get("GoFiles", ())),
                 s_files=tuple(pkg_json.get("SFiles", ())),
-                error=error,
+                error=maybe_error,
             )
         )
         all_digest_subset_gets.append(
@@ -179,6 +188,7 @@ async def download_and_analyze_third_party_packages(
         pkg_info_kwargs["import_path"]: ThirdPartyPkgInfo(digest=digest_subset, **pkg_info_kwargs)
         for pkg_info_kwargs, digest_subset in zip(all_pkg_info_kwargs, all_digest_subsets)
     }
+    import_path_to_info.update((pkg_info.import_path, pkg_info) for pkg_info in all_failed_pkg_info)
     return AllThirdPartyPackages(list_result.output_digest, FrozenDict(import_path_to_info))
 
 
@@ -197,16 +207,19 @@ async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyP
     )
 
 
-def maybe_raise_or_create_error(
-    go_list_json: dict,
-    import_path: str,
-) -> GoThirdPartyPkgError | None:
-    """Error for unrecoverable errors, but lazily create an error for recoverable errors.
+def maybe_raise_or_create_error_or_create_failed_pkg_info(
+    go_list_json: dict, import_path: str
+) -> tuple[GoThirdPartyPkgError | None, ThirdPartyPkgInfo | None]:
+    """Error for unrecoverable errors, otherwise lazily create an error or `ThirdPartyPkgInfo` for
+    recoverable errors.
 
     Lazy errors should only be raised when the package is compiled, but not during target generation
     and project introspection. This is important so that we don't overzealously error on packages
     that the user doesn't actually ever use, given how a Go module includes all of its packages,
     even test packages that are never used by first-party code.
+
+    Returns a `ThirdPartyPkgInfo` if the `Dir` key is missing, which is necessary for our normal
+    analysis of the package.
     """
     if import_path == "...":
         if "Error" not in go_list_json:
@@ -219,20 +232,32 @@ def maybe_raise_or_create_error(
         raise GoThirdPartyPkgError(go_list_json["Error"]["Err"])
 
     if "Dir" not in go_list_json:
-        raise GoThirdPartyPkgError(
+        error = GoThirdPartyPkgError(
             f"`go list` failed for the import path `{import_path}` because `Dir` was not defined. "
             f"Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose so "
             f"that we can figure out how to support this:"
             f"\n\n{go_list_json}"
         )
+        return None, ThirdPartyPkgInfo(
+            import_path=import_path,
+            subpath="",
+            digest=EMPTY_DIGEST,
+            imports=(),
+            go_files=(),
+            s_files=(),
+            error=error,
+        )
 
     if "Error" in go_list_json:
         err_msg = go_list_json["Error"]["Err"]
-        return GoThirdPartyPkgError(
-            f"`go list` failed for the import path `{import_path}`. Please open an issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose so that we can figure out "
-            "how to support this:"
-            f"\n\n{err_msg}\n\n{go_list_json}"
+        return (
+            GoThirdPartyPkgError(
+                f"`go list` failed for the import path `{import_path}`. Please open an issue at "
+                "https://github.com/pantsbuild/pants/issues/new/choose so that we can figure out "
+                "how to support this:"
+                f"\n\n{err_msg}\n\n{go_list_json}"
+            ),
+            None,
         )
 
     for key in (
@@ -248,14 +273,17 @@ def maybe_raise_or_create_error(
         "SysoFiles",
     ):
         if key in go_list_json:
-            return GoThirdPartyPkgError(
-                f"The third-party package {import_path} includes `{key}`, which Pants does "
-                "not yet support. Please open a feature request at "
-                "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-                "prioritize adding support. Please include this error message and the version of "
-                "the third-party module."
+            return (
+                GoThirdPartyPkgError(
+                    f"The third-party package {import_path} includes `{key}`, which Pants does "
+                    "not yet support. Please open a feature request at "
+                    "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+                    "prioritize adding support. Please include this error message and the version of "
+                    "the third-party module."
+                ),
+                None,
             )
-    return None
+    return None, None
 
 
 def rules():
