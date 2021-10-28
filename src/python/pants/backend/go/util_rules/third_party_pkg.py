@@ -210,19 +210,13 @@ async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyP
         AllThirdPartyPackages, AllThirdPartyPackagesRequest(request.go_mod_stripped_digest)
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
-    if pkg_info is None:
-        raise AssertionError(
-            f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "
-            "This should not happen. Please open an issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose with this error message."
-        )
-
-    # We error if trying to _use_ a package with unsupported sources (vs. only generating the
-    # target definition).
-    if pkg_info.unsupported_sources_error:
-        raise pkg_info.unsupported_sources_error
-
-    return pkg_info
+    if pkg_info:
+        return pkg_info
+    raise AssertionError(
+        f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "
+        "This should not happen. Please open an issue at "
+        "https://github.com/pantsbuild/pants/issues/new/choose with this error message."
+    )
 
 
 def maybe_create_error_for_invalid_sources(
