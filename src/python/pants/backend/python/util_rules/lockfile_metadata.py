@@ -123,7 +123,8 @@ class LockfileMetadata:
                 "be decoded. " + error_suffix
             )
 
-        concrete_class = _concrete_metadata_classes[metadata["version"]]
+        version = metadata.get("version", 1)
+        concrete_class = _concrete_metadata_classes[version]
 
         return concrete_class._from_json_dict(metadata, lockfile_description, error_suffix)
 
