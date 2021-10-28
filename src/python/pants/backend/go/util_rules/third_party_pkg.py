@@ -23,6 +23,7 @@ from pants.engine.fs import (
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import strip_prefix, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ class AllThirdPartyPackagesRequest:
     go_mod_stripped_digest: Digest
 
 
-@rule
+@rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
