@@ -15,7 +15,7 @@ from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
-from pants.core.goals.check import CheckResults
+from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -200,11 +200,8 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 [JavacCheckRequest.field_set_type.create(coarsened_target.representative)]
             )
         ],
-    )
-
-    assert len(check_results.results) == 1
-    check_result = check_results.results[0]
-    assert check_result.partition_description == str(coarsened_target)
+    ).results
+    assert set(check_results) == {CheckResult(0, "", "")}
 
 
 @maybe_skip_jdk_test
