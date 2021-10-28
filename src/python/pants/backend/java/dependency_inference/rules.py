@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Set, cast
 
 from pants.backend.java.dependency_inference import import_parser, java_parser, package_mapper
 from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
@@ -169,7 +169,7 @@ class MutableTrieNode:
     def __init__(self):
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
-        self.coordinate: UnversionedCoordinate | None = None
+        self.coordinates: set[UnversionedCoordinate] = set()
 
     def ensure_child(self, name: str) -> MutableTrieNode:
         if name in self.children:
@@ -187,7 +187,9 @@ class FrozenTrieNode:
             children[key] = FrozenTrieNode(child)
         self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
         self._recursive: bool = node.recursive
-        self._coordinate: UnversionedCoordinate | None = node.coordinate
+        self._coordinates: FrozenOrderedSet[UnversionedCoordinate] = FrozenOrderedSet(
+            node.coordinates
+        )
 
     def find_child(self, name: str) -> FrozenTrieNode | None:
         return self._children.get(name)
@@ -197,11 +199,11 @@ class FrozenTrieNode:
         return self._recursive
 
     @property
-    def coordinate(self) -> UnversionedCoordinate | None:
-        return self._coordinate
+    def coordinates(self) -> FrozenOrderedSet[UnversionedCoordinate]:
+        return self._coordinates
 
     def __hash__(self) -> int:
-        return hash((self._children, self._recursive, self._coordinate))
+        return hash((self._children, self._recursive, self._coordinates))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FrozenTrieNode):
@@ -209,11 +211,11 @@ class FrozenTrieNode:
         return (
             self._children == other._children
             and self.recursive == other.recursive
-            and self.coordinate == other.coordinate
+            and self.coordinates == other.coordinates
         )
 
     def __repr__(self):
-        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, coordinate={self._coordinate})"
+        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, coordinate={self._coordinates})"
 
 
 @dataclass(frozen=True)
@@ -260,9 +262,7 @@ async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
 ) -> ThirdPartyJavaPackageToArtifactMapping:
-    def insert(
-        mapping: MutableTrieNode, imp: str, coordinate: UnversionedCoordinate | None
-    ) -> None:
+    def insert(mapping: MutableTrieNode, imp: str, coordinate: UnversionedCoordinate) -> None:
         imp_parts = imp.split(".")
         recursive = False
         if imp_parts[-1] == "**":
@@ -274,12 +274,12 @@ async def compute_java_third_party_artifact_mapping(
             child_node = current_node.ensure_child(imp_part)
             current_node = child_node
 
-        current_node.coordinate = coordinate
+        current_node.coordinates.add(coordinate)
         current_node.recursive = recursive
 
     mapping = MutableTrieNode()
     for imp_name, imp_action in java_infer_subsystem.third_party_import_mapping.items():
-        value = UnversionedCoordinate.from_coord_str(imp_action) if imp_action != "SKIP" else None
+        value = UnversionedCoordinate.from_coord_str(imp_action)
         insert(mapping, imp_name, value)
 
     return ThirdPartyJavaPackageToArtifactMapping(FrozenTrieNode(mapping))
@@ -287,7 +287,7 @@ async def compute_java_third_party_artifact_mapping(
 
 def find_artifact_mapping(
     imp: str, mapping: ThirdPartyJavaPackageToArtifactMapping
-) -> UnversionedCoordinate | None:
+) -> FrozenOrderedSet[UnversionedCoordinate]:
     imp_parts = imp.split(".")
     current_node = mapping.mapping_root
 
@@ -300,20 +300,20 @@ def find_artifact_mapping(
         current_node = child_node_opt
 
     if not found_nodes:
-        return None
+        return FrozenOrderedSet()
 
     # If the length of the found nodes equals the number of parts of the package path, then there
     # is an exact match.
     if len(found_nodes) == len(imp_parts):
-        return found_nodes[-1].coordinate
+        return FrozenOrderedSet(found_nodes[-1].coordinates)
 
     # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
     for found_node in reversed(found_nodes):
         if found_node.recursive:
-            return found_node.coordinate
+            return FrozenOrderedSet(found_node.coordinates)
 
     # Nothing matched so return no match.
-    return None
+    return FrozenOrderedSet()
 
 
 @rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
@@ -336,22 +336,30 @@ async def infer_java_dependencies_via_third_party_imports(
     dependencies: OrderedSet[Address] = OrderedSet()
 
     for imp in analysis.imports:
-        artifact_mapping_opt = find_artifact_mapping(imp.name, artifact_package_mapping)
-        if not artifact_mapping_opt:
+        artifact_mapping_set = find_artifact_mapping(imp.name, artifact_package_mapping)
+        if not artifact_mapping_set:
             continue
 
-        candidate_artifact_addresses = available_artifacts.artifacts.get(artifact_mapping_opt)
+        candidate_artifact_addresses: Set[Address] = set()
+        for dep in artifact_mapping_set:
+            candidates_for_dep = available_artifacts.artifacts.get(dep, FrozenOrderedSet())
+            candidate_artifact_addresses.update(candidates_for_dep)
+
         if not candidate_artifact_addresses:
             continue
 
+        frozen_candidate_artifact_addresses = FrozenOrderedSet(candidate_artifact_addresses)
+
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            candidate_artifact_addresses,
+            frozen_candidate_artifact_addresses,
             address,
             import_reference="third-party package",
             context=f"The target {address} imports `{imp.name}`",
         )
 
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(candidate_artifact_addresses)
+        maybe_disambiguated = explicitly_provided_deps.disambiguated(
+            frozen_candidate_artifact_addresses
+        )
         if maybe_disambiguated:
             dependencies.add(maybe_disambiguated)
 

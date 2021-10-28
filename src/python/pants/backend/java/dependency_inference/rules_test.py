@@ -564,7 +564,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     node = root_node.ensure_child("org")
     node = node.ensure_child("joda")
     node = node.ensure_child("time")
-    node.coordinate = UnversionedCoordinate(group="joda-time", artifact="joda-time")
+    node.coordinates = {UnversionedCoordinate(group="joda-time", artifact="joda-time")}
     node.recursive = True
     assert actual_mapping.mapping_root == FrozenTrieNode(root_node)
 
