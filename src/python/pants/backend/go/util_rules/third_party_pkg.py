@@ -248,6 +248,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             imports=(),
             go_files=(),
             s_files=(),
+            minimum_go_version=None,
             error=error,
         )
 
