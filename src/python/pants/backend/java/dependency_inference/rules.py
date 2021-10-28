@@ -153,11 +153,17 @@ async def infer_java_dependencies_via_imports(
             dependencies.add(maybe_disambiguated)
 
     if java_infer_subsystem.third_party_imports:
-        for imp in analysis.imports:
-            mapped_third_party_artifact_addresses = await Get(
+        mapped_third_party_artifact_addresses_for_imports = await MultiGet(
+            Get(
                 MappedThirdPartyJavaImportsToArtifactsAddresses,
                 MapThirdPartyJavaImportsToArtifactsAddressesRequest(analysis, imp),
             )
+            for imp in analysis.imports
+        )
+
+        for imp, mapped_third_party_artifact_addresses in zip(
+            analysis.imports, mapped_third_party_artifact_addresses_for_imports
+        ):
             if not mapped_third_party_artifact_addresses.addresses:
                 continue
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
