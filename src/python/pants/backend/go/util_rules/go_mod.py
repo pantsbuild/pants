@@ -30,6 +30,8 @@ class GoModInfo:
     # Digest containing `go.mod` and `go.sum` with no path prefixes.
     stripped_digest: Digest
 
+    minimum_go_version: str | None
+
 
 @dataclass(frozen=True)
 class GoModInfoRequest(EngineAwareParameter):
@@ -69,6 +71,7 @@ async def determine_go_mod_info(
         import_path=module_metadata["Module"]["Path"],
         digest=sources_digest,
         stripped_digest=stripped_sources,
+        minimum_go_version=module_metadata.get("Go"),
     )
 
 

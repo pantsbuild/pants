@@ -209,6 +209,7 @@ async def run_go_tests(
             go_file_names=pkg_info.xtest_files,
             s_file_names=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
+            minimum_go_version=pkg_info.minimum_go_version,
         )
         main_direct_deps.append(xtest_pkg_build_request)
 
@@ -222,6 +223,7 @@ async def run_go_tests(
             go_file_names=(GeneratedTestMain.TEST_MAIN_FILE,),
             s_file_names=(),
             direct_dependencies=tuple(main_direct_deps),
+            minimum_go_version=pkg_info.minimum_go_version,
         ),
     )
     if maybe_built_main_pkg.output is None:
