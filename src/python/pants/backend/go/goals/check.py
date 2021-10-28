@@ -55,7 +55,7 @@ async def check_go(request: GoCheckRequest) -> CheckResults:
         ),
         0,
     )
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name="go")
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name="go compile")
 
 
 def rules():
