@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Set, cast
+from typing import Any, Iterable, Set, cast
 
 from pants.backend.java.dependency_inference import import_parser, java_parser, package_mapper
 from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
-from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
+from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.specs import AddressSpecs, MaybeEmptyDescendantAddresses
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -94,13 +94,28 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
     infer_from = JavaSourceField
 
 
+@dataclass(frozen=True)
+class MapThirdPartyJavaImportsToArtifactsAddressesRequest:
+    analysis: JavaSourceDependencyAnalysis
+    import_name: JavaImport
+
+
+@dataclass(frozen=True)
+class MappedThirdPartyJavaImportsToArtifactsAddresses:
+    addresses: FrozenOrderedSet[Address]
+
+
 @rule(desc="Inferring Java dependencies by analyzing imports")
 async def infer_java_dependencies_via_imports(
     request: InferJavaSourceDependencies,
     java_infer_subsystem: JavaInferSubsystem,
     first_party_dep_map: FirstPartyJavaPackageMapping,
 ) -> InferredDependencies:
-    if not java_infer_subsystem.imports and not java_infer_subsystem.consumed_types:
+    if (
+        not java_infer_subsystem.imports
+        and not java_infer_subsystem.consumed_types
+        and not java_infer_subsystem.third_party_imports
+    ):
         return InferredDependencies([])
 
     address = request.sources_field.address
@@ -122,6 +137,7 @@ async def infer_java_dependencies_via_imports(
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
     dependencies: OrderedSet[Address] = OrderedSet()
+
     for typ in types:
         matches = dep_map.addresses_for_type(typ)
         if not matches:
@@ -135,6 +151,26 @@ async def infer_java_dependencies_via_imports(
         maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
         if maybe_disambiguated:
             dependencies.add(maybe_disambiguated)
+
+    if java_infer_subsystem.third_party_imports:
+        for imp in analysis.imports:
+            mapped_third_party_artifact_addresses = await Get(
+                MappedThirdPartyJavaImportsToArtifactsAddresses,
+                MapThirdPartyJavaImportsToArtifactsAddressesRequest(analysis, imp),
+            )
+            if not mapped_third_party_artifact_addresses.addresses:
+                continue
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                mapped_third_party_artifact_addresses.addresses,
+                address,
+                import_reference="import",
+                context=f"The target {address} imports `{imp.name}`",
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(
+                mapped_third_party_artifact_addresses.addresses
+            )
+            if maybe_disambiguated:
+                dependencies.add(maybe_disambiguated)
 
     return InferredDependencies(dependencies)
 
@@ -163,6 +199,15 @@ class AvailableThirdPartyArtifacts:
     target specifying that coordinate."""
 
     artifacts: FrozenDict[UnversionedCoordinate, FrozenOrderedSet[Address]]
+
+    def addresses_for_coordinates(
+        self, coordinates: Iterable[UnversionedCoordinate]
+    ) -> FrozenOrderedSet[Address]:
+        candidate_artifact_addresses: Set[Address] = set()
+        for coordinate in coordinates:
+            candidates = self.artifacts.get(coordinate, FrozenOrderedSet())
+            candidate_artifact_addresses.update(candidates)
+        return FrozenOrderedSet(candidate_artifact_addresses)
 
 
 class MutableTrieNode:
@@ -223,10 +268,6 @@ class ThirdPartyJavaPackageToArtifactMapping:
     mapping_root: FrozenTrieNode
 
 
-class InferJavaThirdPartyImportDependencies(InferDependenciesRequest):
-    infer_from = JavaSourceField
-
-
 @rule
 async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts:
     all_targets = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
@@ -285,10 +326,13 @@ async def compute_java_third_party_artifact_mapping(
     return ThirdPartyJavaPackageToArtifactMapping(FrozenTrieNode(mapping))
 
 
-def find_artifact_mapping(
-    imp: str, mapping: ThirdPartyJavaPackageToArtifactMapping
-) -> FrozenOrderedSet[UnversionedCoordinate]:
-    imp_parts = imp.split(".")
+@rule
+async def find_artifact_mapping(
+    request: MapThirdPartyJavaImportsToArtifactsAddressesRequest,
+    mapping: ThirdPartyJavaPackageToArtifactMapping,
+    available_artifacts: AvailableThirdPartyArtifacts,
+) -> MappedThirdPartyJavaImportsToArtifactsAddresses:
+    imp_parts = request.import_name.name.split(".")
     current_node = mapping.mapping_root
 
     found_nodes = []
@@ -300,70 +344,22 @@ def find_artifact_mapping(
         current_node = child_node_opt
 
     if not found_nodes:
-        return FrozenOrderedSet()
+        return MappedThirdPartyJavaImportsToArtifactsAddresses(FrozenOrderedSet())
 
     # If the length of the found nodes equals the number of parts of the package path, then there
     # is an exact match.
     if len(found_nodes) == len(imp_parts):
-        return FrozenOrderedSet(found_nodes[-1].coordinates)
+        addresses = available_artifacts.addresses_for_coordinates(found_nodes[-1].coordinates)
+        return MappedThirdPartyJavaImportsToArtifactsAddresses(FrozenOrderedSet(addresses))
 
     # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
     for found_node in reversed(found_nodes):
         if found_node.recursive:
-            return FrozenOrderedSet(found_node.coordinates)
+            addresses = available_artifacts.addresses_for_coordinates(found_node.coordinates)
+            return MappedThirdPartyJavaImportsToArtifactsAddresses(addresses)
 
     # Nothing matched so return no match.
-    return FrozenOrderedSet()
-
-
-@rule(desc="Inferring Java dependencies by analyzing consumed and top-level types")
-async def infer_java_dependencies_via_third_party_imports(
-    request: InferJavaThirdPartyImportDependencies,
-    java_infer_subsystem: JavaInferSubsystem,
-    available_artifacts: AvailableThirdPartyArtifacts,
-    artifact_package_mapping: ThirdPartyJavaPackageToArtifactMapping,
-) -> InferredDependencies:
-    if not java_infer_subsystem.third_party_imports:
-        return InferredDependencies([])
-
-    address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
-    explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(JavaSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
-    )
-
-    dependencies: OrderedSet[Address] = OrderedSet()
-
-    for imp in analysis.imports:
-        artifact_mapping_set = find_artifact_mapping(imp.name, artifact_package_mapping)
-        if not artifact_mapping_set:
-            continue
-
-        candidate_artifact_addresses: Set[Address] = set()
-        for dep in artifact_mapping_set:
-            candidates_for_dep = available_artifacts.artifacts.get(dep, FrozenOrderedSet())
-            candidate_artifact_addresses.update(candidates_for_dep)
-
-        if not candidate_artifact_addresses:
-            continue
-
-        frozen_candidate_artifact_addresses = FrozenOrderedSet(candidate_artifact_addresses)
-
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            frozen_candidate_artifact_addresses,
-            address,
-            import_reference="third-party package",
-            context=f"The target {address} imports `{imp.name}`",
-        )
-
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(
-            frozen_candidate_artifact_addresses
-        )
-        if maybe_disambiguated:
-            dependencies.add(maybe_disambiguated)
-
-    return InferredDependencies(dependencies)
+    return MappedThirdPartyJavaImportsToArtifactsAddresses(FrozenOrderedSet())
 
 
 def rules():
@@ -374,5 +370,4 @@ def rules():
         *package_mapper.rules(),
         *source_files_rules(),
         UnionRule(InferDependenciesRequest, InferJavaSourceDependencies),
-        UnionRule(InferDependenciesRequest, InferJavaThirdPartyImportDependencies),
     ]
