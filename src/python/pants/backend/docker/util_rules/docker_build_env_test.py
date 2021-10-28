@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
@@ -68,7 +68,7 @@ def test_docker_build_environment_vars_rule(
     build_args: tuple[str, ...],
     expected_env_vars: dict[str, str],
 ) -> None:
-    tgt = DockerImage({"extra_build_args": build_args}, address=Address("test"))
+    tgt = DockerImageTarget({"extra_build_args": build_args}, address=Address("test"))
     rule_runner.set_options(
         [f"--docker-env-vars={env_var}" for env_var in env_vars],
         env={

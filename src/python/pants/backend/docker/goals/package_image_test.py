@@ -18,7 +18,7 @@ from pants.backend.docker.goals.package_image import (
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(DockerBuildArgs, [DockerBuildArgsRequest]),
             QueryRule(DockerBuildEnvironment, [DockerBuildEnvironmentRequest]),
         ],
-        target_types=[DockerImage],
+        target_types=[DockerImageTarget],
     )
 
 

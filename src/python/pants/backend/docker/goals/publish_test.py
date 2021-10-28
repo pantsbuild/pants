@@ -14,7 +14,7 @@ from pants.backend.docker.goals.publish import (
     rules,
 )
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import DockerVersionContext
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PublishProcesses, [PublishDockerImageRequest]),
             QueryRule(DockerBinary, []),
         ],
-        target_types=[DockerImage],
+        target_types=[DockerImageTarget],
     )
     rule_runner.set_options(
         [],
@@ -52,7 +52,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def build(tgt: DockerImage, options: DockerOptions):
+def build(tgt: DockerImageTarget, options: DockerOptions):
     fs = DockerFieldSet.create(tgt)
     return (
         BuiltPackage(
@@ -77,7 +77,7 @@ def run_publish(
     opts.setdefault("registries", {})
     opts.setdefault("default_repository", "{directory}/{name}")
     docker_options = create_subsystem(DockerOptions, **opts)
-    tgt = cast(DockerImage, rule_runner.get_target(address))
+    tgt = cast(DockerImageTarget, rule_runner.get_target(address))
     fs = PublishDockerImageFieldSet.create(tgt)
     packages = build(tgt, docker_options)
     result = rule_runner.request(PublishProcesses, [fs._request(packages)])
