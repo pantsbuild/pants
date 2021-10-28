@@ -9,7 +9,7 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Mapping, cast
+from typing import Iterable, Mapping, Optional, cast
 
 from pants.base.specs import (
     AddressSpecs,
@@ -259,7 +259,7 @@ class TailorSubsystem(GoalSubsystem):
             "--build-file-header",
             advanced=True,
             type=str,
-            default="",
+            default=None,
             help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
         )
 
@@ -285,8 +285,8 @@ class TailorSubsystem(GoalSubsystem):
         return cast(str, self.options.build_file_name)
 
     @property
-    def build_file_header(self) -> str:
-        return cast(str, self.options.build_file_header)
+    def build_file_header(self) -> str | None:
+        return cast(Optional[str], self.options.build_file_header)
 
     @property
     def build_file_indent(self) -> str:
@@ -416,7 +416,7 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
 class EditBuildFilesRequest:
     putative_targets: PutativeTargets
     name: str
-    header: str
+    header: str | None
     indent: str
 
 
