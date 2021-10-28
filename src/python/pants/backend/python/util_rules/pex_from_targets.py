@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
@@ -388,8 +388,8 @@ async def _setup_constraints_repository_pex(
     name_req_projects = set()
 
     for req_str in request.requirements.req_strings:
-        req = Requirement.parse(req_str)
-        if req.url:  # type: ignore[attr-defined]
+        req = PipRequirement.parse(req_str)
+        if req.url:
             url_reqs.add(req)
         else:
             name_reqs.add(req)
@@ -424,7 +424,12 @@ async def _setup_constraints_repository_pex(
             description=f"Resolving {constraints_path}",
             output_filename="repository.pex",
             internal_only=request.internal_only,
-            requirements=PexRequirements(all_constraints, apply_constraints=True),
+            requirements=PexRequirements(
+                all_constraints,
+                apply_constraints=True,
+                # TODO: See PexRequirements docs.
+                is_all_constraints_resolve=True,
+            ),
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,

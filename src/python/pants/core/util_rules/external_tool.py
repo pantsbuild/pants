@@ -102,11 +102,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.version_constraints:
-            constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
-            self.check_version_constraints(
-                self.version, constraints, self.options.use_unsupported_version
-            )
+        self.check_version_constraints()
 
     @classproperty
     def name(cls):
@@ -235,33 +231,36 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             ) from e
         return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
 
-    @classmethod
-    def check_version_constraints(
-        cls, version: str, constraints: Requirement, action: UnsupportedVersionUsage
-    ) -> None:
-        if constraints.specifier.contains(version):  # type: ignore[attr-defined]
+    def check_version_constraints(self) -> None:
+        if not self.version_constraints:
+            return None
+        # Note that this is not a Python requirement. We're just hackily piggybacking off
+        # pkg_resource.Requirement's ability to check version constraints.
+        constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
+        if constraints.specifier.contains(self.version):  # type: ignore[attr-defined]
             # all ok
             return None
 
         msg = [
-            f"The option [{cls.options_scope}].version is set to {version}, which is not compatible",
-            f"with what this release of Pants expects: {constraints}.",
+            f"The option [{self.options_scope}].version is set to {self.version}, which is not "
+            f"compatible with what this release of Pants expects: {constraints}.",
             "Please update the version to a supported value, or consider using a different Pants",
             "release if you cannot change the version.",
         ]
 
-        if action is UnsupportedVersionUsage.LogWarning:
+        if self.options.use_unsupported_version is UnsupportedVersionUsage.LogWarning:
             msg.extend(
                 [
                     "Alternatively, you can ignore this warning (at your own peril) by adding this",
                     "to the GLOBAL section of pants.toml:",
-                    f"""ignore_warnings = ["The option [{cls.options_scope}].version is set to"].""",
+                    f'ignore_warnings = ["The option [{self.options_scope}].version is set to"].',
                 ]
             )
             logger.warning(" ".join(msg))
-        elif action is UnsupportedVersionUsage.RaiseError:
+        elif self.options.use_unsupported_version is UnsupportedVersionUsage.RaiseError:
             msg.append(
-                f"Alternatively, update [{cls.options_scope}].use_unsupported_version to be 'warning'."
+                f"Alternatively, update [{self.options_scope}].use_unsupported_version to be "
+                f"'warning'."
             )
             raise UnsupportedVersion(" ".join(msg))
 

@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Iterable, Set, TypeVar
 
-from pkg_resources import Requirement
-
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -66,7 +65,7 @@ class LockfileMetadata:
     @staticmethod
     def new(
         valid_for_interpreter_constraints: InterpreterConstraints,
-        requirements: set[Requirement],
+        requirements: set[PipRequirement],
     ) -> LockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -123,7 +122,8 @@ class LockfileMetadata:
                 "be decoded. " + error_suffix
             )
 
-        concrete_class = _concrete_metadata_classes[metadata["version"]]
+        version = metadata.get("version", 1)
+        concrete_class = _concrete_metadata_classes[version]
 
         return concrete_class._from_json_dict(metadata, lockfile_description, error_suffix)
 
@@ -188,7 +188,7 @@ class LockfileMetadata:
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[Requirement] | None,
+        user_requirements: Iterable[PipRequirement] | None,
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `LockfileMetadata` can be used in the current execution
         context."""
@@ -228,7 +228,7 @@ class LockfileMetadataV1(LockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        _: Iterable[Requirement] | None,  # User requirements are not used by V1
+        _: Iterable[PipRequirement] | None,  # User requirements are not used by V1
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 
@@ -255,7 +255,7 @@ class LockfileMetadataV2(LockfileMetadata):
     those in the stored requirements.
     """
 
-    requirements: set[Requirement]
+    requirements: set[PipRequirement]
 
     @classmethod
     def _from_json_dict(
@@ -268,8 +268,8 @@ class LockfileMetadataV2(LockfileMetadata):
 
         requirements = metadata(
             "generated_with_requirements",
-            Set[Requirement],
-            lambda l: {Requirement.parse(i) for i in l},
+            Set[PipRequirement],
+            lambda l: {PipRequirement.parse(i) for i in l},
         )
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
@@ -292,7 +292,7 @@ class LockfileMetadataV2(LockfileMetadata):
         _: str | None,  # Validation digests are not used by V2; this param will be deprecated
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[Requirement] | None,
+        user_requirements: Iterable[PipRequirement] | None,
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidLockfileReason] = set()
 

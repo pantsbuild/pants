@@ -113,17 +113,17 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         [source_files],
     )
     assert analysis.declared_package == "org.pantsbuild.example"
-    assert analysis.imports == [
+    assert analysis.imports == (
         JavaImport(name="java.util.Date"),
         JavaImport(name="bogus", is_asterisk=True),
         JavaImport(name="bogus.T", is_static=True),
         JavaImport(name="bogus.T.t"),
         JavaImport(name="bogus.Foo", is_asterisk=True, is_static=True),
-    ]
-    assert analysis.top_level_types == [
+    )
+    assert analysis.top_level_types == (
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
-    ]
+    )
     assert sorted(analysis.consumed_unqualified_types) == [
         "Date",
         "System",
@@ -221,9 +221,9 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
 
     analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
     assert analysis.declared_package == ""
-    assert analysis.imports == []
-    assert analysis.top_level_types == ["SimpleSource", "Foo"]
-    assert analysis.consumed_unqualified_types == ["System"]
+    assert analysis.imports == ()
+    assert analysis.top_level_types == ("SimpleSource", "Foo")
+    assert analysis.consumed_unqualified_types == ("System",)
 
 
 @maybe_skip_jdk_test
@@ -281,8 +281,8 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
 
     analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
     assert analysis.declared_package == "org.pantsbuild.test"
-    assert analysis.imports == []
-    assert analysis.top_level_types == ["org.pantsbuild.test.AnImpl"]
+    assert analysis.imports == ()
+    assert analysis.top_level_types == ("org.pantsbuild.test.AnImpl",)
     assert sorted(analysis.consumed_unqualified_types) == [
         "AThrownException",
         "ClassAnnotation",

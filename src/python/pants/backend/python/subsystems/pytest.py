@@ -10,9 +10,9 @@ from pathlib import PurePath
 from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -202,7 +202,7 @@ class PyTest(PythonToolBase):
     def validate_pytest_cov_included(self) -> None:
         for s in self.extra_requirements:
             try:
-                req = Requirement.parse(s).project_name
+                req = PipRequirement.parse(s).project_name
             except Exception as e:
                 raise ValueError(
                     format_invalid_requirement_string_error(

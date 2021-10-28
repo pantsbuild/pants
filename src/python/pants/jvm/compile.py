@@ -71,7 +71,7 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
         )
 
     def level(self) -> LogLevel:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
 
     def message(self) -> str:
         message = self.description

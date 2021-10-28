@@ -26,9 +26,9 @@ from typing import (
 )
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
@@ -806,13 +806,13 @@ def format_invalid_requirement_string_error(
     )
 
 
-class _RequirementSequenceField(Field):
-    value: tuple[Requirement, ...]
+class _PipRequirementSequenceField(Field):
+    value: tuple[PipRequirement, ...]
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[Requirement, ...]:
+    ) -> Tuple[PipRequirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -826,13 +826,13 @@ class _RequirementSequenceField(Field):
             raise invalid_type_error
         result = []
         for v in value:
-            # We allow passing a pre-parsed `Requirement`. This is intended for macros which might
-            # have already parsed so that we can avoid parsing multiple times.
-            if isinstance(v, Requirement):
+            # We allow passing a pre-parsed `PipRequirement`. This is intended for macros which
+            # might have already parsed so that we can avoid parsing multiple times.
+            if isinstance(v, PipRequirement):
                 result.append(v)
             elif isinstance(v, str):
                 try:
-                    parsed = Requirement.parse(v)
+                    parsed = PipRequirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
                         format_invalid_requirement_string_error(
@@ -849,7 +849,7 @@ class _RequirementSequenceField(Field):
         return tuple(result)
 
 
-class PythonRequirementsField(_RequirementSequenceField):
+class PythonRequirementsField(_PipRequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
@@ -1005,8 +1005,8 @@ class PythonRequirementTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirement]:
-    """Parse all `Requirement` objects from a requirements.txt-style file.
+def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
+    """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
     This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
@@ -1016,7 +1016,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
         if not line or line.startswith("#") or line.startswith("-"):
             continue
         try:
-            yield Requirement.parse(line)
+            yield PipRequirement.parse(line)
         except Exception as e:
             raise ValueError(
                 format_invalid_requirement_string_error(

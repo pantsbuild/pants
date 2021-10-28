@@ -104,7 +104,7 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
-class DockerImage(Target):
+class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,

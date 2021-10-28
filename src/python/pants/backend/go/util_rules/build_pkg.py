@@ -26,12 +26,13 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
 from pants.build_graph.address import Address
-from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
 
 
@@ -61,7 +62,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class FallibleBuildGoPackageRequest(EngineAwareParameter):
+class FallibleBuildGoPackageRequest(EngineAwareParameter, EngineAwareReturnType):
     """Request to build a package, but fallible if determining the request metadata failed.
 
     When creating "synthetic" packages, use `GoPackageRequest` directly. This type is only intended
@@ -73,9 +74,25 @@ class FallibleBuildGoPackageRequest(EngineAwareParameter):
     exit_code: int = 0
     stderr: str | None = None
 
+    def level(self) -> LogLevel:
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+
+    def message(self) -> str:
+        message = self.import_path
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
+        if self.stderr:
+            message += f"\n{self.stderr}"
+        return message
+
+    def cacheable(self) -> bool:
+        # Failed compile outputs should be re-rendered in every run.
+        return self.exit_code == 0
+
 
 @dataclass(frozen=True)
-class FallibleBuiltGoPackage:
+class FallibleBuiltGoPackage(EngineAwareReturnType):
     """Fallible version of `BuiltGoPackage` with error details."""
 
     output: BuiltGoPackage | None
@@ -83,6 +100,24 @@ class FallibleBuiltGoPackage:
     exit_code: int = 0
     stdout: str | None = None
     stderr: str | None = None
+
+    def level(self) -> LogLevel:
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+
+    def message(self) -> str:
+        message = self.import_path
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
+        if self.stdout:
+            message += f"\n{self.stdout}"
+        if self.stderr:
+            message += f"\n{self.stderr}"
+        return message
+
+    def cacheable(self) -> bool:
+        # Failed compile outputs should be re-rendered in every run.
+        return self.exit_code == 0
 
 
 @dataclass(frozen=True)
@@ -96,7 +131,9 @@ class BuiltGoPackage:
     import_paths_to_pkg_a_files: FrozenDict[str, str]
 
 
-@rule
+# NB: We must have a description for the streaming of this rule to work properly
+# (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
+@rule(desc="Compile with Go")
 async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPackage:
     maybe_built_deps = await MultiGet(
         Get(FallibleBuiltGoPackage, BuildGoPackageRequest, build_request)
@@ -234,7 +271,9 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
         return str(self.address)
 
 
-@rule
+# NB: We must have a description for the streaming of this rule to work properly
+# (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
+@rule(desc="Set up Go compilation request")
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest,
 ) -> FallibleBuildGoPackageRequest:
@@ -279,10 +318,10 @@ async def setup_build_go_package_target_request(
             ),
         )
 
-        # We error if trying to _build_ a package with unsupported sources (vs. only generating the
-        # target and using in project introspection).
-        if _third_party_pkg_info.unsupported_sources_error:
-            raise _third_party_pkg_info.unsupported_sources_error
+        # We error if trying to _build_ a package with issues (vs. only generating the target and
+        # using in project introspection).
+        if _third_party_pkg_info.error:
+            raise _third_party_pkg_info.error
 
         subpath = _third_party_pkg_info.subpath
         digest = _third_party_pkg_info.digest

@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImage, FilesGeneratorTarget, PexBinary],
+        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
