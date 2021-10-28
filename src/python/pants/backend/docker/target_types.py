@@ -122,3 +122,30 @@ class DockerImageTarget(Target):
         "Any dependencies, as inferred or explicitly specified, will be included in the Docker "
         "build context, after being packaged if applicable."
     )
+
+
+class DockerfileInstructionsField(StringSequenceField):
+    alias = "instructions"
+    required = True
+    help = "The `Dockerfile` content, typically one instruction per list item."
+
+
+class DockerfileSourceField(SingleSourceField):
+    # We solely register this field for codegen to work.
+    alias = "_source"
+    required = False
+    expected_num_files = 0
+
+
+class DockerfileTarget(Target):
+    alias = "dockerfile"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        DockerfileInstructionsField,
+        DockerfileSourceField,
+    )
+    help = (
+        "The `dockerfile` target substitutes for a `Dockerfile` in your project workspace.\n\n"
+        "Any `docker_image` may add a dependency to a `dockerfile` target rather than referencing "
+        "a `Dockerfile` on disk."
+    )
