@@ -9,6 +9,19 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @dataclass(frozen=True)
+class Deep:
+    val: int
+
+
+@rule
+async def deep(n: int) -> Deep:
+    if n < 2:
+        return Deep(n)
+    x, y = tuple(await MultiGet([Get(Deep, int(n - 2)), Get(Deep, int(n - 1))]))
+    return Deep(x.val + y.val)
+
+
+@dataclass(frozen=True)
 class Wide:
     val: int
 
@@ -20,24 +33,11 @@ async def wide(index: int) -> Wide:
     return Wide(index)
 
 
-@dataclass(frozen=True)
-class Fib:
-    val: int
-
-
-@rule
-async def fib(n: int) -> Fib:
-    if n < 2:
-        return Fib(n)
-    x, y = tuple(await MultiGet([Get(Fib, int(n - 2)), Get(Fib, int(n - 1))]))
-    return Fib(x.val + y.val)
-
-
 def test_bench_deep():
-    rule_runner = RuleRunner(rules=[fib, QueryRule(Fib, (int,))])
+    rule_runner = RuleRunner(rules=[deep, QueryRule(Deep, (int,))])
     for _ in range(0, 10):
         rule_runner.scheduler.scheduler.invalidate_all()
-        _ = rule_runner.request(Fib, [10000])
+        _ = rule_runner.request(Deep, [10000])
 
 
 def test_bench_wide():
