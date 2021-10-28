@@ -13,10 +13,19 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    SourcesField,
+    Targets,
+    WrappedTarget,
+)
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -114,6 +123,7 @@ async def setup_process_for_parse_dockerfile(
 
 @dataclass(frozen=True)
 class DockerfileInfo:
+    digest: Digest
     source: str = ""
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
@@ -130,13 +140,40 @@ def split_iterable(
 
 
 @rule
-async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(source))
+async def parse_dockerfile(source_field: DockerImageSourceField) -> DockerfileInfo:
+    wrapped_target = await Get(WrappedTarget, Address, source_field.address)
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_target.target.get(Dependencies))
+    )
+    dependencies = await Get(
+        Targets,
+        Addresses([addr for addr in explicit_deps.includes if addr not in explicit_deps.ignores]),
+    )
+    sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            sources_fields=[
+                source_field,
+                *[
+                    tgt.get(SourcesField)
+                    for tgt in dependencies
+                    if not tgt.has_field(DockerImageSourceField)
+                ],
+            ],
+            for_sources_types=(DockerImageSourceField,),
+            enable_codegen=True,
+        ),
+    )
+
+    # The resolved files validation is deferred during hydration for the DockerImageSourceField,
+    # awaiting the result of any codegen rules. Apply validation now that we have all sources.
+    source_field.validate_resolved_files(sources.snapshot.files, defer_validation=False)
+
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
-            hydrated_sources.snapshot.digest,
-            ("version-tags,putative-targets", *hydrated_sources.snapshot.files),
+            sources.snapshot.digest,
+            ("version-tags,putative-targets", *sources.snapshot.files),
         ),
     )
 
@@ -146,7 +183,8 @@ async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
     # There can only be a single file in the snapshot, due to the
     # DockerImageSourceField.expected_num_files == 1.
     return DockerfileInfo(
-        source=hydrated_sources.snapshot.files[0],
+        digest=sources.snapshot.digest,
+        source=sources.snapshot.files[0],
         putative_target_addresses=putative_targets,
         version_tags=version_tags,
     )

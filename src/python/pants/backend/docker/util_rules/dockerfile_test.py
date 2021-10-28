@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
 def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
+            "test/BUILD": dedent(
                 """\
                 dockerfile(
                   name="test",
@@ -46,7 +46,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgt = rule_runner.get_target(Address("", target_name="test"))
+    tgt = rule_runner.get_target(Address("test", target_name="test"))
     result = rule_runner.request(
         SourceFiles,
         [
@@ -58,7 +58,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert result.snapshot.files == ("Dockerfile",)
+    assert result.snapshot.files == ("test/Dockerfile",)
 
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     assert len(contents) == 1

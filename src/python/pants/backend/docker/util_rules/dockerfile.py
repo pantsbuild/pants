@@ -25,7 +25,14 @@ async def generate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSo
     output = (
         await Get(
             Snapshot,
-            CreateDigest((FileContent("Dockerfile", "\n".join([*instructions, ""]).encode()),)),
+            CreateDigest(
+                (
+                    FileContent(
+                        f"{request.protocol_target.residence_dir}/Dockerfile",
+                        "\n".join([*instructions, ""]).encode(),
+                    ),
+                )
+            ),
         )
         if instructions
         else EMPTY_SNAPSHOT

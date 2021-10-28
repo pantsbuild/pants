@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from itertools import chain
 from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -123,30 +122,18 @@ async def create_docker_build_context(
 ) -> DockerBuildContext:
     # Get all targets to include in context.
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
-
     docker_image = transitive_targets.roots[0]
 
-    # Get the Dockerfile from the root target.
-    dockerfile_request = Get(
-        SourceFiles,
-        SourceFilesRequest(
-            sources_fields=[t.get(SourcesField) for t in transitive_targets.roots],
-            for_sources_types=(DockerImageSourceField,),
-        ),
-    )
-
     # Get all dependencies for the root target.
-    root_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(target.get(Dependencies)))
-        for target in transitive_targets.roots
-    )
+    root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
 
     # Get all sources from the root dependencies (i.e. files).
-    sources_request = Get(
+    file_sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=[t.get(SourcesField) for t in chain(*root_dependencies)],
+            sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
             for_sources_types=(FileSourceField,),
+            enable_codegen=True,
         ),
     )
 
@@ -155,14 +142,13 @@ async def create_docker_build_context(
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    dockerfile, sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
-        dockerfile_request,
-        sources_request,
+    file_sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+        file_sources_request,
         embedded_pkgs_per_target_request,
         Get(
             DockerfileInfo,
             DockerImageSourceField,
-            transitive_targets.roots[0][DockerImageSourceField],
+            docker_image[DockerImageSourceField],
         ),
     )
 
@@ -179,7 +165,7 @@ async def create_docker_build_context(
     logger.debug(f"Packages for Docker image: {packages_str}")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
-    all_digests = (dockerfile.snapshot.digest, sources.snapshot.digest, *embedded_pkgs_digest)
+    all_digests = (dockerfile_info.digest, file_sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
     context_request = Get(Digest, MergeDigests(d for d in all_digests if d))

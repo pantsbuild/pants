@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
+from typing import Sequence
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.core.goals.run import RestartableField
@@ -9,6 +10,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    InvalidFieldException,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -29,8 +31,19 @@ class DockerBuildArgsField(StringSequenceField):
 
 class DockerImageSourceField(SingleSourceField):
     default = "Dockerfile"
+    expected_num_files = 1
     required = False
     help = "The Dockerfile to use when building the Docker image."
+
+    def validate_resolved_files(self, files: Sequence[str], defer_validation: bool = True) -> None:
+        if not defer_validation:
+            try:
+                super().validate_resolved_files(files)
+            except InvalidFieldException as e:
+                raise InvalidFieldException(
+                    f"{e}\n\nThis may happen if you use a source glob that matches multiple "
+                    "Dockerfiles, and/or depend on one or more `dockerfile` targets."
+                ) from e
 
 
 class DockerImageTagsField(StringSequenceField):

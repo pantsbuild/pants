@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import DockerfileTarget, DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
@@ -17,6 +17,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
 from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
+from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -36,16 +37,17 @@ def rule_runner() -> RuleRunner:
         rules=[
             *context_rules(),
             *core_target_types_rules(),
-            docker_build_args,
-            docker_build_environment_vars,
+            *dockerfile_rules(),
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
+            docker_build_args,
+            docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
+        target_types=[DockerImageTarget, DockerfileTarget, FilesGeneratorTarget, PexBinary],
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
@@ -200,6 +202,40 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
                 FROM alpine as interim
                 FROM interim
                 FROM scratch:1-1 as output
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile"],
+        expected_version_context={
+            "baseimage": {"tag": "3.8"},
+            "stage0": {"tag": "3.8"},
+            "interim": {"tag": "latest"},
+            "stage2": {"tag": "latest"},
+            "output": {"tag": "1-1"},
+        },
+    )
+
+
+def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(dependencies=[":dockerfile"])
+                dockerfile(
+                  name="dockerfile",
+                  instructions=[
+                    "FROM python:3.8",
+                    "FROM alpine as interim",
+                    "FROM interim",
+                    "FROM scratch:1-1 as output",
+                  ]
+                )
                 """
             ),
         }
