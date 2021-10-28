@@ -832,7 +832,7 @@ class VenvPexRequest:
     bin_names: tuple[str, ...] = ()
 
     def __init__(self, pex_request: PexRequest, bin_names: Iterable[str] = ()) -> None:
-        """A request for a PEX that runs in a venv and optionally exposes select vanv `bin` scripts.
+        """A request for a PEX that runs in a venv and optionally exposes select venv `bin` scripts.
 
         :param pex_request: The details of the desired PEX.
         :param bin_names: The names of venv `bin` scripts to expose for execution.

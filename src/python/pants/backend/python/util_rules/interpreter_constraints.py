@@ -35,12 +35,18 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
-# The current maxes are 2.7.18 and 3.6.13.
-_EXPECTED_LAST_PATCH_VERSION = 18
+# The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
+_PATCH_VERSION_UPPER_BOUND = 30
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
+    @classmethod
+    def for_fixed_python_version(
+        cls, cpython_version_str: str, interpreter_type: str = "CPython"
+    ) -> InterpreterConstraints:
+        return cls([f"{interpreter_type}=={cpython_version_str}"])
+
     def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
         # #12578 `parse_constraint` will sort the requirement's component constraints into a stable form.
         # We need to sort the component constraints for each requirement _before_ sorting the entire list
@@ -180,7 +186,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         return args
 
     def _valid_patch_versions(self, major: int, minor: int) -> Iterator[int]:
-        for p in range(0, _EXPECTED_LAST_PATCH_VERSION + 1):
+        for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
             for req in self:
                 if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
                     yield p
@@ -202,9 +208,21 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         The constraints may also be compatible with later versions; this is the lowest version that
         still works.
         """
+        snapped = self.snap_to_minimum(interpreter_universe)
+        if snapped:
+            # We know by construction that snapped has a single requirement, and that has a single
+            # (op, version) spec whose version is "major.minor.*", so we just strip off the ".*" .
+            return next(iter(snapped)).specs[0][1][:-2]
+        return None
+
+    def snap_to_minimum(self, interpreter_universe: Iterable[str]) -> InterpreterConstraints | None:
+        """Snap to the lowest Python major.minor version that works with these constraints."""
         for major, minor in sorted(_major_minor_to_int(s) for s in interpreter_universe):
-            if self._includes_version(major, minor):
-                return f"{major}.{minor}"
+            for p in range(0, _PATCH_VERSION_UPPER_BOUND + 1):
+                for req in self:
+                    if req.specifier.contains(f"{major}.{minor}.{p}"):  # type: ignore[attr-defined]
+                        snapped = Requirement.parse(f"{req.project_name}=={major}.{minor}.*")
+                        return InterpreterConstraints([snapped])
         return None
 
     def _requires_python3_version_or_newer(
@@ -212,7 +230,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     ) -> bool:
         if not self:
             return False
-        patch_versions = list(reversed(range(0, _EXPECTED_LAST_PATCH_VERSION)))
+        patch_versions = list(reversed(range(0, _PATCH_VERSION_UPPER_BOUND)))
         # We only look at the prior Python release. For example, consider Python 3.8+
         # looking at 3.7. If using something like `>=3.5`, Py37 will be included.
         # `==3.6.*,!=3.7.*,==3.8.*` is unlikely, and even that will work correctly as
