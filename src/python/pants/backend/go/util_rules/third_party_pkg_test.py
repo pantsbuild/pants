@@ -390,7 +390,7 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
     pkg_info = rule_runner.request(
         ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest)]
     )
-    assert pkg_info.unsupported_sources_error is not None
+    assert pkg_info.error is not None
 
 
 def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunner) -> None:

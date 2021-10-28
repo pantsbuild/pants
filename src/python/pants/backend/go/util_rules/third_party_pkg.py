@@ -27,6 +27,10 @@ from pants.util.strutil import strip_prefix, strip_v2_chroot_path
 logger = logging.getLogger(__name__)
 
 
+class GoThirdPartyPkgError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class ThirdPartyPkgInfo:
     """All the info and files needed to build a third-party package.
@@ -45,7 +49,7 @@ class ThirdPartyPkgInfo:
     go_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
-    unsupported_sources_error: NotImplementedError | None = None
+    error: GoThirdPartyPkgError | None = None
 
 
 @dataclass(frozen=True)
@@ -144,31 +148,7 @@ async def download_and_analyze_third_party_packages(
         if "Standard" in pkg_json:
             continue
         import_path = pkg_json["ImportPath"]
-        if import_path == "...":
-            if "Error" not in pkg_json:
-                raise AssertionError(
-                    "`go list` included the import path `...`, but there was no `Error` attached. "
-                    "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
-                    f"with this error message:\n\n{pkg_json}"
-                )
-            # TODO: Improve this error message, such as better instructions if `go.sum` is stale.
-            raise Exception(pkg_json["Error"]["Err"])
-
-        if "Error" in pkg_json:
-            err = pkg_json["Error"]["Err"]
-            if "build constraints exclude all Go files" in err:
-                logger.debug(
-                    f"Skipping the Go third-party package `{import_path}` because of this "
-                    f"error: {err}"
-                )
-                continue
-
-            raise AssertionError(
-                f"`go list` failed for the import path `{import_path}`. Please open an issue at "
-                f"https://github.com/pantsbuild/pants/issues/new/choose so that we can figure out "
-                f"how to support this:\n\n{err}"
-            )
-
+        error = maybe_raise_or_create_error(pkg_json, import_path)
         dir_path = strip_prefix(strip_v2_chroot_path(pkg_json["Dir"]), "gopath/pkg/mod/")
         all_pkg_info_kwargs.append(
             dict(
@@ -177,9 +157,7 @@ async def download_and_analyze_third_party_packages(
                 imports=tuple(pkg_json.get("Imports", ())),
                 go_files=tuple(pkg_json.get("GoFiles", ())),
                 s_files=tuple(pkg_json.get("SFiles", ())),
-                unsupported_sources_error=maybe_create_error_for_invalid_sources(
-                    pkg_json, import_path
-                ),
+                error=error,
             )
         )
         all_digest_subset_gets.append(
@@ -219,9 +197,44 @@ async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyP
     )
 
 
-def maybe_create_error_for_invalid_sources(
-    go_list_json: dict, import_path: str
-) -> NotImplementedError | None:
+def maybe_raise_or_create_error(
+    go_list_json: dict,
+    import_path: str,
+) -> GoThirdPartyPkgError | None:
+    """Error for unrecoverable errors, but lazily create an error for recoverable errors.
+
+    Lazy errors should only be raised when the package is compiled, but not during target generation
+    and project introspection. This is important so that we don't overzealously error on packages
+    that the user doesn't actually ever use, given how a Go module includes all of its packages,
+    even test packages that are never used by first-party code.
+    """
+    if import_path == "...":
+        if "Error" not in go_list_json:
+            raise AssertionError(
+                "`go list` included the import path `...`, but there was no `Error` attached. "
+                "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
+                f"with this error message:\n\n{go_list_json}"
+            )
+        # TODO: Improve this error message, such as better instructions if `go.sum` is stale.
+        raise GoThirdPartyPkgError(go_list_json["Error"]["Err"])
+
+    if "Dir" not in go_list_json:
+        raise GoThirdPartyPkgError(
+            f"`go list` failed for the import path `{import_path}` because `Dir` was not defined. "
+            f"Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose so "
+            f"that we can figure out how to support this:"
+            f"\n\n{go_list_json}"
+        )
+
+    if "Error" in go_list_json:
+        err_msg = go_list_json["Error"]["Err"]
+        return GoThirdPartyPkgError(
+            f"`go list` failed for the import path `{import_path}`. Please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose so that we can figure out "
+            "how to support this:"
+            f"\n\n{err_msg}\n\n{go_list_json}"
+        )
+
     for key in (
         "CgoFiles",
         "CompiledGoFiles",
@@ -235,7 +248,7 @@ def maybe_create_error_for_invalid_sources(
         "SysoFiles",
     ):
         if key in go_list_json:
-            return NotImplementedError(
+            return GoThirdPartyPkgError(
                 f"The third-party package {import_path} includes `{key}`, which Pants does "
                 "not yet support. Please open a feature request at "
                 "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
