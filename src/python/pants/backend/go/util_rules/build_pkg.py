@@ -150,9 +150,10 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         request.import_path,
         "-importcfg",
         import_config.CONFIG_PATH,
+        # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
+        # for why Go sets the default to 1.16.
+        f"-lang=go{request.minimum_go_version or '1.16'}",
     ]
-    if request.minimum_go_version is not None:
-        compile_args.append(f"-lang=go{request.minimum_go_version}")
 
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
