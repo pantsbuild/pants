@@ -566,16 +566,24 @@ class CoursierLockfileForTargetRequest:
 
 
 @rule
-async def get_coursier_lockfile_for_target(
-    request: CoursierLockfileForTargetRequest,
+async def get_coursier_lockfile_for_resolve(
+    coursier_resolve: CoursierResolve,
 ) -> CoursierResolvedLockfile:
-
-    coursier_resolve = await Get(CoursierResolve, Targets, request.targets)
 
     lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
 
     return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
+
+
+@rule
+async def get_coursier_lockfile_for_target(
+    request: CoursierLockfileForTargetRequest,
+) -> CoursierResolvedLockfile:
+
+    coursier_resolve = await Get(CoursierResolve, Targets, request.targets)
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolve, coursier_resolve)
+    return lockfile
 
 
 @dataclass(frozen=True)
