@@ -25,9 +25,6 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     """Inspects COPY instructions in the Dockerfile for references to known targets."""
     original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     sources = original_tgt.target[DockerImageSourceField]
-    if not sources.value:
-        return InjectedDependencies()
-
     dockerfile = await Get(DockerfileInfo, DockerImageSourceField, sources)
     targets = await Get(
         Targets,

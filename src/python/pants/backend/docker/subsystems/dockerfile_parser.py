@@ -22,6 +22,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    InvalidFieldException,
     SourcesField,
     Targets,
     WrappedTarget,
@@ -142,8 +143,9 @@ def split_iterable(
 @rule
 async def parse_dockerfile(source_field: DockerImageSourceField) -> DockerfileInfo:
     wrapped_target = await Get(WrappedTarget, Address, source_field.address)
+    target = wrapped_target.target
     explicit_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_target.target.get(Dependencies))
+        ExplicitlyProvidedDependencies, DependenciesRequest(target.get(Dependencies))
     )
     dependencies = await Get(
         Targets,
@@ -165,9 +167,12 @@ async def parse_dockerfile(source_field: DockerImageSourceField) -> DockerfileIn
         ),
     )
 
-    # The resolved files validation is deferred during hydration for the DockerImageSourceField,
-    # awaiting the result of any codegen rules. Apply validation now that we have all sources.
-    source_field.validate_resolved_files(sources.snapshot.files, defer_validation=False)
+    if not sources.snapshot.files:
+        raise InvalidFieldException(
+            f"The `{target.alias}` {target.address} does not have any Dockerfile.\n\n"
+            "Provide either a filename in the `source` field, or add a dependency to a "
+            "`dockerfile` target."
+        )
 
     result = await Get(
         ProcessResult,

@@ -35,7 +35,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
             "test/BUILD": dedent(
                 """\
                 dockerfile(
-                  name="test",
+                  name="Dockerfile.test",
                   instructions=[
                     "FROM python:3.9",
                     "ENTRYPOINT python3"
@@ -46,7 +46,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgt = rule_runner.get_target(Address("test", target_name="test"))
+    tgt = rule_runner.get_target(Address("test", target_name="Dockerfile.test"))
     result = rule_runner.request(
         SourceFiles,
         [
@@ -58,7 +58,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert result.snapshot.files == ("test/Dockerfile",)
+    assert result.snapshot.files == ("test/Dockerfile.test",)
 
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     assert len(contents) == 1

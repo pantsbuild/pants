@@ -82,7 +82,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         "src/a",
         dedent(
             """\
-            docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+            docker_image(name="img_A", source="Dockerfile", dependencies=[":files_A", "src/b:img_B"])
             files(name="files_A", sources=["files/**"])
             """
         ),
@@ -91,7 +91,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         "src/b",
         dedent(
             """\
-            docker_image(name="img_B", dependencies=[":files_B"])
+            docker_image(name="img_B", source="Dockerfile", dependencies=[":files_B"])
             files(name="files_B", sources=["files/**"])
             """
         ),
@@ -120,7 +120,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         "src/c",
         dedent(
             """\
-            docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
+            docker_image(name="img_C", source="Dockerfile", dependencies=["src/a:files_A", "src/b:files_B"])
             """
         ),
     )
@@ -145,7 +145,7 @@ def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
         "src/a",
         dedent(
             """\
-            docker_image(name="img_A", dependencies=["res/static:files"])
+            docker_image(name="img_A", source="Dockerfile", dependencies=["res/static:files"])
             """
         ),
     )
@@ -178,7 +178,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
     # built pex binaries go, as we rely on that for dependency inference in the Dockerfile.
     rule_runner.write_files(
         {
-            "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
+            "src/docker/BUILD": """docker_image(source="Dockerfile", dependencies=["src/python/proj/cli:bin"])""",
             "src/docker/Dockerfile": """FROM python""",
             "src/python/proj/cli/BUILD": """pex_binary(name="bin", entry_point="main.py")""",
             "src/python/proj/cli/main.py": """print("cli main")""",
@@ -195,7 +195,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
 def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/docker/BUILD": """docker_image()""",
+            "src/docker/BUILD": """docker_image(source="Dockerfile")""",
             "src/docker/Dockerfile": dedent(
                 """\
                 FROM python:3.8
@@ -226,9 +226,9 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
         {
             "src/docker/BUILD": dedent(
                 """\
-                docker_image(dependencies=[":dockerfile"])
+                docker_image(dependencies=[":Dockerfile"])
                 dockerfile(
-                  name="dockerfile",
+                  name="Dockerfile",
                   instructions=[
                     "FROM python:3.8",
                     "FROM alpine as interim",

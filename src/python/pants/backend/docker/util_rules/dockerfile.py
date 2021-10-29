@@ -21,14 +21,15 @@ class GenerateDockerfileRequest(GenerateSourcesRequest):
 
 @rule
 async def generate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSources:
-    instructions = request.protocol_target[DockerfileInstructionsField].value
+    target = request.protocol_target
+    instructions = target[DockerfileInstructionsField].value
     output = (
         await Get(
             Snapshot,
             CreateDigest(
                 (
                     FileContent(
-                        f"{request.protocol_target.residence_dir}/Dockerfile",
+                        f"{target.residence_dir}/{target.address.target_name}",
                         "\n".join([*instructions, ""]).encode(),
                     ),
                 )

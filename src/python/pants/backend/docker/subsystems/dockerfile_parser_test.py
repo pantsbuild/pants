@@ -14,10 +14,12 @@ from pants.backend.docker.target_types import (
     DockerImageSourceField,
     DockerImageTarget,
 )
+from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -25,6 +27,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *dockerfile_rules(),
             *parser_rules(),
             *pex_rules(),
             *source_files_rules(),
@@ -42,7 +45,7 @@ def rule_runner() -> RuleRunner:
 def test_putative_target_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "test/BUILD": "docker_image()",
+            "test/BUILD": "docker_image(source='Dockerfile')",
             "test/Dockerfile": dedent(
                 """\
             FROM base
@@ -71,8 +74,8 @@ def test_shadow_dockerfile(rule_runner: RuleRunner) -> None:
         {
             "test/BUILD": dedent(
                 """\
-                docker_image(dependencies=[":dockerfile_a"])
-                dockerfile(name="dockerfile_a", instructions=["FROM synth"])
+                docker_image(source="Dockerfile", dependencies=[":Dockerfile"])
+                dockerfile(name="Dockerfile", instructions=["FROM synth"])
                 """
             ),
             "test/Dockerfile": "FROM disk",
@@ -80,5 +83,26 @@ def test_shadow_dockerfile(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("test"))
+    with pytest.raises(ExecutionError):
+        rule_runner.request(DockerfileInfo, [tgt[DockerImageSourceField]])
+
+
+def test_multiple_dockerfiles(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """\
+                docker_image(source="Dockerfile.a", dependencies=[":Dockerfile.b"])
+                dockerfile(name="Dockerfile.b", instructions=["FROM synth"])
+                """
+            ),
+            "test/Dockerfile.a": "FROM disk",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("test"))
     info = rule_runner.request(DockerfileInfo, [tgt[DockerImageSourceField]])
-    assert info.source == "test/Dockerfile"
+
+    # TODO: Merge all Dockerfile's into one multistage version of them all, preserving the order:
+    # dep1, dep2, ..., source.
+    assert info.source == "test/Dockerfile.a"

@@ -9,7 +9,9 @@ import pytest
 
 from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet, HadolintRequest
 from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
+from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.python.util_rules import pex
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -21,9 +23,11 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *hadolint_rules(),
             *config_files.rules(),
+            *docker_rules(),
             *external_tool.rules(),
+            *hadolint_rules(),
+            *pex.rules(),
             *source_files.rules(),
             QueryRule(LintResults, [HadolintRequest]),
         ],
@@ -60,13 +64,17 @@ def assert_success(
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Dockerfile": GOOD_FILE, "BUILD": "docker_image(name='t')"})
+    rule_runner.write_files(
+        {"Dockerfile": GOOD_FILE, "BUILD": "docker_image(name='t', source='Dockerfile')"}
+    )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     assert_success(rule_runner, tgt)
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t')"})
+    rule_runner.write_files(
+        {"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t', source='Dockerfile')"}
+    )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     result = run_hadolint(rule_runner, [tgt])
     assert len(result) == 1
@@ -105,10 +113,10 @@ def test_config_files(rule_runner: RuleRunner) -> None:
         {
             ".hadolint.yaml": "ignored: [DL3006, DL3011]",
             "a/Dockerfile": BAD_FILE,
-            "a/BUILD": "docker_image()",
+            "a/BUILD": "docker_image(source='Dockerfile')",
             "b/Dockerfile": BAD_FILE,
-            "b/BUILD": "docker_image()",
-            "c/BUILD": "docker_image()",
+            "b/BUILD": "docker_image(source='Dockerfile')",
+            "c/BUILD": "docker_image(source='Dockerfile')",
             "c/Dockerfile": "EXPOSE 123456",
         }
     )
@@ -127,13 +135,17 @@ def test_config_files(rule_runner: RuleRunner) -> None:
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t')"})
+    rule_runner.write_files(
+        {"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t', source='Dockerfile')"}
+    )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     assert_success(rule_runner, tgt, extra_args=["--hadolint-args=--ignore DL3006"])
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t')"})
+    rule_runner.write_files(
+        {"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t', source='Dockerfile')"}
+    )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     result = run_hadolint(rule_runner, [tgt], extra_args=["--hadolint-skip"])
     assert not result
