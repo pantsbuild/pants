@@ -21,7 +21,7 @@ from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, FileDigest, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, rule
@@ -34,6 +34,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -160,6 +161,15 @@ def expect_single_expanded_coarsened_target(
     return coarsened_targets[0]
 
 
+def make_resolve(
+    rule_runner: RuleRunner,
+    resolve_name: str = "test",
+    resolve_path: str = "coursier_resolve.lockfile",
+) -> CoursierResolveKey:
+    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
+    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
+
+
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -184,7 +194,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [CompileJavaSourceRequest(component=coarsened_target)],
+        [CompileJavaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
@@ -226,7 +236,8 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="lib")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     rule_runner.set_options(
         ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
@@ -295,7 +306,9 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
         list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
     )
 
-    request0 = CompileJavaSourceRequest(component=coarsened_targets_sorted[0])
+    request0 = CompileJavaSourceRequest(
+        component=coarsened_targets_sorted[0], resolve=make_resolve(rule_runner)
+    )
     compiled_classfiles0 = rule_runner.request(CompiledClassfiles, [request0])
     classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
     assert classpath0.content == {
@@ -304,7 +317,9 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
         }
     }
 
-    request1 = CompileJavaSourceRequest(component=coarsened_targets_sorted[1])
+    request1 = CompileJavaSourceRequest(
+        component=coarsened_targets_sorted[1], resolve=make_resolve(rule_runner)
+    )
     compiled_classfiles1 = rule_runner.request(CompiledClassfiles, [request1])
     classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
     assert classpath1.content == {
@@ -384,7 +399,10 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
         rule_runner, Address(spec_path="a", target_name="a")
     )
     assert sorted(t.address.spec for t in coarsened_target.members) == ["a/A.java", "b/B.java"]
-    request = CompileJavaSourceRequest(component=coarsened_target)
+
+    request = CompileJavaSourceRequest(
+        component=coarsened_target, resolve=make_resolve(rule_runner)
+    )
 
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
@@ -473,7 +491,8 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
                     rule_runner, Address(spec_path="", target_name="main")
-                )
+                ),
+                resolve=make_resolve(rule_runner),
             )
         ],
     )
@@ -545,7 +564,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [CompileJavaSourceRequest(component=ctgt)],
+        [CompileJavaSourceRequest(component=ctgt, resolve=make_resolve(rule_runner))],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
@@ -589,7 +608,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
                     rule_runner, Address(spec_path="", target_name="main")
-                )
+                ),
+                resolve=make_resolve(rule_runner),
             )
         ],
     )
@@ -629,7 +649,8 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
                     rule_runner, Address(spec_path="", target_name="main")
-                )
+                ),
+                resolve=make_resolve(rule_runner),
             )
         ],
     )
@@ -658,7 +679,8 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
@@ -721,7 +743,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
@@ -763,7 +786,8 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
