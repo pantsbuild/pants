@@ -16,7 +16,7 @@ from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
-from pants.engine.fs import DigestContents, FileDigest
+from pants.engine.fs import Digest, DigestContents, FileDigest, PathGlobs
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm import jdk_rules
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
@@ -26,6 +26,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -106,6 +107,15 @@ def expect_single_expanded_coarsened_target(
     return coarsened_targets[0]
 
 
+def make_resolve(
+    rule_runner: RuleRunner,
+    resolve_name: str = "test",
+    resolve_path: str = "coursier_resolve.lockfile",
+) -> CoursierResolveKey:
+    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
+    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
+
+
 @logging
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
@@ -132,7 +142,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [CompileScalaSourceRequest(component=coarsened_target)],
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
@@ -190,7 +200,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
                     rule_runner, Address(spec_path="", target_name="main")
-                )
+                ),
+                resolve=make_resolve(rule_runner),
             )
         ],
     )
@@ -221,7 +232,8 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
@@ -283,7 +295,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
@@ -326,7 +339,8 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
