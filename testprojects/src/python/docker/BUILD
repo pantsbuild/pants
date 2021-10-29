@@ -4,7 +4,8 @@
 docker_image(
     name="test-example",
     image_tags=["1.2.5"],
-    dependencies=[":example-dockerfile"],
+    source="Dockerfile",
+    #dependencies=[":example-dockerfile"],
 )
 
 dockerfile(
