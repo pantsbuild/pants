@@ -133,7 +133,7 @@ class BuiltGoPackage:
 
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
-@rule(desc="Compile with Go")
+@rule(desc="Compile with Go", level=LogLevel.DEBUG)
 async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPackage:
     maybe_built_deps = await MultiGet(
         Get(FallibleBuiltGoPackage, BuildGoPackageRequest, build_request)
@@ -273,7 +273,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
-@rule(desc="Set up Go compilation request")
+@rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest,
 ) -> FallibleBuildGoPackageRequest:

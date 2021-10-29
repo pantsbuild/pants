@@ -101,7 +101,7 @@ async def generate_testmain(
         Process(
             argv=(analyzer.PATH, request.import_path, *test_paths, *xtest_paths),
             input_digest=input_digest,
-            description="Analyze Go test sources.",
+            description=f"Analyze Go test sources for {request.import_path}",
             level=LogLevel.DEBUG,
             output_files=("_testmain.go",),
         ),

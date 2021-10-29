@@ -44,7 +44,7 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
                 "-buildmode=exe",  # seen in `go build -x` output
                 *request.archives,
             ),
-            description="Link Go binary.",
+            description=f"Link Go binary: {request.output_filename}",
             output_files=(request.output_filename,),
         ),
     )

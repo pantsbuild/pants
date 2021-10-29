@@ -23,6 +23,7 @@ from pants.engine.fs import (
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import strip_prefix, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ class AllThirdPartyPackagesRequest:
     go_mod_stripped_digest: Digest
 
 
-@rule
+@rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
@@ -134,7 +135,7 @@ async def download_and_analyze_third_party_packages(
         GoSdkProcess(
             command=list_argv,
             # TODO: make this more descriptive: point to the actual `go_mod` target or path.
-            description="Download and analyze all third-party Go packages",
+            description="Run `go list` to download and analyze all third-party Go packages",
             input_digest=go_mod_prefixed_digest,
             output_directories=("gopath/pkg/mod",),
             working_dir=go_mod_prefix,

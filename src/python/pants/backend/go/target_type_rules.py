@@ -91,7 +91,7 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoFirstPartyPackageSourcesField
 
 
-@rule
+@rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
@@ -136,7 +136,7 @@ class InjectGoThirdPartyPackageDependenciesRequest(InjectDependenciesRequest):
     inject_for = GoThirdPartyPackageDependenciesField
 
 
-@rule
+@rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
 async def inject_go_third_party_package_dependencies(
     request: InjectGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
@@ -256,7 +256,7 @@ async def generate_targets_from_go_mod(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(desc="Determine first-party package used by `go_binary` target", level=LogLevel.DEBUG)
 async def determine_main_pkg_for_go_binary(
     request: GoBinaryMainPackageRequest,
 ) -> GoBinaryMainPackage:
