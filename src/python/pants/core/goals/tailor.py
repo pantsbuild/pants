@@ -253,7 +253,11 @@ class TailorSubsystem(GoalSubsystem):
             advanced=True,
             type=str,
             default="BUILD",
-            help="The name to use for generated BUILD files.",
+            help=(
+                "The name to use for generated BUILD files.\n\n"
+                "This must be compatible with `[GLOBAL].build_patterns` and "
+                "`[GLOBAL].build_ignore`."
+            ),
         )
 
         register(
