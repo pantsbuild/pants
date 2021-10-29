@@ -1357,7 +1357,7 @@ class GlobalOptions(Subsystem):
             help=(
                 "The naming scheme for BUILD files, i.e. where you define targets.\n\n"
                 "This only sets the naming scheme, not the directory paths to look for. To add "
-                "ignore patterns, use the option `--build-ignore`.\n\n"
+                "ignore patterns, use the option `[GLOBAL].build_ignore`.\n\n"
                 "You may also need to update the option `[tailor].build_file_name` so that it is "
                 "compatible with this option."
             ),

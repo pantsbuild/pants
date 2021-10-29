@@ -42,6 +42,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.source.filespec import Filespec, matches_filespec
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -255,8 +256,7 @@ class TailorSubsystem(GoalSubsystem):
             default="BUILD",
             help=(
                 "The name to use for generated BUILD files.\n\n"
-                "This must be compatible with `[GLOBAL].build_patterns` and "
-                "`[GLOBAL].build_ignore`."
+                "This must be compatible with `[GLOBAL].build_patterns`."
             ),
         )
 
@@ -302,16 +302,17 @@ class TailorSubsystem(GoalSubsystem):
         # This cast suffices to avoid typecheck errors.
         return cast(str, self.options.alias_mapping.get(standard_type))
 
-    def validate_build_file_name(self, build_file_options: BuildFileOptions) -> None:
+    def validate_build_file_name(self, build_file_patterns: tuple[str, ...]) -> None:
         """Check that the specified BUILD file name works with the repository's BUILD file
         patterns."""
-        if not build_file_options.matches(self.build_file_name):
+        filespec = Filespec(includes=list(build_file_patterns))
+        if not bool(matches_filespec(filespec, paths=[self.build_file_name])):
             raise ValueError(
                 f"The option `[{self.options_scope}].build_file_name` is set to "
                 f"`{self.build_file_name}`, which is not compatible with "
-                f"`[GLOBAL].build_patterns` ({sorted(build_file_options.patterns)}) "
-                f"and `[GLOBAL].build_ignore` ({sorted(build_file_options.ignores)}).\n\n"
-                "To fix, please update these three options so that they are compatible."
+                f"`[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that "
+                "generated BUILD files would be ignored.\n\n"
+                "To fix, please update the options so that they are compatible."
             )
 
 
@@ -533,7 +534,7 @@ async def tailor(
     specs: Specs,
     build_file_options: BuildFileOptions,
 ) -> Tailor:
-    tailor_subsystem.validate_build_file_name(build_file_options)
+    tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
     search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
     putative_targets_results = await MultiGet(
