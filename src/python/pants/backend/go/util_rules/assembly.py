@@ -86,7 +86,9 @@ async def setup_assembly_pre_compilation(
                 "--",
                 *(f"./{request.source_files_subpath}/{name}" for name in request.s_files),
             ),
-            description="Generate symabis metadata for assembly files.",
+            description=(
+                f"Generate symabis metadata for assembly files for {request.source_files_subpath}"
+            ),
             output_files=("symabis",),
         ),
     )
@@ -114,7 +116,7 @@ async def setup_assembly_pre_compilation(
                     f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
                     f"./{request.source_files_subpath}/{s_file}",
                 ),
-                description=f"Assemble {s_file}",
+                description=f"Assemble {s_file} with Go",
                 output_files=(
                     f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
                 ),
@@ -158,7 +160,9 @@ async def link_assembly_post_compilation(
                     for name in request.s_files
                 ),
             ),
-            description="Link assembly files to Go package archive.",
+            description=(
+                f"Link assembly files to Go package archive for {request.source_files_subpath}"
+            ),
             output_files=("__pkg__.a",),
         ),
     )
