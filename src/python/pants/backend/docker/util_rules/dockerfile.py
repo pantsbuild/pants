@@ -29,7 +29,7 @@ async def generate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSo
             CreateDigest(
                 (
                     FileContent(
-                        f"{target.residence_dir}/{target.address.target_name}",
+                        target.address.path_safe_spec,
                         "\n".join([*instructions, ""]).encode(),
                     ),
                 )
