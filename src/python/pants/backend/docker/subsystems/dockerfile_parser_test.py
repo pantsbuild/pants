@@ -72,17 +72,17 @@ def test_split_iterable() -> None:
 def test_shadow_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "test/BUILD": dedent(
+            "BUILD": dedent(
                 """\
-                docker_image(source="Dockerfile", dependencies=[":Dockerfile"])
+                docker_image(name="test", source=".Dockerfile", dependencies=[":Dockerfile"])
                 dockerfile(name="Dockerfile", instructions=["FROM synth"])
                 """
             ),
-            "test/Dockerfile": "FROM disk",
+            ".Dockerfile": "FROM disk",
         }
     )
 
-    tgt = rule_runner.get_target(Address("test"))
+    tgt = rule_runner.get_target(Address("", target_name="test"))
     with pytest.raises(ExecutionError):
         rule_runner.request(DockerfileInfo, [tgt[DockerImageSourceField]])
 

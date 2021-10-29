@@ -244,7 +244,7 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
     assert_build_context(
         rule_runner,
         Address("src/docker"),
-        expected_files=["src/docker/Dockerfile"],
+        expected_files=["src.docker.Dockerfile"],
         expected_version_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},

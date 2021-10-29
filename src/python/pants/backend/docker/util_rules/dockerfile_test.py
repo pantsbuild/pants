@@ -58,7 +58,7 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert result.snapshot.files == ("test/Dockerfile.test",)
+    assert result.snapshot.files == ("test.Dockerfile.test",)
 
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     assert len(contents) == 1
