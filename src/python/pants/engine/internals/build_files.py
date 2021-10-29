@@ -20,6 +20,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
 from pants.option.global_options import GlobalOptions
+from pants.source.filespec import Filespec, matches_filespec
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -30,6 +31,10 @@ class BuildFileOptions:
     patterns: tuple[str, ...]
     ignores: tuple[str, ...] = ()
     prelude_globs: tuple[str, ...] = ()
+
+    def matches(self, file_name: str) -> bool:
+        filespec = Filespec(includes=list(self.patterns), excludes=list(self.ignores))
+        return bool(matches_filespec(filespec, paths=[file_name]))
 
 
 @rule
