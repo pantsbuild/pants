@@ -189,8 +189,6 @@ impl CapturedWorkdir for CommandRunner {
     workdir_path: &'b Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
-    _context: Context,
-    _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     let client_workdir = if let Some(working_directory) = &req.working_directory {
       workdir_path.join(working_directory)

@@ -26,7 +26,7 @@ use nails::execution::ExitCode;
 use shell_quote::bash;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio::process::{Child, Command};
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
@@ -46,7 +46,7 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
-  spawn_lock: RwLock<()>,
+  spawn_lock: Mutex<()>,
 }
 
 impl CommandRunner {
@@ -64,7 +64,7 @@ impl CommandRunner {
       named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
-      spawn_lock: RwLock::new(()),
+      spawn_lock: Mutex::new(()),
     }
   }
 
@@ -347,8 +347,6 @@ impl CapturedWorkdir for CommandRunner {
     workdir_path: &'b Path,
     _workdir_token: (),
     req: Process,
-    _context: Context,
-    exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     let cwd = if let Some(ref working_directory) = req.working_directory {
       workdir_path.join(working_directory)
@@ -358,62 +356,54 @@ impl CapturedWorkdir for CommandRunner {
     let mut command = HermeticCommand::new(&req.argv[0]);
     command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
 
-    // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
-    // indicates the binary we're spawning was written out by the current thread, and, as such,
-    // there may be open file handles against it. This will occur whenever a concurrent call of this
-    // method proceeds through its fork point
-    // (https://pubs.opengroup.org/onlinepubs/009695399/functions/fork.html) while the current
-    // thread is in the middle of writing the binary and thus captures a clone of the open file
-    // handle, but that concurrent call has not yet gotten to its exec point
+    // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but we may be spawning
+    // an executable that was written out by the current thread, and, as such, there may be open
+    // file handles against it. This will occur whenever a concurrent call of this method proceeds
+    // through its fork point (https://pubs.opengroup.org/onlinepubs/009695399/functions/fork.html)
+    // while the current thread is in the middle of writing the binary and thus captures a clone of
+    // the open file handle, but that concurrent call has not yet gotten to its exec point
     // (https://pubs.opengroup.org/onlinepubs/009695399/functions/exec.html) where the operating
     // system will close the cloned file handle (via O_CLOEXEC being set on all files opened by
-    // Rust). To prevent a race like this holding this thread's binary open leading to an ETXTBSY
-    // (https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html) error, we
-    // maintain RwLock that allows non-`exclusive_spawn` binaries to spawn concurrently but ensures
-    // all such concurrent spawns have completed (and thus closed any cloned file handles) before
-    // proceeding to spawn the `exclusive_spawn` binary this thread has written.
+    // Rust).
+    //
+    // To deal with races like this holding this thread's binary open and leading to an ETXTBSY
+    // (https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html) error, we both
+    // hold a lock around the spawns we are responsible for so that they are serial and also retry
+    // with exponential backoff to mitigate concurrent forks happening in parts of the codebase or
+    // in libraries we don't control.
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
     let mut fork_exec = move || command.spawn(Stdio::piped(), Stdio::piped());
     let mut child = {
-      if exclusive_spawn {
-        let _write_locked = self.spawn_lock.write().await;
+      let _write_locked = self.spawn_lock.lock().await;
 
-        // Despite the mitigations taken against racing our own forks, forks can happen in our
-        // process but outside of our control (in libraries). As such, we back-stop by sleeping and
-        // trying again for a while if we do hit one of these fork races we do not control.
-        const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
-        let mut retries: u32 = 0;
-        let mut sleep_millis = 1;
+      const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
+      let mut retries: u32 = 0;
+      let mut sleep_millis = 1;
 
-        let start_time = std::time::Instant::now();
-        loop {
-          match fork_exec() {
-            Err(e) => {
-              if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT
-              {
-                tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
-                retries += 1;
-                sleep_millis *= 2;
-                continue;
-              } else if retries > 0 {
-                break Err(format!(
-                  "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
-                  retries,
-                  if retries == 1 { "retry" } else { "retries" },
-                  e
-                ));
-              } else {
-                break Err(format!("Error launching process: {:?}", e));
-              }
+      let start_time = std::time::Instant::now();
+      loop {
+        match fork_exec() {
+          Err(e) => {
+            if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT {
+              tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
+              retries += 1;
+              sleep_millis *= 2;
+              continue;
+            } else if retries > 0 {
+              break Err(format!(
+                "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
+                retries,
+                if retries == 1 { "retry" } else { "retries" },
+                e
+              ));
+            } else {
+              break Err(format!("Error launching process: {:?}", e));
             }
-            Ok(child) => break Ok(child),
           }
+          Ok(child) => break Ok(child),
         }
-      } else {
-        let _read_locked = self.spawn_lock.read().await;
-        fork_exec().map_err(|e| format!("Error launching process: {:?}", e))
       }
     }?;
 
@@ -469,7 +459,7 @@ pub trait CapturedWorkdir {
     let start_time = Instant::now();
 
     // Prepare the workdir.
-    let exclusive_spawn = prepare_workdir(
+    prepare_workdir(
       workdir_path.clone(),
       &req,
       context.clone(),
@@ -488,13 +478,7 @@ pub trait CapturedWorkdir {
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
-          .run_in_workdir(
-            &workdir_path,
-            workdir_token,
-            req.clone(),
-            context,
-            exclusive_spawn,
-          )
+          .run_in_workdir(&workdir_path, workdir_token, req.clone())
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
@@ -583,28 +567,18 @@ pub trait CapturedWorkdir {
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
   ///
-  /// If the process to be executed has an `argv[0]` that points into its input digest then
-  /// `exclusive_spawn` will be `true` and the spawn implementation should account for the
-  /// possibility of concurrent fork+exec holding open the cloned `argv[0]` file descriptor, which,
-  /// if unhandled, will result in ETXTBSY errors spawning the process.
+  /// If the process to be executed may try to execute files in its input digest then the spawn
+  /// implementation should account for the possibility of concurrent fork+exec holding open the
+  /// cloned input digest file descriptors, which, if unhandled, will result in ETXTBSY errors
+  /// spawning the process.
   ///
   /// See the documentation note in `CommandRunner` in this file for more details.
-  ///
-  /// TODO(John Sirois): https://github.com/pantsbuild/pants/issues/10601
-  ///  Centralize local spawning to one object - we currently spawn here (in
-  ///  process_execution::local::CommandRunner) to launch user `Process`es and in
-  ///  process_execution::nailgun::CommandRunner when a jvm nailgun server needs to be started. The
-  ///  proper handling of `exclusive_spawn` really requires a single point of control for all
-  ///  fork+execs in the scheduler. For now we rely on the fact that the process_execution::nailgun
-  ///  module is dead code in practice.
   ///
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
-    context: Context,
-    exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
@@ -621,21 +595,11 @@ pub async fn prepare_workdir(
   store: Store,
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
-) -> Result<bool, String> {
+) -> Result<(), String> {
   // If named caches are configured, collect the symlinks to create.
   let named_cache_symlinks = named_caches
     .local_paths(&req.append_only_caches)
     .collect::<Vec<_>>();
-
-  // Capture argv0 as the executable path so that we can test whether we have created it in the
-  // sandbox.
-  let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
-    if let Some(working_directory) = &req.working_directory {
-      working_directory.join(relative_path)
-    } else {
-      relative_path
-    }
-  });
 
   // Start with async materialization of input snapshots, followed by synchronous materialization
   // of other configured inputs. Note that we don't do this in parallel, as that might cause
@@ -662,7 +626,7 @@ pub async fn prepare_workdir(
   let output_file_paths = req.output_files.clone();
   let output_dir_paths = req.output_directories.clone();
   let maybe_jdk_home = req.jdk_home.clone();
-  let exclusive_spawn = executor
+  executor
     .spawn_blocking(move || {
       if let Some(jdk_home) = maybe_jdk_home {
         symlink(jdk_home, workdir_path2.join(".jdk"))
@@ -712,22 +676,9 @@ pub async fn prepare_workdir(
           )
         })?;
       }
-
-      let exe_was_materialized = maybe_executable_path
-        .as_ref()
-        .map_or(false, |p| workdir_path2.join(&p).exists());
-      if exe_was_materialized {
-        debug!(
-          "Obtaining exclusive spawn lock for process since \
-               we materialized its executable {:?}.",
-          maybe_executable_path
-        );
-      }
-      let res: Result<_, String> = Ok(exe_was_materialized);
-      res
+      Ok(())
     })
-    .await?;
-  Ok(exclusive_spawn)
+    .await
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
