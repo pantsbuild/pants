@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
@@ -295,3 +296,18 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
         "/qux",
     ]
     assert expected == expanded_paths
+
+
+def test_interpreter_search_path_file_entries() -> None:
+    rule_runner = RuleRunner(
+        rules=[*python_binaries.rules(), QueryRule(PythonBinary, input_types=())]
+    )
+    current_python = os.path.realpath(sys.executable)
+    rule_runner.set_options(
+        args=[
+            f"--python-bootstrap-search-path=[{current_python!r}]",
+            f"--python-bootstrap-names=[{os.path.basename(current_python)!r}]",
+        ]
+    )
+    python_binary = rule_runner.request(PythonBinary, inputs=())
+    assert current_python == python_binary.path
