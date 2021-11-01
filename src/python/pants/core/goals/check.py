@@ -24,6 +24,7 @@ from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,8 @@ class CheckResult:
         return {"partition": self.partition_description}
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class CheckResults(EngineAwareReturnType):
     """Zero or more CheckResult objects for a single type checker.
 
@@ -71,6 +73,10 @@ class CheckResults(EngineAwareReturnType):
 
     results: tuple[CheckResult, ...]
     checker_name: str
+
+    def __init__(self, results: Iterable[CheckResult], *, checker_name: str) -> None:
+        self.results = tuple(results)
+        self.checker_name = checker_name
 
     @property
     def skipped(self) -> bool:
