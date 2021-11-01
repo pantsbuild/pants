@@ -6,7 +6,6 @@ from __future__ import annotations
 import itertools
 import os.path
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -54,14 +53,7 @@ class PythonTestFieldSet(TestFieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        if tgt.get(SkipPythonTestsField).value:
-            return True
-        # TODO(#13238): Remove once we finish deprecating special-casing of `conftest.py`. For now,
-        #  we need this so that we can run explicitly declared `python_test` targets.
-        if not tgt.address.is_file_target:
-            return False
-        file_name = PurePath(tgt.address.filename)
-        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
+        return tgt.get(SkipPythonTestsField).value
 
 
 class PyTest(PythonToolBase):
