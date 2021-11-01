@@ -34,9 +34,10 @@ async def export_venv(
     min_interpreter = interpreter_constraints.snap_to_minimum(python_setup.interpreter_universe)
     if not min_interpreter:
         raise ExportError(
-            "There is no single Python interpreter compatible with all the "
-            "targets for which export was requested. Please restrict the target set "
-            "to one that shares a compatible interpreter."
+            "The following interpreter constraints were computed for all the targets for which "
+            f"export was requested: {interpreter_constraints}. There is no python interpreter "
+            "compatible with these constraints. Please restrict the target set to one that shares "
+            "a compatible interpreter."
         )
 
     venv_pex = await Get(
@@ -52,9 +53,8 @@ async def export_venv(
     complete_pex_env = pex_env.in_workspace()
     venv_abspath = os.path.join(complete_pex_env.pex_root, venv_pex.venv_rel_dir)
 
-    # Run the venv_pex to ensure that the underlying venv is created if necessary.
-    # We also use this to get the full python version (including patch #), so we
-    # can use it in the symlink name (not critical, but nice to have).
+    # Run the venv_pex to get the full python version (including patch #), so we
+    # can use it in the symlink name.
     res = await Get(
         ProcessResult,
         VenvPexProcess(
@@ -62,8 +62,6 @@ async def export_venv(
             description="Create virtualenv",
             argv=["-c", "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))"],
             input_digest=venv_pex.digest,
-            # TODO: Is there always a python_configured?
-            extra_env=complete_pex_env.environment_dict(python_configured=True),
         ),
     )
     py_version = res.stdout.strip().decode()
