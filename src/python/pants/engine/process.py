@@ -380,6 +380,9 @@ class SearchPath(DeduplicatedCollection[str]):
 class BinaryPathRequest:
     """Request to find a binary of a given name.
 
+    If `check_file_entries` is `True` a BinaryPathRequest will consider any entries in the
+    `search_path` that are file paths in addition to traditional directory paths.
+
     If a `test` is specified all binaries that are found will be executed with the test args and
     only those binaries whose test executions exit with return code 0 will be retained.
     Additionally, if test execution includes stdout content, that will be used to fingerprint the
@@ -391,6 +394,7 @@ class BinaryPathRequest:
 
     search_path: SearchPath
     binary_name: str
+    check_file_entries: bool
     test: BinaryPathTest | None
 
     def __init__(
@@ -398,10 +402,12 @@ class BinaryPathRequest:
         *,
         search_path: Iterable[str],
         binary_name: str,
+        check_file_entries: bool = False,
         test: BinaryPathTest | None = None,
     ) -> None:
         self.search_path = SearchPath(search_path)
         self.binary_name = binary_name
+        self.check_file_entries = check_file_entries
         self.test = test
 
 
@@ -529,39 +535,50 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         bash = await Get(BashBinary, BashBinaryRequest())
         shebang = f"#!{bash.path}"
 
-    # Some subtle notes with this script:
-    #
-    #  - The backslash after the `"""` ensures that the shebang is at the start of the script file.
-    #       Many OSs will not see the shebang if there is intervening whitespace.
-    #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
-    #      can catch bugs in the script itself, given an earlier silent failure.
-    #  - We do not use `set -e` like normal because it causes the line
-    #      `command which -a <bin> || true` to fail the script when using Bash 3, which macOS
-    #      uses by default.
-    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
-    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
-    #      processes since all known remoting configurations include a static container image as
-    #      part of their cache key which automatically avoids this problem. See #10769 for a
-    #      solution that is less of a tradeoff.
     script_path = "./find_binary.sh"
-    script_content = dedent(
+    script_header = dedent(
         f"""\
         {shebang}
 
-        set -uox pipefail
+        set -euox pipefail
 
-        if command -v which > /dev/null; then
-            command which -a $1 || true
-        else
-            command -v $1 || true
-        fi
+        CHECK_FILE_ENTRIES={'1' if request.check_file_entries else ''}
         """
     )
+    script_body = dedent(
+        """\
+        for path in ${PATH//:/ }; do
+            if [[ -d "${path}" ]]; then
+                # Handle traditional directory PATH element.
+                maybe_exe="${path}/$1"
+            elif [[ -n "${CHECK_FILE_ENTRIES}" ]]; then
+                # Handle PATH elements that are filenames to allow for precise selection.
+                maybe_exe="${path}"
+            else
+                maybe_exe=
+            fi
+            if [[ "$1" == "${maybe_exe##*/}" && -f "${maybe_exe}" && -x "${maybe_exe}" ]]
+            then
+                echo "${maybe_exe}"
+            fi
+        done
+        """
+    )
+    script_content = script_header + script_body
     script_digest = await Get(
         Digest,
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
+    # Some subtle notes about executing this script:
+    #
+    #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
+    #      can catch bugs in the script itself, given an earlier silent failure.
+    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
+    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
+    #      processes since all known remoting configurations include a static container image as
+    #      part of their cache key which automatically avoids this problem. See #10769 for a
+    #      solution that is less of a tradeoff.
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         ProcessResult,

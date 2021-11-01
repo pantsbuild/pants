@@ -382,6 +382,7 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
             BinaryPathRequest(
                 search_path=interpreter_search_paths,
                 binary_name=binary_name,
+                check_file_entries=True,
                 test=BinaryPathTest(
                     args=[
                         "-c",
