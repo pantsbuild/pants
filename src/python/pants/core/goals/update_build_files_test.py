@@ -22,7 +22,7 @@ from pants.core.goals.update_build_files import (
     maybe_rename_deprecated_targets,
     update_build_files,
 )
-from pants.core.util_rules import config_files
+from pants.core.util_rules import config_files, pants_bin
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -61,6 +61,7 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
+            *pants_bin.rules(),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
@@ -93,7 +94,9 @@ def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
 def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly set the exit code and pipe fixers to each other."""
     generic_goal_rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
-    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal, args=["--check"])
+    result = generic_goal_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+    )
     assert result.exit_code == 1
     assert result.stdout == dedent(
         """\
@@ -103,6 +106,8 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
         Would update dir/BUILD:
           - Add a new line
           - Reverse lines
+
+        To fix `update-build-files` failures, run `./custom_pants update-build-files`.
         """
     )
     assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "line\n"
@@ -123,6 +128,7 @@ def black_rule_runner() -> RuleRunner:
         rules=(
             format_build_file_with_black,
             update_build_files,
+            *pants_bin.rules(),
             *config_files.rules(),
             *pex.rules(),
             SubsystemRule(Black),
@@ -149,8 +155,6 @@ def test_black_fixer_noops(black_rule_runner: RuleRunner) -> None:
     black_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
 
 
@@ -162,8 +166,6 @@ def test_black_fixer_args(black_rule_runner: RuleRunner) -> None:
         env_inherit=BLACK_ENV_INHERIT,
     )
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
 
 
@@ -176,8 +178,6 @@ def test_black_config(black_rule_runner: RuleRunner) -> None:
     )
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
 
 
