@@ -92,7 +92,6 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
                 Address("src/tf/resources/grok/subdir"),
             ]
         ),
-        sibling_dependencies_inferrable=False,
     )
 
 
