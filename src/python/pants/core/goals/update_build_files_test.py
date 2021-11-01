@@ -155,8 +155,6 @@ def test_black_fixer_noops(black_rule_runner: RuleRunner) -> None:
     black_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
 
 
@@ -168,8 +166,6 @@ def test_black_fixer_args(black_rule_runner: RuleRunner) -> None:
         env_inherit=BLACK_ENV_INHERIT,
     )
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
 
 
@@ -182,8 +178,6 @@ def test_black_config(black_rule_runner: RuleRunner) -> None:
     )
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
-    assert not result.stdout
-    assert "No required changes" in result.stderr
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
 
 

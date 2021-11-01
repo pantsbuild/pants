@@ -19,6 +19,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.build_graph.address import Address
+from pants.core.util_rules import pants_bin
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -661,4 +662,4 @@ async def tailor(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *pants_bin.rules())
