@@ -308,13 +308,11 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         *,
         modules: list[str] | None = None,
         stub_modules: list[str] | None = None,
-        module_mapping: dict[str, list[str]] | None = None,
     ) -> str:
         return (
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"modules={modules or []},"
-            f"type_stub_modules={stub_modules or []},"
-            f"module_mapping={repr(module_mapping or {})})"
+            f"type_stub_modules={stub_modules or []})"
         )
 
     build_file = "\n\n".join(
@@ -324,11 +322,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("file_dist", "file_dist@ file:///path/to/dist.whl"),
             req("vcs_dist", "vcs_dist@ git+https://github.com/vcs/dist.git"),
             req("modules", "foo==1", modules=["mapped_module"]),
-            req(
-                "module_mapping_un_normalized",
-                "DiFFerent-than_Mapping",
-                module_mapping={"different_THAN-mapping": ["module_mapping_un_normalized"]},
-            ),
             # We extract the module from type stub dependencies.
             req("typed-dep1", "typed-dep1-types"),
             req("typed-dep2", "types-typed-dep2"),
@@ -367,9 +360,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 "file_dist": (Address("", target_name="file_dist"),),
                 "looks_like_stubs": (Address("", target_name="looks_like_stubs"),),
                 "mapped_module": (Address("", target_name="modules"),),
-                "module_mapping_un_normalized": (
-                    Address("", target_name="module_mapping_un_normalized"),
-                ),
                 "req1": (Address("", target_name="req1"),),
                 "req2": (Address("", target_name="req2"), Address("", target_name="req2_types")),
                 "req3": (Address("", target_name="req3"), Address("", target_name="req3_types")),
@@ -466,10 +456,10 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 # Ambiguity within third-party, which should result in ambiguity for first-party
                 # too. These all share the module `ambiguous.f2`.
                 python_requirement(
-                    name='thirdparty3', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
+                    name='thirdparty3', requirements=['bar'], modules=['ambiguous.f2']
                 )
                 python_requirement(
-                    name='thirdparty4', requirements=['bar'], module_mapping={'bar': ['ambiguous.f2']}
+                    name='thirdparty4', requirements=['bar'], modules=['ambiguous.f2']
                 )
                 python_sources(name="firstparty3", sources=["f2.py"])
 
@@ -478,7 +468,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_sources(name="firstparty4", sources=["f3.py"])
                 python_sources(name="firstparty5", sources=["f3.py"])
                 python_requirement(
-                    name='thirdparty5', requirements=['baz'], module_mapping={'baz': ['ambiguous.f3']}
+                    name='thirdparty5', requirements=['baz'], modules=['ambiguous.f3']
                 )
 
                 # You can only write a first-party type stub for a third-party requirement if
@@ -486,12 +476,12 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_requirement(
                     name='ambiguous-stub',
                     requirements=['ambiguous-stub'],
-                    module_mapping={"ambiguous-stub": ["ambiguous.f4"]},
+                    modules=["ambiguous.f4"],
                 )
                 python_requirement(
                     name='ambiguous-stub-types',
                     requirements=['ambiguous-stub-types'],
-                    type_stubs_module_mapping={"ambiguous-stub-types": ["ambiguous.f4"]},
+                    type_stub_modules=["ambiguous.f4"],
                 )
                 python_sources(name='ambiguous-stub-1stparty', sources=['f4.pyi'])
                 """
