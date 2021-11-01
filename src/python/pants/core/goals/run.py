@@ -1,14 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple, cast
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
-from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -28,6 +27,8 @@ from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+
+logger = logging.getLogger(__name__)
 
 
 @union
@@ -89,10 +90,21 @@ class RunSubsystem(GoalSubsystem):
             help="Arguments to pass directly to the executed target, e.g. "
             '`--run-args="val1 val2 --debug"`',
         )
+        register(
+            "--cleanup",
+            type=bool,
+            default=True,
+            help="Whether to clean up the temporary directory in which the binary is chrooted. "
+            "Set to false to retain the directory, e.g., for debugging.",
+        )
 
     @property
     def args(self) -> Tuple[str, ...]:
         return tuple(self.options.args)
+
+    @property
+    def cleanup(self) -> bool:
+        return cast(bool, self.options.cleanup)
 
 
 class Run(Goal):
@@ -103,7 +115,6 @@ class Run(Goal):
 async def run(
     run_subsystem: RunSubsystem,
     global_options: GlobalOptions,
-    console: Console,
     workspace: Workspace,
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
@@ -122,7 +133,11 @@ async def run(
     wrapped_target = await Get(WrappedTarget, Address, field_set.address)
     restartable = wrapped_target.target.get(RestartableField).value
 
-    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
+    with temporary_dir(
+        root_dir=global_options.options.pants_workdir, cleanup=run_subsystem.cleanup
+    ) as tmpdir:
+        if not run_subsystem.cleanup:
+            logger.info(f"Preserving running binary chroot {tmpdir}")
         workspace.write_digest(
             request.digest,
             path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
