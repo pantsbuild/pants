@@ -581,8 +581,7 @@ async def get_coursier_lockfile_for_target(
     request: CoursierLockfileForTargetRequest,
 ) -> CoursierResolvedLockfile:
     coursier_resolve = await Get(CoursierResolveKey, Targets, request.targets)
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, coursier_resolve)
-    return lockfile
+    return await Get(CoursierResolvedLockfile, CoursierResolveKey, coursier_resolve)
 
 
 @dataclass(frozen=True)
