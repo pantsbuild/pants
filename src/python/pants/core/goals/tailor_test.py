@@ -35,10 +35,12 @@ from pants.core.goals.tailor import (
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
+from pants.engine.internals.build_files import BuildFileOptions, extract_build_file_options
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
@@ -92,6 +94,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
+            extract_build_file_options,
             infer_fortran_module_dependency,
             UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
             QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
@@ -274,9 +277,12 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
                 ),
             ]
         ),
-        name=name,
-        header="Copyright © 2021 FooCorp.",
-        indent="    ",
+    )
+    rule_runner.set_options(
+        [
+            f"--tailor-build-file-name={name}",
+            "--tailor-build-file-header=Copyright © 2021 FooCorp.",
+        ]
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
@@ -339,9 +345,6 @@ def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
                 ),
             ]
         ),
-        name="BUILD",
-        header=None,
-        indent="    ",
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
@@ -379,10 +382,9 @@ def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: st
                 ),
             ]
         ),
-        name="BUILD",
-        header=header,
-        indent="    ",
     )
+    if header:
+        rule_runner.set_options([f"--tailor-build-file-header={header}"])
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
     assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
@@ -482,6 +484,7 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
                 workspace,
                 union_membership,
                 specs,
+                BuildFileOptions(patterns=("BUILD",), ignores=()),
             ],
             mock_gets=[
                 MockGet(
@@ -583,3 +586,21 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         "but this target type does not have a `sources` field."
     )
     assert str(excinfo.value) == expected_msg
+
+
+@pytest.mark.parametrize(
+    "include,file_name,raises",
+    (
+        ("BUILD", "BUILD", False),
+        ("BUILD.*", "BUILD.foo", False),
+        ("BUILD.foo", "BUILD", True),
+    ),
+)
+def test_validate_build_file_name(include: str, file_name: str, raises: bool) -> None:
+    tailor_subsystem = create_goal_subsystem(TailorSubsystem, build_file_name=file_name)
+    if raises:
+        with pytest.raises(ValueError):
+            tailor_subsystem.validate_build_file_name((include,))
+    else:
+        with no_exception():
+            tailor_subsystem.validate_build_file_name((include,))
