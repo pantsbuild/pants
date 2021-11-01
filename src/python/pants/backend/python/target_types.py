@@ -291,16 +291,6 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
             return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
-        if value in {"<none>", "<None>"}:
-            warn_or_error(
-                "2.9.0.dev0",
-                "using `<none>` for the `entry_point` field",
-                (
-                    "Rather than setting `entry_point='<none>' for the pex_binary target "
-                    f"{address}, simply leave off the field."
-                ),
-            )
-            return None
         try:
             return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
