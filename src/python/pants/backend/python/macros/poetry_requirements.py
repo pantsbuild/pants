@@ -18,7 +18,6 @@ from typing_extensions import TypedDict
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
-from pants.base.deprecated import warn_or_error
 from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
@@ -391,40 +390,17 @@ class PoetryRequirements:
 
     def __call__(
         self,
-        pyproject_toml_relpath: str | None = None,
         *,
-        source: str | None = None,
+        source: str = "pyproject.toml",
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
     ) -> None:
         """
-        :param pyproject_toml_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `requirements.txt` file sibling to the BUILD file.
         :param module_mapping: a mapping of requirement names to a list of the modules they provide.
             For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
             requirement name as the default module, e.g. "Django" will default to
             `modules=["django"]`.
         """
-        if pyproject_toml_relpath and source:
-            raise ValueError(
-                "Specified both `pyproject_toml_relpath` and `source` in the `poetry_requirements` "
-                f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
-                "`source`."
-            )
-        if pyproject_toml_relpath is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `pyproject_toml_relpath` argument for `poetry_requirements()`",
-                (
-                    "Use the `source` argument instead of `pyproject_toml_relpath` for the "
-                    f"`poetry_requirements` macro in the BUILD file at "
-                    f"{self._parse_context.rel_path}. `source` behaves the same."
-                ),
-            )
-            source = pyproject_toml_relpath
-        if source is None:
-            source = "pyproject.toml"
-
         req_file_tgt = self._parse_context.create_object(
             "_python_requirements_file",
             name=source.replace(os.path.sep, "_"),
