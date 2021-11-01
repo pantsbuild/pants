@@ -17,6 +17,8 @@ java_sources(
     ],
     dependencies=[
         ":com.github.javaparser_javaparser-symbol-solver-core",
+        ":com.github.javaparser_javaparser-core",
+        ":com.fasterxml.jackson.core_jackson-core",
         ":com.fasterxml.jackson.core_jackson-databind",
     ],
 )
@@ -29,8 +31,22 @@ jvm_artifact(
 )
 
 jvm_artifact(
+    name="com.github.javaparser_javaparser-core",
+    group="com.github.javaparser",
+    artifact="javaparser-core",
+    version="3.23.0",
+)
+
+jvm_artifact(
     name="com.fasterxml.jackson.core_jackson-databind",
     group="com.fasterxml.jackson.core",
     artifact="jackson-databind",
+    version="2.12.4",
+)
+
+jvm_artifact(
+    name="com.fasterxml.jackson.core_jackson-core",
+    group="com.fasterxml.jackson.core",
+    artifact="jackson-core",
     version="2.12.4",
 )
