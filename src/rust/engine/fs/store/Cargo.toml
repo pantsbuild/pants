@@ -25,8 +25,8 @@ log = "0.4"
 madvise = "0.1"
 memmap = "0.7"
 parking_lot = "0.11"
-prost = "0.8"
-prost-types = "0.8"
+prost = "0.9"
+prost-types = "0.9"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
@@ -34,7 +34,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.22"
 tokio = { version = "1.4", features = ["fs"] }
-tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
 uuid = { version = "0.7.1", features = ["v4"] }

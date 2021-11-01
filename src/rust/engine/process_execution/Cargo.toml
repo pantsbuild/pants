@@ -41,11 +41,11 @@ serde = "1.0.104"
 bincode = "1.2.1"
 double-checked-cell-async = "2.0"
 rand = "0.8"
-prost = "0.8"
-prost-types = "0.8"
+prost = "0.9"
+prost-types = "0.9"
 strum = "0.20"
 strum_macros = "0.20"
-tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]
