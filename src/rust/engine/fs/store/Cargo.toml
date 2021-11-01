@@ -6,7 +6,8 @@ edition = "2018"
 
 [dependencies]
 async-stream = "0.3"
-async-trait = "0.1"
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
 protos = { path = "../../protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
