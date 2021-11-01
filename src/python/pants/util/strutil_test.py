@@ -56,9 +56,9 @@ def test_strip_chroot_path() -> None:
         strip_v2_chroot_path(
             dedent(
                 """\
-            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/process-execution3zt5Ph/src/python/example.py
-            Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/process-executionOCnquv/test.py
-            Would reformat /custom-tmpdir/process-execution7zt4pH/custom_tmpdir.py
+            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-pe3zt5Ph/src/python/example.py
+            Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-peOCnquv/test.py
+            Would reformat /custom-tmpdir/pants-pe7zt4pH/custom_tmpdir.py
 
             Some other output.
             """
@@ -75,19 +75,19 @@ def test_strip_chroot_path() -> None:
         )
     )
 
-    # A subdir must be prefixed with `process-execution`, then some characters after it.
+    # A subdir must be prefixed with `pants-pe`, then some characters after it.
     assert (
         strip_v2_chroot_path("/var/process_executionOCnquv/test.py")
         == "/var/process_executionOCnquv/test.py"
     )
     assert (
-        strip_v2_chroot_path("/var/process-execution/test.py") == "/var/process-execution/test.py"
+        strip_v2_chroot_path("/var/pants-pe/test.py") == "/var/pants-pe/test.py"
     )
 
     # Our heuristic requires absolute paths.
     assert (
-        strip_v2_chroot_path("var/process-executionOCnquv/test.py")
-        == "var/process-executionOCnquv/test.py"
+        strip_v2_chroot_path("var/pants-peOCnquv/test.py")
+        == "var/pants-peOCnquv/test.py"
     )
 
     # Confirm we can handle values with no chroot path.

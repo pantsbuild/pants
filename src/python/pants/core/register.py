@@ -8,6 +8,7 @@ These are always activated and cannot be disabled.
 
 from pants.core.goals import (
     check,
+    clean,
     fmt,
     lint,
     package,
@@ -48,6 +49,7 @@ def rules():
     return [
         # goals
         *check.rules(),
+        *clean.rules(),
         *fmt.rules(),
         *lint.rules(),
         *update_build_files.rules(),

@@ -268,7 +268,7 @@ impl super::CommandRunner for CommandRunner {
         // Set up a temporary workdir, which will optionally be preserved.
         let (workdir_path, maybe_workdir) = {
           let workdir = tempfile::Builder::new()
-            .prefix("process-execution")
+            .prefix("pants-pe")
             .tempdir_in(&self.work_dir_base)
             .map_err(|err| {
               format!(
