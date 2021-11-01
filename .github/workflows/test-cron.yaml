@@ -44,7 +44,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
         '
@@ -52,7 +52,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.55.0-*
+        path: '~/.rustup/toolchains/1.56.0-*
 
           ~/.rustup/update-hashes
 
@@ -199,7 +199,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
         '
@@ -207,7 +207,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.55.0-*
+        path: '~/.rustup/toolchains/1.56.0-*
 
           ~/.rustup/update-hashes
 
@@ -324,7 +324,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
         '
@@ -349,6 +349,8 @@ jobs:
         '
     - name: Lint
       run: './pants validate ''**''
+
+        ./pants update-build-files --check
 
         ./pants lint check ::
 
@@ -409,7 +411,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
         '
@@ -492,7 +494,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
         '

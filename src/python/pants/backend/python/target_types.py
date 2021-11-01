@@ -19,15 +19,17 @@ from typing import (
     Iterator,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
 )
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -46,6 +48,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OverridesField,
     ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -54,9 +57,9 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TriBoolField,
+    generate_file_based_overrides_field_help_message,
 )
 from pants.option.subsystem import Subsystem
-from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec
 from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
@@ -89,7 +92,7 @@ class InterpreterConstraintsField(StringSequenceField):
         "`CPython` as a shorthand, e.g. `>=2.7` will be expanded to `CPython>=2.7`.\n\nSpecify "
         "more than one element to OR the constraints, e.g. `['PyPy==3.7.*', 'CPython==3.7.*']` "
         "means either PyPy 3.7 _or_ CPython 3.7.\n\nIf the field is not set, it will default to "
-        "the option `[python-setup].interpreter_constraints`.\n\n"
+        "the option `[python].interpreter_constraints`.\n\n"
         f"See {doc_url('python-interpreter-compatibility')} for how these interpreter "
         "constraints are merged with the constraints of dependencies."
     )
@@ -128,7 +131,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     # TODO(#12314): Figure out how to model the default and disabling lockfile, e.g. if we
     #  hardcode to `default` or let the user set it.
     help = (
-        "The resolve from `[python-setup].experimental_resolves_to_lockfiles` to use, if any.\n\n"
+        "The resolve from `[python].experimental_resolves_to_lockfiles` to use, if any.\n\n"
         "This field is highly experimental and may change without the normal deprecation policy."
     )
 
@@ -551,6 +554,8 @@ class PexBinary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
+#  message to use `python_source`/`python_test_utils` instead.
 class PythonTestSourceField(PythonSourceField):
     pass
 
@@ -630,26 +635,62 @@ class PythonTestTarget(Target):
     )
 
 
+# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
+#  message to use `python_test_utils` instead.
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = (
-        "test_*.py",
-        "*_test.py",
-        "tests.py",
-        "conftest.py",
-        "test_*.pyi",
-        "*_test.pyi",
-        "tests.pyi",
+    default = ("test_*.py", "*_test.py", "tests.py")
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        super().validate_resolved_files(files)
+        deprecated_files = []
+        for fp in files:
+            file_name = os.path.basename(fp)
+            if file_name == "conftest.py" or file_name.endswith(".pyi"):
+                deprecated_files.append(fp)
+
+        if deprecated_files:
+            # NOTE: Update `pytest.py` to stop special-casing file targets once this is removed!
+            warn_or_error(
+                "2.9.0.dev0",
+                entity=(
+                    "including `conftest.py` and `.pyi` stubs in a `python_tests` target's "
+                    "`sources` field"
+                ),
+                hint=(
+                    f"The `python_tests` target {self.address} includes these bad files in its "
+                    f"`sources` field: {deprecated_files}. "
+                    "To fix, please remove these files from the `sources` field and instead add "
+                    "them to a `python_test_utils` target. You can run `./pants tailor` after "
+                    "removing the files from the `sources` field to auto-generate this new target."
+                ),
+            )
+
+
+class PythonTestsOverrideField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        PythonTestTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo_test.py": {"timeout": 120]},\n'
+            '    "bar_test.py": {"timeout": 200]},\n'
+            '    ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
+            "  }"
+        ),
     )
 
 
 class PythonTestsGeneratorTarget(Target):
     alias = "python_tests"
-    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestsGeneratingSourcesField)
+    core_fields = (
+        *_PYTHON_TEST_COMMON_FIELDS,
+        PythonTestsGeneratingSourcesField,
+        PythonTestsOverrideField,
+    )
     help = "Generate a `python_test` target for each file in the `sources` field."
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_source` and `python_sources` targets
+# `python_source`, `python_sources`, and `python_test_utils` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -664,24 +705,66 @@ class PythonSourceTarget(Target):
     help = "A single Python source file."
 
 
+class PythonSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        PythonSourceTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.py": {"skip_pylint": True]},\n'
+            '    "bar.py": {"skip_flake8": True]},\n'
+            '    ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
+            "  }"
+        ),
+    )
+
+
+class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
+    default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+
+
 class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = ("*.py", "*.pyi") + tuple(
-        f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default
+    default = (
+        ("*.py", "*.pyi")
+        + tuple(f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default)
+        + tuple(f"!{pat}" for pat in PythonTestUtilsGeneratingSourcesField.default)
+    )
+
+
+class PythonTestUtilsGeneratorTarget(Target):
+    alias = "python_test_utils"
+    # Keep in sync with `PythonSourcesGeneratorTarget`, outside of the `sources` field.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
+        Dependencies,
+        PythonTestUtilsGeneratingSourcesField,
+        PythonSourcesOverridesField,
+    )
+    help = (
+        "Generate a `python_source` target for each file in the `sources` field.\n\n"
+        "This target generator is intended for test utility files like `conftest.py`, although it "
+        "behaves identically to the `python_sources` target generator and you can safely use that "
+        "instead. This target only exists to help you better model and keep separate test support "
+        "files vs. production files."
     )
 
 
 class PythonSourcesGeneratorTarget(Target):
     alias = "python_sources"
+    # Keep in sync with `PythonTestUtilsGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
         PythonSourcesGeneratingSourcesField,
+        PythonSourcesOverridesField,
     )
-    help = "Generate a `python_source` target for each file in the `sources` field."
-
-    deprecated_alias = "python_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
+    help = (
+        "Generate a `python_source` target for each file in the `sources` field.\n\n"
+        "You can either use this target generator or `python_test_utils` for test utility files "
+        "like `conftest.py`. They behave identically, but can help to better model and keep "
+        "separate test support files vs. production files."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -720,13 +803,13 @@ def format_invalid_requirement_string_error(
     )
 
 
-class _RequirementSequenceField(Field):
-    value: tuple[Requirement, ...]
+class _PipRequirementSequenceField(Field):
+    value: tuple[PipRequirement, ...]
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Tuple[Requirement, ...]:
+    ) -> Tuple[PipRequirement, ...]:
         value = super().compute_value(raw_value, address)
         if value is None:
             return ()
@@ -740,13 +823,13 @@ class _RequirementSequenceField(Field):
             raise invalid_type_error
         result = []
         for v in value:
-            # We allow passing a pre-parsed `Requirement`. This is intended for macros which might
-            # have already parsed so that we can avoid parsing multiple times.
-            if isinstance(v, Requirement):
+            # We allow passing a pre-parsed `PipRequirement`. This is intended for macros which
+            # might have already parsed so that we can avoid parsing multiple times.
+            if isinstance(v, PipRequirement):
                 result.append(v)
             elif isinstance(v, str):
                 try:
-                    parsed = Requirement.parse(v)
+                    parsed = PipRequirement.parse(v)
                 except Exception as e:
                     raise InvalidFieldException(
                         format_invalid_requirement_string_error(
@@ -763,7 +846,7 @@ class _RequirementSequenceField(Field):
         return tuple(result)
 
 
-class PythonRequirementsField(_RequirementSequenceField):
+class PythonRequirementsField(_PipRequirementSequenceField):
     alias = "requirements"
     required = True
     help = (
@@ -898,9 +981,6 @@ class PythonRequirementTarget(Target):
         f"See {doc_url('python-third-party-dependencies')}."
     )
 
-    deprecated_alias = "python_requirement_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
-
     def validate(self) -> None:
         if (
             self[PythonRequirementModulesField].value
@@ -919,8 +999,8 @@ class PythonRequirementTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirement]:
-    """Parse all `Requirement` objects from a requirements.txt-style file.
+def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
+    """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
     This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
@@ -930,7 +1010,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[Requirem
         if not line or line.startswith("#") or line.startswith("-"):
             continue
         try:
-            yield Requirement.parse(line)
+            yield PipRequirement.parse(line)
         except Exception as e:
             raise ValueError(
                 format_invalid_requirement_string_error(

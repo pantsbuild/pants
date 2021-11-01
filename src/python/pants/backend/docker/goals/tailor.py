@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -36,7 +36,7 @@ async def find_putative_targets(
         dirname, filename = os.path.split(dockerfile)
         pts.append(
             PutativeTarget.for_target_type(
-                DockerImage, dirname, "docker", [filename], kwargs={"name": "docker"}
+                DockerImageTarget, dirname, "docker", [filename], kwargs={"name": "docker"}
             )
         )
     return PutativeTargets(pts)

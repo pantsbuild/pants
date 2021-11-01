@@ -6,6 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Iterable, Iterator, Mapping, Sequence, cast
@@ -13,9 +14,9 @@ from typing import Any, Iterable, Iterator, Mapping, Sequence, cast
 import toml
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
-from pkg_resources import Requirement
 from typing_extensions import TypedDict
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.deprecated import warn_or_error
 from pants.base.parse_context import ParseContext
@@ -239,6 +240,10 @@ def handle_dict_attr(
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
+        # If no URL scheme (e.g., `{git = "git@github.com:foo/bar.git"}`) we assume ssh,
+        # i.e., we convert to git+ssh://git@github.com/foo/bar.git.
+        if not urllib.parse.urlsplit(git_lookup).scheme:
+            git_lookup = f"ssh://{git_lookup.replace(':', '/', 1)}"
         rev_lookup = produce_match("#", attributes.get("rev"))
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
@@ -278,11 +283,11 @@ def parse_single_dependency(
     proj_name: str,
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
-) -> Iterator[Requirement]:
+) -> Iterator[PipRequirement]:
 
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
-        yield Requirement.parse(
+        yield PipRequirement.parse(
             parse_str_version(
                 attributes,
                 proj_name=proj_name,
@@ -295,13 +300,13 @@ def parse_single_dependency(
         pyproject_attr = cast(PyprojectAttr, attributes)
         req_str = handle_dict_attr(proj_name, pyproject_attr, pyproject_toml)
         if req_str:
-            yield Requirement.parse(req_str)
+            yield PipRequirement.parse(req_str)
     elif isinstance(attributes, list):
         # E.g. ` foo = [{version = "1.1","python" = "2.7"}, {version = "1.1","python" = "2.7"}]
         for attr in attributes:
             req_str = handle_dict_attr(proj_name, attr, pyproject_toml)
             if req_str:
-                yield Requirement.parse(req_str)
+                yield PipRequirement.parse(req_str)
     else:
         raise AssertionError(
             "Error: invalid Poetry requirement format. Expected type of requirement attributes to "
@@ -309,7 +314,7 @@ def parse_single_dependency(
         )
 
 
-def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
+def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     parsed = pyproject_toml.parse()
     try:
         poetry_vals = parsed["tool"]["poetry"]

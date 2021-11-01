@@ -12,7 +12,15 @@ from pants.core.goals.package import (
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    MergeDigests,
+    PathGlobs,
+    Paths,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -26,6 +34,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
     SourcesField,
     SourcesPaths,
@@ -34,9 +43,11 @@ from pants.engine.target import (
     StringField,
     Target,
     Targets,
+    generate_file_based_overrides_field_help_message,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -64,9 +75,27 @@ class FilesGeneratingSourcesField(MultipleSourcesField):
     uses_source_roots = False
 
 
+class FilesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        FileTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.json": {"description": "our customer model"]},\n'
+            '    "bar.json": {"description": "our product model"]},\n'
+            '    ("foo.json", "bar.json"): {"tags": ["overridden"]},\n'
+            "  }"
+        ),
+    )
+
+
 class FilesGeneratorTarget(Target):
     alias = "files"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesGeneratingSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        FilesGeneratingSourcesField,
+        FilesOverridesField,
+    )
     help = "Generate a `file` target for each file in the `sources` field."
 
 
@@ -76,17 +105,32 @@ class GenerateTargetsFromFiles(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_files(
-    request: GenerateTargetsFromFiles, union_membership: UnionMembership
+    request: GenerateTargetsFromFiles,
+    union_membership: UnionMembership,
+    files_not_found_behavior: FilesNotFoundBehavior,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[FilesGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         FileTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=False,
+        overrides=all_overrides,
     )
 
 
@@ -241,9 +285,27 @@ class ResourcesGeneratingSourcesField(MultipleSourcesField):
     required = True
 
 
+class ResourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        ResourceTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.json": {"description": "our customer model"]},\n'
+            '    "bar.json": {"description": "our product model"]},\n'
+            '    ("foo.json", "bar.json"): {"tags": ["overridden"]},\n'
+            "  }"
+        ),
+    )
+
+
 class ResourcesGeneratorTarget(Target):
     alias = "resources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesGeneratingSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ResourcesGeneratingSourcesField,
+        ResourcesOverridesField,
+    )
     help = "Generate a `resource` target for each file in the `sources` field."
 
 
@@ -253,17 +315,32 @@ class GenerateTargetsFromResources(GenerateTargetsRequest):
 
 @rule
 async def generate_targets_from_resources(
-    request: GenerateTargetsFromResources, union_membership: UnionMembership
+    request: GenerateTargetsFromResources,
+    union_membership: UnionMembership,
+    files_not_found_behavior: FilesNotFoundBehavior,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[ResourcesGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         ResourceTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=False,
+        overrides=all_overrides,
     )
 
 

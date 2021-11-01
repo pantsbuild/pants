@@ -65,6 +65,7 @@ async def setup_analyzer() -> AnalyzerSetup:
             go_file_names=(source_entry.path,),
             s_file_names=(),
             direct_dependencies=(),
+            minimum_go_version=None,
         ),
     )
     main_pkg_a_file_path = built_analyzer_pkg.import_paths_to_pkg_a_files["main"]
@@ -100,7 +101,7 @@ async def generate_testmain(
         Process(
             argv=(analyzer.PATH, request.import_path, *test_paths, *xtest_paths),
             input_digest=input_digest,
-            description="Analyze Go test sources.",
+            description=f"Analyze Go test sources for {request.import_path}",
             level=LogLevel.DEBUG,
             output_files=("_testmain.go",),
         ),

@@ -23,6 +23,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, FallibleBuiltGoPackage
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -45,6 +46,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
+            QueryRule(FallibleBuiltGoPackage, (BuildGoPackageRequest,)),
         ],
         target_types=[GoBinaryTarget, GoModTarget],
     )
@@ -123,3 +125,29 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
     assert result.returncode == 0
     assert result.stdout == b"3\n"
+
+
+def test_build_invalid_package(rule_runner: RuleRunner) -> None:
+    request = BuildGoPackageRequest(
+        import_path="example.com/assembly",
+        subpath="",
+        go_file_names=("add_amd64.go", "add_arm64.go"),
+        digest=rule_runner.make_snapshot(
+            {
+                "add_amd64.go": "package main\nfunc add(x, y int64) int64",
+                "add_arm64.go": "package main\nfunc add(x, y int64) int64",
+                "add_amd64.s": "INVALID!!!",
+                "add_arm64.s": "INVALID!!!",
+            }
+        ).digest,
+        s_file_names=("add_amd64.s", "add_arm64.s"),
+        direct_dependencies=(),
+        minimum_go_version=None,
+    )
+    result = rule_runner.request(FallibleBuiltGoPackage, [request])
+    assert result.output is None
+    assert result.exit_code == 1
+    assert (
+        result.stdout
+        == ".//add_amd64.s:1: unexpected EOF\nasm: assembly of .//add_amd64.s failed\n"
+    )

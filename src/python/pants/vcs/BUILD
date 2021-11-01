@@ -3,20 +3,16 @@
 
 python_sources()
 
-python_tests(
-  name="tests",
-  sources=["*_test.py", "!*integration_test.py"],
-  timeout=120,
-)
+python_tests(name="tests", sources=["*_test.py", "!*integration_test.py"], timeout=120)
 
 
 python_tests(
-  name='changed_integration',
-  sources=['changed_integration_test.py'],
-  dependencies=[
-    '//.gitignore:files',
-    'testprojects/src/python:python_targets_directory',
-    'testprojects/src/python:sources_directory',
-  ],
-  timeout=600,
+    name="changed_integration",
+    sources=["changed_integration_test.py"],
+    dependencies=[
+        "//.gitignore:files",
+        "testprojects/src/python:python_targets_directory",
+        "testprojects/src/python:sources_directory",
+    ],
+    timeout=600,
 )

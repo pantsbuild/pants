@@ -3,21 +3,23 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Dict, Optional, cast
 
 from pkg_resources import Requirement
 
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
-from pants.engine.fs import Digest, DownloadFile, FileDigest
+from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -95,16 +97,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     # The default values for --version and --known-versions, and the supported versions.
     # Subclasses must set appropriately.
     default_version: str
-    default_known_versions: List[str]
-    version_constraints: Optional[str] = None
+    default_known_versions: list[str]
+    version_constraints: str | None = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.version_constraints:
-            constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
-            self.check_version_constraints(
-                self.version, constraints, self.options.use_unsupported_version
-            )
+        self.check_version_constraints()
 
     @classproperty
     def name(cls):
@@ -178,7 +176,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         return cast(str, self.options.version)
 
     @property
-    def known_versions(self) -> Tuple[str, ...]:
+    def known_versions(self) -> tuple[str, ...]:
         return tuple(self.options.known_versions)
 
     @abstractmethod
@@ -233,33 +231,36 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             ) from e
         return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
 
-    @classmethod
-    def check_version_constraints(
-        cls, version: str, constraints: Requirement, action: UnsupportedVersionUsage
-    ) -> None:
-        if constraints.specifier.contains(version):  # type: ignore[attr-defined]
+    def check_version_constraints(self) -> None:
+        if not self.version_constraints:
+            return None
+        # Note that this is not a Python requirement. We're just hackily piggybacking off
+        # pkg_resource.Requirement's ability to check version constraints.
+        constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
+        if constraints.specifier.contains(self.version):  # type: ignore[attr-defined]
             # all ok
             return None
 
         msg = [
-            f"The option [{cls.options_scope}].version is set to {version}, which is not compatible",
-            f"with what this release of Pants expects: {constraints}.",
+            f"The option [{self.options_scope}].version is set to {self.version}, which is not "
+            f"compatible with what this release of Pants expects: {constraints}.",
             "Please update the version to a supported value, or consider using a different Pants",
             "release if you cannot change the version.",
         ]
 
-        if action is UnsupportedVersionUsage.LogWarning:
+        if self.options.use_unsupported_version is UnsupportedVersionUsage.LogWarning:
             msg.extend(
                 [
                     "Alternatively, you can ignore this warning (at your own peril) by adding this",
                     "to the GLOBAL section of pants.toml:",
-                    f"""ignore_warnings = ["The option [{cls.options_scope}].version is set to"].""",
+                    f'ignore_warnings = ["The option [{self.options_scope}].version is set to"].',
                 ]
             )
             logger.warning(" ".join(msg))
-        elif action is UnsupportedVersionUsage.RaiseError:
+        elif self.options.use_unsupported_version is UnsupportedVersionUsage.RaiseError:
             msg.append(
-                f"Alternatively, update [{cls.options_scope}].use_unsupported_version to be 'warning'."
+                f"Alternatively, update [{self.options_scope}].use_unsupported_version to be "
+                f"'warning'."
             )
             raise UnsupportedVersion(" ".join(msg))
 
@@ -280,7 +281,7 @@ class TemplatedExternalTool(ExternalTool):
     """
 
     default_url_template: str
-    default_url_platform_mapping: Optional[Dict[str, str]] = None
+    default_url_platform_mapping: dict[str, str] | None = None
 
     @classmethod
     def register_options(cls, register):
@@ -294,8 +295,10 @@ class TemplatedExternalTool(ExternalTool):
             help=(
                 "URL to download the tool, either as a single binary file or a compressed file "
                 "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
-                "work with proxies or for access via the filesystem through a file:// URL.\n\nUse "
-                "`{version}` to have the value from --version substituted, and `{platform}` to "
+                "work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g. "
+                "`file:/this/is/absolute`, possibly by [templating the buildroot in a "
+                f"config file]({doc_url('options#config-file-entries')})).\n\n"
+                "Use `{version}` to have the value from --version substituted, and `{platform}` to "
                 "have a value from --url-platform-mapping substituted in, depending on the "
                 "current platform. For example, "
                 "https://github.com/.../protoc-{version}-{platform}.zip."
@@ -323,7 +326,7 @@ class TemplatedExternalTool(ExternalTool):
         return cast(str, self.options.url_template)
 
     @property
-    def url_platform_mapping(self) -> Optional[Dict[str, str]]:
+    def url_platform_mapping(self) -> dict[str, str] | None:
         return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
 
     def generate_url(self, plat: Platform):
@@ -333,9 +336,25 @@ class TemplatedExternalTool(ExternalTool):
 
 @rule(level=LogLevel.DEBUG)
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    digest = await Get(Digest, DownloadFile, request.download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, digest)
-    return DownloadedExternalTool(extracted_archive.digest, request.exe)
+    # Download and extract.
+    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
+    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+
+    # Confirm executable.
+    exe_path = request.exe.lstrip("./")
+    digest = extracted_archive.digest
+    is_not_executable = False
+    digest_entries = []
+    for entry in await Get(DigestEntries, Digest, digest):
+        if isinstance(entry, FileEntry) and entry.path == exe_path and not entry.is_executable:
+            # We should recreate the digest with the executable bit set.
+            is_not_executable = True
+            entry = dataclasses.replace(entry, is_executable=True)
+        digest_entries.append(entry)
+    if is_not_executable:
+        digest = await Get(Digest, CreateDigest(digest_entries))
+
+    return DownloadedExternalTool(digest, request.exe)
 
 
 def rules():

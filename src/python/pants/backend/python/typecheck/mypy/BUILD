@@ -12,4 +12,3 @@ python_tests(
     # We want to make sure the default lockfile works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )
-

@@ -5,9 +5,9 @@ from textwrap import dedent
 from typing import Iterable
 
 import pytest
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.python_requirements import PythonRequirements
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -76,7 +76,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                     "modules": ["colors"],
                 },
                 Address("", target_name="ansicolors"),
@@ -84,14 +84,14 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("Django==3.2 ; python_version>'3'")],
+                    "requirements": [PipRequirement.parse("Django==3.2 ; python_version>'3'")],
                 },
                 Address("", target_name="Django"),
             ),
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("Django-types")],
+                    "requirements": [PipRequirement.parse("Django-types")],
                     "type_stub_modules": ["django"],
                 },
                 Address("", target_name="Django-types"),
@@ -99,14 +99,16 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("Un_Normalized_PROJECT")],
+                    "requirements": [PipRequirement.parse("Un_Normalized_PROJECT")],
                 },
                 Address("", target_name="Un-Normalized-PROJECT"),
             ),
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("pip@ git+https://github.com/pypa/pip.git")],
+                    "requirements": [
+                        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git")
+                    ],
                 },
                 Address("", target_name="pip"),
             ),
@@ -139,8 +141,8 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 {
                     "dependencies": [":requirements.txt"],
                     "requirements": [
-                        Requirement.parse("Django>=3.2"),
-                        Requirement.parse("Django==3.2.7"),
+                        PipRequirement.parse("Django>=3.2"),
+                        PipRequirement.parse("Django==3.2.7"),
                     ],
                 },
                 Address("", target_name="Django"),
@@ -148,14 +150,14 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("confusedmonkey==86")],
+                    "requirements": [PipRequirement.parse("confusedmonkey==86")],
                 },
                 Address("", target_name="confusedmonkey"),
             ),
             PythonRequirementTarget(
                 {
                     "dependencies": [":requirements.txt"],
-                    "requirements": [Requirement.parse("repletewateringcan>=7")],
+                    "requirements": [PipRequirement.parse("repletewateringcan>=7")],
                 },
                 Address("", target_name="repletewateringcan"),
             ),
@@ -205,7 +207,7 @@ def test_source_override(source_arg: str, rule_runner: RuleRunner) -> None:
             PythonRequirementTarget(
                 {
                     "dependencies": [":subdir_requirements.txt"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                    "requirements": [PipRequirement.parse("ansicolors>=1.18.0")],
                 },
                 Address("", target_name="ansicolors"),
             ),

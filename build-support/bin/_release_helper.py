@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import itertools
+import json
 import os
 import re
 import shutil
@@ -615,10 +617,8 @@ def build_3rdparty_wheels() -> None:
                 [
                     "./pants",
                     "--concurrent",
-                    "--no-dynamic-ui",
                     "dependencies",
                     "--transitive",
-                    "--type=3rdparty",
                     *pkg_tgts,
                 ],
                 stdout=subprocess.PIPE,
@@ -628,13 +628,44 @@ def build_3rdparty_wheels() -> None:
             .strip()
             .splitlines()
         )
-        if not deps:
+        python_requirements = (
+            subprocess.run(
+                [
+                    "./pants",
+                    "--concurrent",
+                    "filter",
+                    "--target-type=python_requirement",
+                    *deps,
+                ],
+                stdout=subprocess.PIPE,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+            .splitlines()
+        )
+        if not python_requirements:
             die(
                 f"No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies` "
                 "broken?"
             )
+        reqs = itertools.chain.from_iterable(
+            obj["requirements"]
+            for obj in json.loads(
+                subprocess.run(
+                    [
+                        "./pants",
+                        "--concurrent",
+                        "peek",
+                        *python_requirements,
+                    ],
+                    stdout=subprocess.PIPE,
+                    check=True,
+                ).stdout
+            )
+        )
         subprocess.run(
-            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *deps],
+            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *reqs],
             check=True,
         )
         green(f"Wrote 3rdparty wheels to {dest}")
@@ -699,6 +730,12 @@ def build_pex(fetch: bool) -> None:
         build_pants_wheels()
         build_3rdparty_wheels()
 
+    # We need to both run Pex and the Pants PEX we build with it with clean environments since we
+    # ourselves may be running via `./pants run ...` which injects confounding environment variables
+    # like PEX_EXTRA_SYS_PATH, PEX_PATH and PEX_ROOT that need not or should not apply to these
+    # sub-processes.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PEX_")}
+
     dest = Path("dist") / pex_name
     with download_pex_bin() as pex_bin:
         subprocess.run(
@@ -719,6 +756,7 @@ def build_pex(fetch: bool) -> None:
                 *extra_pex_args,
                 f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
             ],
+            env=env,
             check=True,
         )
 
@@ -729,7 +767,7 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    subprocess.run([sys.executable, str(dest), "--version"], check=True)
+    subprocess.run([sys.executable, str(dest), "--no-pantsd", "--version"], env=env, check=True)
     green(f"Validated {dest}")
 
 

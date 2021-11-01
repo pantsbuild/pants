@@ -11,6 +11,8 @@ from pants.backend.java.classpath import Classpath
 from pants.backend.java.classpath import rules as classpath_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.package.deploy_jar import DeployJarFieldSet
 from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
 from pants.backend.java.target_types import DeployJar, JavaSourcesGeneratorTarget
@@ -33,12 +35,12 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             # TODO: delete a few of these (they were copied from junit tests; not sure which
             # are needed)
@@ -51,6 +53,9 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *javac_rules(),
             *jdk_rules.rules(),
+            *java_dep_inf_rules(),
+            *java_parser.rules(),
+            *java_parser_launcher.rules(),
             *source_files.rules(),
             *target_types_rules(),
             *util_rules(),
@@ -71,6 +76,11 @@ def rule_runner() -> RuleRunner:
             DeployJar,
         ],
     )
+    rule_runner.set_options(
+        args=['--jvm-resolves={"test": "coursier_resolve.lockfile"}', "--jvm-default-resolve=test"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    return rule_runner
 
 
 JAVA_LIB_SOURCE = dedent(
@@ -241,16 +251,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
 
                     java_sources(
                         name="example",
-                        dependencies=[
-                            ":lockfile",
-                        ],
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
@@ -281,16 +282,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     java_sources(
                         name="example",
                         sources=["**/*.java", ],
-                        dependencies=[
-                            ":lockfile",
-                        ],
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
@@ -323,7 +315,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                         name="example",
                         sources=["**/*.java", ],
                         dependencies=[
-                            ":lockfile",
                             ":com.fasterxml.jackson.core_jackson-databind",
                         ],
                     )
@@ -334,12 +325,6 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                         artifact = "jackson-databind",
                         version = "2.12.5",
                     )
-
-                    coursier_lockfile(
-                        name="lockfile",
-                        source="coursier_resolve.lockfile",
-                    )
-
                 """
             ),
             "coursier_resolve.lockfile": COURSIER_LOCKFILE_SOURCE,
@@ -370,6 +355,7 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
                 description="Run that test jar",
                 input_digest=input_digests,
                 append_only_caches=jdk_setup.append_only_caches,
+                env=jdk_setup.env,
             )
         ],
     )

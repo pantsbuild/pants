@@ -26,10 +26,10 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
-from pants.python.python_setup import PythonSetup
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def main() -> None:
             # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
             # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
             # restore it here so that the lockfile gets generated properly.
-            "--python-setup-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
+            "--python-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
             "generate-lockfiles",
             "generate-user-lockfile",
             "::",
@@ -60,7 +60,7 @@ def main() -> None:
         [
             "./pants",
             "--concurrent",
-            f"--python-setup-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+            f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
             # Autoflake.
             f"--autoflake-version={Autoflake.default_version}",
             f"--autoflake-extra-requirements={repr(Autoflake.default_extra_requirements)}",
@@ -103,7 +103,7 @@ def main() -> None:
             f"--yapf-interpreter-constraints={repr(Yapf.default_interpreter_constraints)}",
             f"--yapf-lockfile={Yapf.default_lockfile_path}",
             # PyUpgrade.
-            "--backend-packages=+['pants.backend.python.lint.pyupgrade']",
+            "--backend-packages=+['pants.backend.experimental.python.lint.pyupgrade']",
             f"--pyupgrade-version={PyUpgrade.default_version}",
             f"--pyupgrade-extra-requirements={repr(PyUpgrade.default_extra_requirements)}",
             f"--pyupgrade-interpreter-constraints={repr(PyUpgrade.default_interpreter_constraints)}",

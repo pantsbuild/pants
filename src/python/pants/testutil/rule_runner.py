@@ -59,20 +59,42 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-def logging(func):
-    """A decorator that enables logging (optionally at the given level)."""
+def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
+    """A decorator that enables logging (optionally at the given level).
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
-        with temporary_dir() as tempdir, initialize_stdio_raw(
-            LogLevel.INFO, False, False, {}, True, [], tempdir
-        ), stdin_context() as stdin, stdio_destination(
-            stdin.fileno(), stdout_fileno, stderr_fileno
-        ):
-            return func(*args, **kwargs)
+    May be used without a parameter list:
 
-    return wrapper
+        ```
+        @logging
+        def test_function():
+            ...
+        ```
+
+    ...or with a level argument:
+
+        ```
+        @logging(level=LogLevel.DEBUG)
+        def test_function():
+            ...
+        ```
+    """
+
+    def _decorate(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
+            with temporary_dir() as tempdir, initialize_stdio_raw(
+                level, False, False, {}, True, [], tempdir
+            ), stdin_context() as stdin, stdio_destination(
+                stdin.fileno(), stdout_fileno, stderr_fileno
+            ):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    if original_function:
+        return _decorate(original_function)
+    return _decorate
 
 
 @contextmanager
@@ -130,6 +152,12 @@ _O = TypeVar("_O")
 _EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
 
 
+# Environment variable names required for locating Python interpreters, for use with RuleRunner's
+# env_inherit arguments.
+# TODO: This is verbose and redundant: see https://github.com/pantsbuild/pants/issues/13350.
+PYTHON_BOOTSTRAP_ENV = {"PATH", "PYENV_ROOT", "HOME"}
+
+
 @dataclass(frozen=True)
 class GoalRuleResult:
     exit_code: int
@@ -163,15 +191,6 @@ class RuleRunner:
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
-
-        # TODO: Until https://github.com/coursier/coursier/pull/2197 is resolved, we avoid concurrent
-        # use of the named caches via `[pytest] execution_slot_var`.
-        home = os.environ.get("HOME")
-        exec_slot = os.environ.get("EXECUTION_SLOT")
-        if home and exec_slot:
-            bootstrap_args.append(
-                f"--named-caches-dir={home}/.cache/pants/named_caches/tests/{exec_slot}"
-            )
 
         root_dir: Path | None = None
         if preserve_tmpdirs:
@@ -303,14 +322,14 @@ class RuleRunner:
         specs = SpecsParser(self.build_root).parse_specs(raw_specs)
 
         stdout, stderr = StringIO(), StringIO()
-        console = Console(stdout=stdout, stderr=stderr, use_colors=False)
+        console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)
 
         exit_code = self.scheduler.run_goal_rule(
             goal,
             Params(
                 specs,
                 console,
-                Workspace(self.scheduler, _enforce_effects=False),
+                Workspace(self.scheduler),
             ),
         )
 

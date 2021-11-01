@@ -8,11 +8,15 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.shell.shell_command import GenerateFilesFromShellCommandRequest, RunShellCommand
+from pants.backend.shell.shell_command import (
+    GenerateFilesFromShellCommandRequest,
+    RunShellCommand,
+    ShellCommandProcessRequest,
+)
 from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import (
-    ShellCommand,
-    ShellCommandRun,
+    ShellCommandRunTarget,
+    ShellCommandTarget,
     ShellSourcesGeneratorTarget,
 )
 from pants.core.goals.run import RunRequest
@@ -23,6 +27,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
+from pants.engine.process import Process
 from pants.engine.target import (
     GeneratedSources,
     MultipleSourcesField,
@@ -41,13 +46,14 @@ def rule_runner() -> RuleRunner:
             *source_files_rules(),
             *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
+            QueryRule(Process, [ShellCommandProcessRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[
-            ShellCommand,
-            ShellCommandRun,
+            ShellCommandTarget,
+            ShellCommandRunTarget,
             ShellSourcesGeneratorTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
@@ -363,3 +369,39 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
 
     assert_run_args("test", ("bash", "-c", "some cmd string"))
     assert_run_args("cd-test", ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string"))
+
+
+def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="boot-script-test",
+                  tools=[
+                    "python3.8",
+                  ],
+                  command="./command.script",
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
+    res = rule_runner.request(Process, [ShellCommandProcessRequest(tgt)])
+    assert "bash" in res.argv[0]
+    assert res.argv[1:] == (
+        "-c",
+        (
+            "$mkdir -p .bin;"
+            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
+            'export PATH="$PWD/.bin";'
+            "./command.script"
+        ),
+    )
+
+    tools = sorted({"python3_8", "mkdir", "ln"})
+    assert sorted(res.env["TOOLS"].split()) == tools
+    for tool in tools:
+        assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")

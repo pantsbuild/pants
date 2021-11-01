@@ -152,17 +152,6 @@ class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
     required = True
     value: str
 
-    @property
-    def full_dir_path(self) -> str:
-        """The full path to this package's directory, relative to the build root."""
-        # NB: The `spec_path` points to the `go_mod` target used to generate the
-        # `go_first_party_package` target.
-        assert self.address.is_generated_target
-        go_mod_path = self.address.spec_path
-        if not self.value:
-            return go_mod_path
-        return os.path.join(go_mod_path, self.value)
-
 
 class GoFirstPartyPackageTarget(Target):
     alias = "go_first_party_package"
@@ -199,36 +188,9 @@ class GoThirdPartyPackageDependenciesField(Dependencies):
     pass
 
 
-class GoThirdPartyModulePathField(StringField):
-    alias = "module_path"
-    help = (
-        "The module path of the third-party module this package comes from, "
-        "e.g. `github.com/google/go-cmp`.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
-class GoThirdPartyModuleVersionField(StringField):
-    alias = "version"
-    help = (
-        "The version of the third-party module this package comes from, e.g. `v0.4.0`.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
 class GoThirdPartyPackageTarget(Target):
     alias = "go_third_party_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        GoThirdPartyPackageDependenciesField,
-        GoThirdPartyModulePathField,
-        GoThirdPartyModuleVersionField,
-        GoImportPathField,
-    )
+    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
     help = (
         "A package from a third-party Go module.\n\n"
         "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "

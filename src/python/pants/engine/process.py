@@ -217,14 +217,22 @@ class ProcessExecutionFailure(Exception):
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
+
+        def try_decode(content: bytes) -> str:
+            try:
+                return content.decode()
+            except ValueError:
+                content_repr = repr(stdout)
+                return f"{content_repr[:256]}..." if len(content_repr) > 256 else content_repr
+
         # NB: We don't use dedent on a single format string here because it would attempt to
         # interpret the stdio content.
         err_strings = [
             f"Process '{process_description}' failed with exit code {exit_code}.",
             "stdout:",
-            stdout.decode(),
+            try_decode(stdout),
             "stderr:",
-            stderr.decode(),
+            try_decode(stderr),
         ]
         if local_cleanup:
             err_strings.append(
@@ -448,6 +456,13 @@ class BinaryPaths(EngineAwareReturnType):
         """Return the first path to the binary that was discovered, if any."""
         return next(iter(self.paths), None)
 
+    def first_path_or_raise(self, request: BinaryPathRequest, *, rationale: str) -> BinaryPath:
+        """Return the first path to the binary that was discovered, if any."""
+        first_path = self.first_path
+        if not first_path:
+            raise BinaryNotFoundError.from_request(request, rationale=rationale)
+        return first_path
+
 
 class BinaryNotFoundError(EnvironmentError):
     @classmethod
@@ -464,7 +479,7 @@ class BinaryNotFoundError(EnvironmentError):
             "download the tools Pants needs" or "run Python programs".
         :param alternative_solution: A description of what else users can do to fix the issue,
             beyond installing the program. For example, "Alternatively, you can set the option
-            `--python-setup-interpreter-search-path` to change the paths searched."
+            `--python-bootstrap-search-path` to change the paths searched."
         """
         msg = (
             f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "

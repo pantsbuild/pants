@@ -14,6 +14,7 @@ from pants.backend.docker.target_types import DockerRegistriesField, DockerSkipP
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.publish import (
     PublishFieldSet,
+    PublishOutputData,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
@@ -35,6 +36,15 @@ class PublishDockerImageFieldSet(PublishFieldSet):
 
     registries: DockerRegistriesField
     skip_push: DockerSkipPushField
+
+    def get_output_data(self) -> PublishOutputData:
+        return PublishOutputData(
+            {
+                "publisher": "docker",
+                "registries": self.registries.value or (),
+                **super().get_output_data(),
+            }
+        )
 
 
 @rule

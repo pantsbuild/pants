@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -100,7 +100,7 @@ class PipenvRequirements:
             if info.get("markers"):
                 req_str += f";{info['markers']}"
 
-            parsed_req = Requirement.parse(req_str)
+            parsed_req = PipRequirement.parse(req_str)
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             self._parse_context.create_object(
                 "python_requirement",

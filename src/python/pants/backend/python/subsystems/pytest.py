@@ -10,10 +10,11 @@ from pathlib import PurePath
 from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     PythonResolveField,
@@ -36,7 +37,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -56,8 +56,10 @@ class PythonTestFieldSet(TestFieldSet):
     def opt_out(cls, tgt: Target) -> bool:
         if tgt.get(SkipPythonTestsField).value:
             return True
-        # TODO: Replace this by having `python_tests` generate `python_source` targets for these
-        #  files.
+        # TODO(#13238): Remove once we finish deprecating special-casing of `conftest.py`. For now,
+        #  we need this so that we can run explicitly declared `python_test` targets.
+        if not tgt.address.is_file_target:
+            return False
         file_name = PurePath(tgt.address.filename)
         return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
 
@@ -200,7 +202,7 @@ class PyTest(PythonToolBase):
     def validate_pytest_cov_included(self) -> None:
         for s in self.extra_requirements:
             try:
-                req = Requirement.parse(s).project_name
+                req = PipRequirement.parse(s).project_name
             except Exception as e:
                 raise ValueError(
                     format_invalid_requirement_string_error(

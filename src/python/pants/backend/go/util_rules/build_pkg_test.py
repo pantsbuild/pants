@@ -23,6 +23,8 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuildGoPackageTargetRequest,
     BuiltGoPackage,
+    FallibleBuildGoPackageRequest,
+    FallibleBuiltGoPackage,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -44,7 +46,9 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
+            QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
+            QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -87,6 +91,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         ).digest,
         s_file_names=(),
         direct_dependencies=(),
+        minimum_go_version=None,
     )
     direct_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",
@@ -109,6 +114,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         ).digest,
         s_file_names=(),
         direct_dependencies=(transitive_dep,),
+        minimum_go_version=None,
     )
     main = BuildGoPackageRequest(
         import_path="example.com/foo",
@@ -132,6 +138,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         ).digest,
         s_file_names=(),
         direct_dependencies=(direct_dep,),
+        minimum_go_version=None,
     )
 
     assert_built(
@@ -153,6 +160,57 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
+    invalid_dep = BuildGoPackageRequest(
+        import_path="example.com/foo/dep",
+        subpath="dep",
+        go_file_names=("f.go",),
+        digest=rule_runner.make_snapshot({"dep/f.go": "invalid!!!"}).digest,
+        s_file_names=(),
+        direct_dependencies=(),
+        minimum_go_version=None,
+    )
+    main = BuildGoPackageRequest(
+        import_path="example.com/foo",
+        subpath="",
+        go_file_names=("f.go",),
+        digest=rule_runner.make_snapshot(
+            {
+                "f.go": dedent(
+                    """\
+                    package foo
+
+                    import "example.com/foo/dep"
+
+                    func main() {
+                        dep.Quote("Hello world!")
+                    }
+                    """
+                )
+            }
+        ).digest,
+        s_file_names=(),
+        direct_dependencies=(invalid_dep,),
+        minimum_go_version=None,
+    )
+
+    invalid_direct_result = rule_runner.request(FallibleBuiltGoPackage, [invalid_dep])
+    assert invalid_direct_result.output is None
+    assert invalid_direct_result.exit_code == 1
+    assert (
+        invalid_direct_result.stdout
+        == "./dep/f.go:1:1: syntax error: package statement must be first\n"
+    )
+
+    invalid_dep_result = rule_runner.request(FallibleBuiltGoPackage, [main])
+    assert invalid_dep_result.output is None
+    assert invalid_dep_result.exit_code == 1
+    assert (
+        invalid_dep_result.stdout
+        == "./dep/f.go:1:1: syntax error: package statement must be first\n"
+    )
+
+
 def assert_pkg_target_built(
     rule_runner: RuleRunner,
     addr: Address,
@@ -166,7 +224,6 @@ def assert_pkg_target_built(
     build_request = rule_runner.request(BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr)])
     assert build_request.import_path == expected_import_path
     assert build_request.subpath == expected_subpath
-    print(build_request.go_file_names)
     assert build_request.go_file_names == tuple(expected_go_file_names)
     assert not build_request.s_file_names
     assert [
@@ -241,7 +298,7 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=import_path),
         expected_import_path=import_path,
-        expected_subpath="",
+        expected_subpath="github.com/google/uuid@v1.3.0",
         expected_go_file_names=[
             "dce.go",
             "doc.go",
@@ -317,11 +374,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                 """
             ),
-            "BUILD": dedent(
-                """\
-                go_mod(name='mod')
-                """
-            ),
+            "BUILD": "go_mod(name='mod')",
         }
     )
 
@@ -330,7 +383,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
         expected_import_path=xerrors_internal_import_path,
-        expected_subpath="internal",
+        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543/internal",
         expected_go_file_names=["internal.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
@@ -341,7 +394,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_import_path),
         expected_import_path=xerrors_import_path,
-        expected_subpath="",
+        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543",
         expected_go_file_names=[
             "adaptor.go",
             "doc.go",
@@ -390,3 +443,46 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
             xerrors_internal_import_path,
         ],
     )
+
+
+def test_build_invalid_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/greeter
+                go 1.17
+                """
+            ),
+            "BUILD": "go_mod(name='mod')",
+            "direct/f.go": "invalid!!!",
+            "dep/f.go": "invalid!!!",
+            "uses_dep/f.go": dedent(
+                """\
+                package uses_dep
+
+                import "example.com/greeter/dep"
+
+                func Hello() {
+                    dep.Foo("Hello world!")
+                }
+                """
+            ),
+        }
+    )
+
+    direct_build_request = rule_runner.request(
+        FallibleBuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("", target_name="mod", generated_name="./direct"))],
+    )
+    assert direct_build_request.request is None
+    assert direct_build_request.exit_code == 1
+    assert direct_build_request.stderr == "direct/f.go:1:1: expected 'package', found invalid\n"
+
+    dep_build_request = rule_runner.request(
+        FallibleBuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("", target_name="mod", generated_name="./uses_dep"))],
+    )
+    assert dep_build_request.request is None
+    assert dep_build_request.exit_code == 1
+    assert dep_build_request.stderr == "dep/f.go:1:1: expected 'package', found invalid\n"

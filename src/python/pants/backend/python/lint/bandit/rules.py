@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -15,7 +16,6 @@ from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, Remov
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 

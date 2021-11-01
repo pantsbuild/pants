@@ -11,6 +11,7 @@ from typing import Iterable, cast
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
@@ -40,7 +41,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.python.python_setup import PythonSetup
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet

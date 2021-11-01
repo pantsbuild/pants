@@ -16,11 +16,10 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 @dataclass(frozen=True)
 class FallibleAssemblyPreCompilation:
-    results: tuple[FallibleProcessResult, ...]
-    output: AssemblyPreCompilation | None
-
-    def has_failures(self) -> bool:
-        return any(result.exit_code != 0 for result in self.results)
+    result: AssemblyPreCompilation | None
+    exit_code: int = 0
+    stdout: str | None = None
+    stderr: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,12 +86,17 @@ async def setup_assembly_pre_compilation(
                 "--",
                 *(f"./{request.source_files_subpath}/{name}" for name in request.s_files),
             ),
-            description="Generate symabis metadata for assembly files.",
+            description=(
+                f"Generate symabis metadata for assembly files for {request.source_files_subpath}"
+            ),
             output_files=("symabis",),
         ),
     )
     if symabis_result.exit_code != 0:
-        return FallibleAssemblyPreCompilation((symabis_result,), None)
+        return FallibleAssemblyPreCompilation(
+            None, symabis_result.exit_code, symabis_result.stderr.decode("utf-8")
+        )
+
     merged = await Get(
         Digest,
         MergeDigests([request.compilation_input, symabis_result.output_digest]),
@@ -107,12 +111,12 @@ async def setup_assembly_pre_compilation(
                     "tool",
                     "asm",
                     "-I",
-                    str(PurePath(goroot.path, "pkg", "include")),
+                    os.path.join(goroot.path, "pkg", "include"),
                     "-o",
                     f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
                     f"./{request.source_files_subpath}/{s_file}",
                 ),
-                description=f"Assemble {s_file}",
+                description=f"Assemble {s_file} with Go",
                 output_files=(
                     f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
                 ),
@@ -120,9 +124,18 @@ async def setup_assembly_pre_compilation(
         )
         for s_file in request.s_files
     )
+    exit_code = max(result.exit_code for result in assembly_results)
+    if exit_code != 0:
+        stdout = "\n\n".join(
+            result.stdout.decode("utf-8") for result in assembly_results if result.stdout
+        )
+        stderr = "\n\n".join(
+            result.stderr.decode("utf-8") for result in assembly_results if result.stderr
+        )
+        return FallibleAssemblyPreCompilation(None, exit_code, stdout, stderr)
+
     return FallibleAssemblyPreCompilation(
-        tuple(assembly_results),
-        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results)),
+        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results))
     )
 
 
@@ -147,7 +160,9 @@ async def link_assembly_post_compilation(
                     for name in request.s_files
                 ),
             ),
-            description="Link assembly files to Go package archive.",
+            description=(
+                f"Link assembly files to Go package archive for {request.source_files_subpath}"
+            ),
             output_files=("__pkg__.a",),
         ),
     )

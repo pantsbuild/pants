@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import ClassVar, Iterable, Sequence, cast
 
-from pkg_resources import Requirement
-
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
     PoetrySubsystem,
@@ -21,6 +20,8 @@ from pants.backend.python.subsystems.python_tool_base import (
     NO_TOOL_LOCKFILE,
     PythonToolRequirementsBase,
 )
+from pants.backend.python.subsystems.repos import PythonRepos
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
     InterpreterConstraintsField,
@@ -48,8 +49,6 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership, union
-from pants.python.python_repos import PythonRepos
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -78,7 +77,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for the different lockfiles used in your project. "
                 "For your own code's dependencies, these come from the option "
-                "`[python-setup].experimental_resolves_to_lockfiles`. For tool lockfiles, resolve "
+                "`[python].experimental_resolves_to_lockfiles`. For tool lockfiles, resolve "
                 "names are the options scope for that tool such as `black`, `pytest`, and "
                 "`mypy-protobuf`.\n\n"
                 "For example, you can run `./pants generate-lockfiles --resolve=black "
@@ -127,7 +126,7 @@ class PythonLockfileRequest:
     interpreter_constraints: InterpreterConstraints
     resolve_name: str
     lockfile_dest: str
-    # Only kept for `[python-setup].experimental_lockfile`, which is not using the new
+    # Only kept for `[python].experimental_lockfile`, which is not using the new
     # "named resolve" semantics yet.
     _description: str | None = None
     _regenerate_command: str | None = None
@@ -237,7 +236,7 @@ async def generate_lockfile(
     # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = LockfileMetadata.new(
         req.interpreter_constraints,
-        {Requirement.parse(i) for i in req.requirements},
+        {PipRequirement.parse(i) for i in req.requirements},
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
@@ -379,7 +378,7 @@ def warn_python_repos(option: str) -> None:
         "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
         "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
         "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
-        "lockfiles, set `[python-setup].invalid_lockfile_behavior = 'ignore'."
+        "lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
     )
 
 
@@ -388,18 +387,18 @@ class AmbiguousResolveNamesError(Exception):
         if len(ambiguous_names) == 1:
             first_paragraph = (
                 "A resolve name from the option "
-                "`[python-setup].experimental_resolves_to_lockfiles` collides with the name of a "
+                "`[python].experimental_resolves_to_lockfiles` collides with the name of a "
                 f"tool resolve: {ambiguous_names[0]}"
             )
         else:
             first_paragraph = (
                 "Some resolve names from the option "
-                "`[python-setup].experimental_resolves_to_lockfiles` collide with the names of "
+                "`[python].experimental_resolves_to_lockfiles` collide with the names of "
                 f"tool resolves: {sorted(ambiguous_names)}"
             )
         super().__init__(
             f"{first_paragraph}\n\n"
-            "To fix, please update `[python-setup].experimental_resolves_to_lockfiles` to use "
+            "To fix, please update `[python].experimental_resolves_to_lockfiles` to use "
             "different resolve names."
         )
 

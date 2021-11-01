@@ -39,10 +39,15 @@ class GoSdkProcess:
         working_dir: str | None = None,
         output_files: Iterable[str] = (),
         output_directories: Iterable[str] = (),
+        allow_downloads: bool = False,
     ) -> None:
         self.command = tuple(command)
         self.description = description
-        self.env = FrozenDict(env or {})
+        self.env = (
+            FrozenDict(env or {})
+            if allow_downloads
+            else FrozenDict({**(env or {}), "GOPROXY": "off"})
+        )
         self.input_digest = input_digest
         self.working_dir = working_dir
         self.output_files = tuple(output_files)
@@ -91,6 +96,7 @@ async def setup_go_sdk_process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env={
             GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+            **request.env,
         },
         input_digest=input_digest,
         description=request.description,

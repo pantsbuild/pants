@@ -3,7 +3,7 @@
 
 from pants.backend.docker.goals.tailor import rules as tailor_rules
 from pants.backend.docker.rules import rules as docker_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.python.util_rules.pex import rules as pex_rules
 
 
@@ -17,5 +17,5 @@ def rules():
 
 def target_types():
     return [
-        DockerImage,
+        DockerImageTarget,
     ]

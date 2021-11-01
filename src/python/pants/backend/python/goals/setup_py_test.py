@@ -13,6 +13,8 @@ from pants.backend.python.goals.setup_py import (
     AmbiguousOwnerError,
     DependencyOwner,
     DistBuildChroot,
+    DistBuildChrootRequest,
+    DistBuildSources,
     ExportedTarget,
     ExportedTargetRequirements,
     FinalizedSetupKwargs,
@@ -25,9 +27,7 @@ from pants.backend.python.goals.setup_py import (
     OwnedDependency,
     SetupKwargs,
     SetupKwargsRequest,
-    SetupPyChrootRequest,
     SetupPyGeneration,
-    SetupPySources,
     declares_pkg_resources_namespace_package,
     determine_setup_kwargs,
     generate_chroot,
@@ -109,8 +109,8 @@ def chroot_rule_runner() -> RuleRunner:
             setup_kwargs_plugin,
             SubsystemRule(SetupPyGeneration),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
-            QueryRule(DistBuildChroot, (SetupPyChrootRequest,)),
-            QueryRule(SetupPySources, (SetupPyChrootRequest,)),
+            QueryRule(DistBuildChroot, (DistBuildChrootRequest,)),
+            QueryRule(DistBuildSources, (DistBuildChrootRequest,)),
             QueryRule(FinalizedSetupKwargs, (GenerateSetupPyRequest,)),
         ]
     )
@@ -123,13 +123,13 @@ def assert_chroot(
     addr: Address,
 ) -> None:
     tgt = rule_runner.get_target(addr)
-    req = SetupPyChrootRequest(ExportedTarget(tgt), py2=False)
+    req = DistBuildChrootRequest(ExportedTarget(tgt), py2=False)
     chroot = rule_runner.request(DistBuildChroot, [req])
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
 
     if expected_setup_kwargs is not None:
-        sources = rule_runner.request(SetupPySources, [req])
+        sources = rule_runner.request(DistBuildSources, [req])
         setup_kwargs = rule_runner.request(
             FinalizedSetupKwargs, [GenerateSetupPyRequest(ExportedTarget(tgt), sources)]
         )
@@ -141,7 +141,7 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Ex
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             DistBuildChroot,
-            [SetupPyChrootRequest(ExportedTarget(tgt), py2=False)],
+            [DistBuildChrootRequest(ExportedTarget(tgt), py2=False)],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
@@ -566,7 +566,7 @@ def test_get_sources() -> None:
                 *target_types_rules.rules(),
                 *python_sources.rules(),
                 QueryRule(OwnedDependencies, (DependencyOwner,)),
-                QueryRule(SetupPySources, (SetupPyChrootRequest,)),
+                QueryRule(DistBuildSources, (DistBuildChrootRequest,)),
             ]
         )
 
@@ -604,8 +604,8 @@ def test_get_sources() -> None:
         )
         owner_tgt = rule_runner.get_target(Address("src/python/foo", target_name="dist"))
         srcs = rule_runner.request(
-            SetupPySources,
-            [SetupPyChrootRequest(ExportedTarget(owner_tgt), py2=False)],
+            DistBuildSources,
+            [DistBuildChrootRequest(ExportedTarget(owner_tgt), py2=False)],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 

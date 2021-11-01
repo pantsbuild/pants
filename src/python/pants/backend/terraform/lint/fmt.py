@@ -4,9 +4,9 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.terraform.style import StyleRequest
-from pants.backend.terraform.target_types import TerraformModuleSourcesField
+from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleSourcesField
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.internals.selectors import Get
@@ -21,7 +21,7 @@ class TerraformFmtTargets(LanguageFmtTargets):
 
 @union
 class TerraformFmtRequest(StyleRequest):
-    pass
+    field_set_type = TerraformFieldSet
 
 
 @rule

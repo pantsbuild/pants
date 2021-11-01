@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent
@@ -95,6 +96,11 @@ async def run_shell_command(
     return GeneratedSources(output)
 
 
+def _shell_tool_safe_env_name(tool_name: str) -> str:
+    """Replace any characters not suitable in an environment variable name with `_`."""
+    return re.sub(r"\W", "_", tool_name)
+
+
 @rule
 async def prepare_shell_command_process(
     request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
@@ -140,12 +146,16 @@ async def prepare_shell_command_process(
         )
 
         command_env = {
-            "TOOLS": " ".join(shlex.quote(tool.binary_name) for tool in tool_requests),
+            "TOOLS": " ".join(
+                _shell_tool_safe_env_name(tool.binary_name) for tool in tool_requests
+            ),
         }
 
         for binary, tool_request in zip(tool_paths, tool_requests):
             if binary.first_path:
-                command_env[tool_request.binary_name] = binary.first_path.path
+                command_env[
+                    _shell_tool_safe_env_name(tool_request.binary_name)
+                ] = binary.first_path.path
             else:
                 raise BinaryNotFoundError.from_request(
                     tool_request,
@@ -194,13 +204,14 @@ async def prepare_shell_command_process(
         )
         boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
     else:
-        # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH.
+        # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH, force
+        # symlinks to avoid issues with repeat runs using the __run.sh script in the sandbox.
         bin_relpath = ".bin"
         boot_script = ";".join(
             dedent(
                 f"""\
                 $mkdir -p {bin_relpath}
-                for tool in $TOOLS; do $ln -s ${{!tool}} {bin_relpath}; done
+                for tool in $TOOLS; do $ln -sf ${{!tool}} {bin_relpath}; done
                 export PATH="$PWD/{bin_relpath}"
                 """
             ).split("\n")

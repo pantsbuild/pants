@@ -65,8 +65,7 @@ class GolangSubsystem(Subsystem):
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
-                        for path_entry in path.split(os.pathsep):
-                            yield path_entry
+                        yield from path.split(os.pathsep)
                 else:
                     yield entry
 
@@ -84,7 +83,7 @@ class GoRoot:
     path: str
 
 
-@rule
+@rule(desc="Find Go binary", level=LogLevel.DEBUG)
 async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
     search_paths = golang_subsystem.go_search_paths(env)

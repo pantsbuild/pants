@@ -19,23 +19,24 @@ from pants.backend.go.target_types import (
     GoImportPathField,
     GoModPackageSourcesField,
     GoModTarget,
-    GoThirdPartyModulePathField,
-    GoThirdPartyModuleVersionField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgInfo,
+    FirstPartyPkgInfoRequest,
+)
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
-    ThirdPartyModuleInfo,
-    ThirdPartyModuleInfoRequest,
+    AllThirdPartyPackages,
+    AllThirdPartyPackagesRequest,
     ThirdPartyPkgInfo,
     ThirdPartyPkgInfoRequest,
 )
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AddressSpecs, SiblingAddresses
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import PathGlobs, Paths
@@ -90,14 +91,21 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoFirstPartyPackageSourcesField
 
 
-@rule
+@rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
     addr = request.sources_field.address
-    pkg_info = await Get(FirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
+    maybe_pkg_info = await Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
+    if maybe_pkg_info.info is None:
+        logger.error(
+            f"Failed to analyze {maybe_pkg_info.import_path} for dependency inference:\n"
+            f"{maybe_pkg_info.stderr}"
+        )
+        return InferredDependencies([])
+    pkg_info = maybe_pkg_info.info
 
     inferred_dependencies = []
     for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
@@ -128,7 +136,7 @@ class InjectGoThirdPartyPackageDependenciesRequest(InjectDependenciesRequest):
     inject_for = GoThirdPartyPackageDependenciesField
 
 
-@rule
+@rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
 async def inject_go_third_party_package_dependencies(
     request: InjectGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
@@ -143,12 +151,7 @@ async def inject_go_third_party_package_dependencies(
     tgt = wrapped_target.target
     pkg_info = await Get(
         ThirdPartyPkgInfo,
-        ThirdPartyPkgInfoRequest(
-            module_path=tgt[GoThirdPartyModulePathField].value,
-            version=tgt[GoThirdPartyModuleVersionField].value,
-            import_path=tgt[GoImportPathField].value,
-            go_mod_stripped_digest=go_mod_info.stripped_digest,
-        ),
+        ThirdPartyPkgInfoRequest(tgt[GoImportPathField].value, go_mod_info.stripped_digest),
     )
 
     inferred_dependencies = []
@@ -204,16 +207,9 @@ async def generate_targets_from_go_mod(
             request.generator[GoModPackageSourcesField].path_globs(files_not_found_behavior),
         ),
     )
-    all_module_info = await MultiGet(
-        Get(
-            ThirdPartyModuleInfo,
-            ThirdPartyModuleInfoRequest(
-                module_path=module_descriptor.path,
-                version=module_descriptor.version,
-                go_mod_stripped_digest=go_mod_info.stripped_digest,
-            ),
-        )
-        for module_descriptor in go_mod_info.modules
+    all_third_party_packages = await Get(
+        AllThirdPartyPackages,
+        AllThirdPartyPackagesRequest(go_mod_info.stripped_digest),
     )
 
     dir_to_filenames = group_by_dir(go_paths.files)
@@ -241,11 +237,7 @@ async def generate_targets_from_go_mod(
 
     def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {
-                GoThirdPartyModulePathField.alias: pkg_info.module_path,
-                GoThirdPartyModuleVersionField.alias: pkg_info.version,
-                GoImportPathField.alias: pkg_info.import_path,
-            },
+            {GoImportPathField.alias: pkg_info.import_path},
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
             union_membership,
@@ -254,8 +246,7 @@ async def generate_targets_from_go_mod(
 
     third_party_pkgs = (
         create_third_party_package_tgt(pkg_info)
-        for module_info in all_module_info
-        for pkg_info in module_info.values()
+        for pkg_info in all_third_party_packages.import_paths_to_pkg_info.values()
     )
     return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
 
@@ -265,7 +256,7 @@ async def generate_targets_from_go_mod(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(desc="Determine first-party package used by `go_binary` target", level=LogLevel.DEBUG)
 async def determine_main_pkg_for_go_binary(
     request: GoBinaryMainPackageRequest,
 ) -> GoBinaryMainPackage:
@@ -287,14 +278,11 @@ async def determine_main_pkg_for_go_binary(
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
-    candidate_targets = await Get(Targets, AddressSpecs([AscendantAddresses(addr.spec_path)]))
+    candidate_targets = await Get(Targets, AddressSpecs([SiblingAddresses(addr.spec_path)]))
     relevant_pkg_targets = [
         tgt
         for tgt in candidate_targets
-        if (
-            tgt.has_field(GoFirstPartyPackageSubpathField)
-            and tgt[GoFirstPartyPackageSubpathField].full_dir_path == addr.spec_path
-        )
+        if tgt.has_field(GoFirstPartyPackageSourcesField) and tgt.residence_dir == addr.spec_path
     ]
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)
@@ -310,7 +298,7 @@ async def determine_main_pkg_for_go_binary(
         )
     raise ResolveError(
         f"There are multiple `go_first_party_package` targets for the same directory of the "
-        "`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
+        f"`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
         "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
         "`go_first_party_package` targets so that only one remains: "

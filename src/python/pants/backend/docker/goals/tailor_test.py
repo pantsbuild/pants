@@ -3,7 +3,7 @@
 
 from pants.backend.docker.goals.tailor import PutativeDockerTargetsRequest
 from pants.backend.docker.goals.tailor import rules as docker_tailor_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -20,7 +20,7 @@ def test_find_putative_targets() -> None:
             *docker_tailor_rules(),
             QueryRule(PutativeTargets, [PutativeDockerTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[DockerImage],
+        target_types=[DockerImageTarget],
     )
     rule_runner.write_files({"src/docker_ok/Dockerfile": "", "src/docker_orphan/Dockerfile": ""})
     pts = rule_runner.request(
@@ -34,7 +34,7 @@ def test_find_putative_targets() -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    DockerImage,
+                    DockerImageTarget,
                     "src/docker_orphan",
                     "docker",
                     ["Dockerfile"],

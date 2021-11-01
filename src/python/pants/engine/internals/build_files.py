@@ -7,7 +7,7 @@ import itertools
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs
@@ -50,7 +50,7 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()

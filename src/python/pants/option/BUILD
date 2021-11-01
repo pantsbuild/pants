@@ -4,11 +4,11 @@
 python_sources()
 
 python_tests(
-  name="tests",
-  dependencies=[
-    # Used by `options_bootstrapper_test` and `config_test`.
-    '//BUILD_ROOT:files',
-    '//pants.toml:files',
-  ],
-  timeout=300,
+    name="tests",
+    dependencies=[
+        # Used by `options_bootstrapper_test` and `config_test`.
+        "//BUILD_ROOT:files",
+        "//pants.toml:files",
+    ],
+    timeout=300,
 )

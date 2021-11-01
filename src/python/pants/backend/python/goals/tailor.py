@@ -10,12 +10,15 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import PythonModule
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratingSourcesField,
+    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -32,7 +35,6 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -46,12 +48,26 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
     tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
-    test_filenames = set(
-        matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
+    test_utils_filespec = Filespec(includes=list(PythonTestUtilsGeneratingSourcesField.default))
+
+    path_to_file_name = {path: os.path.basename(path) for path in paths}
+    test_file_names = set(matches_filespec(tests_filespec, paths=path_to_file_name.values()))
+    test_util_file_names = set(
+        matches_filespec(test_utils_filespec, paths=path_to_file_name.values())
     )
-    test_files = {path for path in paths if os.path.basename(path) in test_filenames}
-    library_files = set(paths) - test_files
-    return {PythonTestsGeneratorTarget: test_files, PythonSourcesGeneratorTarget: library_files}
+
+    test_files = {
+        path for path, file_name in path_to_file_name.items() if file_name in test_file_names
+    }
+    test_util_files = {
+        path for path, file_name in path_to_file_name.items() if file_name in test_util_file_names
+    }
+    library_files = set(paths) - test_files - test_util_files
+    return {
+        PythonTestsGeneratorTarget: test_files,
+        PythonTestUtilsGeneratorTarget: test_util_files,
+        PythonSourcesGeneratorTarget: library_files,
+    }
 
 
 # The order "__main__" == __name__ would also technically work, but is very
@@ -74,7 +90,7 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
     python_setup: PythonSetup,
 ) -> PutativeTargets:
-    # Find library/test targets.
+    # Find library/test/test_util targets.
 
     all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
     all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
@@ -83,8 +99,15 @@ async def find_putative_targets(
     pts = []
     for tgt_type, paths in classified_unowned_py_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == PythonTestsGeneratorTarget else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == PythonTestsGeneratorTarget else {}
+            if issubclass(tgt_type, PythonTestsGeneratorTarget):
+                name = "tests"
+                kwargs = {"name": name}
+            elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
+                name = "test_utils"
+                kwargs = {"name": name}
+            else:
+                name = os.path.basename(dirname)
+                kwargs = {}
             if (
                 python_setup.tailor_ignore_solitary_init_files
                 and tgt_type == PythonSourcesGeneratorTarget

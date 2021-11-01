@@ -1,49 +1,18 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, cast
+from __future__ import annotations
 
-from pants.option.subsystem import Subsystem
+from pants.backend.python.subsystems import repos
+from pants.base.deprecated import warn_or_error
 
 
-class PythonRepos(Subsystem):
-    options_scope = "python-repos"
-    help = (
-        "External Python code repositories, such as PyPI.\n\nThese options may be used to point to "
-        "custom cheeseshops when resolving requirements."
+def __getattr__(name):
+    if name == "__path__":
+        raise AttributeError()
+    warn_or_error(
+        "2.10.0.dev0",
+        f"the {name} class",
+        f"{name} moved to the {repos.__name__} module.",
     )
-
-    pypi_index = "https://pypi.org/simple/"
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--repos",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "URLs of code repositories to look for requirements. In Pip and Pex, this option "
-                "corresponds to the `--find-links` option."
-            ),
-        )
-        register(
-            "--indexes",
-            advanced=True,
-            type=list,
-            default=[cls.pypi_index],
-            help=(
-                "URLs of code repository indexes to look for requirements. If set to an empty "
-                "list, then Pex will use no indices (meaning it will not use PyPI). The values "
-                "should be compliant with PEP 503."
-            ),
-        )
-
-    @property
-    def repos(self) -> List[str]:
-        return cast(List[str], self.options.repos)
-
-    @property
-    def indexes(self) -> List[str]:
-        return cast(List[str], self.options.indexes)
+    return getattr(repos, name)

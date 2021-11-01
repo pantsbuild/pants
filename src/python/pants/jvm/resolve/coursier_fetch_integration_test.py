@@ -9,6 +9,7 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.process import ProcessExecutionFailure
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -23,7 +24,7 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -34,7 +35,7 @@ HAMCREST_COORD = Coordinate(
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -48,6 +49,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmDependencyLockfile, JvmArtifact],
     )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
 
 
 @maybe_skip_jdk_test
@@ -147,6 +150,24 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
             ),
         )
     )
+
+
+@maybe_skip_jdk_test
+def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
+    with engine_error(
+        ProcessExecutionFailure, contains="Resolution error: Unsatisfied rule Strict(junit:junit)"
+    ):
+        rule_runner.request(
+            CoursierResolvedLockfile,
+            [
+                ArtifactRequirements(
+                    [
+                        Coordinate(group="junit", artifact="junit", version="4.8.1"),
+                        Coordinate(group="junit", artifact="junit", version="4.8.2"),
+                    ]
+                ),
+            ],
+        )
 
 
 @maybe_skip_jdk_test

@@ -29,12 +29,14 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+
+NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -53,7 +55,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[JavaSourcesGeneratorTarget],
+        bootstrap_args=[
+            NAMED_RESOLVE_OPTIONS,
+        ],
     )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
 
 
 @maybe_skip_jdk_test
@@ -62,7 +69,7 @@ def test_parse_java_imports(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'lib')
+                java_sources(name = 'lib', compatible_resolves = ['test',],)
                 """
             ),
             "ExampleLib.java": dedent(
@@ -97,7 +104,7 @@ def test_parse_java_imports_subtargets(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'lib')
+                java_sources(name = 'lib', compatible_resolves = ['test',],)
                 """
             ),
             "ExampleLib.java": dedent(

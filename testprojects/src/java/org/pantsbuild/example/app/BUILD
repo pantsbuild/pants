@@ -4,18 +4,7 @@
 deploy_jar(
     name="example_app_deploy_jar",
     main="org.pantsbuild.example.app.ExampleApp",
-    dependencies=[
-        ":app",
-    ],
+    dependencies=[":app"],
 )
 
-java_sources(
-    dependencies=[
-      ":lockfile",
-    ],
-)
-
-coursier_lockfile(
-    name="lockfile",
-    source="coursier_resolve.lockfile",
-)
+java_sources(compatible_resolves=["exampleapp"])

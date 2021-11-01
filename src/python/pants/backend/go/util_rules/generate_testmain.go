@@ -57,16 +57,16 @@ type Example struct {
 // Analysis contains metadata about tests/benchmarks extracted from the parsed sources.
 type Analysis struct {
 	// Names of all functions in the test sources that heuristically look like test functions.
-	Tests []*TestFunc `json:"tests,omitempty"`
+	Tests []*TestFunc
 
 	// Names of all functions in the test sources that heuristically look like benchmark functions.
-	Benchmarks []*TestFunc `json:"benchmarks,omitempty"`
+	Benchmarks []*TestFunc
 
 	// Testable examples. Extracted using "go/doc" package.
-	Examples []*Example `json:"examples,omitempty"`
+	Examples []*Example
 
-	// True if the sources already contain a `TestMain` function (which is the entry point for test binaries).
-	TestMain *TestFunc `json:"test_main,omitempty"`
+	// Set with location of any `TestMain` function. `nil` if no `TestMain` supplied.
+	TestMain *TestFunc
 
 	ImportPath  string
 	ImportTest  bool

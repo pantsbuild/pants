@@ -1,13 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
 from typing import List
 
 import pytest
 
 from pants.backend.project_info.dependees import DependeesGoal
-from pants.backend.project_info.dependees import DependeesOutputFormat as OutputFormat
 from pants.backend.project_info.dependees import rules as dependee_rules
 from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -38,9 +36,8 @@ def assert_dependees(
     expected: List[str],
     transitive: bool = False,
     closed: bool = False,
-    output_format: OutputFormat = OutputFormat.text,
 ) -> None:
-    args = [f"--output-format={output_format.value}"]
+    args = []
     if transitive:
         args.append("--transitive")
     if closed:
@@ -51,57 +48,18 @@ def assert_dependees(
 
 def test_no_targets(rule_runner: RuleRunner) -> None:
     assert_dependees(rule_runner, targets=[], expected=[])
-    assert_dependees(rule_runner, targets=[], output_format=OutputFormat.json, expected=["{}"])
 
 
 def test_normal(rule_runner: RuleRunner) -> None:
     assert_dependees(rule_runner, targets=["base"], expected=["intermediate:intermediate"])
-    assert_dependees(
-        rule_runner,
-        targets=["base"],
-        output_format=OutputFormat.json,
-        expected=dedent(
-            """\
-            {
-                "base:base": [
-                    "intermediate:intermediate"
-                ]
-            }"""
-        ).splitlines(),
-    )
 
 
 def test_no_dependees(rule_runner: RuleRunner) -> None:
     assert_dependees(rule_runner, targets=["leaf"], expected=[])
-    assert_dependees(
-        rule_runner,
-        targets=["leaf"],
-        output_format=OutputFormat.json,
-        expected=dedent(
-            """\
-            {
-                "leaf:leaf": []
-            }"""
-        ).splitlines(),
-    )
 
 
 def test_closed(rule_runner: RuleRunner) -> None:
     assert_dependees(rule_runner, targets=["leaf"], closed=True, expected=["leaf:leaf"])
-    assert_dependees(
-        rule_runner,
-        targets=["leaf"],
-        closed=True,
-        output_format=OutputFormat.json,
-        expected=dedent(
-            """\
-            {
-                "leaf:leaf": [
-                    "leaf:leaf"
-                ]
-            }"""
-        ).splitlines(),
-    )
 
 
 def test_transitive(rule_runner: RuleRunner) -> None:
@@ -111,50 +69,17 @@ def test_transitive(rule_runner: RuleRunner) -> None:
         transitive=True,
         expected=["intermediate:intermediate", "leaf:leaf"],
     )
-    assert_dependees(
-        rule_runner,
-        targets=["base"],
-        transitive=True,
-        output_format=OutputFormat.json,
-        expected=dedent(
-            """\
-            {
-                "base:base": [
-                    "intermediate:intermediate",
-                    "leaf:leaf"
-                ]
-            }"""
-        ).splitlines(),
-    )
 
 
 def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
-    # This tests that --output-format=text will deduplicate and that --output-format=json will
-    # preserve which dependee belongs to which specified target.
+    # This tests that --output-format=text will deduplicate which dependee belongs to which
+    # specified target.
     assert_dependees(
         rule_runner,
         targets=["base", "intermediate"],
         transitive=True,
         # NB: `intermediate` is not included because it's a root and we have `--no-closed`.
         expected=["leaf:leaf"],
-    )
-    assert_dependees(
-        rule_runner,
-        targets=["base", "intermediate"],
-        transitive=True,
-        output_format=OutputFormat.json,
-        expected=dedent(
-            """\
-            {
-                "base:base": [
-                    "intermediate:intermediate",
-                    "leaf:leaf"
-                ],
-                "intermediate:intermediate": [
-                    "leaf:leaf"
-                ]
-            }"""
-        ).splitlines(),
     )
 
 

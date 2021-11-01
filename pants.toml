@@ -5,7 +5,7 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
-  "pants.backend.python.lint.autoflake",
+  "pants.backend.experimental.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -18,13 +18,14 @@ backend_packages.add = [
   "pants.backend.experimental.docker",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
+  "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.python",
   "internal_plugins.releases",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
   # NOTE: Keep this version in sync with `generate_docs.py`!
-  "toolchain.pants.plugin==0.14.0",
+  "toolchain.pants.plugin==0.15.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -50,7 +51,7 @@ pants_ignore.add = [
 
 build_ignore.add = [
   # Disable Go targets by default so Pants developers do not need Go installed.
-  "/testprojects/src/go/**",
+  "testprojects/src/go/**",
 ]
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
@@ -66,7 +67,7 @@ repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependees=transitive"
-run-pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 
 
 [source]
@@ -80,7 +81,18 @@ root_patterns = [
   "/pants-plugins",
 ]
 
-[python-setup]
+[tailor]
+ignore_paths = ["build-support/migration-support/BUILD"]
+ignore_adding_targets = [
+  "src/python/pants:__main__",
+  "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
+  "src/python/pants/backend/go/goals:bin",
+  "src/python/pants/backend/go/util_rules:bin",
+  "src/python/pants/backend/python/dependency_inference:import_parser",
+  "src/python/pants/backend/terraform:hcl2_parser0",
+]
+
+[python]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
@@ -113,12 +125,11 @@ extra_requirements.add = [
 ]
 lockfile = "3rdparty/python/lockfiles/pytest.txt"
 timeout_default = 60
-execution_slot_var = "EXECUTION_SLOT"
 
 [test]
 extra_env_vars = [
   # TODO: These are exposed to tests in order to allow for python interpreter discovery when
-  # Pants-tests-Pants: in particular, the [python-setup] subsystem consumes them.
+  # Pants-tests-Pants: in particular, the [python] subsystem consumes them.
   #   see https://github.com/pantsbuild/pants/issues/11638
   "PYENV_ROOT",
   "HOME",
@@ -135,6 +146,10 @@ config = "@build-support/regexes/config.yaml"
 
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
+
+[jvm.resolves]
+exampleapp = "testprojects/src/java/org/pantsbuild/example/app/coursier_resolve.lockfile"
+pants_java_parser = "src/python/pants/backend/java/dependency_inference/coursier_resolve.lockfile"
 
 [toolchain-setup]
 repo = "pants"

@@ -3,4 +3,4 @@
 
 python_sources()
 
-pex_binary(name='waiter', entry_point='waiter.py', restartable=True)
+pex_binary(name="waiter", entry_point="waiter.py", restartable=True)

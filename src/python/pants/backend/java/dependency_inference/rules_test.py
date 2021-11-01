@@ -6,11 +6,17 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.dependency_inference.artifact_mapper import (
+    FrozenTrieNode,
+    MutableTrieNode,
+    ThirdPartyJavaPackageToArtifactMapping,
+    UnversionedCoordinate,
+)
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
 )
-from pants.backend.java.dependency_inference.rules import InferJavaImportDependencies
+from pants.backend.java.dependency_inference.rules import InferJavaSourceDependencies
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
     JavaSourceField,
@@ -32,15 +38,19 @@ from pants.engine.target import (
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
+
+NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
+DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -57,11 +67,16 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            QueryRule(InferredDependencies, [InferJavaImportDependencies]),
+            QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
+            QueryRule(ThirdPartyJavaPackageToArtifactMapping, []),
         ],
-        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
+        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifact],
     )
+    rule_runner.set_options(
+        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
+    return rule_runner
 
 
 @maybe_skip_jdk_test
@@ -70,7 +85,10 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -93,12 +111,10 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
-    print([target_a, target_b])
-
     assert (
         rule_runner.request(
             InferredDependencies,
-            [InferJavaImportDependencies(target_a[JavaSourceField])],
+            [InferJavaSourceDependencies(target_a[JavaSourceField])],
         )
         == InferredDependencies(dependencies=[])
     )
@@ -106,7 +122,7 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     assert (
         rule_runner.request(
             InferredDependencies,
-            [InferJavaImportDependencies(target_b[JavaSourceField])],
+            [InferJavaSourceDependencies(target_b[JavaSourceField])],
         )
         == InferredDependencies(dependencies=[])
     )
@@ -118,7 +134,10 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -132,7 +151,10 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
             ),
             "sub/BUILD": dedent(
                 """\
-                java_sources(name = 'b')
+                java_sources(
+                    name = 'b',
+
+                )
                 """
             ),
             "sub/B.java": dedent(
@@ -148,11 +170,11 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[])
 
 
@@ -162,7 +184,10 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -176,7 +201,10 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
             ),
             "sub/BUILD": dedent(
                 """\
-                java_sources(name = 'b')
+                java_sources(
+                    name = 'b',
+
+                )
                 """
             ),
             "sub/B.java": dedent(
@@ -195,12 +223,69 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_a.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
+    ambiguous_source = dedent(
+        """\
+                package org.pantsbuild.a;
+                public class A {}
+                """
+    )
+    rule_runner.write_files(
+        {
+            "a_one/BUILD": "java_sources()",
+            "a_one/A.java": ambiguous_source,
+            "a_two/BUILD": "java_sources()",
+            "a_two/A.java": ambiguous_source,
+            "b/BUILD": "java_sources()",
+            "b/B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+                import org.pantsbuild.a.A;
+                public class B {}
+                """
+            ),
+            "c/BUILD": dedent(
+                """\
+                java_sources(
+                  dependencies=["!a_two/A.java"],
+                )
+                """
+            ),
+            "c/C.java": dedent(
+                """\
+                package org.pantsbuild.c;
+                import org.pantsbuild.a.A;
+                public class C {}
+                """
+            ),
+        }
+    )
+    target_b = rule_runner.get_target(Address("b", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("c", relative_file_path="C.java"))
+
+    # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
+    # disambiguates with a `!`, and so gets the appropriate version.
+    caplog.clear()
+    assert rule_runner.request(
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+    ) == InferredDependencies(dependencies=[])
+    assert len(caplog.records) == 1
+    assert (
+        "The target b/B.java imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+    )
+
+    assert rule_runner.request(
+        InferredDependencies, [InferJavaSourceDependencies(target_c[JavaSourceField])]
+    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.java")])
 
 
 @maybe_skip_jdk_test
@@ -211,7 +296,10 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'a')
+                java_sources(
+                    name = 'a',
+
+                )
                 """
             ),
             "Main.java": dedent(
@@ -224,7 +312,7 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[])
 
 
@@ -234,7 +322,10 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -262,21 +353,24 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_a[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaImportDependencies(target_b[JavaSourceField])]
+        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
-@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
+@maybe_skip_jdk_test
 def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -351,13 +445,16 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.xfail(reason="https://github.com/pantsbuild/pants/issues/13056")
+@maybe_skip_jdk_test
 def test_package_private_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 't')
+                java_sources(
+                    name = 't',
+
+                )
                 """
             ),
             "A.java": dedent(
@@ -406,8 +503,14 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                java_sources(name = 'lib')
-                junit_tests(name = 'tests')
+                java_sources(
+                    name = 'lib',
+
+                )
+                junit_tests(
+                    name = 'tests',
+
+                )
                 """
             ),
             "FooTest.java": dedent(
@@ -448,3 +551,152 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
     # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
     # inferred dependencies.
     assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses()
+
+
+@maybe_skip_jdk_test
+def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    actual_mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+
+    root_node = MutableTrieNode()
+
+    # Supplied by JVM_ARTIFACT_MAPPINGS
+    node = root_node.ensure_child("org")
+    node = node.ensure_child("junit")
+    node.coordinates = {UnversionedCoordinate(group="junit", artifact="junit")}
+    node.recursive = True
+
+    node = root_node.ensure_child("org")
+    node = node.ensure_child("joda")
+    node = node.ensure_child("time")
+    node.coordinates = {UnversionedCoordinate(group="joda-time", artifact="joda-time")}
+    node.recursive = True
+
+    assert actual_mapping.mapping_root == FrozenTrieNode(root_node)
+
+
+@maybe_skip_jdk_test
+def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+
+                java_sources(name = 'lib')
+                """
+            ),
+            "PrintDate.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.DateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new DateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    lib = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time")]
+    )
+
+
+@maybe_skip_jdk_test
+def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}"
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+
+                jvm_artifact(
+                    name = "joda-time_joda-time-2",
+                    group = "joda-time",
+                    artifact = "joda-time-2",  # doesn't really exist, but useful for this test
+                    version = "2.10.10",
+                )
+
+                java_sources(name = 'lib')
+                """
+            ),
+            "PrintDate.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.DateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new DateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+            "PrintDate2.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                import org.joda.time.LocalDateTime;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        DateTime dt = new LocalDateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    # First test whether the specific import mapping for org.joda.time.DateTime takes effect over the recursive
+    # mapping.
+    lib1 = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib1[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time-2")]
+    )
+
+    # Then try a file which should not match the specific import mapping and which will then match the
+    # recursive mapping.
+    lib2 = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate2.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib2[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time")]
+    )

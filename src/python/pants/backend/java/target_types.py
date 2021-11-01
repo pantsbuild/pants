@@ -19,6 +19,7 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.target_types import JvmCompatibleResolveNamesField, JvmResolveName
 
 
 class JavaSourceField(SingleSourceField):
@@ -42,8 +43,9 @@ class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         JavaTestSourceField,
+        Dependencies,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Java test, run with JUnit."
 
@@ -58,6 +60,7 @@ class JunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         JavaTestsGeneratorSourcesField,
         Dependencies,
+        JvmCompatibleResolveNamesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
 
@@ -78,8 +81,7 @@ async def generate_targets_from_junit_tests(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: This should be set to False once dependency inference can infer same-package dependencies.
-        add_dependencies_on_all_siblings=True,
+        add_dependencies_on_all_siblings=False,
     )
 
 
@@ -94,6 +96,7 @@ class JavaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourceField,
+        JvmCompatibleResolveNamesField,
     )
     help = "A single Java source file containing application or library code."
 
@@ -104,7 +107,12 @@ class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
 
 class JavaSourcesGeneratorTarget(Target):
     alias = "java_sources"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JavaSourcesGeneratorSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        JavaSourcesGeneratorSourcesField,
+        JvmCompatibleResolveNamesField,
+    )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 
@@ -124,8 +132,7 @@ async def generate_targets_from_java_sources(
         request.generator,
         paths.files,
         union_membership,
-        # TODO: This should be set to False once dependency inference can infer same-package dependencies.
-        add_dependencies_on_all_siblings=True,
+        add_dependencies_on_all_siblings=False,
         use_source_field=True,
     )
 
@@ -150,6 +157,7 @@ class DeployJar(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassName,
+        JvmResolveName,
     )
     help = (
         "A `jar` file that contains the compiled source code along with its dependency class "

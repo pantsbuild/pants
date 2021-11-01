@@ -13,6 +13,7 @@ debug = true
 codegen-units = 1
 
 [workspace]
+resolver = "2"
 # These are the packages which are built/tested when the --all flag is passed to cargo.
 #
 # We need to explicitly list these, because otherwise the standalone tools

@@ -71,7 +71,7 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
         )
 
     def level(self) -> LogLevel:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
 
     def message(self) -> str:
         message = self.description
@@ -95,7 +95,9 @@ def required_classfiles(fallible_result: FallibleCompiledClassfiles) -> Compiled
         assert fallible_result.output
         return fallible_result.output
     # NB: The compile outputs will already have been streamed as FallibleCompiledClassfiles finish.
-    raise Exception("Compile failed.")
+    raise Exception(
+        f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
+    )
 
 
 def rules():

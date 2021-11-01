@@ -10,14 +10,17 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from pkg_resources import Requirement
 
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PythonRequirementsField,
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
+from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     Pex,
@@ -27,6 +30,7 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
@@ -41,7 +45,6 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -62,6 +65,7 @@ class PexFromTargetsRequest:
     additional_lockfile_args: tuple[str, ...]
     additional_requirements: tuple[str, ...]
     include_source_files: bool
+    include_local_dists: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
     resolve_and_lockfile: tuple[str, str] | None
@@ -83,6 +87,7 @@ class PexFromTargetsRequest:
         additional_lockfile_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
+        include_local_dists: bool = False,
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
@@ -116,6 +121,7 @@ class PexFromTargetsRequest:
             Setting this to `False` and loading the source files by instead populating the chroot
             and setting the environment variable `PEX_EXTRA_SYS_PATH` will result in substantially
             fewer rebuilds of the Pex.
+        :param include_local_dists: Whether to build local dists and include them in the built pex.
         :param additional_sources: Any additional source files to include in the built Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
@@ -136,6 +142,7 @@ class PexFromTargetsRequest:
         self.additional_lockfile_args = tuple(additional_lockfile_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
+        self.include_local_dists = include_local_dists
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
@@ -197,16 +204,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         )
         all_targets = transitive_targets.closure
 
-    input_digests = []
-    if request.additional_sources:
-        input_digests.append(request.additional_sources)
-    if request.include_source_files:
-        prepared_sources = await Get(
-            StrippedPythonSourceFiles, PythonSourceFilesRequest(all_targets)
-        )
-        input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
-    merged_input_digest = await Get(Digest, MergeDigests(input_digests))
-
     if request.hardcoded_interpreter_constraints:
         interpreter_constraints = request.hardcoded_interpreter_constraints
     else:
@@ -218,6 +215,48 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         interpreter_constraints = calculated_constraints or InterpreterConstraints(
             python_setup.interpreter_constraints
         )
+
+    sources_digests = []
+    if request.additional_sources:
+        sources_digests.append(request.additional_sources)
+    if request.include_source_files:
+        sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(all_targets))
+    else:
+        sources = PythonSourceFiles.empty()
+
+    additional_inputs_digests = []
+    if request.additional_inputs:
+        additional_inputs_digests.append(request.additional_inputs)
+    additional_args = request.additional_args
+    if request.include_local_dists:
+        # Note that LocalDistsPexRequest has no `direct_deps_only` mode, so we will build all
+        # local dists in the transitive closure even if the request was for direct_deps_only.
+        # Since we currently use `direct_deps_only` in one case (building a requirements pex
+        # when running pylint) and in that case include_local_dists=False, this seems harmless.
+        local_dists = await Get(
+            LocalDistsPex,
+            LocalDistsPexRequest(
+                request.addresses,
+                internal_only=request.internal_only,
+                interpreter_constraints=interpreter_constraints,
+                sources=sources,
+            ),
+        )
+        remaining_sources = local_dists.remaining_sources
+        additional_inputs_digests.append(local_dists.pex.digest)
+        additional_args += ("--requirements-pex", local_dists.pex.name)
+    else:
+        remaining_sources = sources
+
+    remaining_sources_stripped = await Get(
+        StrippedPythonSourceFiles, PythonSourceFiles, remaining_sources
+    )
+    sources_digests.append(remaining_sources_stripped.stripped_source_files.snapshot.digest)
+
+    merged_sources_digest, additional_inputs = await MultiGet(
+        Get(Digest, MergeDigests(sources_digests)),
+        Get(Digest, MergeDigests(additional_inputs_digests)),
+    )
 
     requirements = PexRequirements.create_from_requirement_fields(
         (
@@ -251,8 +290,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             and python_setup.resolve_all_constraints_was_set_explicitly()
         ):
             raise ValueError(
-                "`[python-setup].resolve_all_constraints` is enabled, so "
-                "`[python-setup].requirement_constraints` must also be set."
+                "`[python].resolve_all_constraints` is enabled, so "
+                "`[python].requirement_constraints` must also be set."
             )
         elif request.resolve_and_lockfile:
             resolve, lockfile = request.resolve_and_lockfile
@@ -266,7 +305,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                         file_path=lockfile,
                         file_path_description_of_origin=(
                             f"the resolve `{resolve}` (from "
-                            "`[python-setup].experimental_resolves_to_lockfiles`)"
+                            "`[python].experimental_resolves_to_lockfiles`)"
                         ),
                         # TODO(#12314): Hook up lockfile staleness check.
                         lockfile_hex_digest=None,
@@ -287,7 +326,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                     requirements=Lockfile(
                         file_path=python_setup.lockfile,
                         file_path_description_of_origin=(
-                            "the option `[python-setup].experimental_lockfile`"
+                            "the option `[python].experimental_lockfile`"
                         ),
                         # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
                         # are supported.
@@ -308,9 +347,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         main=request.main,
-        sources=merged_input_digest,
-        additional_inputs=request.additional_inputs,
-        additional_args=request.additional_args,
+        sources=merged_sources_digest,
+        additional_inputs=additional_inputs,
+        additional_args=additional_args,
         description=description,
     )
 
@@ -332,7 +371,7 @@ async def _setup_constraints_repository_pex(
         PathGlobs(
             [constraints_path],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[python-setup].requirement_constraints`",
+            description_of_origin="the option `[python].requirement_constraints`",
         ),
     )
     constraints_file_reqs = set(
@@ -349,8 +388,8 @@ async def _setup_constraints_repository_pex(
     name_req_projects = set()
 
     for req_str in request.requirements.req_strings:
-        req = Requirement.parse(req_str)
-        if req.url:  # type: ignore[attr-defined]
+        req = PipRequirement.parse(req_str)
+        if req.url:
             url_reqs.add(req)
         else:
             name_reqs.add(req)
@@ -385,7 +424,12 @@ async def _setup_constraints_repository_pex(
             description=f"Resolving {constraints_path}",
             output_filename="repository.pex",
             internal_only=request.internal_only,
-            requirements=PexRequirements(all_constraints, apply_constraints=True),
+            requirements=PexRequirements(
+                all_constraints,
+                apply_constraints=True,
+                # TODO: See PexRequirements docs.
+                is_all_constraints_resolve=True,
+            ),
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,
@@ -395,4 +439,4 @@ async def _setup_constraints_repository_pex(
 
 
 def rules():
-    return (*collect_rules(), *pex_rules(), *python_sources_rules())
+    return (*collect_rules(), *pex_rules(), *local_dists_rules(), *python_sources_rules())

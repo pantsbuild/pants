@@ -8,7 +8,7 @@ import os.path
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, List, Sequence, Tuple
+from typing import DefaultDict, Iterable, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -53,7 +53,7 @@ class AllHelp(HelpRequest):
 class UnknownGoalHelp(HelpRequest):
     """The user specified an unknown goal (or task)."""
 
-    unknown_goals: Tuple[str, ...]
+    unknown_goals: tuple[str, ...]
 
 
 class NoGoalHelp(HelpRequest):
@@ -149,9 +149,9 @@ class ArgSplitter:
             if s not in scope_to_flags:
                 scope_to_flags[s] = []
 
-        specs: List[str] = []
-        passthru: List[str] = []
-        unknown_scopes: List[str] = []
+        specs: list[str] = []
+        passthru: list[str] = []
+        unknown_scopes: list[str] = []
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.

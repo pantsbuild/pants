@@ -183,6 +183,7 @@ async def compile_java_source(
             input_digest=merged_digest,
             use_nailgun=jdk_setup.digest,
             append_only_caches=jdk_setup.append_only_caches,
+            env=jdk_setup.env,
             output_directories=(dest_dir,),
             description=f"Compile {request.component} with javac",
             level=LogLevel.DEBUG,
@@ -231,7 +232,7 @@ async def compile_java_source(
     )
 
 
-@rule(desc="Check compilation for javac", level=LogLevel.DEBUG)
+@rule(desc="Check javac compilation", level=LogLevel.DEBUG)
 async def javac_check(request: JavacCheckRequest) -> CheckResults:
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
@@ -242,20 +243,9 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
         for t in coarsened_targets
     )
 
-    # NB: We return CheckResults with exit codes for the root targets, but we do not pass
-    # stdout/stderr because it will already have been rendered as streaming.
-    return CheckResults(
-        [
-            CheckResult(
-                result.exit_code,
-                stdout="",
-                stderr="",
-                partition_description=str(coarsened_target),
-            )
-            for result, coarsened_target in zip(results, coarsened_targets)
-        ],
-        checker_name="javac",
-    )
+    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
+    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name="javac")
 
 
 def rules():

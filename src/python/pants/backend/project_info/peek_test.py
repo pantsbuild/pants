@@ -27,7 +27,13 @@ from pants.testutil.rule_runner import RuleRunner
             [
                 TargetData(
                     FilesGeneratorTarget(
-                        {"sources": ["*.txt"]}, Address("example", target_name="files_target")
+                        {
+                            "sources": ["*.txt"],
+                            # Regression test that we can handle a dict with `tuple[str, ...]` as
+                            # key.
+                            "overrides": {("foo.txt",): {"tags": ["overridden"]}},
+                        },
+                        Address("example", target_name="files_target"),
                     ),
                     ("foo.txt", "bar.txt"),
                     tuple(),
@@ -41,6 +47,13 @@ from pants.testutil.rule_runner import RuleRunner
                     "address": "example:files_target",
                     "target_type": "files",
                     "dependencies": [],
+                    "overrides": {
+                      "('foo.txt',)": {
+                        "tags": [
+                          "overridden"
+                        ]
+                      }
+                    },
                     "sources": [
                       "foo.txt",
                       "bar.txt"
@@ -74,6 +87,7 @@ from pants.testutil.rule_runner import RuleRunner
                     "dependencies": [],
                     "dependencies_raw": null,
                     "description": null,
+                    "overrides": null,
                     "sources": [],
                     "sources_raw": [],
                     "tags": null
@@ -143,7 +157,7 @@ from pants.testutil.rule_runner import RuleRunner
     ],
 )
 def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
-    actual_output = peek._render_json(expanded_target_infos, exclude_defaults)
+    actual_output = peek.render_json(expanded_target_infos, exclude_defaults)
     assert actual_output == expected_output
 
 
@@ -193,49 +207,3 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
         ]
     )
-
-
-# TODO: Delete everything below this in 2.9.0.dev0.
-
-
-def test_raw_output_single_build_file(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("project", "# A comment\nfiles(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "project"])
-    expected_output = dedent(
-        """\
-        -------------
-        project/BUILD
-        -------------
-        # A comment
-        files(sources=[])
-        """
-    )
-    assert result.stdout == expected_output
-
-
-def test_raw_output_two_build_files(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("project1", "# A comment\nfiles(sources=[])")
-    rule_runner.add_to_build_file("project2", "# Another comment\nfiles(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "project1", "project2"])
-    expected_output = dedent(
-        """\
-        --------------
-        project1/BUILD
-        --------------
-        # A comment
-        files(sources=[])
-
-        --------------
-        project2/BUILD
-        --------------
-        # Another comment
-        files(sources=[])
-        """
-    )
-    assert result.stdout == expected_output
-
-
-def test_raw_output_non_matching_build_target(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("some_name", "files(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "other_name"])
-    assert result.stdout == ""

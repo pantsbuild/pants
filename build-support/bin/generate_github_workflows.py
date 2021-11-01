@@ -253,7 +253,7 @@ def setup_primary_python() -> Sequence[Step]:
             "run": dedent(
                 """\
                 echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-                echo "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
+                echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
                 """
             ),
         },
@@ -364,7 +364,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 setup_toolchain_auth(),
                 {
                     "name": "Lint",
-                    "run": "./pants validate '**'\n./pants lint check ::\n",
+                    "run": (
+                        "./pants validate '**'\n"
+                        "./pants update-build-files --check\n"
+                        "./pants lint check ::\n"
+                    ),
                 },
                 upload_log_artifacts(name="lint"),
             ],

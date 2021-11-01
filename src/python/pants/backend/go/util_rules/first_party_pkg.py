@@ -15,10 +15,14 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.third_party_pkg import (
+    AllThirdPartyPackages,
+    AllThirdPartyPackagesRequest,
+)
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
 
@@ -48,6 +52,18 @@ class FirstPartyPkgInfo:
 
     s_files: tuple[str, ...]
 
+    minimum_go_version: str | None
+
+
+@dataclass(frozen=True)
+class FallibleFirstPartyPkgInfo:
+    """Info needed to build a first-party Go package, but fallible if `go list` failed."""
+
+    info: FirstPartyPkgInfo | None
+    import_path: str
+    exit_code: int = 0
+    stderr: str | None = None
+
 
 @dataclass(frozen=True)
 class FirstPartyPkgInfoRequest(EngineAwareParameter):
@@ -60,7 +76,7 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 @rule
 async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest,
-) -> FirstPartyPkgInfo:
+) -> FallibleFirstPartyPkgInfo:
     go_mod_address = request.address.maybe_convert_to_target_generator()
     wrapped_target, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
@@ -70,22 +86,34 @@ async def compute_first_party_package_info(
     import_path = target[GoImportPathField].value
     subpath = target[GoFirstPartyPackageSubpathField].value
 
-    pkg_sources = await Get(
-        HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
+    pkg_sources, all_third_party_packages = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])),
+        Get(AllThirdPartyPackages, AllThirdPartyPackagesRequest(go_mod_info.stripped_digest)),
     )
     input_digest = await Get(
-        Digest, MergeDigests([pkg_sources.snapshot.digest, go_mod_info.digest])
+        Digest,
+        MergeDigests(
+            [pkg_sources.snapshot.digest, go_mod_info.digest, all_third_party_packages.digest]
+        ),
     )
 
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         GoSdkProcess(
             input_digest=input_digest,
             command=("list", "-json", f"./{subpath}"),
             description=f"Determine metadata for {request.address}",
-            working_dir=request.address.spec_path,
+            working_dir=request.address.spec_path,  # i.e. the `go.mod`'s directory.
         ),
     )
+    if result.exit_code != 0:
+        return FallibleFirstPartyPkgInfo(
+            info=None,
+            import_path=import_path,
+            exit_code=result.exit_code,
+            stderr=result.stderr.decode("utf-8"),
+        )
+
     metadata = json.loads(result.stdout)
 
     if "CgoFiles" in metadata:
@@ -96,7 +124,7 @@ async def compute_first_party_package_info(
             "prioritize adding support."
         )
 
-    return FirstPartyPkgInfo(
+    info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
         subpath=os.path.join(target.address.spec_path, subpath),
         import_path=import_path,
@@ -107,7 +135,9 @@ async def compute_first_party_package_info(
         test_files=tuple(metadata.get("TestGoFiles", [])),
         xtest_files=tuple(metadata.get("XTestGoFiles", [])),
         s_files=tuple(metadata.get("SFiles", [])),
+        minimum_go_version=go_mod_info.minimum_go_version,
     )
+    return FallibleFirstPartyPkgInfo(info, import_path)
 
 
 def rules():

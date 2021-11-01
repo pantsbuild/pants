@@ -9,8 +9,7 @@ from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
     GoFirstPartyPackageSubpathField,
     GoImportPathField,
-    GoThirdPartyModulePathField,
-    GoThirdPartyModuleVersionField,
+    GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -18,19 +17,22 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilationRequest,
     FallibleAssemblyPreCompilation,
 )
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgInfo, FirstPartyPkgInfoRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgInfo,
+    FirstPartyPkgInfoRequest,
+)
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
 from pants.build_graph.address import Address
-from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
-from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
 
 
@@ -50,6 +52,9 @@ class BuildGoPackageRequest(EngineAwareParameter):
     # These dependencies themselves often have dependencies, such that we recursively build.
     direct_dependencies: tuple[BuildGoPackageRequest, ...]
 
+    # In the form `1.16`. This is declared in the `go` directive of `go.mod`.
+    minimum_go_version: str | None
+
     for_tests: bool = False
 
     def debug_hint(self) -> str | None:
@@ -57,43 +62,62 @@ class BuildGoPackageRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class FallibleBuiltGoPackage:
-    """Fallible version of `BuiltGoPackage with error details."""
+class FallibleBuildGoPackageRequest(EngineAwareParameter, EngineAwareReturnType):
+    """Request to build a package, but fallible if determining the request metadata failed.
+
+    When creating "synthetic" packages, use `GoPackageRequest` directly. This type is only intended
+    for determining the package metadata of user code, which may fail to be analyzed.
+    """
+
+    request: BuildGoPackageRequest | None
+    import_path: str
+    exit_code: int = 0
+    stderr: str | None = None
+
+    def level(self) -> LogLevel:
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+
+    def message(self) -> str:
+        message = self.import_path
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
+        )
+        if self.stderr:
+            message += f"\n{self.stderr}"
+        return message
+
+    def cacheable(self) -> bool:
+        # Failed compile outputs should be re-rendered in every run.
+        return self.exit_code == 0
+
+
+@dataclass(frozen=True)
+class FallibleBuiltGoPackage(EngineAwareReturnType):
+    """Fallible version of `BuiltGoPackage` with error details."""
 
     output: BuiltGoPackage | None
-    exit_code: int
+    import_path: str
+    exit_code: int = 0
     stdout: str | None = None
     stderr: str | None = None
 
-    @classmethod
-    def from_fallible_process_result(
-        cls,
-        process_result: FallibleProcessResult,
-        output: BuiltGoPackage | None,
-    ) -> FallibleBuiltGoPackage:
-        return cls(
-            output=output,
-            exit_code=process_result.exit_code,
-            stdout=process_result.stdout.decode("utf-8"),
-            stderr=process_result.stderr.decode("utf-8"),
-        )
+    def level(self) -> LogLevel:
+        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
 
-    @classmethod
-    def from_fallible_process_results(
-        cls,
-        process_results: tuple[FallibleProcessResult, ...],
-        output: BuiltGoPackage | None,
-    ) -> FallibleBuiltGoPackage:
-        return cls(
-            output=output,
-            exit_code=max(process_result.exit_code for process_result in process_results),
-            stdout="\n".join(
-                process_result.stdout.decode("utf-8") for process_result in process_results
-            ),
-            stderr="\n".join(
-                process_result.stderr.decode("utf-8") for process_result in process_results
-            ),
+    def message(self) -> str:
+        message = self.import_path
+        message += (
+            " succeeded." if self.exit_code == 0 else f" failed (exit code {self.exit_code})."
         )
+        if self.stdout:
+            message += f"\n{self.stdout}"
+        if self.stderr:
+            message += f"\n{self.stderr}"
+        return message
+
+    def cacheable(self) -> bool:
+        # Failed compile outputs should be re-rendered in every run.
+        return self.exit_code == 0
 
 
 @dataclass(frozen=True)
@@ -107,16 +131,21 @@ class BuiltGoPackage:
     import_paths_to_pkg_a_files: FrozenDict[str, str]
 
 
-@rule
+# NB: We must have a description for the streaming of this rule to work properly
+# (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
+@rule(desc="Compile with Go", level=LogLevel.DEBUG)
 async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPackage:
-    built_deps = await MultiGet(
-        Get(BuiltGoPackage, BuildGoPackageRequest, build_request)
+    maybe_built_deps = await MultiGet(
+        Get(FallibleBuiltGoPackage, BuildGoPackageRequest, build_request)
         for build_request in request.direct_dependencies
     )
 
     import_paths_to_pkg_a_files: dict[str, str] = {}
     dep_digests = []
-    for dep in built_deps:
+    for maybe_dep in maybe_built_deps:
+        if maybe_dep.output is None:
+            return maybe_dep
+        dep = maybe_dep.output
         import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
         dep_digests.append(dep.digest)
 
@@ -136,13 +165,16 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
             FallibleAssemblyPreCompilation,
             AssemblyPreCompilationRequest(input_digest, request.s_file_names, request.subpath),
         )
-        if assembly_setup.has_failures():
-            return FallibleBuiltGoPackage.from_fallible_process_results(
-                assembly_setup.results, None
+        if assembly_setup.result is None:
+            return FallibleBuiltGoPackage(
+                None,
+                request.import_path,
+                assembly_setup.exit_code,
+                stdout=assembly_setup.stdout,
+                stderr=assembly_setup.stderr,
             )
-        assert assembly_setup.output
-        input_digest = assembly_setup.output.merged_compilation_input_digest
-        assembly_digests = assembly_setup.output.assembly_digests
+        input_digest = assembly_setup.result.merged_compilation_input_digest
+        assembly_digests = assembly_setup.result.assembly_digests
         symabis_path = "./symabis"
 
     compile_args = [
@@ -155,7 +187,11 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         request.import_path,
         "-importcfg",
         import_config.CONFIG_PATH,
+        # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
+        # for why Go sets the default to 1.16.
+        f"-lang=go{request.minimum_go_version or '1.16'}",
     ]
+
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
     relativized_sources = (
@@ -173,7 +209,13 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         ),
     )
     if compile_result.exit_code != 0:
-        return FallibleBuiltGoPackage.from_fallible_process_result(compile_result, None)
+        return FallibleBuiltGoPackage(
+            None,
+            request.import_path,
+            compile_result.exit_code,
+            stdout=compile_result.stdout.decode("utf-8"),
+            stderr=compile_result.stderr.decode("utf-8"),
+        )
 
     compilation_digest = compile_result.output_digest
     if assembly_digests:
@@ -187,7 +229,13 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
             ),
         )
         if assembly_result.result.exit_code != 0:
-            return FallibleBuiltGoPackage.from_fallible_process_result(assembly_result.result, None)
+            return FallibleBuiltGoPackage(
+                None,
+                request.import_path,
+                assembly_result.result.exit_code,
+                stdout=assembly_result.result.stdout.decode("utf-8"),
+                stderr=assembly_result.result.stderr.decode("utf-8"),
+            )
         assert assembly_result.merged_output_digest
         compilation_digest = assembly_result.merged_output_digest
 
@@ -197,17 +245,16 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
     merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
 
     output = BuiltGoPackage(merged_result_digest, FrozenDict(import_paths_to_pkg_a_files))
-    return FallibleBuiltGoPackage.from_fallible_process_result(compile_result, output)
+    return FallibleBuiltGoPackage(output, request.import_path)
 
 
 @rule
 def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltGoPackage:
-    if fallible_result.exit_code == 0:
-        assert fallible_result.output
+    if fallible_result.output is not None:
         return fallible_result.output
-    # TODO(12927): Wire up to streaming workunit system to log compilation results.
     raise Exception(
-        f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
+        f"Failed to compile {fallible_result.import_path}:\n"
+        f"{fallible_result.stdout}\n{fallible_result.stderr}"
     )
 
 
@@ -224,22 +271,35 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
         return str(self.address)
 
 
-@rule
+# NB: We must have a description for the streaming of this rule to work properly
+# (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
+@rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest,
-) -> BuildGoPackageRequest:
+) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
     import_path = target[GoImportPathField].value
 
     if target.has_field(GoFirstPartyPackageSourcesField):
-        _first_party_pkg_info = await Get(
-            FirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
+        _maybe_first_party_pkg_info = await Get(
+            FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
         )
+        if _maybe_first_party_pkg_info.info is None:
+            return FallibleBuildGoPackageRequest(
+                None,
+                import_path,
+                exit_code=_maybe_first_party_pkg_info.exit_code,
+                stderr=_maybe_first_party_pkg_info.stderr,
+            )
+        _first_party_pkg_info = _maybe_first_party_pkg_info.info
+
         digest = _first_party_pkg_info.digest
         subpath = os.path.join(
             target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
         )
+        minimum_go_version = _first_party_pkg_info.minimum_go_version
+
         go_file_names = _first_party_pkg_info.go_files
         if request.for_tests:
             # TODO: Build the test sources separately and link the two object files into the package archive?
@@ -248,23 +308,24 @@ async def setup_build_go_package_target_request(
             go_file_names += _first_party_pkg_info.test_files
         s_file_names = _first_party_pkg_info.s_files
 
-    elif target.has_field(GoThirdPartyModulePathField):
-        _module_path = target[GoThirdPartyModulePathField].value
-        subpath = fast_relpath(import_path, _module_path)
-
+    elif target.has_field(GoThirdPartyPackageDependenciesField):
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgInfo,
             ThirdPartyPkgInfoRequest(
-                import_path=import_path,
-                module_path=_module_path,
-                version=target[GoThirdPartyModuleVersionField].value,
-                go_mod_stripped_digest=_go_mod_info.stripped_digest,
+                import_path=import_path, go_mod_stripped_digest=_go_mod_info.stripped_digest
             ),
         )
 
+        # We error if trying to _build_ a package with issues (vs. only generating the target and
+        # using in project introspection).
+        if _third_party_pkg_info.error:
+            raise _third_party_pkg_info.error
+
+        subpath = _third_party_pkg_info.subpath
         digest = _third_party_pkg_info.digest
+        minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
 
@@ -278,23 +339,42 @@ async def setup_build_go_package_target_request(
     # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
     #  of its generated targets...Figure this out.
     all_deps = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
-    direct_dependencies = await MultiGet(
-        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
+    maybe_direct_dependencies = await MultiGet(
+        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
         if (
             tgt.has_field(GoFirstPartyPackageSourcesField)
-            or tgt.has_field(GoThirdPartyModulePathField)
+            or tgt.has_field(GoThirdPartyPackageDependenciesField)
         )
     )
+    direct_dependencies = []
+    for maybe_dep in maybe_direct_dependencies:
+        if maybe_dep.request is None:
+            return maybe_dep
+        direct_dependencies.append(maybe_dep.request)
 
-    return BuildGoPackageRequest(
+    result = BuildGoPackageRequest(
         digest=digest,
         import_path="main" if request.is_main else import_path,
         subpath=subpath,
         go_file_names=go_file_names,
         s_file_names=s_file_names,
-        direct_dependencies=direct_dependencies,
+        minimum_go_version=minimum_go_version,
+        direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,
+    )
+    return FallibleBuildGoPackageRequest(result, import_path)
+
+
+@rule
+def required_build_go_package_request(
+    fallible_request: FallibleBuildGoPackageRequest,
+) -> BuildGoPackageRequest:
+    if fallible_request.request is not None:
+        return fallible_request.request
+    raise Exception(
+        f"Failed to determine metadata to compile {fallible_request.import_path}:\n"
+        f"{fallible_request.stderr}"
     )
 
 

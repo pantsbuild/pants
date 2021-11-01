@@ -8,13 +8,15 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContextValue,
+    DockerVersionContext,
 )
 from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
+from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -26,7 +28,6 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -35,6 +36,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *context_rules(),
             *core_target_types_rules(),
+            docker_build_args,
+            docker_build_environment_vars,
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
@@ -42,7 +45,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImage, FilesGeneratorTarget, PexBinary],
+        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
@@ -52,7 +55,7 @@ def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
     expected_files: list[str],
-    expected_version_context: FrozenDict[str, DockerVersionContextValue] | None = None,
+    expected_version_context: dict[str, dict[str, str]] | None = None,
 ) -> None:
     context = rule_runner.request(
         DockerBuildContext,
@@ -67,7 +70,7 @@ def assert_build_context(
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
     if expected_version_context is not None:
-        assert expected_version_context == context.version_context
+        assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
@@ -206,13 +209,11 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context=FrozenDict(
-            {
-                "baseimage": DockerVersionContextValue({"tag": "3.8"}),
-                "stage0": DockerVersionContextValue({"tag": "3.8"}),
-                "interim": DockerVersionContextValue({"tag": "latest"}),
-                "stage2": DockerVersionContextValue({"tag": "latest"}),
-                "output": DockerVersionContextValue({"tag": "1-1"}),
-            }
-        ),
+        expected_version_context={
+            "baseimage": {"tag": "3.8"},
+            "stage0": {"tag": "3.8"},
+            "interim": {"tag": "latest"},
+            "stage2": {"tag": "latest"},
+            "output": {"tag": "1-1"},
+        },
     )

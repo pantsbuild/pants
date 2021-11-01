@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pants.backend.java.goals import debug_goals
 
-python_sources()
-python_tests(name='tests')
+
+def rules():
+    return [*debug_goals.rules()]

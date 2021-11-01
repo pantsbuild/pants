@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
@@ -34,7 +35,6 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize

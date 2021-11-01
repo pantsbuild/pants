@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -11,14 +12,17 @@ from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
     Targets,
+    generate_file_based_overrides_field_help_message,
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 
@@ -77,6 +81,19 @@ class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (".proto",)
 
 
+class ProtobufSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        ProtobufSourceTarget.alias,
+        (
+            "  overrides={\n"
+            '    "foo.proto": {"grpc": True]},\n'
+            '    "bar.proto": {"description": "our user model"]},\n'
+            '    ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
+            "  }"
+        ),
+    )
+
+
 class ProtobufSourcesGeneratorTarget(Target):
     alias = "protobuf_sources"
     core_fields = (
@@ -84,11 +101,9 @@ class ProtobufSourcesGeneratorTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourcesGeneratingSourcesField,
         ProtobufGrpcToggleField,
+        ProtobufSourcesOverridesField,
     )
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
-
-    deprecated_alias = "protobuf_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
 
 
 class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
@@ -98,18 +113,32 @@ class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
 @rule
 async def generate_targets_from_protobuf_sources(
     request: GenerateTargetsFromProtobufSources,
+    files_not_found_behavior: FilesNotFoundBehavior,
     protoc: Protoc,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    paths = await Get(
+    sources_paths = await Get(
         SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSourcesGeneratingSourcesField])
     )
+
+    all_overrides = {}
+    overrides_field = request.generator[OverridesField]
+    if overrides_field.value:
+        _all_override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs)
+            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
+        )
+        all_overrides = overrides_field.flatten_paths(
+            dict(zip(_all_override_paths, overrides_field.value.values()))
+        )
+
     return generate_file_level_targets(
         ProtobufSourceTarget,
         request.generator,
-        paths.files,
+        sources_paths.files,
         union_membership,
         add_dependencies_on_all_siblings=not protoc.dependency_inference,
+        overrides=all_overrides,
     )
 
 

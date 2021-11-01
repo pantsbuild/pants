@@ -3,7 +3,4 @@
 
 python_sources()
 
-python_tests(
-  name = "tests",
-  timeout = 180,
-)
+python_tests(name="tests", timeout=180)

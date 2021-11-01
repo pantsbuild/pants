@@ -9,34 +9,42 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    MultipleSourcesField,
+    SingleSourceField,
     StringField,
     StringSequenceField,
     Target,
 )
 
 
-class DockerImageSources(MultipleSourcesField):
-    default = ("Dockerfile",)
-    expected_num_files = 1
-    help = "The Dockerfile to use when building the Docker image."
-
-
-class DockerImageVersion(StringField):
-    alias = "version"
-    default = "latest"
-    help = "Image tag to apply to built images."
-
-
-class DockerImageTags(StringSequenceField):
-    alias = "image_tags"
+class DockerBuildArgsField(StringSequenceField):
+    alias = "extra_build_args"
+    default = ()
     help = (
-        "Any tags to apply to the Docker image name, in addition to the default from the "
-        "`version` field."
+        "Build arguments (`--build-arg`) to use when building this image. "
+        "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
+        "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
+        "Use `[docker].build_args` to set default build args for all images."
     )
 
 
-class DockerDependencies(Dependencies):
+class DockerImageSourceField(SingleSourceField):
+    default = "Dockerfile"
+    required = False
+    help = "The Dockerfile to use when building the Docker image."
+
+
+class DockerImageTagsField(StringSequenceField):
+    alias = "image_tags"
+    default = ("latest",)
+    help = (
+        "Any tags to apply to the Docker image name (the version is usually applied as a tag).\n\n"
+        "Each tag may use placeholders in curly braces to be interpolated. The placeholders are "
+        "derived from various sources, such as the Dockerfile FROM instructions tags and build "
+        "args.\n\nSee {doc_url('tagging-docker-images')}."
+    )
+
+
+class DockerDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -96,14 +104,14 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
-class DockerImage(Target):
+class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        DockerDependencies,
-        DockerImageSources,
-        DockerImageTags,
-        DockerImageVersion,
+        DockerBuildArgsField,
+        DockerDependenciesField,
+        DockerImageSourceField,
+        DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
         DockerSkipPushField,

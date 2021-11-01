@@ -6,7 +6,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerDependencies, DockerImage
+from pants.backend.docker.target_types import DockerDependenciesField, DockerImageTarget
 from pants.backend.docker.util_rules.dependencies import (
     InjectDockerDependencies,
     inject_docker_dependencies,
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             inject_docker_dependencies,
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
         ],
-        target_types=[DockerImage, PexBinary],
+        target_types=[DockerImageTarget, PexBinary],
     )
     rule_runner.set_options(
         [],
@@ -66,7 +66,7 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
     injected = rule_runner.request(
         InjectedDependencies,
-        [InjectDockerDependencies(tgt[DockerDependencies])],
+        [InjectDockerDependencies(tgt[DockerDependenciesField])],
     )
     assert injected == InjectedDependencies(
         [Address("project/hello/main", target_name="main_binary")]

@@ -7,7 +7,12 @@ import io
 import os
 from collections import abc
 from dataclasses import dataclass
+from typing import Any, Mapping
 
+import toml
+
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Lockfile,
@@ -18,11 +23,21 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix, Snapshot
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestSubset,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.osutil import is_macos_big_sur
@@ -38,14 +53,67 @@ class InvalidBuildConfigError(Exception):
 
 
 @dataclass(frozen=True)
+class BuildSystemRequest:
+    """A request to find build system config in the given dir of the given digest."""
+
+    digest: Digest
+    working_directory: str
+
+
+@dataclass(frozen=True)
+class BuildSystem:
+    """A PEP 517/518 build system configuration."""
+
+    requires: PexRequirements | Lockfile | LockfileContent
+    build_backend: str
+
+    @classmethod
+    def legacy(cls, setuptools: Setuptools) -> BuildSystem:
+        return cls(setuptools.pex_requirements(), "setuptools.build_meta:__legacy__")
+
+
+@rule
+async def find_build_system(request: BuildSystemRequest, setuptools: Setuptools) -> BuildSystem:
+    digest_contents = await Get(
+        DigestContents,
+        DigestSubset(
+            request.digest,
+            PathGlobs(
+                globs=[os.path.join(request.working_directory, "pyproject.toml")],
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+            ),
+        ),
+    )
+    ret = None
+    if digest_contents:
+        file_content = next(iter(digest_contents))
+        settings: Mapping[str, Any] = toml.loads(file_content.content.decode())
+        build_system = settings.get("build-system")
+        if build_system is not None:
+            build_backend = build_system.get("build-backend")
+            if build_backend is None:
+                raise InvalidBuildConfigError(
+                    f"No build-backend found in the [build-system] table in {file_content.path}"
+                )
+            requires = build_system.get("requires")
+            if requires is None:
+                raise InvalidBuildConfigError(
+                    f"No requires found in the [build-system] table in {file_content.path}"
+                )
+            ret = BuildSystem(PexRequirements(requires), build_backend)
+    # Per PEP 517: "If the pyproject.toml file is absent, or the build-backend key is missing,
+    #   the source tree is not using this specification, and tools should revert to the legacy
+    #   behaviour of running setup.py."
+    if ret is None:
+        ret = BuildSystem.legacy(setuptools)
+    return ret
+
+
+@dataclass(frozen=True)
 class DistBuildRequest:
     """A request to build dists via a PEP 517 build backend."""
 
-    # TODO: Create one of these from information in pyproject.toml.
-
-    # PEP-517/518 fields.
-    requires: PexRequirements | Lockfile | LockfileContent
-    build_backend: str
+    build_system: BuildSystem
 
     # TODO: Support backend_path (https://www.python.org/dev/peps/pep-0517/#in-tree-build-backends)
 
@@ -100,7 +168,7 @@ if sdist_path:
 
 def interpolate_backend_shim(dist_dir: str, request: DistBuildRequest) -> bytes:
     # See https://www.python.org/dev/peps/pep-0517/#source-trees.
-    module_path, _, object_path = request.build_backend.partition(":")
+    module_path, _, object_path = request.build_system.build_backend.partition(":")
     backend_object = f"{module_path}.{object_path}" if object_path else module_path
 
     def config_settings_repr(cs: FrozenDict[str, tuple[str, ...]] | None) -> str:
@@ -128,7 +196,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         PexRequest(
             output_filename="build_backend.pex",
             internal_only=True,
-            requirements=request.requires,
+            requirements=request.build_system.requires,
             interpreter_constraints=request.interpreter_constraints,
         ),
     )
@@ -162,9 +230,9 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
             working_directory=request.working_directory,
             output_directories=(dist_dir,),  # Relative to the working_directory.
             description=(
-                f"Run {request.build_backend} for {request.target_address_spec}"
+                f"Run {request.build_system.build_backend} for {request.target_address_spec}"
                 if request.target_address_spec
-                else f"Run {request.build_backend}"
+                else f"Run {request.build_system.build_backend}"
             ),
             level=LogLevel.DEBUG,
         ),
@@ -181,7 +249,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     for dist_type, path in paths.items():
         if path not in output_snapshot.files:
             raise BuildBackendError(
-                f"Build backend {request.build_backend} did not create "
+                f"Build backend {request.build_system.build_backend} did not create "
                 f"expected {dist_type} file {path}"
             )
     return DistBuildResult(

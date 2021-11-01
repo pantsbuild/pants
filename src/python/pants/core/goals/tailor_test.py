@@ -1,8 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import textwrap
 from dataclasses import dataclass
+from textwrap import dedent
 
 import pytest
 
@@ -33,10 +35,12 @@ from pants.core.goals.tailor import (
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
+from pants.engine.internals.build_files import BuildFileOptions, extract_build_file_options
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
@@ -90,6 +94,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
+            extract_build_file_options,
             infer_fortran_module_dependency,
             UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
             QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
@@ -123,19 +128,19 @@ def test_make_content_str() -> None:
         ],
     )
     assert (
-        textwrap.dedent(
-            """
-    fortran_library()
+        dedent(
+            """\
+            fortran_library()
 
-    fortran_tests(
-        name="tests",
-        sources=[
-            "test1.f90",
-            "test2.f90",
-        ],
-    )
-    """
-        ).lstrip()
+            fortran_tests(
+                name="tests",
+                sources=[
+                    "test1.f90",
+                    "test2.f90",
+                ],
+            )
+            """
+        )
         == content
     )
 
@@ -272,9 +277,12 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
                 ),
             ]
         ),
-        name=name,
-        header="Copyright © 2021 FooCorp.",
-        indent="    ",
+    )
+    rule_runner.set_options(
+        [
+            f"--tailor-build-file-name={name}",
+            "--tailor-build-file-header=Copyright © 2021 FooCorp.",
+        ]
     )
     edited_build_files = rule_runner.request(EditedBuildFiles, [req])
 
@@ -285,40 +293,36 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
     expected = [
         FileContent(
             f"src/fortran/baz/{name}.pants",
-            textwrap.dedent(
-                """
-                Copyright © 2021 FooCorp.
+            dedent(
+                """\
+            Copyright © 2021 FooCorp.
 
-                fortran_library()
+            fortran_library()
             """
-            )
-            .lstrip()
-            .encode(),
+            ).encode(),
         ),
         FileContent(
             f"src/fortran/foo/{name}",
             textwrap.dedent(
+                """\
+                fortran_library(sources=["bar1.f90"])
+
+                # A comment spread
+                # over multiple lines.
+                fortran_library(
+                    name="foo0",
+                    sources=[
+                        "bar2.f90",
+                        "bar3.f90",
+                    ],
+                )
+
+                fortran_tests(
+                    name="tests",
+                    life_the_universe_and_everything=42,
+                )
                 """
-            fortran_library(sources=["bar1.f90"])
-
-            # A comment spread
-            # over multiple lines.
-            fortran_library(
-                name="foo0",
-                sources=[
-                    "bar2.f90",
-                    "bar3.f90",
-                ],
-            )
-
-            fortran_tests(
-                name="tests",
-                life_the_universe_and_everything=42,
-            )
-            """
-            )
-            .lstrip()
-            .encode(),
+            ).encode(),
         ),
     ]
     actual = list(contents)
@@ -329,6 +333,69 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
         assert efc.path == afc.path
         assert efc.content.decode() == afc.content.decode()
         assert efc.is_executable == afc.is_executable
+
+
+def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
+    req = EditBuildFilesRequest(
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                ),
+            ]
+        ),
+    )
+    edited_build_files = rule_runner.request(EditedBuildFiles, [req])
+
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
+
+    contents = rule_runner.request(DigestContents, [edited_build_files.digest])
+    expected = [
+        FileContent(
+            "src/fortran/baz/BUILD.pants",
+            dedent(
+                """\
+               fortran_library()
+               """
+            ).encode(),
+        ),
+    ]
+    actual = list(contents)
+    # We do these more laborious asserts instead of just comparing the lists so that
+    # on a text mismatch we see the actual string diff on the decoded strings.
+    assert len(expected) == len(actual)
+    for efc, afc in zip(expected, actual):
+        assert efc.path == afc.path
+        assert efc.content.decode() == afc.content.decode()
+        assert efc.is_executable == afc.is_executable
+
+
+@pytest.mark.parametrize("header", [None, "I am some header text"])
+def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: str | None) -> None:
+    rule_runner.create_dir("src/fortran/baz/BUILD")  # NB: A directory, not a file.
+    req = EditBuildFilesRequest(
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                ),
+            ]
+        ),
+    )
+    if header:
+        rule_runner.set_options([f"--tailor-build-file-header={header}"])
+    edited_build_files = rule_runner.request(EditedBuildFiles, [req])
+
+    assert edited_build_files.created_paths == ("src/fortran/baz/BUILD.pants",)
+
+    contents = rule_runner.request(DigestContents, [edited_build_files.digest])
+    actual = list(contents)
+    # We do these more laborious asserts instead of just comparing the lists so that
+    # on a text mismatch we see the actual string diff on the decoded strings.
+    for afc in actual:
+        content = afc.content.decode()
+        assert content.lstrip() == content
 
 
 def test_group_by_dir() -> None:
@@ -411,12 +478,15 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
                     build_file_name="BUILD",
                     build_file_header="",
                     build_file_indent="    ",
+                    ignore_paths=[],
+                    ignore_adding_targets=[],
                     alias_mapping={"fortran_library": "my_fortran_lib"},
                 ),
                 console,
                 workspace,
                 union_membership,
                 specs,
+                BuildFileOptions(patterns=("BUILD",), ignores=()),
             ],
             mock_gets=[
                 MockGet(
@@ -518,3 +588,66 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         "but this target type does not have a `sources` field."
     )
     assert str(excinfo.value) == expected_msg
+
+
+@pytest.mark.parametrize(
+    "include,file_name,raises",
+    (
+        ("BUILD", "BUILD", False),
+        ("BUILD.*", "BUILD.foo", False),
+        ("BUILD.foo", "BUILD", True),
+    ),
+)
+def test_validate_build_file_name(include: str, file_name: str, raises: bool) -> None:
+    tailor_subsystem = create_goal_subsystem(TailorSubsystem, build_file_name=file_name)
+    if raises:
+        with pytest.raises(ValueError):
+            tailor_subsystem.validate_build_file_name((include,))
+    else:
+        with no_exception():
+            tailor_subsystem.validate_build_file_name((include,))
+
+
+def test_filter_by_ignores() -> None:
+    tailor_subsystem = create_goal_subsystem(
+        TailorSubsystem,
+        build_file_name="BUILD",
+        ignore_paths=["path_ignore/**", "path_ignore_not_recursive/BUILD", "path_ignore_unused/*"],
+        ignore_adding_targets=["project:bad", "//:bad", "unused:t"],
+    )
+
+    def make_ptgt(path: str, name: str, *, addressable: bool = True) -> PutativeTarget:
+        return PutativeTarget(
+            path=path,
+            name=name,
+            type_alias="some_tgt",
+            triggering_sources=[],
+            owned_sources=[],
+        )
+
+    valid_ptgts = [
+        make_ptgt("", "good"),
+        make_ptgt("project", "good"),
+        make_ptgt("project", "caof_macro", addressable=False),
+        make_ptgt("path_ignore_not_recursive/subdir", "t"),
+        make_ptgt("global_build_ignore_not_recursive/subdir", "t"),
+    ]
+    ignored_ptgts = [
+        make_ptgt("", "bad"),
+        make_ptgt("project", "bad"),
+        make_ptgt("path_ignore", "t"),
+        make_ptgt("path_ignore/subdir", "t"),
+        make_ptgt("path_ignore_not_recursive", "t"),
+        make_ptgt("global_build_ignore", "t"),
+        make_ptgt("global_build_ignore/subdir", "t"),
+        make_ptgt("global_build_ignore_not_recursive", "t"),
+    ]
+    result = tailor_subsystem.filter_by_ignores(
+        [*valid_ptgts, *ignored_ptgts],
+        build_file_ignores=(
+            "global_build_ignore/**",
+            "global_build_ignore_not_recursive/BUILD",
+            "global_unused/*",
+        ),
+    )
+    assert set(result) == set(valid_ptgts)

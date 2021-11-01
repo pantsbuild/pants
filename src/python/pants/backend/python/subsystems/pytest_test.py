@@ -35,7 +35,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     global_constraint = "==3.9.*"
     rule_runner.set_options(
         ["--pytest-lockfile=lockfile.txt"],
-        env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+        env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
@@ -50,7 +50,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         "python_tests(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_ics("target()", [global_constraint])
 
     # Only care about `python_tests` and their transitive deps, not unused `python_sources`s.

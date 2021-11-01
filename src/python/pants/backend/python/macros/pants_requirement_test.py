@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
-from pkg_resources import Requirement
 
 from pants.backend.python.macros.pants_requirement import PantsRequirement
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementsField,
@@ -36,7 +36,7 @@ def assert_pants_requirement(
     target = rule_runner.get_target(Address("3rdparty/python", target_name=expected_target_name))
     assert isinstance(target, PythonRequirementTarget)
     assert target[PythonRequirementsField].value == (
-        Requirement.parse(f"{expected_dist}=={pants_version()}"),
+        PipRequirement.parse(f"{expected_dist}=={pants_version()}"),
     )
     assert target[PythonRequirementModulesField].value == (expected_module,)
 

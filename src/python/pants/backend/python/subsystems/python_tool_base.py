@@ -103,7 +103,7 @@ class PythonToolRequirementsBase(Subsystem):
                     "Pants, so long as you have not changed the `--version` and "
                     "`--extra-requirements` options, and the tool's interpreter constraints are "
                     "compatible with the default. Pants will error or warn if the lockfile is not "
-                    "compatible (controlled by `[python-setup].invalid_lockfile_behavior`). See "
+                    "compatible (controlled by `[python].invalid_lockfile_behavior`). See "
                     f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
                     f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We "
                     f"do not recommend this, though, as lockfiles are essential for reproducible "
@@ -115,7 +115,7 @@ class PythonToolRequirementsBase(Subsystem):
                     "If lockfile generation fails, you can manually generate a lockfile, such as "
                     "by using pip-compile or `pip freeze`. Set this option to the path to your "
                     "manually generated lockfile. When manually maintaining lockfiles, set "
-                    "`[python-setup].invalid_lockfile_behavior = 'ignore'`."
+                    "`[python].invalid_lockfile_behavior = 'ignore'`."
                 ),
             )
 

@@ -19,7 +19,7 @@ def test_native_code() -> None:
     pants_run = run_pants(
         [
             "--backend-packages=pants.backend.python",
-            f"--python-setup-interpreter-constraints=['=={pyver}']",
+            f"--python-interpreter-constraints=['=={pyver}']",
             "package",
             "testprojects/src/python/native:dist",
         ],

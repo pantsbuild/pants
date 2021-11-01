@@ -10,13 +10,16 @@ import pytest
 
 from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
+from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
-from pants.core.goals.check import CheckResults
+from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, FileDigest, RemovePrefix, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -37,12 +40,15 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
+
+NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
+DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             render_classpath,
             QueryRule(RenderedClasspath, (Digest,)),
@@ -57,13 +63,26 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *coursier_rules(),
             *jdk_rules.rules(),
+            *java_dep_inf_rules(),
+            *java_parser.rules(),
+            *java_parser_launcher.rules(),
+            *source_files.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
+            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
+        bootstrap_args=[
+            NAMED_RESOLVE_OPTIONS,
+            DEFAULT_RESOLVE_OPTION,
+        ],
     )
+    rule_runner.set_options(
+        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
+    return rule_runner
 
 
 JAVA_LIB_SOURCE = dedent(
@@ -147,16 +166,9 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'lib',
-                    dependencies = [
-                        ':lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -188,11 +200,8 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 [JavacCheckRequest.field_set_type.create(coarsened_target.representative)]
             )
         ],
-    )
-
-    assert len(check_results.results) == 1
-    check_result = check_results.results[0]
-    assert check_result.partition_description == str(coarsened_target)
+    ).results
+    assert set(check_results) == {CheckResult(0, "", "")}
 
 
 @maybe_skip_jdk_test
@@ -201,16 +210,9 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'lib',
-                    dependencies = [
-                        ':lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -226,14 +228,20 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
             rule_runner, Address(spec_path="", target_name="lib")
         )
     )
-    rule_runner.set_options(["--javac-jdk=zulu:1.8"])
+    rule_runner.set_options(
+        ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
-    rule_runner.set_options(["--javac-jdk=bogusjdk:999"])
+    rule_runner.set_options(
+        ["--javac-jdk=bogusjdk:999", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(CompiledClassfiles, [request])
@@ -245,16 +253,9 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'lib',
-                    dependencies = [
-                        ':lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -287,16 +288,27 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     coarsened_targets = rule_runner.request(
         CoarsenedTargets, [Addresses([t.address for t in expanded_targets])]
     )
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    assert len(coarsened_target.members) == 2
-    request = CompileJavaSourceRequest(component=coarsened_target)
+    assert len(coarsened_targets) == 2
+    assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {
+    coarsened_targets_sorted = sorted(
+        list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
+    )
+
+    request0 = CompileJavaSourceRequest(component=coarsened_targets_sorted[0])
+    compiled_classfiles0 = rule_runner.request(CompiledClassfiles, [request0])
+    classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
+    assert classpath0.content == {
         ".ExampleLib.java.lib.jar": {
             "org/pantsbuild/example/lib/ExampleLib.class",
+        }
+    }
+
+    request1 = CompileJavaSourceRequest(component=coarsened_targets_sorted[1])
+    compiled_classfiles1 = rule_runner.request(CompiledClassfiles, [request1])
+    classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
+    assert classpath1.content == {
+        ".OtherLib.java.lib.jar": {
             "org/pantsbuild/example/lib/OtherLib.class",
         }
     }
@@ -323,10 +335,6 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
@@ -336,8 +344,8 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
+
                     dependencies = [
-                        '//:lockfile',
                         'b/B.java',
                     ]
                 )
@@ -355,8 +363,8 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
+
                     dependencies = [
-                        '//:lockfile',
                         'a/A.java',
                     ]
                 )
@@ -399,15 +407,10 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
+
                     dependencies = [
-                        '//:lockfile',
                         'a:a',
                     ]
                 )
@@ -427,8 +430,8 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'a',
+
                     dependencies = [
-                        '//:lockfile',
                         'b/B.java',
                     ]
                 )
@@ -446,8 +449,8 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'b',
+
                     dependencies = [
-                        '//:lockfile',
                         'a:a',
                     ]
                 )
@@ -478,6 +481,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     assert classpath.content == {".Main.java.main.jar": {"org/pantsbuild/main/Main.class"}}
 
 
+@logging
 @maybe_skip_jdk_test
 def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> None:
     """Like test_compile_with_transitive_cycle, but the cycle occurs via subtarget source expansion
@@ -487,15 +491,10 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
+
                     dependencies = [
-                        '//:lockfile',
                         'lib:lib',
                     ]
                 )
@@ -517,9 +516,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 """\
                 java_sources(
                     name = 'lib',
-                    dependencies = [
-                        '//:lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -542,15 +539,13 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
         }
     )
 
+    ctgt = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="main")
+    )
+
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [
-            CompileJavaSourceRequest(
-                component=expect_single_expanded_coarsened_target(
-                    rule_runner, Address(spec_path="", target_name="main")
-                )
-            )
-        ],
+        [CompileJavaSourceRequest(component=ctgt)],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
@@ -564,15 +559,10 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
+
                     dependencies = [
-                        ':lockfile',
                         'lib:lib',
                     ]
                 )
@@ -586,9 +576,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 """\
                 java_sources(
                     name = 'lib',
-                    dependencies = [
-                        '//:lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -615,16 +603,9 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
-                    dependencies = [
-                        ":lockfile",
-                    ]
+
                 )
                 """
             ),
@@ -662,16 +643,9 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
-                    dependencies = [
-                        ':lockfile',
-                    ]
+
                 )
                 """
             ),
@@ -717,15 +691,11 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     artifact = "joda-time",
                     version = "2.10.10",
                 )
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
 
                 java_sources(
                     name = 'main',
+
                     dependencies = [
-                        ':lockfile',
                         ':joda-time_joda-time',
                     ]
                 )
@@ -764,16 +734,9 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                coursier_lockfile(
-                    name = 'lockfile',
-                    source="coursier_resolve.lockfile",
-                )
-
                 java_sources(
                     name = 'main',
-                    dependencies = [
-                        ':lockfile',
-                    ]
+
                 )
                 """
             ),

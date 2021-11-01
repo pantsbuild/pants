@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.docker.rules import rules as docker_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.python.util_rules import pex
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.source_files import rules as source_files_rules
@@ -25,7 +25,7 @@ def rule_runner() -> RuleRunner:
             *source_files_rules(),
             QueryRule(BuiltPackage, [DockerFieldSet]),
         ],
-        target_types=[DockerImage],
+        target_types=[DockerImageTarget],
     )
 
 
@@ -50,7 +50,7 @@ def test_docker_build(rule_runner) -> None:
     """This test requires a running docker daemon."""
     rule_runner.write_files(
         {
-            "src/BUILD": "docker_image(name='test-image', version='1.0')",
+            "src/BUILD": "docker_image(name='test-image', image_tags=['1.0'])",
             "src/Dockerfile": "FROM python:3.8",
         }
     )
