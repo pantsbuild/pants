@@ -13,6 +13,7 @@ from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Iterable,
     Iterator,
     Mapping,
