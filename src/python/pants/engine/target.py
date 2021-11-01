@@ -1674,17 +1674,6 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         return self.value or ()
 
 
-class Sources(MultipleSourcesField):
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "The `Sources` type has been removed in favor of `SourcesField`, `SingleSourceField`, and "
-        "`MultipleSourcesField`. Update your field definitions to subclass either "
-        "`SingleSourceField` or `MultipleSourcesField`, depending on if you want the field "
-        "`source: str` or `sources: list[str]`. Update all rules to use `tgt.get(SourcesField)` "
-        "instead of `tgt.get(Sources)`."
-    )
-
-
 class SingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
