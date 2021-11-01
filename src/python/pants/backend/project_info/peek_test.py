@@ -11,13 +11,7 @@ from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
-from pants.engine.target import OverridesField
 from pants.testutil.rule_runner import RuleRunner
-
-
-# TODO: Remove this if/when we add an overrides field to `files`.
-class FilesGeneratorTargetWithOverrides(FilesGeneratorTarget):
-    core_fields = (*FilesGeneratorTarget.core_fields, OverridesField)  # type: ignore[assignment]
 
 
 @pytest.mark.parametrize(
@@ -32,7 +26,7 @@ class FilesGeneratorTargetWithOverrides(FilesGeneratorTarget):
         pytest.param(
             [
                 TargetData(
-                    FilesGeneratorTargetWithOverrides(
+                    FilesGeneratorTarget(
                         {
                             "sources": ["*.txt"],
                             # Regression test that we can handle a dict with `tuple[str, ...]` as
@@ -213,49 +207,3 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
         ]
     )
-
-
-# TODO: Delete everything below this in 2.9.0.dev0.
-
-
-def test_raw_output_single_build_file(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("project", "# A comment\nfiles(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "project"])
-    expected_output = dedent(
-        """\
-        -------------
-        project/BUILD
-        -------------
-        # A comment
-        files(sources=[])
-        """
-    )
-    assert result.stdout == expected_output
-
-
-def test_raw_output_two_build_files(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("project1", "# A comment\nfiles(sources=[])")
-    rule_runner.add_to_build_file("project2", "# Another comment\nfiles(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "project1", "project2"])
-    expected_output = dedent(
-        """\
-        --------------
-        project1/BUILD
-        --------------
-        # A comment
-        files(sources=[])
-
-        --------------
-        project2/BUILD
-        --------------
-        # Another comment
-        files(sources=[])
-        """
-    )
-    assert result.stdout == expected_output
-
-
-def test_raw_output_non_matching_build_target(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("some_name", "files(sources=[])")
-    result = rule_runner.run_goal_rule(Peek, args=["--output=raw", "other_name"])
-    assert result.stdout == ""
