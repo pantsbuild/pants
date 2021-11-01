@@ -478,6 +478,8 @@ def test_tailor_rule(rule_runner: RuleRunner) -> None:
                     build_file_name="BUILD",
                     build_file_header="",
                     build_file_indent="    ",
+                    ignore_paths=[],
+                    ignore_adding_targets=[],
                     alias_mapping={"fortran_library": "my_fortran_lib"},
                 ),
                 console,
@@ -604,3 +606,48 @@ def test_validate_build_file_name(include: str, file_name: str, raises: bool) ->
     else:
         with no_exception():
             tailor_subsystem.validate_build_file_name((include,))
+
+
+def test_filter_by_ignores() -> None:
+    tailor_subsystem = create_goal_subsystem(
+        TailorSubsystem,
+        build_file_name="BUILD",
+        ignore_paths=["path_ignore/**", "path_ignore_not_recursive/BUILD", "path_ignore_unused/*"],
+        ignore_adding_targets=["project:bad", "//:bad", "unused:t"],
+    )
+
+    def make_ptgt(path: str, name: str, *, addressable: bool = True) -> PutativeTarget:
+        return PutativeTarget(
+            path=path,
+            name=name,
+            type_alias="some_tgt",
+            triggering_sources=[],
+            owned_sources=[],
+        )
+
+    valid_ptgts = [
+        make_ptgt("", "good"),
+        make_ptgt("project", "good"),
+        make_ptgt("project", "caof_macro", addressable=False),
+        make_ptgt("path_ignore_not_recursive/subdir", "t"),
+        make_ptgt("global_build_ignore_not_recursive/subdir", "t"),
+    ]
+    ignored_ptgts = [
+        make_ptgt("", "bad"),
+        make_ptgt("project", "bad"),
+        make_ptgt("path_ignore", "t"),
+        make_ptgt("path_ignore/subdir", "t"),
+        make_ptgt("path_ignore_not_recursive", "t"),
+        make_ptgt("global_build_ignore", "t"),
+        make_ptgt("global_build_ignore/subdir", "t"),
+        make_ptgt("global_build_ignore_not_recursive", "t"),
+    ]
+    result = tailor_subsystem.filter_by_ignores(
+        [*valid_ptgts, *ignored_ptgts],
+        build_file_ignores=(
+            "global_build_ignore/**",
+            "global_build_ignore_not_recursive/BUILD",
+            "global_unused/*",
+        ),
+    )
+    assert set(result) == set(valid_ptgts)
