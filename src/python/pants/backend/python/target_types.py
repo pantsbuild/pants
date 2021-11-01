@@ -77,11 +77,11 @@ if TYPE_CHECKING:
 
 class PythonSourceField(SingleSourceField):
     # Note that Python scripts often have no file ending.
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
