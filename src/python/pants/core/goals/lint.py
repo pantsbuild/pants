@@ -10,10 +10,6 @@ from typing import Any, Iterable, cast
 
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
@@ -28,11 +24,6 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class LintReport:
-    digest: Digest
 
 
 @dataclass(frozen=True)
@@ -200,21 +191,13 @@ async def lint(
         )
         for request_type in request_types
     )
-    field_sets_with_sources = await MultiGet(
-        Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(request.field_sets))
-        for request in requests
-    )
-    valid_requests = tuple(
-        request_cls(request)
-        for request_cls, request in zip(request_types, field_sets_with_sources)
-        if request
-    )
 
     if lint_subsystem.per_file_caching:
         all_per_file_results = await MultiGet(
             Get(LintResults, LintRequest, request.__class__([field_set]))
-            for request in valid_requests
+            for request in requests
             for field_set in request.field_sets
+            if request.field_sets
         )
 
         def key_fn(results: LintResults):
@@ -236,7 +219,7 @@ async def lint(
         )
     else:
         all_results = await MultiGet(
-            Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
+            Get(LintResults, LintRequest, request) for request in requests if request.field_sets
         )
 
     all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))

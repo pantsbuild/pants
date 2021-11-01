@@ -8,7 +8,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, TypeVar, cast
 
-from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
@@ -188,29 +187,6 @@ async def fmt(
         )
         for language_target_collection_type in language_target_collection_types
     )
-    targets_with_sources = await MultiGet(
-        Get(
-            TargetsWithSources,
-            TargetsWithSourcesRequest(language_target_collection.targets),
-        )
-        for language_target_collection in language_target_collections
-    )
-    # NB: We must convert back the generic TargetsWithSources objects back into their
-    # corresponding LanguageFmtTargets, e.g. back to PythonFmtTargets, in order for the union
-    # rule to work.
-    valid_language_target_collections = tuple(
-        language_target_collection_cls(
-            Targets(
-                target
-                for target in language_target_collection.targets
-                if target in language_targets_with_sources
-            )
-        )
-        for language_target_collection_cls, language_target_collection, language_targets_with_sources in zip(
-            language_target_collection_types, language_target_collections, targets_with_sources
-        )
-        if language_targets_with_sources
-    )
 
     if fmt_subsystem.per_file_caching:
         per_language_results = await MultiGet(
@@ -219,13 +195,15 @@ async def fmt(
                 LanguageFmtTargets,
                 language_target_collection.__class__(Targets([target])),
             )
-            for language_target_collection in valid_language_target_collections
+            for language_target_collection in language_target_collections
             for target in language_target_collection.targets
+            if language_target_collection.targets
         )
     else:
         per_language_results = await MultiGet(
             Get(LanguageFmtResults, LanguageFmtTargets, language_target_collection)
-            for language_target_collection in valid_language_target_collections
+            for language_target_collection in language_target_collections
+            if language_target_collection.targets
         )
 
     individual_results = list(
