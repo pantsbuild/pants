@@ -766,9 +766,6 @@ class PythonSourcesGeneratorTarget(Target):
         "separate test support files vs. production files."
     )
 
-    deprecated_alias = "python_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
-
 
 # -----------------------------------------------------------------------------------------------
 # `python_requirement` target
@@ -983,9 +980,6 @@ class PythonRequirementTarget(Target):
         "\n\n"
         f"See {doc_url('python-third-party-dependencies')}."
     )
-
-    deprecated_alias = "python_requirement_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
 
     def validate(self) -> None:
         if (
