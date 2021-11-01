@@ -2335,10 +2335,3 @@ def generate_file_based_overrides_field_help_message(
         "You can specify the same file name in multiple keys, so long as you don't override the "
         "same field more than one time for the file."
     )
-
-
-class ProvidesField(Field):
-    """An `artifact` that describes how to represent this target to the outside world."""
-
-    alias = "provides"
-    default: ClassVar[Optional[Any]] = None
