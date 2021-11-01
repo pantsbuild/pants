@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 import textwrap
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -26,6 +28,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
     PutativeTargetsSearchPaths,
+    TailorGoal,
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
@@ -33,15 +36,16 @@ from pants.core.goals.tailor import (
     make_content_str,
     specs_to_dirs,
 )
-from pants.core.util_rules import source_files
-from pants.engine.fs import EMPTY_DIGEST, DigestContents, FileContent, Workspace
-from pants.engine.internals.build_files import BuildFileOptions, extract_build_file_options
-from pants.engine.rules import QueryRule, rule
+from pants.core.util_rules import pants_bin, source_files
+from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
+from pants.engine.internals.build_files import extract_build_file_options
+from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
+from pants.source.filespec import Filespec, matches_filespec
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner
 
 
 class MockPutativeTargetsRequest:
@@ -61,18 +65,55 @@ class FortranLibrarySources(FortranSources):
     default = ("*.f90",) + tuple(f"!{pat}" for pat in FortranTestsSources.default)
 
 
-class FortranLibrary(Target):
+class FortranLibraryTarget(Target):
     alias = "fortran_library"
     core_fields = (FortranLibrarySources,)
 
 
-class FortranTests(Target):
+class FortranTestsTarget(Target):
     alias = "fortran_tests"
     core_fields = (FortranTestsSources,)
 
 
-# This target intentionally has no `sources` field in order to test how `tailor` interacts with targets that
-# have no sources. An example of this type of target is `GoExternalModule`.
+class PutativeFortranTargetsRequest(PutativeTargetsRequest):
+    pass
+
+
+@rule
+async def find_fortran_targets(
+    req: PutativeFortranTargetsRequest, all_owned_sources: AllOwnedSources
+) -> PutativeTargets:
+    all_fortran_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.f90"))
+    unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
+
+    tests_filespec = Filespec(includes=list(FortranTestsSources.default))
+    test_filenames = set(
+        matches_filespec(
+            tests_filespec, paths=[os.path.basename(path) for path in unowned_shell_files]
+        )
+    )
+    test_files = {path for path in unowned_shell_files if os.path.basename(path) in test_filenames}
+    sources_files = set(unowned_shell_files) - test_files
+    classified_unowned_shell_files = {
+        FortranTestsTarget: test_files,
+        FortranLibraryTarget: sources_files,
+    }
+
+    pts = []
+    for tgt_type, paths in classified_unowned_shell_files.items():
+        for dirname, filenames in group_by_dir(paths).items():
+            name = "tests" if tgt_type == FortranTestsTarget else os.path.basename(dirname)
+            kwargs = {"name": name} if tgt_type == FortranTestsTarget else {}
+            pts.append(
+                PutativeTarget.for_target_type(
+                    tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
+                )
+            )
+    return PutativeTargets(pts)
+
+
+# This target intentionally has no `sources` field in order to test how `tailor` interacts with
+# targets that have no sources. An example of this type of target is `GoExternalModule`.
 class FortranModule(Target):
     alias = "fortran_module"
     core_fields = ()
@@ -94,22 +135,24 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
+            *pants_bin.rules(),
             extract_build_file_options,
+            find_fortran_targets,
             infer_fortran_module_dependency,
-            UnionRule(PutativeTargetsRequest, MockPutativeFortranModuleRequest),
+            UnionRule(PutativeTargetsRequest, PutativeFortranTargetsRequest),
             QueryRule(PutativeTargets, (MockPutativeFortranModuleRequest,)),
             QueryRule(UniquelyNamedPutativeTargets, (PutativeTargets,)),
             QueryRule(DisjointSourcePutativeTarget, (PutativeTarget,)),
             QueryRule(EditedBuildFiles, (EditBuildFilesRequest,)),
             QueryRule(AllOwnedSources, ()),
         ],
-        target_types=[FortranLibrary, FortranTests],
+        target_types=[FortranLibraryTarget, FortranTestsTarget],
     )
 
 
 def test_default_sources_for_target_type() -> None:
-    assert default_sources_for_target_type(FortranLibrary) == FortranLibrarySources.default
-    assert default_sources_for_target_type(FortranTests) == FortranTestsSources.default
+    assert default_sources_for_target_type(FortranLibraryTarget) == FortranLibrarySources.default
+    assert default_sources_for_target_type(FortranTestsTarget) == FortranTestsSources.default
     assert default_sources_for_target_type(FortranModule) == tuple()
 
 
@@ -119,7 +162,7 @@ def test_make_content_str() -> None:
         "    ",
         [
             PutativeTarget.for_target_type(
-                FortranTests,
+                FortranTestsTarget,
                 "path/to",
                 "tests",
                 ["test1.f90", "test2.f90"],
@@ -258,14 +301,14 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    FortranTests,
+                    FortranTestsTarget,
                     "src/fortran/foo",
                     "tests",
                     ["bar1_test.f90"],
                     kwargs={"name": "tests", "life_the_universe_and_everything": 42},
                 ),
                 PutativeTarget.for_target_type(
-                    FortranLibrary,
+                    FortranLibraryTarget,
                     "src/fortran/foo",
                     "foo0",
                     ["bar2.f90", "bar3.f90"],
@@ -273,7 +316,7 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
                     comments=["# A comment spread", "# over multiple lines."],
                 ),
                 PutativeTarget.for_target_type(
-                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                    FortranLibraryTarget, "src/fortran/baz", "baz", ["qux1.f90"]
                 ),
             ]
         ),
@@ -341,7 +384,7 @@ def test_edit_build_files_without_header_text(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                    FortranLibraryTarget, "src/fortran/baz", "baz", ["qux1.f90"]
                 ),
             ]
         ),
@@ -378,7 +421,7 @@ def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: st
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
+                    FortranLibraryTarget, "src/fortran/baz", "baz", ["qux1.f90"]
                 ),
             ]
         ),
@@ -463,96 +506,77 @@ def test_specs_to_dirs() -> None:
         )
 
 
-def test_tailor_rule(rule_runner: RuleRunner) -> None:
-    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
-        union_membership = UnionMembership({PutativeTargetsRequest: [MockPutativeTargetsRequest]})
-        specs = Specs(
-            address_specs=AddressSpecs(tuple()), filesystem_specs=FilesystemSpecs(tuple())
-        )
-        run_rule_with_mocks(
-            tailor.tailor,
-            rule_args=[
-                create_goal_subsystem(
-                    TailorSubsystem,
-                    build_file_name="BUILD",
-                    build_file_header="",
-                    build_file_indent="    ",
-                    ignore_paths=[],
-                    ignore_adding_targets=[],
-                    alias_mapping={"fortran_library": "my_fortran_lib"},
-                ),
-                console,
-                workspace,
-                union_membership,
-                specs,
-                BuildFileOptions(patterns=("BUILD",), ignores=()),
-            ],
-            mock_gets=[
-                MockGet(
-                    output_type=PutativeTargets,
-                    input_type=PutativeTargetsRequest,
-                    mock=lambda req: PutativeTargets(
-                        [
-                            PutativeTarget.for_target_type(
-                                FortranTests, "src/fortran/foo", "tests", ["bar1_test.f90"]
-                            ),
-                            PutativeTarget.for_target_type(
-                                FortranLibrary, "src/fortran/baz", "baz", ["qux1.f90"]
-                            ),
-                            PutativeTarget.for_target_type(
-                                FortranLibrary,
-                                "src/fortran/conflict",
-                                "conflict",
-                                ["conflict1.f90", "conflict2.f90"],
-                            ),
-                        ]
-                    ),
-                ),
-                MockGet(
-                    output_type=UniquelyNamedPutativeTargets,
-                    input_type=PutativeTargets,
-                    mock=lambda pts: UniquelyNamedPutativeTargets(
-                        PutativeTargets(
-                            [pt.rename("conflict0") if pt.name == "conflict" else pt for pt in pts]
-                        )
-                    ),
-                ),
-                MockGet(
-                    output_type=DisjointSourcePutativeTarget,
-                    input_type=PutativeTarget,
-                    # This test exists to test the console output, which isn't affected by
-                    # whether the sources of a putative target were modified due to conflict,
-                    # so we don't bother to inject such modifications. The BUILD file content
-                    # generation, which is so affected, is tested separately above.
-                    mock=lambda pt: DisjointSourcePutativeTarget(pt),
-                ),
-                MockGet(
-                    output_type=EditedBuildFiles,
-                    input_type=EditBuildFilesRequest,
-                    mock=lambda _: EditedBuildFiles(
-                        # We test that the created digest contains what we expect above, and we
-                        # don't need to test here that writing digests to the Workspace works.
-                        # So the empty digest is sufficient.
-                        digest=EMPTY_DIGEST,
-                        created_paths=("src/fortran/baz/BUILD",),
-                        updated_paths=(
-                            "src/fortran/foo/BUILD",
-                            "src/fortran/conflict/BUILD",
-                        ),
-                    ),
-                ),
-            ],
-            union_membership=union_membership,
-        )
+def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/bar1_test.f90": "",
+            "foo/BUILD": "fortran_library()",
+            "baz/qux1.f90": "",
+            "conflict/f1.f90": "",
+            "conflict/f2.f90": "",
+            "conflict/BUILD": "fortran_library(sources=['f1.f90'])",
+        }
+    )
+    result = rule_runner.run_goal_rule(
+        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}"]
+    )
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        """\
+        Created baz/BUILD:
+          - Add my_fortran_lib target baz
+        Updated conflict/BUILD:
+          - Add my_fortran_lib target conflict0
+        Updated foo/BUILD:
+          - Add fortran_tests target tests
+        """
+    )
+    assert Path(rule_runner.build_root, "foo/BUILD").read_text() == dedent(
+        """\
+        fortran_library()
 
-        stdout_str = stdio_reader.get_stdout()
+        fortran_tests(
+            name="tests",
+        )
+        """
+    )
+    assert Path(rule_runner.build_root, "baz/BUILD").read_text() == "my_fortran_lib()\n"
+    assert Path(rule_runner.build_root, "conflict/BUILD").read_text() == dedent(
+        """\
+        fortran_library(sources=['f1.f90'])
 
-    assert "Created src/fortran/baz/BUILD:\n  - Added my_fortran_lib target baz" in stdout_str
-    assert "Updated src/fortran/foo/BUILD:\n  - Added fortran_tests target tests" in stdout_str
-    assert (
-        "Updated src/fortran/conflict/BUILD:\n  - Added my_fortran_lib target conflict0"
-    ) in stdout_str
+        # NOTE: Sources restricted from the default for my_fortran_lib due to conflict with
+        #   - conflict:conflict
+        my_fortran_lib(
+            name="conflict0",
+            sources=[
+                "f2.f90",
+            ],
+        )
+        """
+    )
+
+
+def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"foo/bar1_test.f90": "", "foo/BUILD": "fortran_library()", "baz/qux1.f90": ""}
+    )
+    result = rule_runner.run_goal_rule(
+        TailorGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+    )
+    assert result.exit_code == 1
+    assert result.stdout == dedent(
+        """\
+        Would create baz/BUILD:
+          - Add fortran_library target baz
+        Would update foo/BUILD:
+          - Add fortran_tests target tests
+
+        To fix `tailor` failures, run `./custom_pants tailor`.
+        """
+    )
+    assert Path(rule_runner.build_root, "foo/BUILD").read_text() == "fortran_library()"
+    assert not Path(rule_runner.build_root, "baz/BUILD").exists()
 
 
 def test_all_owned_sources(rule_runner: RuleRunner) -> None:

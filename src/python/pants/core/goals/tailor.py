@@ -19,6 +19,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.build_graph.address import Address
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -250,6 +251,16 @@ class TailorSubsystem(GoalSubsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
+            "--check",
+            type=bool,
+            default=False,
+            help=(
+                "Do not write changes to disk, only write back what would change. Return code "
+                "0 means there would be no changes, and 1 means that there would be. "
+            ),
+        )
+
+        register(
             "--build-file-name",
             advanced=True,
             type=str,
@@ -259,7 +270,6 @@ class TailorSubsystem(GoalSubsystem):
                 "This must be compatible with `[GLOBAL].build_patterns`."
             ),
         )
-
         register(
             "--build-file-header",
             advanced=True,
@@ -267,7 +277,6 @@ class TailorSubsystem(GoalSubsystem):
             default=None,
             help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
         )
-
         register(
             "--build-file-indent",
             advanced=True,
@@ -307,13 +316,17 @@ class TailorSubsystem(GoalSubsystem):
             help=(
                 "Do not add these target definitions.\n\n"
                 "Expects a list of target addresses that would normally be added by `tailor`, "
-                "e.g. [`project:tgt']`. To find these names, you can run `tailor`, then combine "
-                "the BUILD file path with the target's name. For example, if `tailor` is adding "
-                "the target `bin` to `project/BUILD`, then the address would be `project:bin`. If "
-                "the BUILD file is at the root of your repository, use `//` for the path, e.g. "
-                "`//:bin`."
+                "e.g. [`project:tgt']`. To find these names, you can run `tailor --check`, then "
+                "combine the BUILD file path with the target's name. For example, if `tailor` "
+                "would add the target `bin` to `project/BUILD`, then the address would be "
+                "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
+                "the path, e.g. `//:bin`."
             ),
         )
+
+    @property
+    def check(self) -> bool:
+        return cast(bool, self.options.check)
 
     @property
     def build_file_name(self) -> str:
@@ -375,7 +388,7 @@ class TailorSubsystem(GoalSubsystem):
             yield ptgt
 
 
-class Tailor(Goal):
+class TailorGoal(Goal):
     subsystem_cls = TailorSubsystem
 
 
@@ -592,7 +605,8 @@ async def tailor(
     union_membership: UnionMembership,
     specs: Specs,
     build_file_options: BuildFileOptions,
-) -> Tailor:
+    pants_bin: PantsBin,
+) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
     search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
@@ -617,24 +631,33 @@ async def tailor(
         )
     )
     if not valid_putative_targets:
-        return Tailor(0)
+        return TailorGoal(exit_code=0)
 
     edited_build_files = await Get(
         EditedBuildFiles, EditBuildFilesRequest(PutativeTargets(valid_putative_targets))
     )
+    if not tailor_subsystem.check:
+        workspace.write_digest(edited_build_files.digest)
+
     updated_build_files = set(edited_build_files.updated_paths)
-    workspace.write_digest(edited_build_files.digest)
     ptgts_by_build_file = group_by_build_file(
         tailor_subsystem.build_file_name, valid_putative_targets
     )
     for build_file_path, ptgts in ptgts_by_build_file.items():
-        verb = "Updated" if build_file_path in updated_build_files else "Created"
-        console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
-        for ptgt in ptgts:
-            console.print_stdout(
-                f"  - Added {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
-            )
-    return Tailor(0)
+        formatted_changes = "\n".join(
+            f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
+            for ptgt in ptgts
+        )
+        if build_file_path in updated_build_files:
+            verb = "Would update" if tailor_subsystem.check else "Updated"
+        else:
+            verb = "Would create" if tailor_subsystem.check else "Created"
+        console.print_stdout(f"{verb} {console.blue(build_file_path)}:\n{formatted_changes}")
+
+    if tailor_subsystem.check:
+        console.print_stdout(f"\nTo fix `tailor` failures, run `{pants_bin.name} tailor`.")
+
+    return TailorGoal(exit_code=1 if tailor_subsystem.check else 0)
 
 
 def rules():
