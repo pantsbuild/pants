@@ -81,17 +81,6 @@ root_patterns = [
   "/pants-plugins",
 ]
 
-[tailor]
-ignore_paths = ["build-support/migration-support/BUILD"]
-ignore_adding_targets = [
-  "src/python/pants:__main__",
-  "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
-  "src/python/pants/backend/go/goals:bin",
-  "src/python/pants/backend/go/util_rules:bin",
-  "src/python/pants/backend/python/dependency_inference:import_parser",
-  "src/python/pants/backend/terraform:hcl2_parser0",
-]
-
 [python]
 experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
