@@ -47,7 +47,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     NestedDictStringToStringField,
     OverridesField,
-    ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
     SingleSourceField,
@@ -968,7 +967,8 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
+class PythonProvidesField(ScalarField, AsyncFieldMixin):
+    alias = "provides"
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact

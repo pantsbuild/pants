@@ -7,21 +7,18 @@ import re
 from textwrap import dedent
 
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
-from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
-from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
+from pants.engine.target import DescriptionField, Target, UnexpandedTargets
 from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
 from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (DescriptionField, ProvidesField)
+    core_fields = (DescriptionField,)
 
 
-def run_goal(
-    targets: list[MockTarget], *, show_documented: bool = False, show_provides: bool = False
-) -> tuple[str, str]:
+def run_goal(targets: list[MockTarget], *, show_documented: bool = False) -> tuple[str, str]:
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
         run_rule_with_mocks(
             list_targets,
@@ -32,7 +29,6 @@ def run_goal(
                     sep="\\n",
                     output_file=None,
                     documented=show_documented,
-                    provides=show_provides,
                 ),
                 console,
             ],
@@ -89,13 +85,3 @@ def test_list_documented() -> None:
           \tThis target is the best.
         """
     )
-
-
-def test_list_provides() -> None:
-    sample_artifact = PythonArtifact(name="project.demo")
-    targets = [
-        MockTarget({ProvidesField.alias: sample_artifact}, Address("", target_name="provided")),
-        MockTarget({}, Address("", target_name="not_provided")),
-    ]
-    stdout, _ = run_goal(targets, show_provides=True)
-    assert stdout.strip() == f"//:provided {sample_artifact}"
