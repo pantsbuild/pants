@@ -298,7 +298,24 @@ def test_find_binary_file_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
 
     binary_paths = rule_runner.request(
         BinaryPaths,
-        [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(binary_path_abs)])],
+        [
+            BinaryPathRequest(
+                binary_name=MyBin.binary_name,
+                search_path=[str(binary_path_abs)],
+            )
+        ],
+    )
+    assert binary_paths.first_path is None, "By default, PATH file entries should not be checked."
+
+    binary_paths = rule_runner.request(
+        BinaryPaths,
+        [
+            BinaryPathRequest(
+                binary_name=MyBin.binary_name,
+                search_path=[str(binary_path_abs)],
+                check_file_entries=True,
+            )
+        ],
     )
     assert binary_paths.first_path is not None
     assert binary_paths.first_path.path == str(binary_path_abs)
@@ -319,6 +336,7 @@ def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_pat
                     str(binary_path_abs2),
                     str(binary_path_abs3.parent),
                 ],
+                check_file_entries=True,
             )
         ],
     )
