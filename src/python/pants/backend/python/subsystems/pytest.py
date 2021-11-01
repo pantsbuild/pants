@@ -120,19 +120,6 @@ class PyTest(PythonToolBase):
             help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
         )
         register(
-            "--junit-xml-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            removal_version="2.9.0.dev0",
-            removal_hint="Moved to `[test] xml_dir`.",
-            help=(
-                "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run."
-            ),
-        )
-        register(
             "--junit-family",
             type=str,
             default="xunit2",
