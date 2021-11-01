@@ -77,11 +77,11 @@ if TYPE_CHECKING:
 
 class PythonSourceField(SingleSourceField):
     # Note that Python scripts often have no file ending.
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
@@ -554,10 +554,21 @@ class PexBinary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
-#  message to use `python_source`/`python_test_utils` instead.
 class PythonTestSourceField(PythonSourceField):
-    pass
+    expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        super().validate_resolved_files(files)
+        file = files[0]
+        file_name = os.path.basename(file)
+        if file_name == "conftest.py":
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} should not be set to the "
+                f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
+                "`python_source` target or the target generator `python_test_utils`. You can run "
+                f"`./pants tailor` after removing this target ({self.address}) to autogenerate a "
+                "`python_test_utils` target."
+            )
 
 
 class PythonTestsDependencies(Dependencies):
@@ -630,39 +641,29 @@ class PythonTestTarget(Target):
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
-        "target and then be included in the `dependencies` field.\n\n"
+        "target and then be included in the `dependencies` field. (You can use the "
+        "`python_test_utils` target to generate these `python_source` targets.)\n\n"
         f"See {doc_url('python-test-goal')}"
     )
 
 
-# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
-#  message to use `python_test_utils` instead.
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
+    expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
     default = ("test_*.py", "*_test.py", "tests.py")
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
-        deprecated_files = []
-        for fp in files:
-            file_name = os.path.basename(fp)
-            if file_name == "conftest.py" or file_name.endswith(".pyi"):
-                deprecated_files.append(fp)
-
-        if deprecated_files:
-            # NOTE: Update `pytest.py` to stop special-casing file targets once this is removed!
-            warn_or_error(
-                "2.9.0.dev0",
-                entity=(
-                    "including `conftest.py` and `.pyi` stubs in a `python_tests` target's "
-                    "`sources` field"
-                ),
-                hint=(
-                    f"The `python_tests` target {self.address} includes these bad files in its "
-                    f"`sources` field: {deprecated_files}. "
-                    "To fix, please remove these files from the `sources` field and instead add "
-                    "them to a `python_test_utils` target. You can run `./pants tailor` after "
-                    "removing the files from the `sources` field to auto-generate this new target."
-                ),
+        # We don't technically need to error for `conftest.py` here because `PythonTestSourceField`
+        # already validates this, but we get a better error message this way so that users don't
+        # have to reason about generated targets.
+        conftest_files = [fp for fp in files if os.path.basename(fp) == "conftest.py"]
+        if conftest_files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} should not include the "
+                f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
+                "`python_source` target or the target generator `python_test_utils`. You can run "
+                f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
+                f"this target ({self.address}) to autogenerate a `python_test_utils` target."
             )
 
 
