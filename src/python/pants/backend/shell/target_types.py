@@ -259,9 +259,6 @@ class ShellSourcesGeneratorTarget(Target):
     )
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
-    deprecated_alias = "shell_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
-
 
 class GenerateTargetsFromShellSources(GenerateTargetsRequest):
     generate_from = ShellSourcesGeneratorTarget
