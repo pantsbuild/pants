@@ -235,15 +235,14 @@ async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
-    targets_for_resolve = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
-    resolve = await Get(CoursierResolveKey, Targets, targets_for_resolve)
+    resolves = await MultiGet(
+        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
+    )
 
+    # TODO: This should be fallible so that we exit cleanly.
     results = await MultiGet(
-        Get(
-            FallibleCompiledClassfiles,
-            CompileScalaSourceRequest(component=target, resolve=resolve),
-        )
-        for target in coarsened_targets
+        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t, resolve=r))
+        for t, r in zip(coarsened_targets, resolves)
     )
 
     # NB: We return CheckResults with exit codes for the root targets, but we do not pass

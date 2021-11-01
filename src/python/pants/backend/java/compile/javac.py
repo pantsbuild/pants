@@ -239,15 +239,16 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
-    targets_for_resolve = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
-    resolve = await Get(CoursierResolveKey, Targets, targets_for_resolve)
+    resolves = await MultiGet(
+        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
+    )
 
     results = await MultiGet(
         Get(
             FallibleCompiledClassfiles,
             CompileJavaSourceRequest(component=target, resolve=resolve),
         )
-        for target in coarsened_targets
+        for target, resolve in zip(coarsened_targets, resolves)
     )
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
