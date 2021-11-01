@@ -5,7 +5,7 @@ docker_image(
     name="test-example",
     image_tags=["1.2.5"],
     source="Dockerfile",
-    #dependencies=[":example-dockerfile"],
+    # dependencies=[":example-dockerfile"],
 )
 
 dockerfile(
@@ -15,5 +15,5 @@ dockerfile(
         'ENTRYPOINT ["/hello"]',
         'CMD ["synthetic!"]',
         "COPY testprojects.src.python.hello.main/main.pex /hello",
-    ]
+    ],
 )
