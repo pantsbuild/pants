@@ -168,6 +168,7 @@ async def find_pex_python(
             BinaryPathRequest(
                 search_path=python_setup.interpreter_search_paths(pex_relevant_environment),
                 binary_name=binary_name,
+                check_file_entries=True,
                 test=BinaryPathTest(
                     args=[
                         "-c",
