@@ -659,7 +659,7 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
         conftest_files = [fp for fp in files if os.path.basename(fp) == "conftest.py"]
         if conftest_files:
             raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} should not be include the "
+                f"The {repr(self.alias)} field in target {self.address} should not include the "
                 f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
                 f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
