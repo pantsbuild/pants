@@ -383,9 +383,8 @@ async def resolve_python_distribution_entry_points(
             entry_point = binary_entry_point_by_address[owner].val
             if entry_point is None:
                 logger.warning(
-                    f"The entry point {name} in {category} references a pex binary {ref}, "
-                    "which has set its entry point to '<none>'. "
-                    "Skipping this entry because '<none>' is not valid as an entry point."
+                    f"The entry point {name} in {category} references a pex_binary target {ref} "
+                    "which does not set `entry_point`. Skipping."
                 )
                 continue
         else:

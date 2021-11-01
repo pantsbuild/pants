@@ -116,7 +116,6 @@ def test_timeout_calculation() -> None:
 @pytest.mark.parametrize(
     ["entry_point", "expected"],
     (
-        ("<none>", []),
         ("path.to.module", []),
         ("path.to.module:func", []),
         ("lambda.py", ["project/dir/lambda.py"]),
@@ -185,10 +184,6 @@ def test_resolve_pex_binary_entry_point() -> None:
         expected=EntryPoint(module="project.app", function="func"),
         is_file=True,
     )
-
-    # We special case the strings `<none>` and `<None>`.
-    assert_resolved(entry_point="<none>", expected=None, is_file=False)
-    assert_resolved(entry_point="<None>", expected=None, is_file=False)
 
     with pytest.raises(ExecutionError):
         assert_resolved(
