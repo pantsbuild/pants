@@ -12,7 +12,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 
 
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
@@ -38,16 +37,13 @@ class PipenvRequirements:
 
     def __call__(
         self,
-        requirements_relpath: str | None = None,
         *,
-        source: str | None = None,
+        source: str = "Pipfile.lock",
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
         pipfile_target: str | None = None,
     ) -> None:
         """
-        :param requirements_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `Pipfile.lock` file sibling to the BUILD file.
         :param module_mapping: a mapping of requirement names to a list of the modules they provide.
             For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
             requirement name as the default module, e.g. "Django" will default to
@@ -55,26 +51,6 @@ class PipenvRequirements:
         :param pipfile_target: a `_python_requirements_file` target to provide for cache invalidation
         if the requirements_relpath value is not in the current rel_path
         """
-        if requirements_relpath and source:
-            raise ValueError(
-                "Specified both `requirements_relpath` and `source` in the `pipenv_requirements` "
-                f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
-                "`source`."
-            )
-        if requirements_relpath is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `requirements_relpath` argument for `pipenv_requirements()`",
-                (
-                    "Use the `source` argument instead of `requirements_relpath` for the "
-                    f"`pipenv_requirements` macro in the BUILD file at "
-                    f"{self._parse_context.rel_path}. `source` behaves the same."
-                ),
-            )
-            source = requirements_relpath
-        if source is None:
-            source = "Pipfile.lock"
-
         requirements_path = Path(get_buildroot(), self._parse_context.rel_path, source)
         lock_info = json.loads(requirements_path.read_text())
 
