@@ -29,10 +29,18 @@ from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompile
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierResolvedLockfile,
     CoursierResolveKey,
+    FilterDirectDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
+)
+from pants.jvm.target_types import (
+    JvmArtifactArtifactField,
+    JvmArtifactGroupField,
+    JvmArtifactVersionField,
 )
 from pants.util.logging import LogLevel
 
@@ -118,7 +126,36 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    transitive_deps = [
+        t
+        for item in CoarsenedTargets(request.component.dependencies).closure()
+        for t in item.members
+    ]
+
+    jvm_artifact_deps = [
+        dep
+        for dep in transitive_deps
+        if dep.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+    ]
+    coordinates = Coordinates(
+        (
+            Coordinate(
+                group=(dep[JvmArtifactGroupField].value or ""),
+                artifact=(dep[JvmArtifactArtifactField].value or ""),
+                version=(dep[JvmArtifactVersionField].value or ""),
+            )
+            for dep in jvm_artifact_deps
+        )
+    )
+
+
+    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    lockfile = await Get(
+        CoursierResolvedLockfile, FilterDirectDependenciesRequest(coordinates, unfiltered_lockfile)
+    )
+
+    #raise Exception(request.component)#, coordinates, lockfile)
+
 
     dest_dir = "classfiles"
     (
@@ -139,6 +176,8 @@ async def compile_java_source(
             CreateDigest([Directory(dest_dir)]),
         ),
     )
+
+    #raise Exception(materialized_classpath)
 
     prefixed_direct_dependency_classpath = await Get(
         Snapshot, AddPrefix(merged_direct_dependency_classpath_digest, "__usercp")

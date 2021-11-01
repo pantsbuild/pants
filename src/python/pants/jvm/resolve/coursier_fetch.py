@@ -317,6 +317,35 @@ async def coursier_resolve_lockfile(
 
 
 @dataclass(frozen=True)
+class FilterDirectDependenciesRequest:
+    direct_dependencies: Coordinates
+    lockfile: CoursierResolvedLockfile
+
+
+@rule
+async def filter_for_direct_dependencies(
+    request: FilterDirectDependenciesRequest,
+) -> CoursierResolvedLockfile:
+    """Returns a filtered version of the input lockfile that only contains the direct dependencies
+    of a given target.
+
+    This should reduce the volume of files that are copied to various compilation tasks.
+    """
+
+    # Assumption: all coordinates in the resolved lockfile will be compatible with the
+    # direct_dependencies in some way, so we do not need to do version testing here.
+
+    unversioned_deps = {(i.group, i.artifact) for i in request.direct_dependencies}
+    entries_out = (
+        entry
+        for entry in request.lockfile.entries
+        if (entry.coord.group, entry.coord.artifact) in unversioned_deps
+    )
+
+    return CoursierResolvedLockfile(entries=tuple(entries_out))
+
+
+@dataclass(frozen=True)
 class FetchOneCoordRequest:
     coord: Coordinate
     expected_digest: FileDigest
