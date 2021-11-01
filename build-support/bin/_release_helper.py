@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import itertools
+import json
 import os
 import re
 import shutil
@@ -615,10 +617,8 @@ def build_3rdparty_wheels() -> None:
                 [
                     "./pants",
                     "--concurrent",
-                    "--no-dynamic-ui",
                     "dependencies",
                     "--transitive",
-                    "--type=3rdparty",
                     *pkg_tgts,
                 ],
                 stdout=subprocess.PIPE,
@@ -628,13 +628,44 @@ def build_3rdparty_wheels() -> None:
             .strip()
             .splitlines()
         )
-        if not deps:
+        python_requirements = (
+            subprocess.run(
+                [
+                    "./pants",
+                    "--concurrent",
+                    "filter",
+                    "--target-type=python_requirement",
+                    *deps,
+                ],
+                stdout=subprocess.PIPE,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+            .splitlines()
+        )
+        if not python_requirements:
             die(
                 f"No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies` "
                 "broken?"
             )
+        reqs = itertools.chain.from_iterable(
+            obj["requirements"]
+            for obj in json.loads(
+                subprocess.run(
+                    [
+                        "./pants",
+                        "--concurrent",
+                        "peek",
+                        *python_requirements,
+                    ],
+                    stdout=subprocess.PIPE,
+                    check=True,
+                ).stdout
+            )
+        )
         subprocess.run(
-            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *deps],
+            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *reqs],
             check=True,
         )
         green(f"Wrote 3rdparty wheels to {dest}")

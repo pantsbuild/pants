@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from enum import Enum
-from typing import Set, cast
+from typing import cast
 
-from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -18,12 +16,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
-
-
-class DependencyType(Enum):
-    SOURCE = "source"
-    THIRD_PARTY = "3rdparty"
-    SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
 
 
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
@@ -47,22 +39,6 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
             default=False,
             help="Include the input targets in the output, along with the dependencies.",
         )
-        register(
-            "--type",
-            type=DependencyType,
-            default=DependencyType.SOURCE,
-            removal_version="2.9.0.dev0",
-            removal_hint="This option is misleading and not very useful. In the future there "
-            "will be a more robust way of querying and filtering dependencies.\nMeanwhile you "
-            "can get the list of requirement strings for a set of targets using something like\n\n"
-            "./pants dependencies :: \\\n"
-            "| xargs ./pants filter --target-type=python_requirement \\\n"
-            "| xargs ./pants peek | jq -r '.[][\"requirements\"][]'\n",
-            help=(
-                "Which types of dependencies to list, where `source` means source code "
-                "dependencies and `3rdparty` means third-party requirement strings."
-            ),
-        )
 
     @property
     def transitive(self) -> bool:
@@ -71,10 +47,6 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     @property
     def closed(self) -> bool:
         return cast(bool, self.options.closed)
-
-    @property
-    def type(self) -> DependencyType:
-        return cast(DependencyType, self.options.type)
 
 
 class Dependencies(Goal):
@@ -105,31 +77,13 @@ async def dependencies(
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 
-    include_source = dependencies_subsystem.type in [
-        DependencyType.SOURCE,
-        DependencyType.SOURCE_AND_THIRD_PARTY,
-    ]
-    include_3rdparty = dependencies_subsystem.type in [
-        DependencyType.THIRD_PARTY,
-        DependencyType.SOURCE_AND_THIRD_PARTY,
-    ]
-
     address_strings = {addr.spec for addr in addresses} if dependencies_subsystem.closed else set()
-    third_party_requirements: Set[str] = set()
     for tgt in targets:
-        if include_source:
-            address_strings.add(tgt.address.spec)
-        if include_3rdparty:
-            if tgt.has_field(PythonRequirementsField):
-                third_party_requirements.update(
-                    str(python_req) for python_req in tgt[PythonRequirementsField].value
-                )
+        address_strings.add(tgt.address.spec)
 
     with dependencies_subsystem.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
             print_stdout(address)
-        for requirement_string in sorted(third_party_requirements):
-            print_stdout(requirement_string)
 
     return Dependencies(exit_code=0)
 
