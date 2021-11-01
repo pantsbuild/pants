@@ -6,7 +6,8 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-trait = "0.1"
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
 async_value = { path = "../async_value" }
 fnv = "1.0.5"
 futures = "0.3"
