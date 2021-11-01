@@ -504,8 +504,9 @@ async def select_coursier_resolve_for_targets(
     if not compatible_resolves:
         raise CoursierError(
             "There are no resolve names that are compatible with all of the targets in this build. "
-            "At least one resolve must be compatible with every target -- including dependencies "
-            "and transitive dependencies in order to complete the build."
+            f"The targets are {targets}.  At least one resolve must be compatible with every "
+            "target -- including dependencies and transitive dependencies in order to complete the "
+            "build."
         )
 
     available_resolves = jvm.options.resolves
