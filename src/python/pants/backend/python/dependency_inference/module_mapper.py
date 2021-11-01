@@ -16,12 +16,10 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.target_types import (
-    ModuleMappingField,
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
     PythonSourceField,
-    TypeStubsModuleMappingField,
 )
 from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
 from pants.engine.addresses import Address
@@ -302,11 +300,6 @@ async def map_third_party_modules_to_addresses(
             continue
 
         # Else, fall back to defaults.
-        module_map = {**DEFAULT_MODULE_MAPPING, **tgt.get(ModuleMappingField).value}
-        stubs_module_map = {
-            **DEFAULT_TYPE_STUB_MODULE_MAPPING,
-            **tgt.get(TypeStubsModuleMappingField).value,
-        }
         for req in tgt[PythonRequirementsField].value:
             # NB: We don't use `canonicalize_project_name()` for the fallback value because we
             # want to preserve `.` in the module name. See
@@ -314,21 +307,21 @@ async def map_third_party_modules_to_addresses(
             proj_name = canonicalize_project_name(req.project_name)
             fallback_value = req.project_name.strip().lower().replace("-", "_")
 
-            in_stubs_map = proj_name in stubs_module_map
+            in_stubs_map = proj_name in DEFAULT_TYPE_STUB_MODULE_MAPPING
             starts_with_prefix = fallback_value.startswith(("types_", "stubs_"))
             ends_with_prefix = fallback_value.endswith(("_types", "_stubs"))
-            if proj_name not in module_map and (
+            if proj_name not in DEFAULT_MODULE_MAPPING and (
                 in_stubs_map or starts_with_prefix or ends_with_prefix
             ):
                 if in_stubs_map:
-                    stub_modules = stubs_module_map[proj_name]
+                    stub_modules = DEFAULT_TYPE_STUB_MODULE_MAPPING[proj_name]
                 else:
                     stub_modules = (
                         fallback_value[6:] if starts_with_prefix else fallback_value[:-6],
                     )
                 add_stub_modules(stub_modules, tgt.address)
             else:
-                add_modules(module_map.get(proj_name, (fallback_value,)), tgt.address)
+                add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)), tgt.address)
 
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:

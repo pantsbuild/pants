@@ -13,8 +13,6 @@ from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
     Any,
-    ClassVar,
-    Dict,
     Iterable,
     Iterator,
     Mapping,
@@ -891,65 +889,6 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class ModuleMappingField(DictStringToStringSequenceField):
-    alias = "module_mapping"
-    help = (
-        "A mapping of requirement names to a list of the modules they provide.\n\n"
-        'For example, `{"ansicolors": ["colors"]}`.\n\n'
-        "Any unspecified requirements will use the requirement name as the default module, "
-        'e.g. "Django" will default to `["django"]`.\n\n'
-        "This is used to infer dependencies."
-    )
-    value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "Use the field `modules` instead, which takes a list of modules the `python_requirement` "
-        "target provides.\n\n"
-        "If this `python_requirement` target has multiple distinct 3rd-party "
-        "projects in its `requirements` field, you should split those up into one `"
-        "python_requirement` target per distinct project."
-    )
-
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        return normalize_module_mapping(value_or_default)
-
-
-class TypeStubsModuleMappingField(DictStringToStringSequenceField):
-    alias = "type_stubs_module_mapping"
-    help = (
-        "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
-        'For example, `{"types-requests": ["requests"]}`.\n\n'
-        "If the requirement is not specified _and_ it starts with `types-` or `stubs-`, or ends "
-        "with `-types` or `-stubs`, the requirement will be treated as a type stub for the "
-        'corresponding module, e.g. "types-request" has the module "requests". Otherwise, '
-        "the requirement is treated like a normal dependency (see the field "
-        f"{ModuleMappingField.alias}).\n\n"
-        "This is used to infer dependencies for type stubs."
-    )
-    value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "Use the field `type_stub_modules` instead, which takes a list of modules the "
-        "`python_requirement` target provides type stubs for.\n\n"
-        "If this `python_requirement` target has multiple distinct 3rd-party "
-        "projects in its `requirements` field, you should split those up into one `"
-        "python_requirement` target per distinct project."
-    )
-
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        return normalize_module_mapping(value_or_default)
-
-
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -958,8 +897,6 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        ModuleMappingField,
-        TypeStubsModuleMappingField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
