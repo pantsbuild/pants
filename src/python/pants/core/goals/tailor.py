@@ -9,7 +9,7 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, cast
+from typing import Iterable, Iterator, Mapping, Optional, cast
 
 from pants.base.specs import (
     AddressSpecs,
@@ -285,6 +285,36 @@ class TailorSubsystem(GoalSubsystem):
             f"to the one it replaces (see {doc_url('macros')}).",
         )
 
+        register(
+            "--ignore-paths",
+            advanced=True,
+            type=list,
+            member_type=str,
+            help=(
+                "Do not edit or create BUILD files at these paths.\n\n"
+                "Can use literal file names and/or globs, e.g. "
+                "`['project/BUILD, 'ignore_me/**']`.\n\n"
+                "This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not "
+                "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
+                "not edit/create BUILD files at the specified paths."
+            ),
+        )
+        register(
+            "--ignore-adding-targets",
+            advanced=True,
+            type=list,
+            member_type=str,
+            help=(
+                "Do not add these target definitions.\n\n"
+                "Expects a list of target addresses that would normally be added by `tailor`, "
+                "e.g. [`project:tgt']`. To find these names, you can run `tailor`, then combine "
+                "the BUILD file path with the target's name. For example, if `tailor` is adding "
+                "the target `bin` to `project/BUILD`, then the address would be `project:bin`. If "
+                "the BUILD file is at the root of your repository, use `//` for the path, e.g. "
+                "`//:bin`."
+            ),
+        )
+
     @property
     def build_file_name(self) -> str:
         return cast(str, self.options.build_file_name)
@@ -296,6 +326,14 @@ class TailorSubsystem(GoalSubsystem):
     @property
     def build_file_indent(self) -> str:
         return cast(str, self.options.build_file_indent)
+
+    @property
+    def ignore_paths(self) -> tuple[str, ...]:
+        return tuple(self.options.ignore_paths)
+
+    @property
+    def ignore_adding_targets(self) -> set[str]:
+        return set(self.options.ignore_adding_targets)
 
     def alias_for(self, standard_type: str) -> str | None:
         # The get() could return None, but casting to str | None errors.
@@ -314,6 +352,27 @@ class TailorSubsystem(GoalSubsystem):
                 "generated BUILD files would be ignored.\n\n"
                 "To fix, please update the options so that they are compatible."
             )
+
+    def filter_by_ignores(
+        self, putative_targets: Iterable[PutativeTarget], build_file_ignores: tuple[str, ...]
+    ) -> Iterator[PutativeTarget]:
+        ignore_paths_filespec = Filespec(includes=[*self.ignore_paths, *build_file_ignores])
+        for ptgt in putative_targets:
+            is_ignored_file = bool(
+                matches_filespec(
+                    ignore_paths_filespec,
+                    paths=[os.path.join(ptgt.path, self.build_file_name)],
+                )
+            )
+            if is_ignored_file:
+                continue
+            if ptgt.addressable:
+                # Note that `tailor` can only generate explicit targets, so we don't need to
+                # worry about generated address syntax (`#`) or file address syntax.
+                address = f"{ptgt.path or '//'}:{ptgt.name}"
+                if address in self.ignore_adding_targets:
+                    continue
+            yield ptgt
 
 
 class Tailor(Goal):
@@ -550,23 +609,31 @@ async def tailor(
         Get(DisjointSourcePutativeTarget, PutativeTarget, ptgt)
         for ptgt in fixed_names_ptgts.putative_targets
     )
-    ptgts = [dspt.putative_target for dspt in fixed_sources_ptgts]
 
-    if ptgts:
-        edited_build_files = await Get(
-            EditedBuildFiles, EditBuildFilesRequest(PutativeTargets(ptgts))
+    valid_putative_targets = list(
+        tailor_subsystem.filter_by_ignores(
+            (disjoint_source_ptgt.putative_target for disjoint_source_ptgt in fixed_sources_ptgts),
+            build_file_options.ignores,
         )
-        updated_build_files = set(edited_build_files.updated_paths)
-        workspace.write_digest(edited_build_files.digest)
-        ptgts_by_build_file = group_by_build_file(tailor_subsystem.build_file_name, ptgts)
-        for build_file_path, ptgts in ptgts_by_build_file.items():
-            verb = "Updated" if build_file_path in updated_build_files else "Created"
-            console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
-            for ptgt in ptgts:
-                console.print_stdout(
-                    f"  - Added {console.green(ptgt.type_alias)} target "
-                    f"{console.cyan(ptgt.name)}"
-                )
+    )
+    if not valid_putative_targets:
+        return Tailor(0)
+
+    edited_build_files = await Get(
+        EditedBuildFiles, EditBuildFilesRequest(PutativeTargets(valid_putative_targets))
+    )
+    updated_build_files = set(edited_build_files.updated_paths)
+    workspace.write_digest(edited_build_files.digest)
+    ptgts_by_build_file = group_by_build_file(
+        tailor_subsystem.build_file_name, valid_putative_targets
+    )
+    for build_file_path, ptgts in ptgts_by_build_file.items():
+        verb = "Updated" if build_file_path in updated_build_files else "Created"
+        console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
+        for ptgt in ptgts:
+            console.print_stdout(
+                f"  - Added {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
+            )
     return Tailor(0)
 
 
