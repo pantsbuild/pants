@@ -580,7 +580,6 @@ async def get_coursier_lockfile_for_resolve(
 async def get_coursier_lockfile_for_target(
     request: CoursierLockfileForTargetRequest,
 ) -> CoursierResolvedLockfile:
-
     coursier_resolve = await Get(CoursierResolveKey, Targets, request.targets)
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, coursier_resolve)
     return lockfile
