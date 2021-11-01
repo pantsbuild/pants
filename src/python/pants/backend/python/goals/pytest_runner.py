@@ -24,8 +24,6 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
-    JunitXMLDir,
-    JunitXMLDirSource,
     RuntimePackageDependenciesField,
     TestDebugRequest,
     TestExtraEnv,
@@ -370,17 +368,6 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     )
 
 
-@union
-class PytestJunitXMLDirSource:
-    pass
-
-
-@rule
-def builtin_xml_dir_source(_: PytestJunitXMLDirSource, pytest: PyTest) -> JunitXMLDir:
-    # TODO: When this field access is removed, the entire union should be as well.
-    return JunitXMLDir(pytest.options.junit_xml_dir)
-
-
 # -----------------------------------------------------------------------------------------
 # `runtime_package_dependencies` plugin
 # -----------------------------------------------------------------------------------------
@@ -408,5 +395,4 @@ def rules():
         *collect_rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
-        UnionRule(JunitXMLDirSource, PytestJunitXMLDirSource),
     ]
