@@ -105,9 +105,6 @@ class ProtobufSourcesGeneratorTarget(Target):
     )
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 
-    deprecated_alias = "protobuf_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
-
 
 class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
     generate_from = ProtobufSourcesGeneratorTarget
