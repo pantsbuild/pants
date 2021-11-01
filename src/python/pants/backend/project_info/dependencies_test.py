@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
+from pants.backend.project_info.dependencies import Dependencies, rules
 from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -60,10 +60,9 @@ def assert_dependencies(
     specs: List[str],
     expected: List[str],
     transitive: bool = False,
-    dependency_type: DependencyType = DependencyType.SOURCE,
     closed: bool = False,
 ) -> None:
-    args = [f"--type={dependency_type.value}"]
+    args = []
     if transitive:
         args.append("--transitive")
     if closed:
@@ -121,74 +120,19 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
 
     assert_deps = partial(assert_dependencies, rule_runner)
 
-    # `--type=source`
     assert_deps(
         specs=["some/other/target"],
-        dependency_type=DependencyType.SOURCE,
+        transitive=False,
         expected=["3rdparty/python:req2", "some/target:target"],
     )
     assert_deps(
         specs=["some/other/target"],
         transitive=True,
-        dependency_type=DependencyType.SOURCE,
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
             "dep/target:target",
             "some/target:target",
-        ],
-    )
-    assert_deps(
-        specs=["some/other/target"],
-        dependency_type=DependencyType.SOURCE,
-        expected=["3rdparty/python:req2", "some/other/target:target", "some/target:target"],
-        closed=True,
-    )
-    assert_deps(
-        specs=["some/other/target"],
-        transitive=True,
-        dependency_type=DependencyType.SOURCE,
-        expected=[
-            "3rdparty/python:req1",
-            "3rdparty/python:req2",
-            "dep/target:target",
-            "some/other/target:target",
-            "some/target:target",
-        ],
-        closed=True,
-    )
-
-    # `--type=3rdparty`
-    assert_deps(
-        specs=["some/other/target"],
-        dependency_type=DependencyType.THIRD_PARTY,
-        expected=["req2==1.0.0"],
-    )
-    assert_deps(
-        specs=["some/other/target"],
-        transitive=True,
-        dependency_type=DependencyType.THIRD_PARTY,
-        expected=["req1==1.0.0", "req2==1.0.0"],
-    )
-
-    # `--type=source-and-3rdparty`
-    assert_deps(
-        specs=["some/other/target"],
-        transitive=False,
-        dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
-        expected=["3rdparty/python:req2", "some/target:target", "req2==1.0.0"],
-    )
-    assert_deps(
-        specs=["some/other/target"],
-        transitive=True,
-        dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
-        expected=[
-            "3rdparty/python:req1",
-            "3rdparty/python:req2",
-            "dep/target:target",
-            "some/target:target",
-            "req1==1.0.0",
-            "req2==1.0.0",
         ],
     )
 
