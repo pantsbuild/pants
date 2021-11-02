@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from typing import Any, Dict, Optional, Tuple, Union
 
 from packaging.utils import canonicalize_name as canonicalize_project_name

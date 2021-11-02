@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import pytest
 
 from pants.backend.python.macros.caof_utils import flatten_overrides_to_dependency_field
