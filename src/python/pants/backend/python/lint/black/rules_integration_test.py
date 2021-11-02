@@ -76,7 +76,7 @@ def run_black(
     input_sources = rule_runner.request(
         SourceFiles,
         [
-            SourceFilesRequest(field_set.sources for field_set in field_sets),
+            SourceFilesRequest(field_set.source for field_set in field_sets),
         ],
     )
     fmt_result = rule_runner.request(

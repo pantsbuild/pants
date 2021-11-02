@@ -30,7 +30,7 @@ from pants.util.logging import LogLevel
 class Flake8FieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod

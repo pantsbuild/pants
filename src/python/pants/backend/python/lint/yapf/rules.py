@@ -27,7 +27,7 @@ from pants.util.strutil import pluralize
 class YapfFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -79,7 +79,7 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
     )
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
     )
     source_files, yapf_pex = await MultiGet(source_files_get, yapf_pex_get)
 

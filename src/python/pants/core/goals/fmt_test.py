@@ -16,7 +16,6 @@ from pants.core.goals.fmt import (
     LanguageFmtTargets,
     fmt,
 )
-from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import MultipleSourcesField, Target, Targets
@@ -155,7 +154,6 @@ def run_fmt_rule(
     targets: List[Target],
     result_digest: Digest,
     per_file_caching: bool,
-    include_sources: bool = True,
 ) -> str:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
@@ -177,11 +175,6 @@ def run_fmt_rule(
                     mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
                         result_digest
                     ),
-                ),
-                MockGet(
-                    output_type=TargetsWithSources,
-                    input_type=TargetsWithSourcesRequest,
-                    mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
                     output_type=Digest,
@@ -207,23 +200,6 @@ def assert_workspace_modified(
     if smalltalk_formatted:
         assert smalltalk_file.is_file()
         assert smalltalk_file.read_text() == SMALLTALK_FILE.content.decode()
-
-
-def test_empty_target_noops(rule_runner: RuleRunner) -> None:
-    def assert_noops(*, per_file_caching: bool) -> None:
-        stderr = run_fmt_rule(
-            rule_runner,
-            language_target_collection_types=[FortranTargets],
-            targets=[make_target()],
-            result_digest=fortran_digest(rule_runner),
-            per_file_caching=per_file_caching,
-            include_sources=False,
-        )
-        assert stderr.strip() == ""
-        assert_workspace_modified(rule_runner, fortran_formatted=False, smalltalk_formatted=False)
-
-    assert_noops(per_file_caching=False)
-    assert_noops(per_file_caching=True)
 
 
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
