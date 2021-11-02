@@ -501,8 +501,12 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
 
     # Address globs do not require any matches.
     for glob_type in (SiblingAddresses, DescendantAddresses, AscendantAddresses):
-        assert not resolve_address_specs(address_specs_rule_runner, [glob_type("fake")])
-        assert not resolve_address_specs(address_specs_rule_runner, [glob_type("empty")])
+        assert not resolve_address_specs(
+            address_specs_rule_runner, [glob_type("fake")]  # type: ignore[abstract]
+        )
+        assert not resolve_address_specs(
+            address_specs_rule_runner, [glob_type("empty")]  # type: ignore[abstract]
+        )
 
 
 def test_address_specs_generated_target_does_not_belong_to_generator(
