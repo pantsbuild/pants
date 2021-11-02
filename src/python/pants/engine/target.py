@@ -588,7 +588,12 @@ class Target:
         return UnionRule(cls._plugin_field_cls, field)
 
     def validate(self) -> None:
-        """Validate the target, such as checking for mutually exclusive fields."""
+        """Validate the target, such as checking for mutually exclusive fields.
+
+        N.B.: The validation should only be of properties intrinsic to the associated files in any
+        context. If the validation only makes sense for certain goals acting on targets; those
+        validations should be done in the associated rules.
+        """
 
 
 @dataclass(frozen=True)

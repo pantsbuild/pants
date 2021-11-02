@@ -22,6 +22,7 @@ from pants.backend.python.goals.setup_py import (
     GenerateSetupPyRequest,
     InvalidEntryPoint,
     InvalidSetupPyArgs,
+    NoDistTypeSelected,
     NoOwnerError,
     OwnedDependencies,
     OwnedDependency,
@@ -38,16 +39,20 @@ from pants.backend.python.goals.setup_py import (
     get_requirements,
     get_sources,
     merge_entry_points,
+    package_python_dist,
     validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
+    PythonProvidesField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
-from pants.backend.python.util_rules import python_sources
+from pants.backend.python.util_rules import dists, python_sources
+from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -85,10 +90,7 @@ class PluginSetupKwargsRequest(SetupKwargsRequest):
 
 @rule
 def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
-    if "setup_script" in request.explicit_kwargs:
-        kwargs = request.explicit_kwargs
-    else:
-        kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
+    kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
     return SetupKwargs(kwargs, address=request.target.address)
 
 
@@ -1194,3 +1196,59 @@ def test_declares_pkg_resources_namespace_package(python_src: str) -> None:
 )
 def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> None:
     assert not declares_pkg_resources_namespace_package(python_src)
+
+
+def test_no_dist_type_selected() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            determine_setup_kwargs,
+            generate_chroot,
+            generate_setup_py,
+            generate_setup_py_kwargs,
+            get_sources,
+            get_requirements,
+            get_owned_dependencies,
+            get_exporting_owner,
+            package_python_dist,
+            *dists.rules(),
+            *python_sources.rules(),
+            *target_types_rules.rules(),
+            SubsystemRule(SetupPyGeneration),
+            QueryRule(BuiltPackage, (PythonDistributionFieldSet,)),
+        ],
+        target_types=[PythonDistribution],
+        objects={"setup_py": PythonArtifact},
+    )
+    rule_runner.add_to_build_file(
+        "src/python/aaa",
+        textwrap.dedent(
+            """
+            python_distribution(
+                name='aaa',
+                provides=setup_py(name='aaa', version='2.2.2'),
+                wheel=False,
+                sdist=False
+            )
+            """
+        ),
+    )
+    address = Address("src/python/aaa", target_name="aaa")
+    with pytest.raises(ExecutionError) as exc_info:
+        rule_runner.request(
+            BuiltPackage,
+            inputs=[
+                PythonDistributionFieldSet(
+                    address=address,
+                    provides=PythonProvidesField(
+                        PythonArtifact(name="aaa", version="2.2.2"), address
+                    ),
+                )
+            ],
+        )
+    assert 1 == len(exc_info.value.wrapped_exceptions)
+    wrapped_exception = exc_info.value.wrapped_exceptions[0]
+    assert isinstance(wrapped_exception, NoDistTypeSelected)
+    assert (
+        "In order to package src/python/aaa:aaa at least one of 'wheel' or 'sdist' must be `True`."
+        == str(wrapped_exception)
+    )

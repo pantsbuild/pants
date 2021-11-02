@@ -1137,22 +1137,6 @@ class SDistConfigSettingsField(ConfigSettingsField):
     help = "PEP-517 config settings to pass to the build backend when building an sdist."
 
 
-class SetupPyCommandsField(StringSequenceField):
-    removal_version = "2.9.0.dev0"
-    removal_hint = "Set the boolean `wheel` and/or `sdist` fields instead."
-
-    alias = "setup_py_commands"
-    expected_type_help = (
-        "an iterable of string commands to invoke setup.py with, or "
-        "an empty list to just create a chroot with a setup() function."
-    )
-    help = (
-        "The runtime commands to invoke setup.py with to create the distribution, e.g. "
-        '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
-        "will just create a chroot with a setup() function."
-    )
-
-
 class GenerateSetupField(TriBoolField):
     alias = "generate_setup"
     required = False
@@ -1179,7 +1163,6 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
-        SetupPyCommandsField,
     )
     help = (
         "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "
