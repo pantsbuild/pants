@@ -15,6 +15,7 @@ from pants.engine.process import (
     BinaryPaths,
     BinaryPathTest,
     Process,
+    ProcessCacheScope,
     SearchPath,
 )
 from pants.engine.rules import Get, collect_rules, rule
@@ -58,6 +59,7 @@ class DockerBinary(BinaryPath):
             ),
             env=env,
             input_digest=digest,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
     def push_image(self, tags: tuple[str, ...]) -> Process | None:
@@ -65,7 +67,9 @@ class DockerBinary(BinaryPath):
             return None
 
         return Process(
-            argv=(self.path, "push", *tags), description="Pushing docker image {tags[0]}"
+            argv=(self.path, "push", *tags),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Pushing docker image {tags[0]}",
         )
 
 
