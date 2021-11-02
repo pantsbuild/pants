@@ -31,6 +31,9 @@ async def export_venv(
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         request.targets, python_setup
     )
+    if not interpreter_constraints:
+        # If there were no targets that defined any constraints, fall back to the global ones.
+        interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
     min_interpreter = interpreter_constraints.snap_to_minimum(python_setup.interpreter_universe)
     if not min_interpreter:
         raise ExportError(
