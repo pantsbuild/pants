@@ -8,13 +8,12 @@ from typing import Any, Iterable, Set
 
 from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
-from pants.base.specs import AddressSpecs, MaybeEmptyDescendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.target import AllTargets, Targets
 from pants.jvm.target_types import JvmArtifactArtifactField, JvmArtifactGroupField
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -102,22 +101,28 @@ class FrozenTrieNode:
         return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, coordinate={self._coordinates})"
 
 
+class AllJvmArtifactTargets(Targets):
+    pass
+
+
+@rule(desc="Find all jvm_artifact targets in project", level=LogLevel.DEBUG)
+def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
+    return AllJvmArtifactTargets(
+        tgt for tgt in targets if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+    )
+
+
 @dataclass(frozen=True)
 class ThirdPartyJavaPackageToArtifactMapping:
     mapping_root: FrozenTrieNode
 
 
 @rule
-async def find_available_third_party_artifacts() -> AvailableThirdPartyArtifacts:
-    all_targets = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
-    jvm_artifact_targets = [
-        tgt
-        for tgt in all_targets
-        if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
-    ]
-
+async def find_available_third_party_artifacts(
+    all_jvm_artifact_tgts: AllJvmArtifactTargets,
+) -> AvailableThirdPartyArtifacts:
     artifact_mapping: dict[UnversionedCoordinate, set[Address]] = defaultdict(set)
-    for tgt in jvm_artifact_targets:
+    for tgt in all_jvm_artifact_tgts:
         group = tgt[JvmArtifactGroupField].value
         if not group:
             raise ValueError(

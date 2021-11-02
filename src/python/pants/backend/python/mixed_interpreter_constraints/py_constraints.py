@@ -16,8 +16,8 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
-    AllTargets,
     AllTargetsRequest,
+    AllUnexpandedTargets,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -77,7 +77,7 @@ async def py_constraints(
             return PyConstraintsGoal(exit_code=1)
 
         # TODO: Stop including the target generator? I don't think it's relevant for this goal.
-        all_targets = await Get(AllTargets, AllTargetsRequest(include_target_generators=True))
+        all_targets = await Get(AllUnexpandedTargets, AllTargetsRequest())
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
@@ -139,18 +139,6 @@ async def py_constraints(
     final_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     )
-
-    if not final_constraints:
-        target_types_with_constraints = sorted(
-            tgt_type.alias
-            for tgt_type in registered_target_types.types
-            if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
-        )
-        logger.warning(
-            "No Python files/targets matched for the `py-constraints` goal. All target types with "
-            f"Python interpreter constraints: {', '.join(target_types_with_constraints)}"
-        )
-        return PyConstraintsGoal(exit_code=0)
 
     constraints_to_addresses = defaultdict(set)
     for tgt in transitive_targets.closure:

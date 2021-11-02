@@ -44,6 +44,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
+    AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
     Dependencies,
@@ -217,22 +218,25 @@ async def resolve_targets(
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
-async def find_all_targets(req: AllTargetsRequest) -> AllTargets:
-    if not req.include_target_generators:
-        tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
-        return AllTargets(tgts)
-    target_generators_replaced, target_generators_kep = await MultiGet(
-        Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")])),
-        Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")])),
-    )
-    return AllTargets(
-        sorted({*target_generators_replaced, *target_generators_kep}, key=lambda t: t.address)
-    )
+async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
+    tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    return AllTargets(tgts)
+
+
+@rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
+async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
+    tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    return AllUnexpandedTargets(tgts)
 
 
 @rule
 async def find_all_targets_singleton() -> AllTargets:
     return await Get(AllTargets, AllTargetsRequest())
+
+
+@rule
+async def find_all_unexpanded_targets_singleton() -> AllUnexpandedTargets:
+    return await Get(AllUnexpandedTargets, AllTargetsRequest())
 
 
 # -----------------------------------------------------------------------------------------------

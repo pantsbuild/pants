@@ -772,16 +772,17 @@ class RegisteredTargetTypes:
         return FrozenOrderedSet(self.aliases_to_types.values())
 
 
-class AllTargets(Targets):
-    """All targets in the project.
+class AllTargets(Collection[Target]):
+    """All targets in the project, but with target generators replaced by their generated targets,
+    unlike `AllUnexpandedTargets`."""
 
-    This should generally be avoided because it is relatively expensive to compute and is
-    frequently invalidated, but it can be necessary for things like dependency inference to build
-    a global mapping of imports to targets.
 
-    You can either request via `Get(AllTargets, AllTargetsRequest)`, or as a singleton, i.e. using
-    `AllTargets` as a parameter to the `@rule`. When used as a singleton, all target generators
-    will be replaced by their generated targets.
+class AllUnexpandedTargets(Collection[Target]):
+    """All targets in the project, including generated targets.
+
+    This should generally be avoided because it is relatively expensive to compute and is frequently
+    invalidated, but it can be necessary for things like dependency inference to build a global
+    mapping of imports to targets.
     """
 
 
@@ -789,11 +790,8 @@ class AllTargets(Targets):
 class AllTargetsRequest:
     """Find all targets in the project.
 
-    Will always include generated targets. If `include_target_generators` is True, will also include
-    target generators rather than replacing them with their generated targets.
+    Use with either `AllUnexpandedTargets` or `AllTargets`.
     """
-
-    include_target_generators: bool = False
 
 
 # -----------------------------------------------------------------------------------------------

@@ -44,6 +44,7 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
+    AllUnexpandedTargets,
     AsyncFieldMixin,
     CoarsenedTargets,
     Dependencies,
@@ -135,6 +136,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             generate_mock_generated_target,
             UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
             QueryRule(AllTargets, [AllTargetsRequest]),
+            QueryRule(AllUnexpandedTargets, [AllTargetsRequest]),
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -607,11 +609,10 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     }
     assert {t.address for t in all_tgts} == expected
 
-    pytest.xfail("The singleton rule is being evaluated, rather than the one with the param")
-    with_generators = transitive_targets_rule_runner.request(  # type: ignore[unreachable]
-        AllTargets, [AllTargetsRequest(include_target_generators=True)]
+    all_unexpanded = transitive_targets_rule_runner.request(
+        AllUnexpandedTargets, [AllTargetsRequest()]
     )
-    assert {t.address for t in with_generators} == {*expected, Address("", target_name="generator")}
+    assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
 
 
 def test_resolve_specs_snapshot() -> None:

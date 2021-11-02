@@ -196,8 +196,9 @@ def test_interpreter_constraints_minimum_python_version(
     "constraints,expected",
     [
         (["CPython>=2.7"], "CPython==2.7.*"),
+        (["CPython>=2.7,!=2.7.2"], "CPython==2.7.*,!=2.7.2"),
         (["CPython>=3.7"], "CPython==3.7.*"),
-        (["CPython>=3.8.6"], "CPython==3.8.*"),
+        (["CPython>=3.8.3,!=3.8.5,!=3.9.1"], "CPython==3.8.*,!=3.8.0,!=3.8.1,!=3.8.2,!=3.8.5"),
         (["CPython==3.5.*", "CPython>=3.6"], "CPython==3.5.*"),
         (["CPython==3.7.*", "PyPy==3.6.*"], "PyPy==3.6.*"),
         (["CPython"], "CPython==2.7.*"),
