@@ -317,15 +317,15 @@ async def coursier_resolve_lockfile(
 
 
 @dataclass(frozen=True)
-class FilterDirectDependenciesRequest:
+class FilterDependenciesRequest:
     direct_dependencies: Coordinates
     lockfile: CoursierResolvedLockfile
     transitive: bool = True
 
 
 @rule
-async def filter_for_direct_dependencies(
-    request: FilterDirectDependenciesRequest,
+async def filter_for_dependencies(
+    request: FilterDependenciesRequest,
 ) -> CoursierResolvedLockfile:
     """Returns a filtered version of the input lockfile that only contains the direct dependencies
     of a given target.

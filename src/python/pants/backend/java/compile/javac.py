@@ -33,7 +33,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierResolvedLockfile,
     CoursierResolveKey,
-    FilterDirectDependenciesRequest,
+    FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
@@ -141,7 +141,7 @@ async def compile_java_source(
 
     unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
     lockfile = await Get(
-        CoursierResolvedLockfile, FilterDirectDependenciesRequest(coordinates, unfiltered_lockfile)
+        CoursierResolvedLockfile, FilterDependenciesRequest(coordinates, unfiltered_lockfile)
     )
 
     dest_dir = "classfiles"
