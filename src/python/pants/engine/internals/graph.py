@@ -16,9 +16,9 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
+    DescendantAddresses,
     FileLiteralSpec,
     FilesystemSpecs,
-    MaybeEmptyDescendantAddresses,
     Specs,
 )
 from pants.engine.addresses import (
@@ -219,13 +219,13 @@ async def resolve_targets(
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
-    tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    tgts = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     return AllTargets(tgts)
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
-    tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    tgts = await Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")]))
     return AllUnexpandedTargets(tgts)
 
 

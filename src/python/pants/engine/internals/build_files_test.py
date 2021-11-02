@@ -16,7 +16,6 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     DescendantAddresses,
-    MaybeEmptySiblingAddresses,
     SiblingAddresses,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -500,33 +499,10 @@ def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> No
     assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
     assert_resolve_error([AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean))
 
-    # SiblingAddresses requires at least one match.
-    assert_resolve_error(
-        [SiblingAddresses("fake")],
-        expected="No targets found for the address glob `fake:`",
-    )
-    assert_resolve_error(
-        [SiblingAddresses("empty")], expected="No targets found for the address glob `empty:`"
-    )
-
-    # MaybeEmptySiblingAddresses does not require any matches.
-    assert not resolve_address_specs(
-        address_specs_rule_runner, [MaybeEmptySiblingAddresses("fake")]
-    )
-    assert not resolve_address_specs(
-        address_specs_rule_runner, [MaybeEmptySiblingAddresses("empty")]
-    )
-
-    # DescendantAddresses requires at least one match.
-    assert_resolve_error(
-        [DescendantAddresses("fake"), DescendantAddresses("empty")],
-        expected="No targets found for these address globs: ['empty::', 'fake::']",
-    )
-
-    # AscendantAddresses does not require any matches.
-    assert not resolve_address_specs(
-        address_specs_rule_runner, [AscendantAddresses("fake"), AscendantAddresses("empty")]
-    )
+    # Address globs do not require any matches.
+    for glob_type in (SiblingAddresses, DescendantAddresses, AscendantAddresses):
+        assert not resolve_address_specs(address_specs_rule_runner, [glob_type("fake")])
+        assert not resolve_address_specs(address_specs_rule_runner, [glob_type("empty")])
 
 
 def test_address_specs_generated_target_does_not_belong_to_generator(

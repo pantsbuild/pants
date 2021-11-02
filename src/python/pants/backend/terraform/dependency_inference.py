@@ -11,7 +11,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
-from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
+from pants.base.specs import AddressSpecs, SiblingAddresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -137,7 +137,7 @@ async def infer_terraform_module_dependencies(
 
     # For each path, see if there is a `terraform_module` target at the specified spec_path.
     candidate_targets = await Get(
-        Targets, AddressSpecs([MaybeEmptySiblingAddresses(path) for path in candidate_spec_paths])
+        Targets, AddressSpecs([SiblingAddresses(path) for path in candidate_spec_paths])
     )
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
     # per directory.

@@ -7,7 +7,7 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import Iterable
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -57,7 +57,6 @@ class AddressLiteralSpec(AddressSpec):
 @dataclass(frozen=True)  # type: ignore[misc]
 class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
     directory: str
-    error_if_no_matches: ClassVar[bool]
 
     def to_build_file_globs(self, build_patterns: Iterable[str]) -> set[str]:
         """Generate glob patterns matching all the BUILD files this address spec must inspect to
@@ -79,12 +78,7 @@ class AddressGlobSpec(AddressSpec, metaclass=ABCMeta):
 
 
 class SiblingAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses residing within the given directory.
-
-    At least one such address must exist.
-    """
-
-    error_if_no_matches = True
+    """An AddressSpec representing all addresses residing within the given directory."""
 
     def __str__(self) -> str:
         return f"{self.directory}:"
@@ -93,22 +87,8 @@ class SiblingAddresses(AddressGlobSpec):
         return tgt_residence_dir == self.directory
 
 
-class MaybeEmptySiblingAddresses(SiblingAddresses):
-    """An AddressSpec representing all addresses residing within the given directory.
-
-    It is not an error if there are no such addresses.
-    """
-
-    error_if_no_matches = False
-
-
 class DescendantAddresses(AddressGlobSpec):
-    """An AddressSpec representing all addresses residing recursively under the given directory.
-
-    At least one such address must exist.
-    """
-
-    error_if_no_matches = True
+    """An AddressSpec representing all addresses residing recursively under the given directory."""
 
     def __str__(self) -> str:
         return f"{self.directory}::"
@@ -123,20 +103,9 @@ class DescendantAddresses(AddressGlobSpec):
         return fast_relpath_optional(tgt_residence_dir, self.directory) is not None
 
 
-class MaybeEmptyDescendantAddresses(DescendantAddresses):
-    """An AddressSpec representing all addresses residing recursively under the given directory.
-
-    It is not an error if there are no such addresses.
-    """
-
-    error_if_no_matches = False
-
-
 class AscendantAddresses(AddressGlobSpec):
     """An AddressSpec representing all addresses located recursively in and above the given
     directory."""
-
-    error_if_no_matches = False
 
     def __str__(self) -> str:
         return f"{self.directory}^"

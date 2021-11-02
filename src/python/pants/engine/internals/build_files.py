@@ -20,7 +20,6 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
 from pants.option.global_options import GlobalOptions
-from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -226,34 +225,15 @@ async def addresses_from_address_specs(
     for tgt in (*tgts_generators_kept, *tgts_generators_replaced):
         residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
-    matched_globs = set()
     for glob_spec in address_specs.globs:
         for residence_dir in residence_dir_to_targets:
             if not glob_spec.matches(residence_dir):
                 continue
-            matched_globs.add(glob_spec)
             matched_addresses.update(
                 tgt.address
                 for tgt in residence_dir_to_targets[residence_dir]
                 if filtering_disabled or specs_filter.matches(tgt)
             )
-
-    unmatched_globs = [
-        glob
-        for glob in address_specs.globs
-        if glob not in matched_globs and glob.error_if_no_matches
-    ]
-    if unmatched_globs:
-        glob_description = (
-            f"the address glob `{unmatched_globs[0]}`"
-            if len(unmatched_globs) == 1
-            else f"these address globs: {sorted(str(glob) for glob in unmatched_globs)}"
-        )
-        raise ResolveError(
-            f"No targets found for {glob_description}\n\n"
-            f"Do targets exist in those directories? Maybe run `./pants tailor` to generate "
-            f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
-        )
 
     return Addresses(sorted(matched_addresses))
 
