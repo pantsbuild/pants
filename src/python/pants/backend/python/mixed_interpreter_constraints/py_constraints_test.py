@@ -60,6 +60,18 @@ def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
     )
 
 
+def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
+    rule_runner.write_files({"f.txt": "", "BUILD": "file(name='tgt', source='f.txt')"})
+    result = run_goal(rule_runner, ["f.txt"])
+    assert result.exit_code == 0
+    print(caplog.records)
+    assert len(caplog.records) == 1
+    assert (
+        "No Python files/targets matched for the `py-constraints` goal. All target types with "
+        "Python interpreter constraints: python_sources, python_tests"
+    ) in caplog.text
+
+
 def test_render_constraints(rule_runner: RuleRunner) -> None:
     write_files(rule_runner)
     result = run_goal(rule_runner, ["app:app"])
