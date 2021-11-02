@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os.path
 import tokenize
 from collections import defaultdict
@@ -17,6 +18,7 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -40,6 +42,8 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
+
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
@@ -160,6 +164,7 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    pants_bin: PantsBin,
 ) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
@@ -211,10 +216,10 @@ async def update_build_files(
         if change_descriptions
     )
     if not changed_build_files:
-        console.print_stderr(
-            "No required changes to BUILD files found.\n\n"
-            "Note that there may still be deprecations this goal doesn't know how to fix. See "
-            f"{doc_url('upgrade-tips')} for upgrade tips."
+        logger.info(
+            "No required changes to BUILD files found. However, there may still be deprecations "
+            f"that `update-build-files` doesn't know how to fix. See {doc_url('upgrade-tips')} for "
+            f"upgrade tips."
         )
         return UpdateBuildFilesGoal(exit_code=0)
 
@@ -236,6 +241,11 @@ async def update_build_files(
         )
         tense = "Would update" if update_build_files_subsystem.check else "Updated"
         console.print_stdout(f"{tense} {console.blue(build_file)}:\n{formatted_changes}")
+
+    if update_build_files_subsystem.check:
+        console.print_stdout(
+            f"\nTo fix `update-build-files` failures, run `{pants_bin.name} update-build-files`."
+        )
 
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
 
