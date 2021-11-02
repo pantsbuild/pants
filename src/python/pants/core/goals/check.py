@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
-from pants.base.deprecated import deprecated_conditional
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
@@ -75,26 +74,8 @@ class CheckResults(EngineAwareReturnType):
     results: tuple[CheckResult, ...]
     checker_name: str
 
-    def __init__(
-        self,
-        results: Iterable[CheckResult],
-        *,
-        typechecker_name: str | None = None,
-        checker_name: str | None = None,
-    ) -> None:
-
+    def __init__(self, results: Iterable[CheckResult], *, checker_name: str) -> None:
         self.results = tuple(results)
-
-        # TODO: After deprecation, make `checker_name` required and convert to simple field-set.
-        deprecated_conditional(
-            lambda: typechecker_name is not None,
-            "2.9.0.dev0",
-            entity="the `typechecker_name` argument",
-            hint=("Pass `checker_name` instead."),
-        )
-        checker_name = checker_name if checker_name is not None else typechecker_name
-        if not checker_name:
-            raise ValueError("The `checker_name` argument is required.")
         self.checker_name = checker_name
 
     @property
