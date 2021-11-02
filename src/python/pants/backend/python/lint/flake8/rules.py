@@ -53,7 +53,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
     )
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))

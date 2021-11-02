@@ -10,10 +10,6 @@ import pytest
 
 from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address
 from pants.engine.fs import Workspace
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
@@ -117,7 +113,6 @@ def run_lint_rule(
     lint_request_types: List[Type[LintRequest]],
     targets: List[Target],
     per_file_caching: bool,
-    include_sources: bool = True,
 ) -> Tuple[int, str]:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         union_membership = UnionMembership({LintRequest: lint_request_types})
@@ -138,35 +133,12 @@ def run_lint_rule(
                     output_type=LintResults,
                     input_type=LintRequest,
                     mock=lambda field_set_collection: field_set_collection.lint_results,
-                ),
-                MockGet(
-                    output_type=FieldSetsWithSources,
-                    input_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
+                )
             ],
             union_membership=union_membership,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
-
-
-def test_empty_target_noops(rule_runner: RuleRunner) -> None:
-    def assert_noops(per_file_caching: bool) -> None:
-        exit_code, stderr = run_lint_rule(
-            rule_runner,
-            lint_request_types=[FailingRequest],
-            targets=[make_target()],
-            per_file_caching=per_file_caching,
-            include_sources=False,
-        )
-        assert exit_code == 0
-        assert stderr == ""
-
-    assert_noops(per_file_caching=False)
-    assert_noops(per_file_caching=True)
 
 
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:

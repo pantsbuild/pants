@@ -33,10 +33,6 @@ from pants.core.goals.test import (
     run_tests,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
@@ -135,7 +131,6 @@ def run_test_rule(
     use_coverage: bool = False,
     xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
-    include_sources: bool = True,
     valid_targets: bool = True,
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
@@ -201,13 +196,6 @@ def run_test_rule(
                     input_type=TestFieldSet,
                     mock=mock_debug_request,
                 ),
-                MockGet(
-                    output_type=FieldSetsWithSources,
-                    input_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
@@ -234,17 +222,6 @@ def run_test_rule(
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
-
-
-def test_empty_target_noops(rule_runner: RuleRunner) -> None:
-    exit_code, stderr = run_test_rule(
-        rule_runner,
-        field_set=SuccessfulFieldSet,
-        targets=[make_target()],
-        include_sources=False,
-    )
-    assert exit_code == 0
-    assert stderr.strip() == ""
 
 
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:

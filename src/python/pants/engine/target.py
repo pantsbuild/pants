@@ -1116,8 +1116,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
-    # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
-    #  `util_rules/filter_empty_sources.py`.
 
     def __init__(
         self,

@@ -45,7 +45,7 @@ from pants.util.memo import memoized_method
 class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestSourceField,)
 
-    sources: PythonTestSourceField
+    source: PythonTestSourceField
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars

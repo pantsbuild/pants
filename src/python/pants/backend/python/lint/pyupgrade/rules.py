@@ -26,7 +26,7 @@ from pants.util.strutil import pluralize
 class PyUpgradeFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -57,7 +57,7 @@ async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUp
     )
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in request.field_sets),
     )
     source_files, pyupgrade_pex = await MultiGet(source_files_get, pyupgrade_pex_get)
 

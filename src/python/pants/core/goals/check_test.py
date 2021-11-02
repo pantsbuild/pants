@@ -8,10 +8,6 @@ from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.core.goals.check import Check, CheckRequest, CheckResult, CheckResults, check
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address
 from pants.engine.fs import Workspace
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
@@ -114,10 +110,7 @@ def make_target(address: Optional[Address] = None) -> Target:
 
 
 def run_typecheck_rule(
-    *,
-    request_types: List[Type[CheckRequest]],
-    targets: List[Target],
-    include_sources: bool = True,
+    *, request_types: List[Type[CheckRequest]], targets: List[Target]
 ) -> Tuple[int, str]:
     union_membership = UnionMembership({CheckRequest: request_types})
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
@@ -137,26 +130,11 @@ def run_typecheck_rule(
                     input_type=CheckRequest,
                     mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
-                MockGet(
-                    output_type=FieldSetsWithSources,
-                    input_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
             ],
             union_membership=union_membership,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
-
-
-def test_empty_target_noops() -> None:
-    exit_code, stderr = run_typecheck_rule(
-        request_types=[FailingRequest], targets=[make_target()], include_sources=False
-    )
-    assert exit_code == 0
-    assert stderr == ""
 
 
 def test_invalid_target_noops() -> None:

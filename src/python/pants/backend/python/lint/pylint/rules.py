@@ -110,7 +110,7 @@ async def pylint_lint_partition(
         PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies)
     )
     field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
 
     pylint_pex, requirements_pex, prepared_python_sources, field_set_sources = await MultiGet(

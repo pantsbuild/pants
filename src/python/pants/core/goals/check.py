@@ -10,10 +10,6 @@ from typing import Any, Iterable, cast
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
@@ -167,17 +163,8 @@ async def check(
         )
         for typecheck_request_type in typecheck_request_types
     )
-    field_sets_with_sources = await MultiGet(
-        Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(request.field_sets))
-        for request in requests
-    )
-    valid_requests = tuple(
-        request_cls(request)
-        for request_cls, request in zip(typecheck_request_types, field_sets_with_sources)
-        if request
-    )
     all_results = await MultiGet(
-        Get(CheckResults, CheckRequest, request) for request in valid_requests
+        Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
     )
 
     def get_tool_name(res: CheckResults) -> str:

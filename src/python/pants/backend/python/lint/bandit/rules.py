@@ -55,7 +55,7 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
