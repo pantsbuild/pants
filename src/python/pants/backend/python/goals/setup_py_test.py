@@ -90,10 +90,7 @@ class PluginSetupKwargsRequest(SetupKwargsRequest):
 
 @rule
 def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
-    if "setup_script" in request.explicit_kwargs:
-        kwargs = request.explicit_kwargs
-    else:
-        kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
+    kwargs = {**request.explicit_kwargs, "plugin_demo": "hello world"}
     return SetupKwargs(kwargs, address=request.target.address)
 
 
