@@ -25,7 +25,7 @@ from pants.util.strutil import pluralize
 class HadolintFieldSet(FieldSet):
     required_fields = (DockerImageSourceField,)
 
-    sources: DockerImageSourceField
+    source: DockerImageSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -58,7 +58,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
     )
 
     dockerfile_infos = await MultiGet(
-        Get(DockerfileInfo, DockerImageSourceField, field_set.sources)
+        Get(DockerfileInfo, DockerImageSourceField, field_set.source)
         for field_set in request.field_sets
     )
 
