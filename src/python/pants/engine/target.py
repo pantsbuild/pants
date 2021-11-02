@@ -2126,28 +2126,8 @@ class InferDependenciesRequest(EngineAwareParameter):
 class InferredDependencies:
     dependencies: FrozenOrderedSet[Address]
 
-    def __init__(
-        self,
-        dependencies: Iterable[Address],
-        *,
-        sibling_dependencies_inferrable: bool | None = None,
-    ) -> None:
+    def __init__(self, dependencies: Iterable[Address]) -> None:
         """The result of inferring dependencies."""
-        if sibling_dependencies_inferrable is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `sibling_dependencies_inferrable` kwarg for InferredDependencies",
-                (
-                    "Pants no longer automatically generates 'file targets' automatically for "
-                    "you. You must now opt in to generating file targets by subclassing "
-                    "`GenerateTargetsRequest` and registering a rule that goes from your subclass "
-                    "to `GeneratedTargets`. Use `generate_file_level_targets()` from "
-                    "`pants.engine.target` to emulate the old 'file target' semantics. If you were "
-                    "setting `sibling_dependencies_inferrable=False` before, then you should use  "
-                    "set `add_dependencies_on_all_siblings=True` in your call to "
-                    "`generate_file_level_targets`."
-                ),
-            )
         self.dependencies = FrozenOrderedSet(sorted(dependencies))
 
     def __bool__(self) -> bool:
