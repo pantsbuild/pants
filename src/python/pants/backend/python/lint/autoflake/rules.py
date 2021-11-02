@@ -26,7 +26,7 @@ from pants.util.strutil import pluralize
 class AutoflakeFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
@@ -79,7 +79,7 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
 
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
     )
 
     source_files, autoflake_pex = await MultiGet(source_files_get, autoflake_pex_get)

@@ -588,7 +588,12 @@ class Target:
         return UnionRule(cls._plugin_field_cls, field)
 
     def validate(self) -> None:
-        """Validate the target, such as checking for mutually exclusive fields."""
+        """Validate the target, such as checking for mutually exclusive fields.
+
+        N.B.: The validation should only be of properties intrinsic to the associated files in any
+        context. If the validation only makes sense for certain goals acting on targets; those
+        validations should be done in the associated rules.
+        """
 
 
 @dataclass(frozen=True)
@@ -1111,8 +1116,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
-    # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
-    #  `util_rules/filter_empty_sources.py`.
 
     def __init__(
         self,
@@ -1674,17 +1677,6 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         return self.value or ()
 
 
-class Sources(MultipleSourcesField):
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "The `Sources` type has been removed in favor of `SourcesField`, `SingleSourceField`, and "
-        "`MultipleSourcesField`. Update your field definitions to subclass either "
-        "`SingleSourceField` or `MultipleSourcesField`, depending on if you want the field "
-        "`source: str` or `sources: list[str]`. Update all rules to use `tgt.get(SourcesField)` "
-        "instead of `tgt.get(Sources)`."
-    )
-
-
 class SingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
@@ -2137,28 +2129,8 @@ class InferDependenciesRequest(EngineAwareParameter):
 class InferredDependencies:
     dependencies: FrozenOrderedSet[Address]
 
-    def __init__(
-        self,
-        dependencies: Iterable[Address],
-        *,
-        sibling_dependencies_inferrable: bool | None = None,
-    ) -> None:
+    def __init__(self, dependencies: Iterable[Address]) -> None:
         """The result of inferring dependencies."""
-        if sibling_dependencies_inferrable is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `sibling_dependencies_inferrable` kwarg for InferredDependencies",
-                (
-                    "Pants no longer automatically generates 'file targets' automatically for "
-                    "you. You must now opt in to generating file targets by subclassing "
-                    "`GenerateTargetsRequest` and registering a rule that goes from your subclass "
-                    "to `GeneratedTargets`. Use `generate_file_level_targets()` from "
-                    "`pants.engine.target` to emulate the old 'file target' semantics. If you were "
-                    "setting `sibling_dependencies_inferrable=False` before, then you should use  "
-                    "set `add_dependencies_on_all_siblings=True` in your call to "
-                    "`generate_file_level_targets`."
-                ),
-            )
         self.dependencies = FrozenOrderedSet(sorted(dependencies))
 
     def __bool__(self) -> bool:
@@ -2335,10 +2307,3 @@ def generate_file_based_overrides_field_help_message(
         "You can specify the same file name in multiple keys, so long as you don't override the "
         "same field more than one time for the file."
     )
-
-
-class ProvidesField(Field):
-    """An `artifact` that describes how to represent this target to the outside world."""
-
-    alias = "provides"
-    default: ClassVar[Optional[Any]] = None

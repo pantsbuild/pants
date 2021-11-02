@@ -6,7 +6,6 @@ from __future__ import annotations
 import itertools
 import os.path
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -46,7 +45,7 @@ from pants.util.memo import memoized_method
 class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestSourceField,)
 
-    sources: PythonTestSourceField
+    source: PythonTestSourceField
     timeout: PythonTestsTimeout
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVars
@@ -54,14 +53,7 @@ class PythonTestFieldSet(TestFieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        if tgt.get(SkipPythonTestsField).value:
-            return True
-        # TODO(#13238): Remove once we finish deprecating special-casing of `conftest.py`. For now,
-        #  we need this so that we can run explicitly declared `python_test` targets.
-        if not tgt.address.is_file_target:
-            return False
-        file_name = PurePath(tgt.address.filename)
-        return file_name.name == "conftest.py" or file_name.suffix == ".pyi"
+        return tgt.get(SkipPythonTestsField).value
 
 
 class PyTest(PythonToolBase):
@@ -118,19 +110,6 @@ class PyTest(PythonToolBase):
             type=int,
             advanced=True,
             help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
-        )
-        register(
-            "--junit-xml-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            removal_version="2.9.0.dev0",
-            removal_hint="Moved to `[test] xml_dir`.",
-            help=(
-                "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run."
-            ),
         )
         register(
             "--junit-family",

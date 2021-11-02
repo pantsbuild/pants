@@ -28,7 +28,6 @@ from pants.backend.python.target_types import (
     ResolvePythonDistributionEntryPointsRequest,
     SDistConfigSettingsField,
     SDistField,
-    SetupPyCommandsField,
     WheelConfigSettingsField,
     WheelField,
 )
@@ -47,7 +46,6 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -371,6 +369,10 @@ def validate_commands(commands: tuple[str, ...]):
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands.")
 
 
+class NoDistTypeSelected(ValueError):
+    pass
+
+
 @rule
 async def package_python_dist(
     field_set: PythonDistributionFieldSet,
@@ -378,6 +380,18 @@ async def package_python_dist(
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
+
+    dist_tgt = exported_target.target
+    wheel = dist_tgt.get(WheelField).value
+    sdist = dist_tgt.get(SDistField).value
+    if not wheel and not sdist:
+        raise NoDistTypeSelected(
+            f"In order to package {dist_tgt.address.spec} at least one of {WheelField.alias!r} or "
+            f"{SDistField.alias!r} must be `True`."
+        )
+
+    wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
+    sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
@@ -390,91 +404,32 @@ async def package_python_dist(
         ),
     )
 
-    dist_tgt = exported_target.target
-    wheel = dist_tgt.get(WheelField).value
-    sdist = dist_tgt.get(SDistField).value
-    wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
-    sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
-
-    # TODO: Delete the next three lines in 2.9.0.dev0.
-    commands = dist_tgt.get(SetupPyCommandsField).value or ()
-    if commands:
-        wheel, sdist, wheel_config_settings, sdist_config_settings = _override_from_legacy_commands(
-            commands
-        )
-
-    if wheel or sdist:
-        # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture
-        # any changes setup made within it without also capturing other artifacts of the pex
-        # process invocation.
-        chroot_prefix = "chroot"
-        working_directory = os.path.join(chroot_prefix, chroot.working_directory)
-        prefixed_chroot = await Get(Digest, AddPrefix(chroot.digest, chroot_prefix))
-        build_system = await Get(
-            BuildSystem, BuildSystemRequest(prefixed_chroot, working_directory)
-        )
-        setup_py_result = await Get(
-            DistBuildResult,
-            DistBuildRequest(
-                build_system=build_system,
-                interpreter_constraints=interpreter_constraints,
-                build_wheel=wheel,
-                build_sdist=sdist,
-                input=prefixed_chroot,
-                working_directory=working_directory,
-                target_address_spec=exported_target.target.address.spec,
-                wheel_config_settings=wheel_config_settings,
-                sdist_config_settings=sdist_config_settings,
-            ),
-        )
-        dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
-        return BuiltPackage(
-            setup_py_result.output,
-            tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
-        )
-    else:
-        warn_or_error(
-            "2.9.0.dev0",
-            "Creating a raw dump of the generated setup.py and its chroot",
-            "This exposed an internal implementation detail, and is no longer supported.",
-        )
-        dirname = field_set.address.path_safe_spec
-        rel_chroot = await Get(Digest, AddPrefix(chroot.digest, dirname))
-        return BuiltPackage(rel_chroot, (BuiltPackageArtifact(dirname),))
-
-
-# Returns overridden values for wheel, sdist, wheel_config_settings, sdist_config_settings
-# TODO: Delete this in 2.9.dev0.
-def _override_from_legacy_commands(
-    commands: tuple[str, ...]
-) -> tuple[bool, bool, FrozenDict[str, tuple[str, ...]], FrozenDict[str, tuple[str, ...]]]:
-    # Override with the legacy commands mechanism.
-    validate_commands(commands)
-    wheel = False
-    sdist = False
-    # The original commands might have some options scoped to bdist_wheel and others
-    # scoped to sdist, and possibly some unscoped ones preceeding both. E.g.,
-    # ["--unscoped", "bdist_wheel", "--scoped-to-bdist", "sdist", "--scoped-to-sdist"]
-    # We untangle this as best we can.
-    wheel_cmds: list[str] = []
-    sdist_cmds: list[str] = []
-    scoped_cmds = None  # Will point to one of the above, as we enter its scope.
-    for cmd in commands:
-        if cmd == "bdist_wheel":
-            wheel = True
-            scoped_cmds = wheel_cmds
-        elif cmd == "sdist":
-            sdist = True
-            scoped_cmds = sdist_cmds
-        elif scoped_cmds:
-            scoped_cmds.append(cmd)
-        else:
-            # Unscoped, so use in both.
-            wheel_cmds.append(cmd)
-            sdist_cmds.append(cmd)
-    wheel_config_settings = FrozenDict({"--global-option": tuple(wheel_cmds)})
-    sdist_config_settings = FrozenDict({"--global-option": tuple(sdist_cmds)})
-    return wheel, sdist, wheel_config_settings, sdist_config_settings
+    # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture
+    # any changes setup made within it without also capturing other artifacts of the pex
+    # process invocation.
+    chroot_prefix = "chroot"
+    working_directory = os.path.join(chroot_prefix, chroot.working_directory)
+    prefixed_chroot = await Get(Digest, AddPrefix(chroot.digest, chroot_prefix))
+    build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_chroot, working_directory))
+    setup_py_result = await Get(
+        DistBuildResult,
+        DistBuildRequest(
+            build_system=build_system,
+            interpreter_constraints=interpreter_constraints,
+            build_wheel=wheel,
+            build_sdist=sdist,
+            input=prefixed_chroot,
+            working_directory=working_directory,
+            target_address_spec=exported_target.target.address.spec,
+            wheel_config_settings=wheel_config_settings,
+            sdist_config_settings=sdist_config_settings,
+        ),
+    )
+    dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
+    return BuiltPackage(
+        setup_py_result.output,
+        tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
+    )
 
 
 SETUP_BOILERPLATE = """
@@ -533,21 +488,6 @@ async def generate_chroot(
     if generate_setup is None:
         generate_setup = subsys.generate_setup_default
 
-    # TODO: In 2.9.0.dev0 delete from here...
-    resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, request.exported_target)
-    setup_script = resolved_setup_kwargs.kwargs.get("setup_script")
-    if setup_script:
-        generate_setup = False
-        warn_or_error(
-            "2.9.0.dev0",
-            "explicitly specifying a setup_script",
-            f"This kwarg is ignored. Instead set generate_setup=False on the python_distribution "
-            f"target at {request.exported_target.target.address.spec}, and setup will run on "
-            f"whatever relevant files it finds in the dependency closure (e.g., setup.py, "
-            f"setup.cfg, pyproject.toml",
-        )
-    # ... to here.
-
     sources = await Get(DistBuildSources, DistBuildChrootRequest, request)
 
     if generate_setup:
@@ -605,8 +545,6 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
-    # TODO: Delete this line in 2.9.0.dev0.
-    setup_kwargs.pop("setup_script", None)
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
     # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have

@@ -13,10 +13,6 @@ from typing import Any, ClassVar, List, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -38,7 +34,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     Targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -358,25 +354,6 @@ class Test(Goal):
     __test__ = False
 
 
-@union
-class JunitXMLDirSource:
-    """A pre-deprecated union to support reading the XML directory from its previous location."""
-
-
-@dataclass(frozen=True)
-class JunitXMLDir:
-    directory: str | None
-
-
-class BuiltinXMLDirSource:
-    pass
-
-
-@rule
-def builtin_xml_dir_source(_: BuiltinXMLDirSource, test_subsystem: TestSubsystem) -> JunitXMLDir:
-    return JunitXMLDir(test_subsystem.options.xml_dir)
-
-
 @goal_rule
 async def run_tests(
     console: Console,
@@ -415,12 +392,9 @@ async def run_tests(
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
-    field_sets_with_sources = await Get(
-        FieldSetsWithSources, FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
-    )
-
     results = await MultiGet(
-        Get(TestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
+        Get(TestResult, TestFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
 
     # Print summary.
@@ -442,16 +416,8 @@ async def run_tests(
                 path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    # TODO: After the deprecation of the `[pytest] junit_xml_dir` option, this should directly use
-    # `[test] xml_dir` instead.
-    xml_dir_results = await MultiGet(
-        Get(JunitXMLDir, JunitXMLDirSource, source_cls())
-        for source_cls in union_membership.get(JunitXMLDirSource)
-    )
-    for xml_dir_result in xml_dir_results:
-        xml_dir = xml_dir_result.directory
-        if not xml_dir:
-            continue
+    if test_subsystem.options.xml_dir:
+        xml_dir = test_subsystem.options.xml_dir
         merged_xml_results = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),
@@ -569,5 +535,4 @@ async def build_runtime_package_dependencies(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(JunitXMLDirSource, BuiltinXMLDirSource),
     ]

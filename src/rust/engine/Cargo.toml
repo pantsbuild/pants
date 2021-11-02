@@ -108,7 +108,8 @@ default = []
 [dependencies]
 async_latch = { path = "async_latch" }
 async_semaphore = { path = "async_semaphore" }
-async-trait = "0.1"
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
 protos = { path = "protos" }
 bytes = "1.0"
 cache = { path = "cache" }

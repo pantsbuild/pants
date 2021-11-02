@@ -19,7 +19,6 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
-    ModuleMappingField,
     PexBinary,
     PexBinaryDependencies,
     PexEntryPointField,
@@ -37,8 +36,8 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
-    TypeStubsModuleMappingField,
     UnrecognizedResolveNamesError,
+    normalize_module_mapping,
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
@@ -116,7 +115,6 @@ def test_timeout_calculation() -> None:
 @pytest.mark.parametrize(
     ["entry_point", "expected"],
     (
-        ("<none>", []),
         ("path.to.module", []),
         ("path.to.module:func", []),
         ("lambda.py", ["project/dir/lambda.py"]),
@@ -186,10 +184,6 @@ def test_resolve_pex_binary_entry_point() -> None:
         is_file=True,
     )
 
-    # We special case the strings `<none>` and `<None>`.
-    assert_resolved(entry_point="<none>", expected=None, is_file=False)
-    assert_resolved(entry_point="<None>", expected=None, is_file=False)
-
     with pytest.raises(ExecutionError):
         assert_resolved(
             entry_point="doesnt_exist.py", expected=EntryPoint("doesnt matter"), is_file=True
@@ -215,7 +209,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                 python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
-                    module_mapping={'ansicolors': ['colors']},
+                    modules=['colors'],
                 )
                 """
             ),
@@ -417,7 +411,7 @@ def test_inject_python_distribution_dependencies() -> None:
             python_requirement(
                 name='ansicolors',
                 requirements=['ansicolors'],
-                module_mapping={'ansicolors': ['colors']},
+                modules=['colors'],
             )
             """
         ),
@@ -533,36 +527,6 @@ def test_inject_python_distribution_dependencies() -> None:
 
 
 @pytest.mark.parametrize(
-    ["raw_value", "expected"],
-    (
-        (None, {}),
-        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
-        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
-    ),
-)
-def test_module_mapping_field(
-    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
-) -> None:
-    actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict(expected)
-
-
-@pytest.mark.parametrize(
-    ["raw_value", "expected"],
-    (
-        (None, {}),
-        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
-        ({"types-PyYAML": ["custom_yaml"]}, {"types-pyyaml": ("custom_yaml",)}),
-    ),
-)
-def test_type_stub_module_mapping_field(
-    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
-) -> None:
-    actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict(expected)
-
-
-@pytest.mark.parametrize(
     "unrecognized,bad_entry_str,name_str",
     (
         (["fake"], "fake", "name"),
@@ -580,6 +544,20 @@ def test_unrecognized_resolve_names_error(
         f"Unrecognized resolve {name_str} from foo: "
         f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
     ) in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ["raw_value", "expected"],
+    (
+        (None, {}),
+        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
+        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
+    ),
+)
+def test_normalize_module_mapping(
+    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
+) -> None:
+    assert normalize_module_mapping(raw_value) == FrozenDict(expected)
 
 
 # -----------------------------------------------------------------------------------------------

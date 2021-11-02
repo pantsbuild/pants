@@ -13,8 +13,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm.compile import CompiledClassfiles
 from pants.jvm.resolve.coursier_fetch import (
-    CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
@@ -61,7 +61,9 @@ class Classpath:
 async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
     targets = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
 
-    lockfile = await Get(CoursierResolvedLockfile, CoursierLockfileForTargetRequest(targets))
+    resolve = await Get(CoursierResolveKey, Targets, targets)
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
+
     materialized_classpath = await Get(
         MaterializedClasspath,
         MaterializedClasspathRequest(
@@ -70,7 +72,7 @@ async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
         ),
     )
     transitive_user_classfiles = await MultiGet(
-        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t))
+        Get(CompiledClassfiles, CompileJavaSourceRequest(component=t, resolve=resolve))
         for t in coarsened_targets.closure()
     )
     merged_transitive_user_classfiles_digest = await Get(

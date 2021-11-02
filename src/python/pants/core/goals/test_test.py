@@ -17,14 +17,11 @@ from pants.backend.python.target_types_rules import rules as python_target_type_
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
-    BuiltinXMLDirSource,
     BuiltPackageDependencies,
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
-    JunitXMLDir,
-    JunitXMLDirSource,
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
@@ -36,10 +33,6 @@ from pants.core.goals.test import (
     run_tests,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
@@ -138,7 +131,6 @@ def run_test_rule(
     use_coverage: bool = False,
     xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
-    include_sources: bool = True,
     valid_targets: bool = True,
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
@@ -154,7 +146,6 @@ def run_test_rule(
         {
             TestFieldSet: [field_set],
             CoverageDataCollection: [MockCoverageDataCollection],
-            JunitXMLDirSource: [BuiltinXMLDirSource],
         }
     )
 
@@ -178,9 +169,6 @@ def run_test_rule(
             coverage_insufficient=False, report=f"Ran coverage on {addresses}"
         )
         return CoverageReports(reports=(console_report,))
-
-    def mock_xml_dir(_: BuiltinXMLDirSource) -> JunitXMLDir:
-        return JunitXMLDir(xml_dir)
 
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Test = run_rule_with_mocks(
@@ -208,23 +196,11 @@ def run_test_rule(
                     input_type=TestFieldSet,
                     mock=mock_debug_request,
                 ),
-                MockGet(
-                    output_type=FieldSetsWithSources,
-                    input_type=FieldSetsWithSourcesRequest,
-                    mock=lambda field_sets: FieldSetsWithSources(
-                        field_sets if include_sources else ()
-                    ),
-                ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
                     input_type=MergeDigests,
                     mock=lambda _: EMPTY_DIGEST,
-                ),
-                MockGet(
-                    output_type=JunitXMLDir,
-                    input_type=JunitXMLDirSource,
-                    mock=mock_xml_dir,
                 ),
                 MockGet(
                     output_type=CoverageReports,
@@ -246,17 +222,6 @@ def run_test_rule(
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
-
-
-def test_empty_target_noops(rule_runner: RuleRunner) -> None:
-    exit_code, stderr = run_test_rule(
-        rule_runner,
-        field_set=SuccessfulFieldSet,
-        targets=[make_target()],
-        include_sources=False,
-    )
-    assert exit_code == 0
-    assert stderr.strip() == ""
 
 
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:

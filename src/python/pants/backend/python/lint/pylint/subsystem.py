@@ -50,7 +50,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 class PylintFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
     dependencies: Dependencies
 
     @classmethod

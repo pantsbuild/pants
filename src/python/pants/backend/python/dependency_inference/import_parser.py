@@ -142,7 +142,7 @@ class ParsedPythonImports(DeduplicatedCollection[str]):
 
 @dataclass(frozen=True)
 class ParsePythonImportsRequest:
-    sources: PythonSourceField
+    source: PythonSourceField
     interpreter_constraints: InterpreterConstraints
     string_imports: bool
     string_imports_min_dots: int
@@ -154,7 +154,7 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
     python_interpreter, script_digest, stripped_sources = await MultiGet(
         Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
         Get(Digest, CreateDigest([FileContent("__parse_python_imports.py", script)])),
-        Get(StrippedSourceFiles, SourceFilesRequest([request.sources])),
+        Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
     )
 
     # We operate on PythonSourceField, which should be one file.
@@ -173,7 +173,7 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
                 file,
             ],
             input_digest=input_digest,
-            description=f"Determine Python imports for {request.sources.address}",
+            description=f"Determine Python imports for {request.source.address}",
             env={"STRING_IMPORTS": "y" if request.string_imports else "n"},
             level=LogLevel.DEBUG,
         ),

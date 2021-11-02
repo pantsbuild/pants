@@ -29,8 +29,8 @@ from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompile
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
-    CoursierLockfileForTargetRequest,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
@@ -53,6 +53,7 @@ class JavacCheckRequest(CheckRequest):
 @dataclass(frozen=True)
 class CompileJavaSourceRequest:
     component: CoarsenedTarget
+    resolve: CoursierResolveKey
 
 
 @rule(desc="Compile with javac")
@@ -64,7 +65,10 @@ async def compile_java_source(
 ) -> FallibleCompiledClassfiles:
     # Request the component's direct dependency classpath.
     direct_dependency_classfiles_fallible = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=coarsened_dep))
+        Get(
+            FallibleCompiledClassfiles,
+            CompileJavaSourceRequest(component=coarsened_dep, resolve=request.resolve),
+        )
         for coarsened_dep in request.component.dependencies
     )
     direct_dependency_classfiles = [
@@ -114,10 +118,7 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    lockfile = await Get(
-        CoursierResolvedLockfile,
-        CoursierLockfileForTargetRequest(Targets(request.component.members)),
-    )
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
     dest_dir = "classfiles"
     (
@@ -238,9 +239,16 @@ async def javac_check(request: JavacCheckRequest) -> CheckResults:
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
+    resolves = await MultiGet(
+        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
+    )
+
     results = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileJavaSourceRequest(component=t))
-        for t in coarsened_targets
+        Get(
+            FallibleCompiledClassfiles,
+            CompileJavaSourceRequest(component=target, resolve=resolve),
+        )
+        for target, resolve in zip(coarsened_targets, resolves)
     )
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.

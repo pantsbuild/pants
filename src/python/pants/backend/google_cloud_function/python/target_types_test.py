@@ -111,7 +111,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                 python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
-                    module_mapping={'ansicolors': ['colors']},
+                    modules=['colors'],
                 )
                 """
             ),
