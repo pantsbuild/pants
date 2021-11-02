@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 import tempfile
 from dataclasses import dataclass
-from typing import Iterable, cast
+from typing import Iterable, Union, cast, List
+
+import humanize
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
@@ -16,7 +20,7 @@ from pants.engine.internals.options_parsing import _Options
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
-from pants.util.dirutil import absolute_symlink
+from pants.util.dirutil import absolute_symlink, safe_delete, safe_rmtree, rm_rf
 from pants.util.meta import frozen_after_init
 from pants.base.build_environment import (
     get_buildroot,
@@ -32,9 +36,11 @@ from pants.option.global_options import (
     GlobalOptions,
     LocalStoreOptions,
 )
+from pants.init.logging import pants_log_path
 
 class CleanSubsystem(GoalSubsystem):
     name = "clean"
+    # @TODO: Note about how it can only clean disk based on current values
     help = "Clean pants caches and temp dirs"
 
     @classmethod
@@ -52,46 +58,71 @@ class CleanSubsystem(GoalSubsystem):
             ),
         )
 
-        # @TODO:
-        register(
-            "--process-execution-temp-dirs",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "@TODO"
-            ),
-        )
+        # Add "all" option
 
-        register(
-            "--lmdb-store",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "@TODO"
-            ),
-        )
+        # @TODO: Fill these out
+        # @TODO: Is there a way to collect these programmatically?
+        for named_path, help in (
+            # Leaked when --no-process-execution-local-cleanup is used
+            ("process-execution-temp-dirs", "@TODO"),
+            # @TODO: Big cache
+            ("lmdb-store", "@TODO"),
+            # @TODO: Big cache
+            ("named-caches", "@TODO"),
+            # From ./pants run
+            ("run-tracker", "@TODO"),
+            # From ./pants repl
+            ("repl-temp-dirs", "@TODO"),
+            ("dist-dir", "@TODO"),
+            ("bootstrap-dir", "@TODO"),
+            # @TODO: pants-subprocessdir?
+        ):
+            register(
+                f"--keep-{named_path}",
+                advanced=True,
+                type=bool,
+                default=False,
+                help=help,
+            )
 
-        register(
-            "--named-caches",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "@TODO"
-            ),
-        )
-
-    @property
-    def clean_process_execution_temp_dirs(self) -> bool:
-        if self.options.dry_run:
-            pass
-        return self.options.process_execution_temp_dirs
 
 class Clean(Goal):
     subsystem_cls = CleanSubsystem
 
+def _dir_info(*paths: Path):
+    total_size = num_files = 0
+    for path in paths:
+        for dirpath, _, filenames in os.walk(path):
+            total_size += sum(os.path.getsize(os.path.join(dirpath, f)) for f in filenames)
+            num_files += len(filenames)
+    return total_size, num_files
+
+def _print_dry_run_info(
+    console: Console,
+    flag: str,
+    human_path: str,
+    paths: List[Path],
+):
+    # @TODO: handle empty (0 bytes or 0 files)?
+    console.print_stdout(f"Would clean {console.green(human_path)}:")
+    total_size, num_files = _dir_info(*paths)
+    console.print_stdout(f"  Controlled by {console.blue(f'--[no-]{flag}')}")
+    console.print_stdout(f"  {len(paths)} dirs, spanning {humanize.intword(num_files)} files totalling {humanize.naturalsize(total_size)}")
+
+def _maybe_clean(
+    console: Console,
+    dry_run: bool,
+    flag: str,
+    path: Union[str, Path],
+    glob: str = "*",
+):
+    path = Path(path)
+
+    if dry_run:
+        _print_dry_run_info(console, flag, path / glob, list(path.glob(glob)))
+    else:
+        pass  # @TODO: Cleaning!
+    # (safe_delete, safe_delete) or rm_rf
 
 @goal_rule
 async def clean(
@@ -100,26 +131,75 @@ async def clean(
     workspace: Workspace,
     union_membership: UnionMembership,
     real_opts: _Options,
+    dist_dir: DistDir,
     # specs: Specs,
 ) -> Clean:
 
-    print(tempfile.gettempdir())
+    global_options = real_opts.options.for_global_scope()
+    bootstrap_options = real_opts.options.bootstrap_option_values()
+    pants_cache_dir = get_pants_cachedir()  # Needed for setup
 
-    if clean_subsystem.options.lmdb_store:
-        local_store_options = LocalStoreOptions.from_options(real_opts.options.for_global_scope())
-        if clean_subsystem.options.dry_run:
-            console.print_stdout(f"Would clean '{local_store_options.store_dir}'")
-        else:
-            ...  # @TODO: Clean!
+    if not clean_subsystem.options.keep_process_execution_temp_dirs:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-process-execution-temp-dirs",
+            Path(tempfile.gettempdir()),
+            "pants-pe*",
+        )
 
-    if clean_subsystem.options.named_caches:
-        bootstrap_option_values = real_opts.options.bootstrap_option_values()
-        if clean_subsystem.options.dry_run:
-            console.print_stdout(f"Would clean '{bootstrap_option_values.named_caches_dir}'")
-        else:
-            ...  # @TODO: Clean!
+    if not clean_subsystem.options.keep_lmdb_store:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-lmdb-store",
+            LocalStoreOptions.from_options(global_options).store_dir,
+        )
 
-    console.print_stdout(clean_subsystem.options.is_default("dry_run"))
+    if not clean_subsystem.options.keep_run_tracker:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-run-tracker",
+            Path(global_options.pants_workdir) / "run-tracker",
+        )
+
+    if not clean_subsystem.options.keep_repl_temp_dirs:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-repl-temp-dirs",
+            Path(global_options.pants_workdir),
+            "repl*",
+        )
+
+    if not clean_subsystem.options.keep_dist_dir:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-dist-dir",
+            dist_dir.relpath,
+        )
+
+    if not clean_subsystem.options.keep_bootstrap_dir:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-bootstrap-dir",
+            Path(pants_cache_dir) / "setup",
+        )
+
+    # N.B. This one is last because it can get quite large
+    if not clean_subsystem.options.keep_named_caches:
+        _maybe_clean(
+            console,
+            clean_subsystem.options.dry_run,
+            "keep-named-caches",
+            bootstrap_options.named_caches_dir,
+        )
+
+    console.print_stdout(f"Specify {console.blue('--no-dry-run')} to actually clean the disk")
+
     return Clean(exit_code=0)
 
 
