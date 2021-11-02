@@ -160,6 +160,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
+        if not merged_constraints:
+            # There were no applicable fields, so the only constraint is the global one.
+            return InterpreterConstraints(python_setup.interpreter_constraints)
         return InterpreterConstraints(merged_constraints)
 
     @classmethod
