@@ -11,13 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, Optional, cast
 
-from pants.base.specs import (
-    AddressSpecs,
-    AscendantAddresses,
-    MaybeEmptyDescendantAddresses,
-    Spec,
-    Specs,
-)
+from pants.base.specs import AddressSpecs, AscendantAddresses, Spec, Specs
 from pants.build_graph.address import Address
 from pants.core.util_rules import pants_bin
 from pants.core.util_rules.pants_bin import PantsBin
@@ -37,6 +31,7 @@ from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
+    AllUnexpandedTargets,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -416,8 +411,7 @@ class AllOwnedSources(DeduplicatedCollection[str]):
 
 
 @rule(desc="Determine all files already owned by targets", level=LogLevel.DEBUG)
-async def determine_all_owned_sources() -> AllOwnedSources:
-    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+async def determine_all_owned_sources(all_tgts: AllUnexpandedTargets) -> AllOwnedSources:
     all_sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt.get(SourcesField))) for tgt in all_tgts
     )
@@ -434,11 +428,10 @@ class UniquelyNamedPutativeTargets:
 
 
 @rule
-async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPutativeTargets:
+async def rename_conflicting_targets(
+    ptgts: PutativeTargets, all_existing_tgts: AllUnexpandedTargets
+) -> UniquelyNamedPutativeTargets:
     """Ensure that no target addresses collide."""
-    all_existing_tgts = await Get(
-        UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")])
-    )
     existing_addrs: set[str] = {tgt.address.spec for tgt in all_existing_tgts}
     uniquely_named_putative_targets: list[PutativeTarget] = []
     for ptgt in ptgts:
