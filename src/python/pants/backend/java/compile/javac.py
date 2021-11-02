@@ -126,17 +126,6 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    transitive_deps = [
-        t
-        for item in CoarsenedTargets(request.component.dependencies).closure()
-        for t in item.members
-    ]
-
-    jvm_artifact_deps = [
-        dep
-        for dep in transitive_deps
-        if dep.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
-    ]
     coordinates = Coordinates(
         (
             Coordinate(
@@ -144,7 +133,9 @@ async def compile_java_source(
                 artifact=(dep[JvmArtifactArtifactField].value or ""),
                 version=(dep[JvmArtifactVersionField].value or ""),
             )
-            for dep in jvm_artifact_deps
+            for item in CoarsenedTargets(request.component.dependencies).closure()
+            for dep in item.members
+            if dep.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
         )
     )
 
