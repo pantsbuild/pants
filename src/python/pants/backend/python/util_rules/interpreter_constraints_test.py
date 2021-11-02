@@ -12,7 +12,7 @@ from pkg_resources import Requirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import (
-    _EXPECTED_LAST_PATCH_VERSION,
+    _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
 )
 from pants.build_graph.address import Address
@@ -193,6 +193,29 @@ def test_interpreter_constraints_minimum_python_version(
 
 
 @pytest.mark.parametrize(
+    "constraints,expected",
+    [
+        (["CPython>=2.7"], "CPython==2.7.*"),
+        (["CPython>=3.7"], "CPython==3.7.*"),
+        (["CPython>=3.8.6"], "CPython==3.8.*"),
+        (["CPython==3.5.*", "CPython>=3.6"], "CPython==3.5.*"),
+        (["CPython==3.7.*", "PyPy==3.6.*"], "PyPy==3.6.*"),
+        (["CPython"], "CPython==2.7.*"),
+        (["CPython==3.7.*,<3.6"], None),
+        ([], None),
+    ],
+)
+def test_snap_to_minimum(constraints, expected) -> None:
+    universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ics = InterpreterConstraints(constraints)
+    snapped = ics.snap_to_minimum(universe)
+    if expected is None:
+        assert snapped is None
+    else:
+        assert snapped == InterpreterConstraints([expected])
+
+
+@pytest.mark.parametrize(
     "constraints",
     [
         ["CPython==3.8.*"],
@@ -304,7 +327,7 @@ def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
     assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
 
 
-_ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+_ALL_PATCHES = list(range(_PATCH_VERSION_UPPER_BOUND + 1))
 
 
 def patches(
@@ -324,7 +347,7 @@ def patches(
             ["==2.7.1", ">=3.6.15"],
             (
                 [(2, 7, 1)]
-                + patches(3, 6, range(15, _EXPECTED_LAST_PATCH_VERSION + 1))
+                + patches(3, 6, range(15, _PATCH_VERSION_UPPER_BOUND + 1))
                 + patches(3, 7, _ALL_PATCHES)
                 + patches(3, 8, _ALL_PATCHES)
                 + patches(3, 9, _ALL_PATCHES)

@@ -140,18 +140,6 @@ async def py_constraints(
         transitive_targets.closure, python_setup
     )
 
-    if not final_constraints:
-        target_types_with_constraints = sorted(
-            tgt_type.alias
-            for tgt_type in registered_target_types.types
-            if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
-        )
-        logger.warning(
-            "No Python files/targets matched for the `py-constraints` goal. All target types with "
-            f"Python interpreter constraints: {', '.join(target_types_with_constraints)}"
-        )
-        return PyConstraintsGoal(exit_code=0)
-
     constraints_to_addresses = defaultdict(set)
     for tgt in transitive_targets.closure:
         constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
