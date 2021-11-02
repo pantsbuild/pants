@@ -320,6 +320,7 @@ async def coursier_resolve_lockfile(
 class FilterDirectDependenciesRequest:
     direct_dependencies: Coordinates
     lockfile: CoursierResolvedLockfile
+    transitive: bool = True
 
 
 @rule
@@ -335,13 +336,20 @@ async def filter_for_direct_dependencies(
     # Assumption: all coordinates in the resolved lockfile will be compatible with the
     # direct_dependencies in some way, so we do not need to do version testing here.
 
-    unversioned_deps = {(i.group, i.artifact) for i in request.direct_dependencies}
-    entries_out = (
-        entry
-        for entry in request.lockfile.entries
-        if (entry.coord.group, entry.coord.artifact) in unversioned_deps
-    )
+    entries = {(i.coord.group, i.coord.artifact): i for i in request.lockfile.entries}
 
+    dependencies = {(i.group, i.artifact) for i in request.direct_dependencies}
+
+    if request.transitive:
+        # Coursier already stores the transitive dependencies (`dependencies` vs `direct`
+        # dependencies), so we can just iterate through those to get the full transitive dep list.
+        dependencies |= {
+            (j.group, j.artifact)
+            for dependency in dependencies
+            for j in entries[dependency].dependencies
+        }
+
+    entries_out = (entries[dependency] for dependency in dependencies)
     return CoursierResolvedLockfile(entries=tuple(entries_out))
 
 

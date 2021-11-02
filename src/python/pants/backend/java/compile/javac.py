@@ -148,14 +148,10 @@ async def compile_java_source(
         )
     )
 
-
     unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
     lockfile = await Get(
         CoursierResolvedLockfile, FilterDirectDependenciesRequest(coordinates, unfiltered_lockfile)
     )
-
-    #raise Exception(request.component)#, coordinates, lockfile)
-
 
     dest_dir = "classfiles"
     (
@@ -176,8 +172,6 @@ async def compile_java_source(
             CreateDigest([Directory(dest_dir)]),
         ),
     )
-
-    #raise Exception(materialized_classpath)
 
     prefixed_direct_dependency_classpath = await Get(
         Snapshot, AddPrefix(merged_direct_dependency_classpath_digest, "__usercp")
