@@ -13,10 +13,6 @@ from typing import Any, ClassVar, List, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -415,12 +411,9 @@ async def run_tests(
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
         ),
     )
-    field_sets_with_sources = await Get(
-        FieldSetsWithSources, FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
-    )
-
     results = await MultiGet(
-        Get(TestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
+        Get(TestResult, TestFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
 
     # Print summary.

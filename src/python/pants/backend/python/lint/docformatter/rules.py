@@ -26,7 +26,7 @@ from pants.util.strutil import pluralize
 class DocformatterFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
-    sources: PythonSourceField
+    source: PythonSourceField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -70,7 +70,7 @@ async def setup_docformatter(setup_request: SetupRequest, docformatter: Docforma
     )
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
     )
     source_files, docformatter_pex = await MultiGet(source_files_get, docformatter_pex_get)
 

@@ -199,7 +199,7 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
+    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.source]))
 
     (
         pytest_pex,
