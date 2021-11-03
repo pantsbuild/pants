@@ -39,8 +39,8 @@ async def find_putative_targets(
                 DockerImageTarget,
                 dirname,
                 "docker",
-                [],
-                kwargs={"name": "docker", "source": filename},
+                [filename],
+                kwargs={"name": "docker"},
             )
         )
     return PutativeTargets(pts)

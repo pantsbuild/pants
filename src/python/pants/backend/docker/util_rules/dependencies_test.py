@@ -6,14 +6,18 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.target_types import DockerDependenciesField, DockerImageTarget
+from pants.backend.docker.target_types import (
+    DockerDependenciesField,
+    DockerfileTarget,
+    DockerImageTarget,
+)
 from pants.backend.docker.util_rules.dependencies import (
     InjectDockerDependencies,
     inject_docker_dependencies,
 )
+from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -23,13 +27,13 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *dockerfile_rules(),
             *parser_rules(),
             *pex_rules(),
-            *source_files_rules(),
             inject_docker_dependencies,
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
         ],
-        target_types=[DockerImageTarget, PexBinary],
+        target_types=[DockerImageTarget, DockerfileTarget, PexBinary],
     )
     rule_runner.set_options(
         [],
@@ -73,3 +77,23 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
     assert injected == InjectedDependencies(
         [Address("project/hello/main", target_name="main_binary")]
     )
+
+
+def test_inject_dockerfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """\
+                docker_image(source=":synthetic")
+                dockerfile(name="synthetic", instructions=["FROM base"])
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("test", target_name="test"))
+    injected = rule_runner.request(
+        InjectedDependencies,
+        [InjectDockerDependencies(tgt[DockerDependenciesField])],
+    )
+    assert injected == InjectedDependencies([Address("test", target_name="synthetic")])

@@ -28,12 +28,13 @@ class DockerBuildArgsField(StringSequenceField):
 
 
 class DockerImageSourceField(SingleSourceField):
-    expected_num_files = range(0, 2)
+    default = "Dockerfile"
+    expected_num_files = 1
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
-        "This will look for the named file in your project workspace. Do not use this field if "
-        "you depend on a `dockerfile` target to generate the Dockerfile at runtime."
+        "This should either be a filename for a Dockerfile in your project workspace, or the "
+        "address to a `dockerfile` target."
     )
 
 

@@ -37,8 +37,8 @@ def test_find_putative_targets() -> None:
                     DockerImageTarget,
                     "src/docker_orphan",
                     "docker",
-                    [],
-                    kwargs={"name": "docker", "source": "Dockerfile"},
+                    ["Dockerfile"],
+                    kwargs={"name": "docker"},
                 ),
             ]
         )

@@ -52,9 +52,7 @@ def test_docker_build(rule_runner) -> None:
     """This test requires a running docker daemon."""
     rule_runner.write_files(
         {
-            "src/BUILD": (
-                "docker_image(name='test-image', source='Dockerfile', image_tags=['1.0'])"
-            ),
+            "src/BUILD": ("docker_image(name='test-image', image_tags=['1.0'])"),
             "src/Dockerfile": "FROM python:3.8",
         }
     )

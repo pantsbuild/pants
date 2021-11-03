@@ -13,15 +13,13 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
-    DependenciesRequest,
-    ExplicitlyProvidedDependencies,
+    HydratedSources,
+    HydrateSourcesRequest,
     InvalidFieldException,
     SourcesField,
     Targets,
@@ -123,11 +121,21 @@ async def setup_process_for_parse_dockerfile(
 
 
 @dataclass(frozen=True)
+class DockerfileAddress:
+    address: Address
+
+
+@dataclass(frozen=True)
 class DockerfileInfo:
     digest: Digest
     source: str = ""
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DockerfileInfoRequest:
+    address: Address
 
 
 def split_iterable(
@@ -141,37 +149,40 @@ def split_iterable(
 
 
 @rule
-async def parse_dockerfile(source_field: DockerImageSourceField) -> DockerfileInfo:
-    wrapped_target = await Get(WrappedTarget, Address, source_field.address)
+async def resolve_dockerfile_address(wrapped_target: WrappedTarget) -> DockerfileAddress:
+    """Get address to target owning the Dockerfile by inspecting the source field of the target."""
     target = wrapped_target.target
-    explicit_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(target.get(Dependencies))
-    )
-    dependencies = await Get(
+    dockerfile_targets = await Get(
         Targets,
-        Addresses([addr for addr in explicit_deps.includes if addr not in explicit_deps.ignores]),
-    )
-    sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            sources_fields=[
-                source_field,
-                *[
-                    tgt.get(SourcesField)
-                    for tgt in dependencies
-                    if not tgt.has_field(DockerImageSourceField)
-                ],
+        UnparsedAddressInputs(
+            [
+                address
+                for address in [target.get(DockerImageSourceField).value]
+                if address and ":" in address
             ],
+            owning_address=target.address,
+        ),
+    )
+    dockerfile_address = dockerfile_targets[0].address if dockerfile_targets else target.address
+    return DockerfileAddress(dockerfile_address)
+
+
+@rule
+async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
+    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    target = wrapped_target.target
+    sources = await Get(
+        HydratedSources,
+        HydrateSourcesRequest(
+            target.get(SourcesField),
             for_sources_types=(DockerImageSourceField,),
             enable_codegen=True,
         ),
     )
 
-    if not sources.snapshot.files:
+    if len(sources.snapshot.files) != 1:
         raise InvalidFieldException(
-            f"The `{target.alias}` {target.address} does not have any Dockerfile.\n\n"
-            "Provide either a filename in the `source` field, or add a dependency to a "
-            "`dockerfile` target."
+            f"The `{target.alias}` {target.address} does not have any Dockerfile."
         )
 
     result = await Get(
@@ -185,8 +196,6 @@ async def parse_dockerfile(source_field: DockerImageSourceField) -> DockerfileIn
     output = result.stdout.decode("utf-8").strip().split("\n")
     version_tags, putative_targets = split_iterable("---", output)
 
-    # There can only be a single file in the snapshot, due to the
-    # DockerImageSourceField.expected_num_files == 1.
     return DockerfileInfo(
         digest=sources.snapshot.digest,
         source=sources.snapshot.files[0],
