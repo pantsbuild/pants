@@ -28,10 +28,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JvmArtifactArtifactField,
+    JvmArtifactFieldSet,
+    JvmArtifactGroupField,
+    JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
     JvmLockfileSources,
     JvmRequirementsField,
@@ -90,6 +94,22 @@ class Coordinate:
         if versioned:
             return f"{self.group}:{self.artifact}:{self.version}"
         return f"{self.group}:{self.artifact}"
+
+    @staticmethod
+    def from_jvm_artifact_target(target: Target) -> Coordinate:
+        if not JvmArtifactFieldSet.is_applicable(target):
+            raise CoursierError(
+                "`Coordinate.from_jvm_artifact_target()` only works on targets with "
+                "`JvmArtifactFieldSet` fields present."
+            )
+
+        group = target[JvmArtifactGroupField].value
+        artifact = target[JvmArtifactArtifactField].value
+        version = target[JvmArtifactVersionField].value
+
+        # These are all required, but mypy doesn't think so.
+        assert group is not None and artifact is not None and version is not None
+        return Coordinate(group=group, artifact=artifact, version=version)
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):

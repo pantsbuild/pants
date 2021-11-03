@@ -37,11 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.target_types import (
-    JvmArtifactArtifactField,
-    JvmArtifactGroupField,
-    JvmArtifactVersionField,
-)
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -126,22 +122,18 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    coordinates = Coordinates(
+    filter_coords = Coordinates(
         (
-            Coordinate(
-                group=(dep[JvmArtifactGroupField].value or ""),
-                artifact=(dep[JvmArtifactArtifactField].value or ""),
-                version=(dep[JvmArtifactVersionField].value or ""),
-            )
+            Coordinate.from_jvm_artifact_target(dep)
             for item in CoarsenedTargets(request.component.dependencies).closure()
             for dep in item.members
-            if dep.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+            if JvmArtifactFieldSet.is_applicable(dep)
         )
     )
 
     unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
     lockfile = await Get(
-        CoursierResolvedLockfile, FilterDependenciesRequest(coordinates, unfiltered_lockfile)
+        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
     )
 
     dest_dir = "classfiles"
