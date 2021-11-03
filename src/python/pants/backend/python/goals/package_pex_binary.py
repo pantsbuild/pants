@@ -7,7 +7,6 @@ from typing import Tuple
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PexAlwaysWriteCacheField,
     PexBinaryDefaults,
     PexEmitWarningsField,
     PexEntryPointField,
@@ -22,7 +21,6 @@ from pants.backend.python.target_types import (
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
-    PexZipSafeField,
     PythonResolveField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -58,12 +56,10 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     script: PexScriptField
 
     output_path: OutputPathField
-    always_write_cache: PexAlwaysWriteCacheField
     emit_warnings: PexEmitWarningsField
     ignore_errors: PexIgnoreErrorsField
     inherit_path: PexInheritPathField
     shebang: PexShebangField
-    zip_safe: PexZipSafeField
     strip_env: PexStripEnvField
     platforms: PythonPlatformsField
     execution_mode: PexExecutionModeField
