@@ -26,7 +26,15 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoThirdPartyPackageTarget,
 )
-from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
 from pants.core.target_types import GenericTarget
@@ -58,6 +66,9 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
+            *build_pkg.rules(),
+            *link.rules(),
+            *assembly.rules(),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
             QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),

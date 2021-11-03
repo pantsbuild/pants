@@ -131,19 +131,19 @@ func cleanImports(importsMap map[string]bool) []string {
 }
 
 func analyzePackage(directory string, buildContext *build.Context) (*Package, error) {
+	pkg := &Package{
+		InvalidGoFiles: make(map[string]string),
+	}
+
 	fileSet := token.NewFileSet()
 
 	entries, err := os.ReadDir(directory)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %s: %s", directory, err)
+		return pkg, fmt.Errorf("failed to read directory %s: %s", directory, err)
 	}
 
 	// Keep track of the names used in `package` directives to ensure that only one package name is used.
 	packageNames := make(map[string]bool)
-
-	pkg := &Package{
-		InvalidGoFiles: make(map[string]string),
-	}
 
 	importsMap := make(map[string]bool)
 	testImportsMap := make(map[string]bool)
@@ -221,7 +221,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		isTest := strings.HasSuffix(name, "_test.go")
 		isXTest := false
-		if isTest && strings.HasSuffix(analysis.Name, "_test") {
+		if analysis != nil && isTest && strings.HasSuffix(analysis.Name, "_test") {
 			isXTest = true
 			pkgName = pkgName[:len(pkgName)-len("_test")]
 		}
@@ -232,15 +232,17 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		// Check whether CGo is in use.
 		isCGo := false
-		for _, imp := range analysis.Imports {
-			if imp == "C" {
-				if isTest {
-					pkg.InvalidGoFiles[name] = fmt.Sprintf("use of cgo in test %s not supported", name)
-					continue
+		if analysis != nil {
+			for _, imp := range analysis.Imports {
+				if imp == "C" {
+					if isTest {
+						pkg.InvalidGoFiles[name] = fmt.Sprintf("use of cgo in test %s not supported", name)
+						continue
+					}
+					isCGo = true
+					// TODO: Save the cgo options.
+					// See https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;drc=refs%2Ftags%2Fgo1.17.2;l=1640.
 				}
-				isCGo = true
-				// TODO: Save the cgo options.
-				// See https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;drc=refs%2Ftags%2Fgo1.17.2;l=1640.
 			}
 		}
 
@@ -264,7 +266,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		}
 		*fileList = append(*fileList, name)
 
-		if importsMapForFile != nil {
+		if importsMapForFile != nil && analysis != nil {
 			for _, importPath := range analysis.Imports {
 				importsMapForFile[importPath] = true
 			}
@@ -296,7 +298,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	}
 	if len(packageNamesList) == 1 {
 		pkg.Name = packageNamesList[0]
-	} else {
+	} else if len(packageNamesList) > 1 {
 		return pkg, fmt.Errorf("multiple package names encountered: %s", strings.Join(packageNamesList, ", "))
 	}
 

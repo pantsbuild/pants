@@ -74,14 +74,14 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class AnalyzerSetup:
+class PackageAnalyzerSetup:
     digest: Digest
-    PATH: ClassVar[str] = "./analyze_package"
+    PATH: ClassVar[str] = "./_analyze_package"
 
 
 @rule
 async def compute_first_party_package_info(
-    request: FirstPartyPkgInfoRequest, analyzer: AnalyzerSetup
+    request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgInfo:
     go_mod_address = request.address.maybe_convert_to_target_generator()
     wrapped_target, go_mod_info = await MultiGet(
@@ -99,11 +99,14 @@ async def compute_first_party_package_info(
         Digest,
         MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
     )
-
+    path = request.address.spec_path if request.address.spec_path else "."
+    path = os.path.join(path, subpath) if subpath else path
+    if not path:
+        path = "."
     result = await Get(
         FallibleProcessResult,
         Process(
-            (analyzer.PATH, subpath),
+            (analyzer.PATH, path),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
         ),
@@ -123,8 +126,10 @@ async def compute_first_party_package_info(
             error += "\n"
         if "InvalidGoFiles" in metadata:
             error += "\n".join(
-                f"{filename}: {error}" for filename, error in metadata.get("InvalidGoFiles", [])
+                f"{filename}: {error}"
+                for filename, error in metadata.get("InvalidGoFiles", {}).items()
             )
+            error += "\n"
         return FallibleFirstPartyPkgInfo(
             info=None, import_path=import_path, exit_code=1, stderr=error
         )
@@ -154,12 +159,12 @@ async def compute_first_party_package_info(
 
 
 @rule
-async def setup_analyzer() -> AnalyzerSetup:
+async def setup_analyzer() -> PackageAnalyzerSetup:
     source_entry_content = pkgutil.get_data("pants.backend.go.util_rules", "analyze_package.go")
     if not source_entry_content:
-        raise AssertionError("Unable to find resource for `generate_testmain.go`.")
+        raise AssertionError("Unable to find resource for `analyze_package.go`.")
 
-    source_entry = FileContent("generate_testmain.go", source_entry_content)
+    source_entry = FileContent("analyze_package.go", source_entry_content)
 
     source_digest, import_config = await MultiGet(
         Get(Digest, CreateDigest([source_entry])),
@@ -189,12 +194,12 @@ async def setup_analyzer() -> AnalyzerSetup:
             input_digest=input_digest,
             archives=(main_pkg_a_file_path,),
             import_config_path=import_config.CONFIG_PATH,
-            output_filename=AnalyzerSetup.PATH,
+            output_filename=PackageAnalyzerSetup.PATH,
             description="Link Go package analyzer",
         ),
     )
 
-    return AnalyzerSetup(analyzer.digest)
+    return PackageAnalyzerSetup(analyzer.digest)
 
 
 def rules():

@@ -9,7 +9,15 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgInfoRequest,
@@ -29,6 +37,9 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            *build_pkg.rules(),
+            *link.rules(),
+            *assembly.rules(),
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
@@ -167,7 +178,7 @@ def test_invalid_package(rule_runner) -> None:
     )
     assert maybe_info.info is None
     assert maybe_info.exit_code == 1
-    assert maybe_info.stderr == "bad.go:1:1: expected 'package', found invalid\n"
+    assert "bad.go:1:1: expected 'package', found invalid\n" in maybe_info.stderr
 
 
 @pytest.mark.xfail(reason="cgo is ignored")

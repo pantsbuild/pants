@@ -238,12 +238,12 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
-    assert result.stderr == "bad_test.go:1:1: expected 'package', found invalid\n"
+    assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
 
     tgt = rule_runner.get_target(Address("foo", generated_name="./uses_dep"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
-    assert result.stderr == "dep/f.go:1:1: expected 'package', found invalid\n"
+    assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
 
 
 def test_external_test_success(rule_runner: RuleRunner) -> None:
