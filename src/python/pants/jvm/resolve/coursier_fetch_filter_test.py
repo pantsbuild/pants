@@ -104,13 +104,9 @@ def test_filter_transitive_includes_transitive_deps(
     rule_runner: RuleRunner, lockfile: CoursierResolvedLockfile
 ) -> None:
     filtered = filter(rule_runner, [coord2], lockfile, True)
-    assert sorted(filtered, key=lambda i: i.artifact) == [
-        coord1,
-        coord2,
-        coord3,
-        coord4,
-        coord5,
-    ]  # Entries should only appear once.
+    assert set(filtered) == {coord1, coord2, coord3, coord4, coord5}
+    # Entries should only appear once.
+    assert len(filtered) == 5
 
 
 def filter(rule_runner, coordinates, lockfile, transitive) -> Sequence[Coordinate]:
