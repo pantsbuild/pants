@@ -272,6 +272,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 scala_sources(
                     name = 'main',
+                    dependencies = [":joda-time_joda-time"],
                 )
                 """
             ),
@@ -306,13 +307,62 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
+def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
                 scala_sources(
                     name = 'main',
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "Example.scala": dedent(
+                """
+                package org.pantsbuild.example
+
+                import org.joda.time.DateTime
+
+                object Main {
+                    def main(args: Array[String]): Unit = {
+                        val dt = new DateTime()
+                        println(dt.getYear)
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="main")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "error: object joda is not a member of package org" in fallible_result.stderr
+
+
+@maybe_skip_jdk_test
+def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+                scala_sources(
+                    name = 'main',
+                    dependencies = [],  # `joda-time` needs to be here for compile to succeed
                 )
                 """
             ),

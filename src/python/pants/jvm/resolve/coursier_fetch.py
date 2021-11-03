@@ -28,10 +28,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JvmArtifactArtifactField,
+    JvmArtifactFieldSet,
+    JvmArtifactGroupField,
+    JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
     JvmLockfileSources,
     JvmRequirementsField,
@@ -90,6 +94,22 @@ class Coordinate:
         if versioned:
             return f"{self.group}:{self.artifact}:{self.version}"
         return f"{self.group}:{self.artifact}"
+
+    @staticmethod
+    def from_jvm_artifact_target(target: Target) -> Coordinate:
+        if not JvmArtifactFieldSet.is_applicable(target):
+            raise CoursierError(
+                "`Coordinate.from_jvm_artifact_target()` only works on targets with "
+                "`JvmArtifactFieldSet` fields present."
+            )
+
+        group = target[JvmArtifactGroupField].value
+        artifact = target[JvmArtifactArtifactField].value
+        version = target[JvmArtifactVersionField].value
+
+        # These are all required, but mypy doesn't think so.
+        assert group is not None and artifact is not None and version is not None
+        return Coordinate(group=group, artifact=artifact, version=version)
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
@@ -314,6 +334,43 @@ async def coursier_resolve_lockfile(
             )
         )
     )
+
+
+@dataclass(frozen=True)
+class FilterDependenciesRequest:
+    direct_dependencies: Coordinates
+    lockfile: CoursierResolvedLockfile
+    transitive: bool = True
+
+
+@rule
+async def filter_for_dependencies(
+    request: FilterDependenciesRequest,
+) -> CoursierResolvedLockfile:
+    """Returns a filtered version of the input lockfile that only contains the direct dependencies
+    of a given target.
+
+    This should reduce the volume of files that are copied to various compilation tasks.
+    """
+
+    # Assumption: all coordinates in the resolved lockfile will be compatible with the
+    # direct_dependencies in some way, so we do not need to do version testing here.
+
+    entries = {(i.coord.group, i.coord.artifact): i for i in request.lockfile.entries}
+
+    dependencies = {(i.group, i.artifact) for i in request.direct_dependencies}
+
+    if request.transitive:
+        # Coursier already stores the transitive dependencies (`dependencies` vs `direct`
+        # dependencies), so we can just iterate through those to get the full transitive dep list.
+        dependencies |= {
+            (j.group, j.artifact)
+            for dependency in dependencies
+            for j in entries[dependency].dependencies
+        }
+
+    entries_out = (entries[dependency] for dependency in dependencies)
+    return CoursierResolvedLockfile(entries=tuple(entries_out))
 
 
 @dataclass(frozen=True)
