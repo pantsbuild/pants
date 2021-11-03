@@ -14,6 +14,7 @@ from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
+    build_pkg_target,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *assembly.rules(),
             *build_pkg.rules(),
+            *build_pkg_target.rules(),
             *import_analysis.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
