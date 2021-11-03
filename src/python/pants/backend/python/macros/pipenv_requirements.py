@@ -10,6 +10,10 @@ from typing import Iterable, Mapping
 from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement
 
+from pants.backend.python.macros.caof_utils import (
+    OVERRIDES_TYPE,
+    flatten_overrides_to_dependency_field,
+)
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -44,6 +48,7 @@ class PipenvRequirements:
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
         pipfile_target: str | None = None,
+        overrides: OVERRIDES_TYPE = None,
     ) -> None:
         """
         :param requirements_relpath: The relpath from this BUILD file to the requirements file.
@@ -92,6 +97,10 @@ class PipenvRequirements:
         normalized_module_mapping = normalize_module_mapping(module_mapping)
         normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
 
+        dependencies_overrides = flatten_overrides_to_dependency_field(
+            overrides, macro_name="python_requirements", build_file_dir=self._parse_context.rel_path
+        )
+
         requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
         for req, info in requirements.items():
             extras = [x for x in info.get("extras", [])]
@@ -106,7 +115,10 @@ class PipenvRequirements:
                 "python_requirement",
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
-                dependencies=[requirements_dep],
+                dependencies=[
+                    requirements_dep,
+                    *dependencies_overrides.get(normalized_proj_name, []),
+                ],
                 modules=normalized_module_mapping.get(normalized_proj_name),
                 type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
             )
