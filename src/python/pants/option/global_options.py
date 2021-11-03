@@ -616,15 +616,6 @@ class GlobalOptions(Subsystem):
             "per-workspace subdirectory.",
         )
         register(
-            "--pants-supportdir",
-            advanced=True,
-            metavar="<dir>",
-            removal_version="2.9.0.dev0",
-            removal_hint="Unused: this option has no necessary equivalent in v2.",
-            default=os.path.join(buildroot, "build-support"),
-            help="Does not do anything.",
-        )
-        register(
             "--pants-distdir",
             advanced=True,
             metavar="<dir>",
