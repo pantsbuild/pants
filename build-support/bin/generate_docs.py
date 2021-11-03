@@ -231,7 +231,7 @@ def run_pants_help_all() -> dict[str, Any]:
             f"\n\nstderr:\n{run.stderr}"
         )
         raise
-    return cast(dict[str, Any], json.loads(run.stdout))
+    return cast("dict[str, Any]", json.loads(run.stdout))
 
 
 def value_strs_iter(help_info: dict[str, Any]) -> Iterable[str]:
@@ -261,7 +261,7 @@ def rewrite_value_strs(help_info: dict[str, Any], slug_to_title: dict[str, str])
             return [_recurse(x) for x in val]
         return val
 
-    return cast(dict[str, Any], _recurse(help_info))
+    return cast("dict[str, Any]", _recurse(help_info))
 
 
 class ReferenceGenerator:

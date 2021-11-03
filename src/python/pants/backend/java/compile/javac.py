@@ -29,11 +29,15 @@ from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompile
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierResolvedLockfile,
     CoursierResolveKey,
+    FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -118,7 +122,19 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    filter_coords = Coordinates(
+        (
+            Coordinate.from_jvm_artifact_target(dep)
+            for item in CoarsenedTargets(request.component.dependencies).closure()
+            for dep in item.members
+            if JvmArtifactFieldSet.is_applicable(dep)
+        )
+    )
+
+    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    lockfile = await Get(
+        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
+    )
 
     dest_dir = "classfiles"
     (
