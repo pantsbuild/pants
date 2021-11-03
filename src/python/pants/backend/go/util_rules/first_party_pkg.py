@@ -126,7 +126,7 @@ async def compute_first_party_package_info(
                 f"{filename}: {error}" for filename, error in metadata.get("InvalidGoFiles", [])
             )
         return FallibleFirstPartyPkgInfo(
-            info=None, import_path=import_path, exit_code=result.exit_code, stderr=error
+            info=None, import_path=import_path, exit_code=1, stderr=error
         )
 
     if "CgoFiles" in metadata:
