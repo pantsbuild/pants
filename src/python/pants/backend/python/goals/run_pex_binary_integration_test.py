@@ -80,9 +80,7 @@ def test_run_sample_script(
             return run_pants(args, extra_env=extra_env)
 
     result = run()
-    assert (
-        "Hola, mundo.\n" in result.stderr
-    ), f"STDOUT:\n-------\n{result.stdout}\n\nSTDERR:\n-------\n{result.stderr}"
+    assert "Hola, mundo.\n" in result.stderr
     assert result.stdout == "HELLO WORLD.\n"
     assert result.exit_code == 23
 
