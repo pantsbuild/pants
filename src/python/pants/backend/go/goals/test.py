@@ -10,10 +10,10 @@ from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
-    BuildGoPackageTargetRequest,
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
+from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgInfoRequest,
