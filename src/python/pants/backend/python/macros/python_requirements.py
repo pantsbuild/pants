@@ -10,6 +10,10 @@ from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
+from pants.backend.python.macros.caof_utils import (
+    OVERRIDES_TYPE,
+    flatten_overrides_to_dependency_field,
+)
 from pants.backend.python.target_types import normalize_module_mapping, parse_requirements_file
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -57,6 +61,7 @@ class PythonRequirements:
         source: str | None = None,
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
+        overrides: OVERRIDES_TYPE = None,
     ) -> None:
         """
         :param requirements_relpath: The relpath from this BUILD file to the requirements file.
@@ -101,6 +106,9 @@ class PythonRequirements:
             req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
         )
 
+        dependencies_overrides = flatten_overrides_to_dependency_field(
+            overrides, macro_name="python_requirements", build_file_dir=self._parse_context.rel_path
+        )
         grouped_requirements = groupby(requirements, lambda parsed_req: parsed_req.project_name)
 
         for project_name, parsed_reqs_ in grouped_requirements:
@@ -111,5 +119,8 @@ class PythonRequirements:
                 requirements=list(parsed_reqs_),
                 modules=normalized_module_mapping.get(normalized_proj_name),
                 type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
-                dependencies=[requirements_dep],
+                dependencies=[
+                    requirements_dep,
+                    *dependencies_overrides.get(normalized_proj_name, []),
+                ],
             )
