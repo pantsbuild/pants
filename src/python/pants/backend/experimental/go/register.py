@@ -21,7 +21,6 @@ from pants.backend.go.util_rules import (
     go_mod,
     import_analysis,
     link,
-    pkg_analysis,
     sdk,
     tests_analysis,
     third_party_pkg,
@@ -51,7 +50,6 @@ def rules():
         *test.rules(),
         *run_binary.rules(),
         *package_binary.rules(),
-        *pkg_analysis.rules(),
         # Gofmt
         *fmt.rules(),
         *gofmt_rules(),

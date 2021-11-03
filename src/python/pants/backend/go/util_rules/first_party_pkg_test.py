@@ -170,6 +170,7 @@ def test_invalid_package(rule_runner) -> None:
     assert maybe_info.stderr == "bad.go:1:1: expected 'package', found invalid\n"
 
 
+@pytest.mark.xfail(reason="cgo is ignored")
 def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
