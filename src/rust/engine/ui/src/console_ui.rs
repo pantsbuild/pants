@@ -168,8 +168,7 @@ impl ConsoleUI {
     }
 
     // Start any new items.
-    let now = SystemTime::now();
-    for (span_id, (description, duration)) in heavy_hitters {
+    for (span_id, (description, start_time)) in heavy_hitters {
       if tasks_to_display.contains_key(&span_id) {
         // We're already rendering this item, and our dynamic `unit` instance will continue to
         // handle rendering elapsed time for it.
@@ -193,7 +192,7 @@ impl ConsoleUI {
         None,
         Some(prodash::unit::dynamic(MillisAsFloatingPointSecs)),
       );
-      item.set(MillisAsFloatingPointSecs::duration_to_step(&now, duration));
+      item.set(MillisAsFloatingPointSecs::start_time_to_step(&start_time));
       tasks_to_display.insert(span_id, item);
     }
   }
@@ -218,12 +217,14 @@ impl ConsoleUI {
   /// If the ConsoleUI is running, completes it.
   ///
   pub async fn teardown(&mut self) {
-    if let Some(instance) = self.instance.take() {
+    if let Some(mut instance) = self.instance.take() {
+      // Drop all tasks to clear the Tree. The call to shutdown will render a final "Tick" with the
+      // empty Tree, which will clear the screen.
+      instance.tasks_to_display.clear();
       instance
         .executor
         .clone()
         .spawn_blocking(move || {
-          // TODO: Necessary to do this on Drop as well? Or do we guarantee that teardown is called?
           instance.handle.shutdown_and_wait();
         })
         .await
@@ -244,10 +245,8 @@ struct Instance {
 struct MillisAsFloatingPointSecs;
 
 impl MillisAsFloatingPointSecs {
-  /// Computes a static Step value from the given Duration by converting it to "millis-since-epoch".
-  fn duration_to_step(now: &SystemTime, duration: Option<Duration>) -> Step {
-    // TODO: Use workunit start SystemTimes directly rather than calculating them.
-    let start_time = duration.and_then(|d| now.checked_sub(d)).unwrap_or(*now);
+  /// Computes a static Step from the given start time by converting it to "millis-since-epoch".
+  fn start_time_to_step(start_time: &SystemTime) -> Step {
     start_time.duration_since(UNIX_EPOCH).unwrap().as_millis() as usize
   }
 }
