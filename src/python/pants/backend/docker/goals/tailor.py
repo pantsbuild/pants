@@ -36,11 +36,7 @@ async def find_putative_targets(
         dirname, filename = os.path.split(dockerfile)
         pts.append(
             PutativeTarget.for_target_type(
-                DockerImageTarget,
-                dirname,
-                "docker",
-                [filename],
-                kwargs={"name": "docker"},
+                DockerImageTarget, dirname, "docker", [filename], kwargs={"name": "docker"}
             )
         )
     return PutativeTargets(pts)

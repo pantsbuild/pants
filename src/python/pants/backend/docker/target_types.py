@@ -29,7 +29,6 @@ class DockerBuildArgsField(StringSequenceField):
 
 class DockerImageSourceField(SingleSourceField):
     default = "Dockerfile"
-    expected_num_files = 1
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"

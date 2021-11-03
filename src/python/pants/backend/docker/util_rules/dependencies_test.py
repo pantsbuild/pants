@@ -47,7 +47,7 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
         "project/image/test",
         dedent(
             """\
-            docker_image(name="image", source="Dockerfile")
+            docker_image(name="image")
             """
         ),
     )
