@@ -20,6 +20,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,22 +28,47 @@ import (
 	"strings"
 )
 
+// Package represents the results of analyzing a Go package.
 type Package struct {
-	Name string `json:"name"`
+	Name string // package name
 
-	Imports      []string `json:"imports,omitempty"`
-	TestImports  []string `json:"test_imports,omitempty"`
-	XTestImports []string `json:"xtest_imports,omitempty"`
+	// Source files
+	GoFiles           []string `json:",omitempty"` // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
+	CgoFiles          []string `json:",omitempty"` // .go source files that import "C"
+	IgnoredGoFiles    []string `json:",omitempty"` // .go source files ignored for this build (including ignored _test.go files)
+	IgnoredOtherFiles []string `json:",omitempty"` // non-.go source files ignored for this build
+	CFiles            []string `json:",omitempty"` // .c source files
+	CXXFiles          []string `json:",omitempty"` // .cc, .cpp and .cxx source files
+	MFiles            []string `json:",omitempty"` // .m (Objective-C) source files
+	HFiles            []string `json:",omitempty"` // .h, .hh, .hpp and .hxx source files
+	FFiles            []string `json:",omitempty"` // .f, .F, .for and .f90 Fortran source files
+	SFiles            []string `json:",omitempty"` // .s source files
+	SwigFiles         []string `json:",omitempty"` // .swig files
+	SwigCXXFiles      []string `json:",omitempty"` // .swigcxx files
+	SysoFiles         []string `json:",omitempty"` // .syso system object files to add to archive
 
-	GoFiles []string `json:"go_files,omitempty"`
-	SFiles  []string `json:"s_files,omitempty"`
+	// Test information
+	TestGoFiles  []string `json:",omitempty"`
+	XTestGoFiles []string `json:",omitempty"`
 
-	InvalidGoFiles    map[string]string `json:"invalid_go_files,omitempty"`
-	IgnoredGoFiles    []string          `json:"ignored_go_files,omitempty"'`
-	IgnoredOtherFiles []string          `json:"ignored_other_files,omitempty"`
+	// Dependency information
+	// Note: This does not include the token position information for the imports.
+	Imports      []string `json:",omitempty"`
+	TestImports  []string `json:",omitempty"`
+	XTestImports []string `json:",omitempty"`
 
-	TestGoFiles  []string `json:"test_go_files,omitempty"`
-	XTestGoFiles []string `json:"xtest_go_files,omitempty"`
+	// //go:embed patterns found in Go source files
+	// For example, if a source file says
+	//	//go:embed a* b.c
+	// then the list will contain those two strings as separate entries.
+	// (See package embed for more details about //go:embed.)
+	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
+	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
+
+	// Error information. This differs from how `go list` reports errors.
+	InvalidGoFiles map[string]string `json:",omitempty"`
+	Error          string            `json:",omitempty"`
 }
 
 type fileAnalysis struct {
@@ -62,7 +88,7 @@ func analyzeFile(fileSet *token.FileSet, filename string) (*fileAnalysis, error)
 	for _, spec := range parsed.Imports {
 		importPath, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode import: %s", spec.Path.Value)
+			return nil, fmt.Errorf("unable to decode import %s in %s", spec.Path.Value, filename)
 		}
 		analysis.Imports = append(analysis.Imports, importPath)
 	}
@@ -70,29 +96,38 @@ func analyzeFile(fileSet *token.FileSet, filename string) (*fileAnalysis, error)
 	return analysis, nil
 }
 
-// Vendored from https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;l=1024;drc=refs%2Ftags%2Fgo1.17.2
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;l=1024;drc=refs%2Ftags%2Fgo1.17.2
 func fileListForExt(p *Package, ext string) *[]string {
 	switch ext {
-	//case ".c":
-	//	return &p.CFiles
-	//case ".cc", ".cpp", ".cxx":
-	//	return &p.CXXFiles
-	//case ".m":
-	//	return &p.MFiles
-	//case ".h", ".hh", ".hpp", ".hxx":
-	//	return &p.HFiles
-	//case ".f", ".F", ".for", ".f90":
-	//	return &p.FFiles
+	case ".c":
+		return &p.CFiles
+	case ".cc", ".cpp", ".cxx":
+		return &p.CXXFiles
+	case ".m":
+		return &p.MFiles
+	case ".h", ".hh", ".hpp", ".hxx":
+		return &p.HFiles
+	case ".f", ".F", ".for", ".f90":
+		return &p.FFiles
 	case ".s", ".S", ".sx":
 		return &p.SFiles
-		//case ".swig":
-		//	return &p.SwigFiles
-		//case ".swigcxx":
-		//	return &p.SwigCXXFiles
-		//case ".syso":
-		//	return &p.SysoFiles
+	case ".swig":
+		return &p.SwigFiles
+	case ".swigcxx":
+		return &p.SwigCXXFiles
+	case ".syso":
+		return &p.SysoFiles
 	}
 	return nil
+}
+
+func cleanImports(importsMap map[string]bool) []string {
+	var imports []string
+	for importPath, _ := range importsMap {
+		imports = append(imports, importPath)
+	}
+	sort.Strings(imports)
+	return imports
 }
 
 func analyzePackage(directory string, buildContext *build.Context) (*Package, error) {
@@ -113,15 +148,27 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	importsMap := make(map[string]bool)
 	testImportsMap := make(map[string]bool)
 	xtestImportsMap := make(map[string]bool)
+	var Sfiles []string // files with ".S"(capital S)/.sx(capital s equivalent for case insensitive filesystems)
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// TODO: Consider flagging existence of a testdata directory.
 			continue
 		}
 
 		name := entry.Name()
 		ext := filepath.Ext(name)
+
+		if entry.Type()&fs.ModeSymlink != 0 {
+			linkFullPath := filepath.Join(directory, name)
+			linkStat, err := os.Stat(linkFullPath)
+			if err != nil {
+				// TODO: Report this error?
+				continue
+			}
+			if linkStat.IsDir() {
+				continue
+			}
+		}
 
 		// TODO: `MatchFile` will actually parse the imports but does not return the AST. Consider vendoring
 		// the MatchFile logic to avoid double parsing.
@@ -147,7 +194,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 			// keep going
 		case ".S", ".sx":
 			// special case for cgo, handled at end
-			//Sfiles = append(Sfiles, name)
+			Sfiles = append(Sfiles, name)
 			continue
 		default:
 			if list := fileListForExt(pkg, ext); list != nil {
@@ -159,13 +206,14 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		analysis, err := analyzeFile(fileSet, filepath.Join(directory, name))
 		if err != nil {
 			pkg.InvalidGoFiles[name] = err.Error()
-			// Fall-through to allow listing the file's existence.
+			// Fall-through to allow still listing the file's existence.
 		}
 
 		var pkgName string
 		if analysis != nil {
 			pkgName = analysis.Name
 			if pkgName == "documentation" {
+				// Ignore package documentation that are in `documentation` package.
 				pkg.IgnoredGoFiles = append(pkg.IgnoredGoFiles, name)
 				continue
 			}
@@ -191,6 +239,8 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 					continue
 				}
 				isCGo = true
+				// TODO: Save the cgo options.
+				// See https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;drc=refs%2Ftags%2Fgo1.17.2;l=1640.
 			}
 		}
 
@@ -224,24 +274,22 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	// TODO: Add generated build tags (like `cgo` tag) to a field in package analysis?
 	// Will probably need to vendor MatchFile (like rules_go does).
 
-	for importPath, _ := range importsMap {
-		pkg.Imports = append(pkg.Imports, importPath)
+	pkg.Imports = cleanImports(importsMap)
+	pkg.TestImports = cleanImports(testImportsMap)
+	pkg.XTestImports = cleanImports(xtestImportsMap)
+
+	// add the .S/.sx files only if we are using cgo
+	// (which means gcc will compile them).
+	// The standard assemblers expect .s files.
+	if len(pkg.CgoFiles) > 0 {
+		pkg.SFiles = append(pkg.SFiles, Sfiles...)
+		sort.Strings(pkg.SFiles)
+	} else {
+		pkg.IgnoredOtherFiles = append(pkg.IgnoredOtherFiles, Sfiles...)
+		sort.Strings(pkg.IgnoredOtherFiles)
 	}
-	sort.Strings(pkg.Imports)
 
-	for importPath, _ := range testImportsMap {
-		pkg.TestImports = append(pkg.TestImports, importPath)
-	}
-	sort.Strings(pkg.Imports)
-
-	for importPath, _ := range xtestImportsMap {
-		pkg.XTestImports = append(pkg.XTestImports, importPath)
-	}
-	sort.Strings(pkg.XTestImports)
-
-	// TODO: For cgo, add in .S/.sx files to SFiles.
-
-	// Set the package name from the observed package name. There must only be one.
+	// Set the package name from the observed package name. "There can be only one."
 	var packageNamesList []string
 	for pn, _ := range packageNames {
 		packageNamesList = append(packageNamesList, pn)
@@ -249,36 +297,39 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	if len(packageNamesList) == 1 {
 		pkg.Name = packageNamesList[0]
 	} else {
-		return nil, fmt.Errorf("multiple package name encountered: %s", strings.Join(packageNamesList, ", "))
+		return pkg, fmt.Errorf("multiple package names encountered: %s", strings.Join(packageNamesList, ", "))
+	}
+
+	if len(pkg.GoFiles)+len(pkg.CgoFiles)+len(pkg.TestGoFiles)+len(pkg.XTestGoFiles) == 0 {
+		return pkg, fmt.Errorf("no buildable Go source files in %s", directory)
 	}
 
 	return pkg, nil
 }
 
 func main() {
-	// TODO: Consider allowing caller to set build tags or platform? Setting platfor GOOS/GOARCH will be
-	// necessary for multi-platform.
+	// TODO: Consider allowing caller to set build tags or platform? Setting platform GOOS/GOARCH will be
+	// necessary for multi-platform support.
 	buildContext := &build.Default
 
 	for _, arg := range os.Args[1:] {
 		pkg, err := analyzePackage(arg, buildContext)
 		if err != nil {
-			// TODO: Return an error in JSON form.
-			fmt.Fprintf(os.Stderr, "Failed to analyze package: %s\n", err)
-			os.Exit(1)
+			pkg.Error = err.Error()
+		}
+		if pkg.Error == "" && len(pkg.InvalidGoFiles) > 0 {
+			pkg.Error = "invalid Go sources encountered"
 		}
 
 		outputBytes, err := json.Marshal(pkg)
 		if err != nil {
-			// TODO: Return an error in JSON form.
-			fmt.Fprintf(os.Stderr, "Failed to encode package metadata: %s\n", err)
-			os.Exit(1)
+			fmt.Printf("{\"Error\": \"Failed to encode package metadata: %s\"}", err)
+			continue
 		}
 		_, err = os.Stdout.Write(outputBytes)
 		if err != nil {
-			// TODO: Return an error in JSON form.
-			fmt.Fprintf(os.Stderr, "Failed to write package metadata: %s\n", err)
-			os.Exit(1)
+			fmt.Printf("{\"Error\": \"Failed to write package metadata: %s\"}", err)
+			continue
 		}
 	}
 
