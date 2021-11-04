@@ -21,8 +21,6 @@ from pants.util.logging import LogLevel
 class GoCheckFieldSet(FieldSet):
     required_fields = (GoFirstPartyPackageSourcesField,)
 
-    sources: GoFirstPartyPackageSourcesField
-
 
 class GoCheckRequest(CheckRequest):
     field_set_type = GoCheckFieldSet
