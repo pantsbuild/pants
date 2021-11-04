@@ -9,7 +9,16 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.goals.tailor import PutativeGoTargetsRequest, has_package_main
 from pants.backend.go.goals.tailor import rules as go_tailor_rules
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
-from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    build_pkg_target,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -30,6 +39,10 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
+            *build_pkg.rules(),
+            *build_pkg_target.rules(),
+            *assembly.rules(),
+            *link.rules(),
             QueryRule(PutativeTargets, [PutativeGoTargetsRequest, AllOwnedSources]),
         ],
         target_types=[GoModTarget, GoBinaryTarget],
