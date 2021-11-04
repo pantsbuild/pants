@@ -17,6 +17,7 @@ from pants.backend.go.util_rules import (
     first_party_pkg,
     go_mod,
     import_analysis,
+    link,
     sdk,
     third_party_pkg,
 )
@@ -43,6 +44,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *build_pkg_target.rules(),
             *import_analysis.rules(),
+            *link.rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
@@ -337,7 +339,9 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     )
     assert direct_build_request.request is None
     assert direct_build_request.exit_code == 1
-    assert direct_build_request.stderr == "direct/f.go:1:1: expected 'package', found invalid\n"
+    assert "direct/f.go:1:1: expected 'package', found invalid\n" in (
+        direct_build_request.stderr or ""
+    )
 
     dep_build_request = rule_runner.request(
         FallibleBuildGoPackageRequest,
@@ -345,4 +349,4 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     )
     assert dep_build_request.request is None
     assert dep_build_request.exit_code == 1
-    assert dep_build_request.stderr == "dep/f.go:1:1: expected 'package', found invalid\n"
+    assert "dep/f.go:1:1: expected 'package', found invalid\n" in (dep_build_request.stderr or "")
