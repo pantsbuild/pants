@@ -145,11 +145,20 @@ impl Session {
     core: Arc<Core>,
     dynamic_ui: bool,
     ui_use_prodash: bool,
+    mut max_workunit_level: log::Level,
     build_id: String,
     session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(!dynamic_ui);
+    // We record workunits with the maximum level of:
+    // 1. the given `max_workunit_verbosity`, which should be computed from:
+    //     * the log level, to ensure that workunit events are logged
+    //     * the levels required by any consumers who will call `with_latest_workunits`.
+    // 2. the level required by the ConsoleUI (if any): currently, DEBUG.
+    if dynamic_ui {
+      max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
+    }
+    let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,

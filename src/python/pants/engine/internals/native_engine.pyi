@@ -344,6 +344,7 @@ class PySession:
         scheduler: PyScheduler,
         dynamic_ui: bool,
         ui_use_prodash: bool,
+        max_workunit_level: int,
         build_id: str,
         session_values: SessionValues,
         cancellation_latch: PySessionCancellationLatch,
