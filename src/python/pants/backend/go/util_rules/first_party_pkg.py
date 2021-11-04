@@ -25,6 +25,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ async def compute_first_party_package_info(
             (analyzer.PATH, path),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
+            level=LogLevel.DEBUG,
         ),
     )
     if result.exit_code != 0:
