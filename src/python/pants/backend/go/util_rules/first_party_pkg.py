@@ -55,6 +55,10 @@ class FirstPartyPkgInfo:
 
     minimum_go_version: str | None
 
+    embed_patterns: tuple[str, ...]
+    test_embed_patterns: tuple[str, ...]
+    xtest_embed_patterns: tuple[str, ...]
+
 
 @dataclass(frozen=True)
 class FallibleFirstPartyPkgInfo:
@@ -156,20 +160,27 @@ async def compute_first_party_package_info(
         xtest_files=tuple(metadata.get("XTestGoFiles", [])),
         s_files=tuple(metadata.get("SFiles", [])),
         minimum_go_version=go_mod_info.minimum_go_version,
+        embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
+        test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
+        xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
     )
     return FallibleFirstPartyPkgInfo(info, import_path)
 
 
 @rule
 async def setup_analyzer() -> PackageAnalyzerSetup:
-    source_entry_content = pkgutil.get_data("pants.backend.go.util_rules", "analyze_package.go")
-    if not source_entry_content:
-        raise AssertionError("Unable to find resource for `analyze_package.go`.")
+    def get_file(filename: str) -> bytes:
+        content = pkgutil.get_data("pants.backend.go.util_rules", filename)
+        if not content:
+            raise AssertionError(f"Unable to find resource for `{filename}`.")
+        return content
 
-    source_entry = FileContent("analyze_package.go", source_entry_content)
+    analyer_sources_content = [
+        FileContent(filename, get_file(filename)) for filename in ("analyze_package.go", "read.go")
+    ]
 
     source_digest, import_config = await MultiGet(
-        Get(Digest, CreateDigest([source_entry])),
+        Get(Digest, CreateDigest(analyer_sources_content)),
         Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
     )
 
@@ -179,7 +190,7 @@ async def setup_analyzer() -> PackageAnalyzerSetup:
             import_path="main",
             subpath="",
             digest=source_digest,
-            go_file_names=(source_entry.path,),
+            go_file_names=tuple(fc.path for fc in analyer_sources_content),
             s_file_names=(),
             direct_dependencies=(),
             minimum_go_version=None,
