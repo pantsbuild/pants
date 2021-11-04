@@ -281,6 +281,7 @@ class LocalPantsRunner:
                 allow_async_completion=(
                     global_options.pantsd and global_options.streaming_workunits_complete_async
                 ),
+                max_workunit_verbosity=global_options.streaming_workunits_level,
             )
             with streaming_reporter:
                 engine_result = PANTS_FAILED_EXIT_CODE

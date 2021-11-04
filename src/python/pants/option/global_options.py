@@ -1440,6 +1440,18 @@ class GlobalOptions(Subsystem):
         help="Interval in seconds between when streaming workunit event receivers will be polled.",
         advanced=True,
     )
+    streaming_workunits_level = EnumOption(
+        "--streaming-workunits-level",
+        default=LogLevel.DEBUG,
+        help=(
+            "The Level of workunits that will be reported to streaming workunit event "
+            "receivers.\n\n"
+            "The filtering of workunits that occurs at higher levels is tree-aware: parent "
+            "pointers are fixed up when workunits are filtered such that the resulting workunits "
+            "always form a tree."
+        ),
+        advanced=True,
+    )
     streaming_workunits_complete_async = BoolOption(
         "--streaming-workunits-complete-async",
         default=not is_in_container(),

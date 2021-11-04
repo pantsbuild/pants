@@ -186,7 +186,7 @@ class StreamingWorkunitHandler:
         specs: Specs,
         report_interval_seconds: float,
         allow_async_completion: bool,
-        max_workunit_verbosity: LogLevel = LogLevel.TRACE,
+        max_workunit_verbosity: LogLevel,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
         self.callbacks = callbacks
