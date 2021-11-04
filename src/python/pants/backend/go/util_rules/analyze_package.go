@@ -148,7 +148,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	importsMap := make(map[string]bool)
 	testImportsMap := make(map[string]bool)
 	xtestImportsMap := make(map[string]bool)
-	var Sfiles []string // files with ".S"(capital S)/.sx(capital s equivalent for case insensitive filesystems)
+	var cgoSfiles []string // files with ".S"(capital S)/.sx(capital s equivalent for case insensitive filesystems)
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -194,7 +194,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 			// keep going
 		case ".S", ".sx":
 			// special case for cgo, handled at end
-			Sfiles = append(Sfiles, name)
+			cgoSfiles = append(cgoSfiles, name)
 			continue
 		default:
 			if list := fileListForExt(pkg, ext); list != nil {
@@ -284,10 +284,10 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	// (which means gcc will compile them).
 	// The standard assemblers expect .s files.
 	if len(pkg.CgoFiles) > 0 {
-		pkg.SFiles = append(pkg.SFiles, Sfiles...)
+		pkg.SFiles = append(pkg.SFiles, cgoSfiles...)
 		sort.Strings(pkg.SFiles)
 	} else {
-		pkg.IgnoredOtherFiles = append(pkg.IgnoredOtherFiles, Sfiles...)
+		pkg.IgnoredOtherFiles = append(pkg.IgnoredOtherFiles, cgoSfiles...)
 		sort.Strings(pkg.IgnoredOtherFiles)
 	}
 
