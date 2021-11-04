@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
 import itertools
 import logging
 from typing import cast
@@ -33,8 +34,20 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.backend.python.dependency_inference.default_unowned_dependencies import DEFAULT_UNOWNED_DEPENDENCIES
 
 logger = logging.getLogger(__name__)
+
+class UnownedDependencyError(Exception):
+    """The inferred dependency does not have an unambiguous owner."""
+
+
+class UnownedDependencyUsage(Enum):
+    """What action to take when an inferred dependency is unowned."""
+
+    RaiseError = "error"
+    LogWarning = "warning"
+    DoNothing = "ignore"
 
 
 class PythonInferSubsystem(Subsystem):
@@ -106,6 +119,17 @@ class PythonInferSubsystem(Subsystem):
                 "`python_distribution`'s `entry_points` field."
             ),
         )
+        register(
+            "--unowned-dependency-behavior",
+            type=UnownedDependencyUsage,
+            default=UnownedDependencyUsage.DoNothing,
+            help=(
+                "How to handle inferred dependencies that don't have an unambiguous owner.\n"
+                "@TODO: More info"
+            ),
+        )
+        # @TODO: Add a way for people to whitelist ok unowned dependencies?
+        # Or just use python_requirement()?
 
     @property
     def imports(self) -> bool:
@@ -163,6 +187,29 @@ async def infer_python_dependencies_via_imports(
         Get(PythonModuleOwners, PythonModule(imported_module))
         for imported_module in detected_imports
     )
+
+    unowned_dependency_behavior = python_infer_subsystem.options.unowned_dependency_behavior
+    if unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
+        unowned_imports = sorted(
+            imp for owners, imp in zip(owners_per_import, detected_imports)
+            if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
+        )
+        if unowned_imports:
+            messaging = (
+                # @TODO: I don't like the manual tabbing here.
+                f"The following imports have no unambiguous owner:\n"
+                + ("\n".join(f"    {imp}" for imp in unowned_imports))
+                + (
+                    # Don't forget to update when experimental_lockfile becomes nonexperimental
+                    "\n\n  If you are using [python-setup].requirement_constraints, consider adding the relevant "
+                    "package.\n  Otherwise consider specifying a python_requirement target as a dependency."
+                )
+            )
+            if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
+                logger.warn(messaging)
+            elif unowned_dependency_behavior is UnownedDependencyUsage.RaiseError:
+                raise UnownedDependencyError(messaging)
+
     merged_result: set[Address] = set()
     for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
