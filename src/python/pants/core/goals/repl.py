@@ -120,7 +120,9 @@ async def run_repl(
         )
         return Repl(-1)
 
-    with temporary_dir(root_dir=global_options.options.pants_workdir, prefix="repl", cleanup=False) as tmpdir:
+    with temporary_dir(
+        root_dir=global_options.options.pants_workdir, prefix="repl", cleanup=False
+    ) as tmpdir:
         repl_impl = repl_implementation_cls(
             targets=Targets(transitive_targets.closure), chroot=tmpdir
         )

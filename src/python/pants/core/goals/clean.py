@@ -4,39 +4,20 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import tempfile
-from dataclasses import dataclass
-from typing import Iterable, Union, cast, List
+from pathlib import Path
+from typing import Union
 
 import humanize
 
+from pants.base.build_environment import get_pants_cachedir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.options_parsing import _Options
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import Targets
-from pants.engine.unions import UnionMembership, union
-from pants.util.dirutil import absolute_symlink, safe_delete, safe_rmtree, rm_rf
-from pants.util.meta import frozen_after_init
-from pants.base.build_environment import (
-    get_buildroot,
-    get_default_pants_config_file,
-    get_pants_cachedir,
-    is_in_container,
-    pants_version,
-)
-from pants.option.global_options import (
-    DEFAULT_EXECUTION_OPTIONS,
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    LocalStoreOptions,
-)
-from pants.init.logging import pants_log_path
+from pants.option.global_options import LocalStoreOptions
+from pants.util.dirutil import rm_rf
 
 # N.B. We use a list so that named-caches can go last, as it is quite large and for dry-run
 # it's a nicer UX if it's last.
@@ -58,19 +39,11 @@ _NAMED_CACHE_FLAGS_INFO = [
         "repl-temp-dirs",
         "Whether to clean directories persisted after using `./pants repl`.",
     ),
-    (
-        "dist-dir",
-        "Whether to clean the distributable files directory. "
-    ),
-    (
-        "bootstrap-dir",
-        "Whether to clean directories used by pants for bootstrapping itself."
-    ),
-    (
-        "named-caches",
-        "Whether to clean the named global caches."
-    ),
+    ("dist-dir", "Whether to clean the distributable files directory. "),
+    ("bootstrap-dir", "Whether to clean directories used by pants for bootstrapping itself."),
+    ("named-caches", "Whether to clean the named global caches."),
 ]
+
 
 def _dir_info(*paths: Path):
     total_size = num_files = 0
@@ -79,6 +52,7 @@ def _dir_info(*paths: Path):
             total_size += sum(os.path.getsize(os.path.join(dirpath, f)) for f in filenames)
             num_files += len(filenames)
     return total_size, num_files
+
 
 class CleanSubsystem(GoalSubsystem):
     name = "clean"
@@ -92,9 +66,7 @@ class CleanSubsystem(GoalSubsystem):
             advanced=False,
             type=bool,
             default=True,
-            help=(
-                "Whether to just report what would be cleaned. @TODO: more"
-            ),
+            help=("Whether to just report what would be cleaned. @TODO: more"),
         )
         register(
             "--all",
@@ -116,6 +88,7 @@ class CleanSubsystem(GoalSubsystem):
                 help=help,
             )
 
+
 class Clean(Goal):
     subsystem_cls = CleanSubsystem
 
@@ -135,9 +108,8 @@ async def clean(
     ):
         path = Path(path)
         paths = list(path.glob(glob))
-        should_clean = (
-            (clean_subsystem.options.all and not keep_flag_value)
-            or (clean_subsystem.options.all and not not keep_flag_value)
+        should_clean = (clean_subsystem.options.all and not keep_flag_value) or (
+            clean_subsystem.options.all and not not keep_flag_value
         )
 
         if clean_subsystem.options.dry_run:
@@ -148,13 +120,14 @@ async def clean(
             console.print_stdout(f"Would {maybe_negative}clean {console.green(path / glob)}:")
             # @TODO: Print the relevant flag that gave us this directory?
             console.print_stdout(f"  Controlled by {console.blue(f'--[no-]keep-{keep_flag_slug}')}")
-            console.print_stdout(f"  {len(paths)} dirs, spanning {humanize.intword(num_files)} files totalling {humanize.naturalsize(total_size)}")
+            console.print_stdout(
+                f"  {len(paths)} dirs, spanning {humanize.intword(num_files)} files totalling {humanize.naturalsize(total_size)}"
+            )
         elif should_clean:
             # @TODO: Should we multi-process this?
             console.print_stdout(f"Cleaning {console.green(path / glob)}")
             for path in paths:
                 rm_rf(str(path))
-
 
     global_options = real_opts.options.for_global_scope()
     bootstrap_options = real_opts.options.bootstrap_option_values()
@@ -172,7 +145,7 @@ async def clean(
                 "dist-dir": (dist_dir.relpath,),
                 "bootstrap-dir": (Path(pants_cache_dir) / "setup",),
                 "named-caches": (bootstrap_options.named_caches_dir,),
-            }[flag_slug]
+            }[flag_slug],
         )
 
     if clean_subsystem.options.dry_run:

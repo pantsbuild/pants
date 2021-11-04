@@ -80,15 +80,10 @@ def test_strip_chroot_path() -> None:
         strip_v2_chroot_path("/var/process_executionOCnquv/test.py")
         == "/var/process_executionOCnquv/test.py"
     )
-    assert (
-        strip_v2_chroot_path("/var/pants-pe/test.py") == "/var/pants-pe/test.py"
-    )
+    assert strip_v2_chroot_path("/var/pants-pe/test.py") == "/var/pants-pe/test.py"
 
     # Our heuristic requires absolute paths.
-    assert (
-        strip_v2_chroot_path("var/pants-peOCnquv/test.py")
-        == "var/pants-peOCnquv/test.py"
-    )
+    assert strip_v2_chroot_path("var/pants-peOCnquv/test.py") == "var/pants-peOCnquv/test.py"
 
     # Confirm we can handle values with no chroot path.
     assert strip_v2_chroot_path("") == ""
