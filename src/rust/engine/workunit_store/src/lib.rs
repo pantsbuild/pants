@@ -848,32 +848,19 @@ pub fn _start_workunit(
 
 #[macro_export]
 macro_rules! in_workunit {
-    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* $(,)? }) => (
-      {
-        let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
-        $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
-          let result = {
-            let $workunit = &mut $workunit;
-            async move { $( $body )* }
-          }.await;
-          $workunit.complete();
-          result
-        })
+  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => {{
+    let (store_handle, mut $workunit) =
+      $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+    $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+      let result = {
+        let $workunit = &mut $workunit;
+        $f
       }
-    );
-  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => (
-    {
-      let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
-      $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
-          let result = {
-            let $workunit = &mut $workunit;
-            $f
-          }.await;
-          $workunit.complete();
-          result
-        })
-    }
-  );
+      .await;
+      $workunit.complete();
+      result
+    })
+  }};
 }
 
 pub struct RunningWorkunit {
