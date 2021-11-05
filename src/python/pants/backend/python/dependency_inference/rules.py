@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 class UnownedDependencyError(Exception):
-    """The inferred dependency does not have an unambiguous owner."""
+    """The inferred dependency does not have any owner."""
 
 
 class UnownedDependencyUsage(Enum):
