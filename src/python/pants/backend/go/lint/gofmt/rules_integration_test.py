@@ -12,7 +12,15 @@ from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import source_files
@@ -36,6 +44,9 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *sdk.rules(),
             *go_mod.rules(),
+            *build_pkg.rules(),
+            *link.rules(),
+            *assembly.rules(),
             QueryRule(LintResults, (GofmtRequest,)),
             QueryRule(FmtResult, (GofmtRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
