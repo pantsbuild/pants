@@ -15,7 +15,8 @@ from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess, \
+    PexRequirements
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -225,6 +226,8 @@ async def setup_pytest_for_target(
         ),
     )
 
+    provided_pex = Pex(digest=EMPTY_DIGEST, name="/tmp/provided.pex", python=None)
+
     pytest_runner_pex_get = Get(
         VenvPex,
         PexRequest(
@@ -232,7 +235,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=[pytest_pex, requirements_pex, local_dists.pex, provided_pex],
         ),
     )
     config_files_get = Get(
