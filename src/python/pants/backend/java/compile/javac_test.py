@@ -9,7 +9,6 @@ import pytest
 
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.goals.check import JavacCheckRequest
 from pants.backend.java.goals.check import rules as javac_check_rules
@@ -19,11 +18,10 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, FileDigest, PathGlobs
+from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals.coursier import rules as coursier_rules
@@ -35,9 +33,13 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
-from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+    maybe_skip_jdk_test,
+)
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
@@ -62,15 +64,12 @@ def rule_runner() -> RuleRunner:
             *coursier_rules(),
             *jdk_rules.rules(),
             *java_dep_inf_rules(),
-            *java_parser.rules(),
-            *java_parser_launcher.rules(),
             *source_files.rules(),
             *testutil.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JvmDependencyLockfile, JavaSourcesGeneratorTarget, JvmArtifact],
         bootstrap_args=[
@@ -109,26 +108,6 @@ JAVA_LIB_MAIN_SOURCE = dedent(
     }
     """
 )
-
-
-def expect_single_expanded_coarsened_target(
-    rule_runner: RuleRunner, address: Address
-) -> CoarsenedTarget:
-    expanded_target = rule_runner.request(Targets, [Addresses([address])]).expect_single()
-    coarsened_targets = rule_runner.request(
-        CoarsenedTargets, [Addresses([expanded_target.address])]
-    )
-    assert len(coarsened_targets) == 1
-    return coarsened_targets[0]
-
-
-def make_resolve(
-    rule_runner: RuleRunner,
-    resolve_name: str = "test",
-    resolve_path: str = "coursier_resolve.lockfile",
-) -> CoursierResolveKey:
-    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
-    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
 
 
 @maybe_skip_jdk_test

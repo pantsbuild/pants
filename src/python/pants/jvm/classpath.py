@@ -7,11 +7,11 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
-from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
-from pants.jvm.compile import ClasspathEntry
+from pants.engine.unions import UnionMembership
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
@@ -58,7 +58,10 @@ class Classpath:
 
 
 @rule
-async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
+async def classpath(
+    coarsened_targets: CoarsenedTargets,
+    union_membership: UnionMembership,
+) -> Classpath:
     targets = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
 
     resolve = await Get(CoursierResolveKey, Targets, targets)
@@ -72,7 +75,11 @@ async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
         ),
     )
     transitive_user_classfiles = await MultiGet(
-        Get(ClasspathEntry, CompileJavaSourceRequest(component=t, resolve=resolve))
+        Get(
+            ClasspathEntry,
+            ClasspathEntryRequest,
+            ClasspathEntryRequest.for_targets(union_membership, component=t, resolve=resolve),
+        )
         for t in coarsened_targets.closure()
     )
     merged_transitive_user_classfiles_digest = await Get(

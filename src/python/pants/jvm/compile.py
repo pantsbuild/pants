@@ -4,22 +4,83 @@
 from __future__ import annotations
 
 import logging
+from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
+from typing import ClassVar
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import CoarsenedTarget, FieldSet
+from pants.engine.unions import UnionMembership, union
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
 
+class ClasspathSourceMissing(Exception):
+    """No compiler instances were compatible with a CoarsenedTarget."""
+
+
+class ClasspathSourceAmbiguity(Exception):
+    """Too many compiler instances were compatible with a CoarsenedTarget."""
+
+
+@union
+@dataclass(frozen=True)
+class ClasspathEntryRequest(metaclass=ABCMeta):
+    """A request for a ClasspathEntry for the given CoarsenedTarget and resolve.
+
+    TODO: Move to `classpath.py`.
+    """
+
+    component: CoarsenedTarget
+    resolve: CoursierResolveKey
+
+    # The FieldSets types that this request subclass is compatible with. A request will only be
+    # constructed if it is compatible with _all_ of the members of the CoarsenedTarget.
+    field_sets: ClassVar[tuple[type[FieldSet], ...]]
+
+    @staticmethod
+    def for_targets(
+        union_membership: UnionMembership, component: CoarsenedTarget, resolve: CoursierResolveKey
+    ) -> ClasspathEntryRequest:
+        """Constructs a subclass compatible with the members of the CoarsenedTarget."""
+        compatible = []
+        impls = union_membership.get(ClasspathEntryRequest)
+        for impl in impls:
+            if all(any(fs.is_applicable(t) for fs in impl.field_sets) for t in component.members):
+                compatible.append(impl)
+
+        if len(compatible) == 1:
+            return compatible[0](component, resolve)
+
+        impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
+        targets_str = "\n  ".join(
+            sorted(f"{t.address.spec}\t({type(t).alias})" for t in component.members)
+        )
+        if compatible:
+            raise ClasspathSourceAmbiguity(
+                f"More than one JVM compiler instance ({impls_str}) was compatible with "
+                f"the inputs:\n  {targets_str}"
+            )
+        else:
+            raise ClasspathSourceMissing(
+                f"No single JVM compiler instance (from: {impls_str}) was compatible with all of the "
+                f"the inputs:\n  {targets_str}"
+            )
+
+
 @dataclass(frozen=True)
 class ClasspathEntry:
-    """A JVM classpath entry, which will always be either zero or one JAR file."""
+    """A JVM classpath entry, which will always be either zero or one JAR file.
+
+    TODO: Move to `classpath.py`.
+    """
 
     digest: Digest
 

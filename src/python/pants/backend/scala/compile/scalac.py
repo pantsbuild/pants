@@ -4,17 +4,22 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
-from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
+from pants.engine.target import CoarsenedTargets, SourcesField
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    CompileResult,
+    FallibleClasspathEntry,
+)
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
@@ -34,17 +39,8 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ScalacFieldSet(FieldSet):
-    required_fields = (ScalaSourceField,)
-
-    sources: ScalaSourceField
-
-
-@dataclass(frozen=True)
-class CompileScalaSourceRequest:
-    component: CoarsenedTarget
-    resolve: CoursierResolveKey
+class CompileScalaSourceRequest(ClasspathEntryRequest):
+    field_sets = (ScalaFieldSet, ScalaGeneratorFieldSet)
 
 
 @rule(desc="Compile with scalac")
@@ -53,6 +49,7 @@ async def compile_scala_source(
     coursier: Coursier,
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
+    union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
     component_members_with_sources = tuple(
@@ -104,7 +101,10 @@ async def compile_scala_source(
     transitive_dependency_classfiles_fallible = await MultiGet(
         Get(
             FallibleClasspathEntry,
-            CompileScalaSourceRequest(component=component, resolve=request.resolve),
+            ClasspathEntryRequest,
+            ClasspathEntryRequest.for_targets(
+                union_membership, component=component, resolve=request.resolve
+            ),
         )
         for component in CoarsenedTargets(request.component.dependencies).closure()
     )
@@ -230,4 +230,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
     ]
