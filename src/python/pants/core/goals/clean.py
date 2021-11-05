@@ -74,7 +74,7 @@ class CleanSubsystem(GoalSubsystem):
             "--all",
             advanced=False,
             type=bool,
-            default=False,  # @TODO: True?
+            default=False,
             help=(
                 "Clear all caches. Can be combined with the advanced options for further control."
             ),
