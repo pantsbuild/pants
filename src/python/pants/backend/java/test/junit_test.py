@@ -8,7 +8,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java import classpath
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
@@ -21,6 +20,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
+from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,

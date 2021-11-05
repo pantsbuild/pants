@@ -7,8 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.classpath import Classpath
-from pants.backend.java.classpath import rules as classpath_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
@@ -26,6 +24,8 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
+from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.compile import CompiledClassfiles, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.jdk_rules import JdkSetup
