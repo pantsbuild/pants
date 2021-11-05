@@ -1,13 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java.package import deploy_jar  # TODO: Should move to the JVM package.
-from pants.backend.java.target_types import (  # TODO: All of these should move to the JVM package.
-    DeployJar,
-    JunitTestsGeneratorTarget,
-    JunitTestTarget,
-)
-from pants.backend.java.test import junit  # TODO: Should move to the JVM package.
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.goals import check
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
@@ -21,11 +14,8 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 
 def target_types():
     return [
-        DeployJar,
         ScalaSourceTarget,
         ScalaSourcesGeneratorTarget,
-        JunitTestTarget,
-        JunitTestsGeneratorTarget,
         JvmArtifact,
         JvmDependencyLockfile,
     ]
@@ -33,15 +23,13 @@ def target_types():
 
 def rules():
     return [
-        *scalac.rules(),
         *check.rules(),
         *classpath.rules(),
-        *junit.rules(),
-        *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
-        *jvm_util_rules.rules(),
         *jdk_rules.rules(),
+        *jvm_util_rules.rules(),
+        *scalac.rules(),
         *target_types_rules(),
     ]

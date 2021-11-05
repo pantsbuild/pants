@@ -15,14 +15,12 @@ from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules import source_files
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, FileDigest, PathGlobs
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm import jdk_rules
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
-from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
@@ -45,16 +43,13 @@ DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
-            *external_tool_rules(),
             *source_files.rules(),
             *scalac_rules(),
             *scalac_check_rules(),
             *util_rules(),
             *target_types_rules(),
-            *coursier_rules(),
             *jdk_rules.rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileScalaSourceRequest,)),

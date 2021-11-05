@@ -21,6 +21,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
+from pants.jvm import classpath
 from pants.jvm.classpath import Classpath
 
 logger = logging.getLogger(__name__)
@@ -163,5 +164,6 @@ async def package_deploy_jar(
 def rules():
     return [
         *collect_rules(),
+        *classpath.rules(),
         UnionRule(PackageFieldSet, DeployJarFieldSet),
     ]
