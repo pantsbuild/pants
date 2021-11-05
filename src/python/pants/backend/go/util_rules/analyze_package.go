@@ -18,13 +18,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/build"
-	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -71,29 +69,21 @@ type Package struct {
 	Error          string            `json:",omitempty"`
 }
 
-type fileAnalysis struct {
-	Name    string
-	Imports []string
-}
+func analyzeFile(fileSet *token.FileSet, filename string) (*fileInfo, error) {
+	fi := fileInfo{filename: filename, fset: fileSet}
 
-func analyzeFile(fileSet *token.FileSet, filename string) (*fileAnalysis, error) {
-	parsed, err := parser.ParseFile(fileSet, filename, nil, parser.ImportsOnly|parser.ParseComments)
+	f, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return &fi, err
+	}
+	defer f.Close()
+
+	err = readGoInfo(f, &fi)
+	if err != nil {
+		return &fi, err
 	}
 
-	analysis := &fileAnalysis{}
-
-	analysis.Name = parsed.Name.Name
-	for _, spec := range parsed.Imports {
-		importPath, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode import %s in %s", spec.Path.Value, filename)
-		}
-		analysis.Imports = append(analysis.Imports, importPath)
-	}
-
-	return analysis, nil
+	return &fi, nil
 }
 
 // Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;l=1024;drc=refs%2Ftags%2Fgo1.17.2
@@ -121,13 +111,13 @@ func fileListForExt(p *Package, ext string) *[]string {
 	return nil
 }
 
-func cleanImports(importsMap map[string]bool) []string {
-	var imports []string
-	for importPath, _ := range importsMap {
-		imports = append(imports, importPath)
+func cleanStringSet(valuesMap map[string]bool) []string {
+	var values []string
+	for value, _ := range valuesMap {
+		values = append(values, value)
 	}
-	sort.Strings(imports)
-	return imports
+	sort.Strings(values)
+	return values
 }
 
 func analyzePackage(directory string, buildContext *build.Context) (*Package, error) {
@@ -148,6 +138,11 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	importsMap := make(map[string]bool)
 	testImportsMap := make(map[string]bool)
 	xtestImportsMap := make(map[string]bool)
+
+	embedsMap := make(map[string]bool)
+	testEmbedsMap := make(map[string]bool)
+	xtestEmbedsMap := make(map[string]bool)
+
 	var cgoSfiles []string // files with ".S"(capital S)/.sx(capital s equivalent for case insensitive filesystems)
 
 	for _, entry := range entries {
@@ -207,11 +202,16 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		if err != nil {
 			pkg.InvalidGoFiles[name] = err.Error()
 			// Fall-through to allow still listing the file's existence.
+			// TODO: This should just be I/O errors now, so consider erroring out here as that is infra failure.
+		}
+		if analysis.parseErr != nil {
+			pkg.InvalidGoFiles[name] = analysis.parseErr.Error()
+			// Fall-through to allow still listing the file's existence.
 		}
 
 		var pkgName string
 		if analysis != nil {
-			pkgName = analysis.Name
+			pkgName = analysis.pkg
 			if pkgName == "documentation" {
 				// Ignore package documentation that are in `documentation` package.
 				pkg.IgnoredGoFiles = append(pkg.IgnoredGoFiles, name)
@@ -221,7 +221,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		isTest := strings.HasSuffix(name, "_test.go")
 		isXTest := false
-		if analysis != nil && isTest && strings.HasSuffix(analysis.Name, "_test") {
+		if isTest && strings.HasSuffix(pkgName, "_test") {
 			isXTest = true
 			pkgName = pkgName[:len(pkgName)-len("_test")]
 		}
@@ -233,8 +233,8 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		// Check whether CGo is in use.
 		isCGo := false
 		if analysis != nil {
-			for _, imp := range analysis.Imports {
-				if imp == "C" {
+			for _, imp := range analysis.imports {
+				if imp.path == "C" {
 					if isTest {
 						pkg.InvalidGoFiles[name] = fmt.Sprintf("use of cgo in test %s not supported", name)
 						continue
@@ -247,6 +247,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		}
 
 		var fileList *[]string
+		var embedsMapForFile map[string]bool
 		var importsMapForFile map[string]bool
 
 		switch {
@@ -257,18 +258,28 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		case isXTest:
 			fileList = &pkg.XTestGoFiles
 			importsMapForFile = xtestImportsMap
+			embedsMapForFile = xtestEmbedsMap
 		case isTest:
 			fileList = &pkg.TestGoFiles
 			importsMapForFile = testImportsMap
+			embedsMapForFile = testEmbedsMap
 		default:
 			fileList = &pkg.GoFiles
 			importsMapForFile = importsMap
+			embedsMapForFile = embedsMap
 		}
+
 		*fileList = append(*fileList, name)
 
 		if importsMapForFile != nil && analysis != nil {
-			for _, importPath := range analysis.Imports {
-				importsMapForFile[importPath] = true
+			for _, importPath := range analysis.imports {
+				importsMapForFile[importPath.path] = true
+			}
+		}
+
+		if embedsMapForFile != nil && len(analysis.embeds) > 0 {
+			for _, e := range analysis.embeds {
+				embedsMapForFile[e.pattern] = true
 			}
 		}
 	}
@@ -276,9 +287,13 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	// TODO: Add generated build tags (like `cgo` tag) to a field in package analysis?
 	// Will probably need to vendor MatchFile (like rules_go does).
 
-	pkg.Imports = cleanImports(importsMap)
-	pkg.TestImports = cleanImports(testImportsMap)
-	pkg.XTestImports = cleanImports(xtestImportsMap)
+	pkg.Imports = cleanStringSet(importsMap)
+	pkg.TestImports = cleanStringSet(testImportsMap)
+	pkg.XTestImports = cleanStringSet(xtestImportsMap)
+
+	pkg.EmbedPatterns = cleanStringSet(embedsMap)
+	pkg.TestEmbedPatterns = cleanStringSet(testEmbedsMap)
+	pkg.XTestEmbedPatterns = cleanStringSet(xtestEmbedsMap)
 
 	// add the .S/.sx files only if we are using cgo
 	// (which means gcc will compile them).
