@@ -274,12 +274,7 @@ async def coursier_resolve_lockfile(
             argv=coursier.args(
                 [
                     coursier_report_file_name,
-                    *(req.to_coord_str() for req in artifact_requirements),
-                    *(
-                        f"--strict-include={req.to_coord_str(versioned=False)}"
-                        for req in artifact_requirements
-                        if req.strict
-                    ),
+                    *(f"{req.to_coord_str()}:strict" for req in artifact_requirements),
                 ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
