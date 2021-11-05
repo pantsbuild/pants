@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.java.goals import check
 from pants.backend.java import tailor
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import (
@@ -42,8 +43,9 @@ def target_types():
 def rules():
     return [
         *javac.rules(),
-        *junit.rules(),
+        *check.rules(),
         *classpath.rules(),
+        *junit.rules(),
         *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),

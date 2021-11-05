@@ -7,8 +7,10 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.scala.compile.scalac import CompileScalaSourceRequest, ScalacCheckRequest
+from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.goals.check import ScalacCheckRequest
+from pants.backend.scala.goals.check import rules as scalac_check_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
@@ -49,6 +51,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *scalac_rules(),
+            *scalac_check_rules(),
             *util_rules(),
             *target_types_rules(),
             *coursier_rules(),

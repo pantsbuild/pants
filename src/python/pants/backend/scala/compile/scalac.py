@@ -9,9 +9,7 @@ from itertools import chain
 
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -23,8 +21,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField, Targets
-from pants.engine.unions import UnionRule
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
@@ -50,10 +47,6 @@ class ScalacFieldSet(FieldSet):
     required_fields = (ScalaSourceField,)
 
     sources: ScalaSourceField
-
-
-class ScalacCheckRequest(CheckRequest):
-    field_set_type = ScalacFieldSet
 
 
 @dataclass(frozen=True)
@@ -244,41 +237,8 @@ async def compile_scala_source(
     )
 
 
-@rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
-async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
-    )
-
-    resolves = await MultiGet(
-        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
-    )
-
-    # TODO: This should be fallible so that we exit cleanly.
-    results = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t, resolve=r))
-        for t, r in zip(coarsened_targets, resolves)
-    )
-
-    # NB: We return CheckResults with exit codes for the root targets, but we do not pass
-    # stdout/stderr because it will already have been rendered as streaming.
-    return CheckResults(
-        [
-            CheckResult(
-                result.exit_code,
-                stdout="",
-                stderr="",
-                partition_description=str(coarsened_target),
-            )
-            for result, coarsened_target in zip(results, coarsened_targets)
-        ],
-        checker_name="scalac",
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
-        UnionRule(CheckRequest, ScalacCheckRequest),
     ]

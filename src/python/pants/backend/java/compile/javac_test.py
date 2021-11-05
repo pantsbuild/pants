@@ -8,10 +8,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
+from pants.backend.java.goals.check import JavacCheckRequest
+from pants.backend.java.goals.check import rules as javac_check_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
@@ -60,6 +62,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *javac_rules(),
+            *javac_check_rules(),
             *util_rules(),
             *target_types_rules(),
             *coursier_rules(),

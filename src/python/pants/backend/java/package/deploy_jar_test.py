@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
@@ -16,17 +15,13 @@ from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
 from pants.backend.java.target_types import DeployJar, JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
-from pants.core.goals.check import CheckResults
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
-from pants.jvm.classpath import Classpath
 from pants.jvm.classpath import rules as classpath_rules
-from pants.jvm.compile import CompiledClassfiles, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
@@ -61,10 +56,6 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(BuiltPackage, (DeployJarFieldSet,)),
-            QueryRule(CheckResults, (JavacCheckRequest,)),
-            QueryRule(Classpath, (Addresses,)),
-            QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
-            QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(JdkSetup, ()),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(Snapshot, (Digest,)),
