@@ -126,7 +126,7 @@ class PythonInferSubsystem(Subsystem):
             "--unowned-dependency-behavior",
             type=UnownedDependencyUsage,
             default=UnownedDependencyUsage.DoNothing,
-            help=("How to handle inferred dependencies that don't have an unambiguous owner."),
+            help=("How to handle inferred dependencies that don't have any owner."),
         )
         # @TODO: Add a way for people to whitelist ok unowned dependencies?
         # Or just use python_requirement()?
