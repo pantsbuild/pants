@@ -260,20 +260,9 @@ async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
         for t, r in zip(coarsened_targets, resolves)
     )
 
-    # NB: We return CheckResults with exit codes for the root targets, but we do not pass
-    # stdout/stderr because it will already have been rendered as streaming.
-    return CheckResults(
-        [
-            CheckResult(
-                result.exit_code,
-                stdout="",
-                stderr="",
-                partition_description=str(coarsened_target),
-            )
-            for result, coarsened_target in zip(results, coarsened_targets)
-        ],
-        checker_name="scalac",
-    )
+    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
+    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name="scalac")
 
 
 def rules():

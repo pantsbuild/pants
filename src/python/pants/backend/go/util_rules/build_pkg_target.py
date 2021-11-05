@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 
@@ -122,7 +123,11 @@ async def setup_build_go_package_target_request(
     direct_dependencies = []
     for maybe_dep in maybe_direct_dependencies:
         if maybe_dep.request is None:
-            return maybe_dep
+            return dataclasses.replace(
+                maybe_dep,
+                import_path="main" if request.is_main else import_path,
+                dependency_failed=True,
+            )
         direct_dependencies.append(maybe_dep.request)
 
     result = BuildGoPackageRequest(
