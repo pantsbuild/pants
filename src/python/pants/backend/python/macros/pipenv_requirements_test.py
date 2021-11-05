@@ -119,15 +119,14 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.parametrize("source_arg", ("source", "requirements_relpath"))
-def test_supply_python_requirements_file(source_arg: str, rule_runner: RuleRunner) -> None:
+def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
     """This tests that we can supply our own `_python_requirements_file`."""
     assert_pipenv_requirements(
         rule_runner,
         dedent(
-            f"""
+            """
             pipenv_requirements(
-                {source_arg}='custom/pipfile/Pipfile.lock',
+                source='custom/pipfile/Pipfile.lock',
                 pipfile_target='//:custom_pipfile_target'
             )
 

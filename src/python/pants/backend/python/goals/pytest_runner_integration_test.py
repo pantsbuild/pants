@@ -533,8 +533,9 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
                 python_distribution(
                     name="dist",
                     dependencies=[":lib"],
-                    provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
+                    provides=python_artifact(name="foo", version="9.8.7"),
                     sdist=False,
+                    generate_setup=False,
                 )
 
                 # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
@@ -554,24 +555,20 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
 def test_skip_tests(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/test_skip_me.py": "",
-            f"{PACKAGE}/test_foo.py": "",
-            f"{PACKAGE}/test_foo.pyi": "",
-            f"{PACKAGE}/conftest.py": "",
-            f"{PACKAGE}/BUILD": dedent(
+            "test_skip_me.py": "",
+            "test_foo.py": "",
+            "BUILD": dedent(
                 """\
                 python_tests(name='t1', sources=['test_skip_me.py'], skip_tests=True)
-                python_tests(name='t2', sources=['test_foo*', 'conftest.py'])
+                python_tests(name='t2', sources=['test_foo.py'])
                 """
             ),
         }
     )
 
     def is_applicable(tgt_name: str, fp: str) -> bool:
-        tgt = rule_runner.get_target(Address(PACKAGE, target_name=tgt_name, relative_file_path=fp))
+        tgt = rule_runner.get_target(Address("", target_name=tgt_name, relative_file_path=fp))
         return PythonTestFieldSet.is_applicable(tgt)
 
     assert not is_applicable("t1", "test_skip_me.py")
     assert is_applicable("t2", "test_foo.py")
-    assert not is_applicable("t2", "test_foo.pyi")
-    assert not is_applicable("t2", "conftest.py")

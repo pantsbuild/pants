@@ -1,10 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from typing import Iterable, Set, cast
 
 from pants.engine.addresses import Address, Addresses
@@ -12,7 +10,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, AllTargetsRequest, Dependencies, DependenciesRequest
+from pants.engine.target import AllUnexpandedTargets, Dependencies, DependenciesRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -25,8 +23,7 @@ class AddressToDependees:
 
 
 @rule(desc="Map all targets to their dependees", level=LogLevel.DEBUG)
-async def map_addresses_to_dependees() -> AddressToDependees:
-    all_targets = await Get(AllTargets, AllTargetsRequest(include_target_generators=True))
+async def map_addresses_to_dependees(all_targets: AllUnexpandedTargets) -> AddressToDependees:
     dependencies_per_target = await MultiGet(
         Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
         for tgt in all_targets
@@ -84,11 +81,6 @@ def find_dependees(
         known_dependents = dependents
 
 
-class DependeesOutputFormat(Enum):
-    text = "text"
-    json = "json"
-
-
 class DependeesSubsystem(LineOriented, GoalSubsystem):
     name = "dependees"
     help = "List all targets that depend on any of the input files/targets."
@@ -108,18 +100,6 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
             default=False,
             help="Include the input targets in the output, along with the dependees.",
         )
-        register(
-            "--output-format",
-            type=DependeesOutputFormat,
-            default=DependeesOutputFormat.text,
-            removal_version="2.9.0.dev0",
-            removal_hint="Use the `peek` goal for structured output, including dependencies.",
-            help=(
-                "Use `text` for a flattened list of target addresses; use `json` for each key to be "
-                "the address of one of the specified targets, with its value being "
-                "a list of that target's dependees, e.g. `{':example': [':dep1', ':dep2']}`."
-            ),
-        )
 
     @property
     def transitive(self) -> bool:
@@ -128,10 +108,6 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
     @property
     def closed(self) -> bool:
         return cast(bool, self.options.closed)
-
-    @property
-    def output_format(self) -> DependeesOutputFormat:
-        return cast(DependeesOutputFormat, self.options.output_format)
 
 
 class DependeesGoal(Goal):
@@ -142,27 +118,6 @@ class DependeesGoal(Goal):
 async def dependees_goal(
     specified_addresses: Addresses, dependees_subsystem: DependeesSubsystem, console: Console
 ) -> DependeesGoal:
-    # TODO: Delte this entire conditional in 2.9.0.dev0.
-    if dependees_subsystem.output_format == DependeesOutputFormat.json:
-        dependees_per_target = await MultiGet(
-            Get(
-                Dependees,
-                DependeesRequest(
-                    [specified_address],
-                    transitive=dependees_subsystem.transitive,
-                    include_roots=dependees_subsystem.closed,
-                ),
-            )
-            for specified_address in specified_addresses
-        )
-        json_result = {
-            specified_address.spec: [dependee.spec for dependee in dependees]
-            for specified_address, dependees in zip(specified_addresses, dependees_per_target)
-        }
-        with dependees_subsystem.line_oriented(console) as print_stdout:
-            print_stdout(json.dumps(json_result, indent=4, separators=(",", ": "), sort_keys=True))
-        return DependeesGoal(exit_code=0)
-
     dependees = await Get(
         Dependees,
         DependeesRequest(

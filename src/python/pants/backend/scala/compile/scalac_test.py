@@ -16,7 +16,7 @@ from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
-from pants.engine.fs import DigestContents, FileDigest
+from pants.engine.fs import Digest, DigestContents, FileDigest, PathGlobs
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm import jdk_rules
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
@@ -26,6 +26,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -106,6 +107,15 @@ def expect_single_expanded_coarsened_target(
     return coarsened_targets[0]
 
 
+def make_resolve(
+    rule_runner: RuleRunner,
+    resolve_name: str = "test",
+    resolve_path: str = "coursier_resolve.lockfile",
+) -> CoursierResolveKey:
+    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
+    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
+
+
 @logging
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
@@ -132,7 +142,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     compiled_classfiles = rule_runner.request(
         CompiledClassfiles,
-        [CompileScalaSourceRequest(component=coarsened_target)],
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
@@ -190,7 +200,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
                     rule_runner, Address(spec_path="", target_name="main")
-                )
+                ),
+                resolve=make_resolve(rule_runner),
             )
         ],
     )
@@ -221,7 +232,8 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
@@ -260,6 +272,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 scala_sources(
                     name = 'main',
+                    dependencies = [":joda-time_joda-time"],
                 )
                 """
             ),
@@ -283,7 +296,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
     classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
@@ -293,7 +307,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
+def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -326,7 +340,57 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="", target_name="main")
-        )
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "error: object joda is not a member of package org" in fallible_result.stderr
+
+
+@maybe_skip_jdk_test
+def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+                scala_sources(
+                    name = 'main',
+                    dependencies = [],  # `joda-time` needs to be here for compile to succeed
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
+            .to_json()
+            .decode("utf-8"),
+            "Example.scala": dedent(
+                """
+                package org.pantsbuild.example
+
+                import org.joda.time.DateTime
+
+                object Main {
+                    def main(args: Array[String]): Unit = {
+                        val dt = new DateTime()
+                        println(dt.getYear)
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="main")
+        ),
+        resolve=make_resolve(rule_runner),
     )
     fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr

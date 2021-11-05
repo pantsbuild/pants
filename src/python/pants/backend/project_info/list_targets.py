@@ -8,7 +8,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTargets
+from pants.engine.target import DescriptionField, UnexpandedTargets
 
 logger = logging.getLogger(__name__)
 
@@ -21,23 +21,11 @@ class ListSubsystem(LineOriented, GoalSubsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--provides",
-            type=bool,
-            default=False,
-            help="List only targets that provide an artifact.",
-            removal_version="2.9.0.dev0",
-            removal_hint="Filter on python distributions instead: ./pants filter --target-type=python_distribution ::\n",
-        )
-        register(
             "--documented",
             type=bool,
             default=False,
             help="Print only targets that are documented with a description.",
         )
-
-    @property
-    def provides(self) -> bool:
-        return cast(bool, self.options.provides)
 
     @property
     def documented(self) -> bool:
@@ -54,25 +42,6 @@ async def list_targets(
 ) -> List:
     if not addresses:
         logger.warning(f"No targets were matched in goal `{list_subsystem.name}`.")
-        return List(exit_code=0)
-
-    if list_subsystem.provides and list_subsystem.documented:
-        raise ValueError(
-            "Cannot specify both `--list-documented` and `--list-provides` at the same time. "
-            "Please choose one."
-        )
-
-    if list_subsystem.provides:
-        # We must preserve target generators, not replace with their generated targets.
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
-        addresses_with_provide_artifacts = {
-            tgt.address: tgt[ProvidesField].value
-            for tgt in targets
-            if tgt.get(ProvidesField).value is not None
-        }
-        with list_subsystem.line_oriented(console) as print_stdout:
-            for address, artifact in addresses_with_provide_artifacts.items():
-                print_stdout(f"{address.spec} {artifact}")
         return List(exit_code=0)
 
     if list_subsystem.documented:

@@ -51,7 +51,7 @@ pants_ignore.add = [
 
 build_ignore.add = [
   # Disable Go targets by default so Pants developers do not need Go installed.
-  "/testprojects/src/go/**",
+  "testprojects/src/go/**",
 ]
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
@@ -79,6 +79,17 @@ root_patterns = [
   "/build-support/bin",
   "/build-support/migration-support",
   "/pants-plugins",
+]
+
+[tailor]
+ignore_paths = ["build-support/migration-support/BUILD"]
+ignore_adding_targets = [
+  "src/python/pants:__main__",
+  "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
+  "src/python/pants/backend/go/goals:bin",
+  "src/python/pants/backend/go/util_rules:bin",
+  "src/python/pants/backend/python/dependency_inference:import_parser",
+  "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
 [python]
@@ -188,3 +199,4 @@ master = "src/python/pants/notes/master.rst"
 "2.6.x" = "src/python/pants/notes/2.6.x.md"
 "2.7.x" = "src/python/pants/notes/2.7.x.md"
 "2.8.x" = "src/python/pants/notes/2.8.x.md"
+"2.9.x" = "src/python/pants/notes/2.9.x.md"

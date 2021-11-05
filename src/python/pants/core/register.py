@@ -9,6 +9,7 @@ These are always activated and cannot be disabled.
 from pants.core.goals import (
     check,
     clean,
+    export,
     fmt,
     lint,
     package,
@@ -34,7 +35,6 @@ from pants.core.util_rules import (
     config_files,
     distdir,
     external_tool,
-    filter_empty_sources,
     pants_bin,
     source_files,
     stripped_source_files,
@@ -50,6 +50,7 @@ def rules():
         # goals
         *check.rules(),
         *clean.rules(),
+        *export.rules(),
         *fmt.rules(),
         *lint.rules(),
         *update_build_files.rules(),
@@ -66,7 +67,6 @@ def rules():
         *python_binaries.rules(),
         *distdir.rules(),
         *external_tool.rules(),
-        *filter_empty_sources.rules(),
         *pants_bin.rules(),
         *source_files.rules(),
         *source_root.rules(),

@@ -16,9 +16,12 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
 from typing_extensions import TypedDict
 
+from pants.backend.python.macros.caof_utils import (
+    OVERRIDES_TYPE,
+    flatten_overrides_to_dependency_field,
+)
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
-from pants.base.deprecated import warn_or_error
 from pants.base.parse_context import ParseContext
 
 logger = logging.getLogger(__name__)
@@ -391,40 +394,18 @@ class PoetryRequirements:
 
     def __call__(
         self,
-        pyproject_toml_relpath: str | None = None,
         *,
-        source: str | None = None,
+        source: str = "pyproject.toml",
         module_mapping: Mapping[str, Iterable[str]] | None = None,
         type_stubs_module_mapping: Mapping[str, Iterable[str]] | None = None,
+        overrides: OVERRIDES_TYPE = None,
     ) -> None:
         """
-        :param pyproject_toml_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `requirements.txt` file sibling to the BUILD file.
         :param module_mapping: a mapping of requirement names to a list of the modules they provide.
             For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
             requirement name as the default module, e.g. "Django" will default to
             `modules=["django"]`.
         """
-        if pyproject_toml_relpath and source:
-            raise ValueError(
-                "Specified both `pyproject_toml_relpath` and `source` in the `poetry_requirements` "
-                f"macro in the BUILD file at {self._parse_context.rel_path}. Use one, preferably "
-                "`source`."
-            )
-        if pyproject_toml_relpath is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `pyproject_toml_relpath` argument for `poetry_requirements()`",
-                (
-                    "Use the `source` argument instead of `pyproject_toml_relpath` for the "
-                    f"`poetry_requirements` macro in the BUILD file at "
-                    f"{self._parse_context.rel_path}. `source` behaves the same."
-                ),
-            )
-            source = pyproject_toml_relpath
-        if source is None:
-            source = "pyproject.toml"
-
         req_file_tgt = self._parse_context.create_object(
             "_python_requirements_file",
             name=source.replace(os.path.sep, "_"),
@@ -435,6 +416,10 @@ class PoetryRequirements:
         normalized_module_mapping = normalize_module_mapping(module_mapping)
         normalized_type_stubs_module_mapping = normalize_module_mapping(type_stubs_module_mapping)
 
+        dependencies_overrides = flatten_overrides_to_dependency_field(
+            overrides, macro_name="python_requirements", build_file_dir=self._parse_context.rel_path
+        )
+
         requirements = parse_pyproject_toml(PyProjectToml.create(self._parse_context, source))
         for parsed_req in requirements:
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
@@ -444,5 +429,8 @@ class PoetryRequirements:
                 requirements=[parsed_req],
                 modules=normalized_module_mapping.get(normalized_proj_name),
                 type_stub_modules=normalized_type_stubs_module_mapping.get(normalized_proj_name),
-                dependencies=[requirements_dep],
+                dependencies=[
+                    requirements_dep,
+                    *dependencies_overrides.get(normalized_proj_name, []),
+                ],
             )

@@ -15,9 +15,9 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 @pytest.mark.parametrize(
     ("entry_point", "execution_mode", "include_tools"),
     [
-        ("app.py", PexExecutionMode.UNZIP, True),
-        ("app.py", PexExecutionMode.VENV, True),
-        ("app.py:main", PexExecutionMode.ZIPAPP, False),
+        ("app.py", None, True),
+        ("app.py", PexExecutionMode.VENV, False),
+        ("app.py:main", PexExecutionMode.ZIPAPP, True),
         ("app.py:main", None, False),
     ],
 )
@@ -183,8 +183,9 @@ def test_local_dist() -> None:
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
-                provides=python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
+                provides=python_artifact(name="foo", version="9.8.7"),
                 sdist=False,
+                generate_setup=False,
             )
 
             pex_binary(

@@ -240,7 +240,7 @@ async fn write_connection_error() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Unknown: \"transport error\""),
+    error.contains("Unavailable: \"error trying to connect: dns error"),
     "Bad error message, got: {}",
     error
   );

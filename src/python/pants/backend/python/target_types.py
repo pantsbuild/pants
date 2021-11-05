@@ -12,9 +12,7 @@ from enum import Enum
 from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
-    Any,
     ClassVar,
-    Dict,
     Iterable,
     Iterator,
     Mapping,
@@ -30,7 +28,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import RuntimePackageDependenciesField
@@ -49,7 +46,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     NestedDictStringToStringField,
     OverridesField,
-    ProvidesField,
     ScalarField,
     SecondaryOwnerMixin,
     SingleSourceField,
@@ -77,11 +73,11 @@ if TYPE_CHECKING:
 
 class PythonSourceField(SingleSourceField):
     # Note that Python scripts often have no file ending.
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
-    expected_file_extensions = ("", ".py", ".pyi")
+    expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
 class InterpreterConstraintsField(StringSequenceField):
@@ -291,16 +287,6 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
             return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
-        if value in {"<none>", "<None>"}:
-            warn_or_error(
-                "2.9.0.dev0",
-                "using `<none>` for the `entry_point` field",
-                (
-                    "Rather than setting `entry_point='<none>' for the pex_binary target "
-                    f"{address}, simply leave off the field."
-                ),
-            )
-            return None
         try:
             return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
@@ -389,22 +375,6 @@ class PexInheritPathField(StringField):
         return super().compute_value(raw_value, address)
 
 
-# TODO(John Sirois): Deprecate: https://github.com/pantsbuild/pants/issues/12803
-class PexZipSafeField(BoolField):
-    alias = "zip_safe"
-    default = True
-    help = (
-        "Whether or not this binary is safe to run in compacted (zip-file) form.\n\nIf the PEX is "
-        "not zip safe, it will be written to disk prior to execution. You may need to mark "
-        "`zip_safe=False` if you're having issues loading your code."
-    )
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "All PEX binaries now unpack your code to disk prior to first execution; so this option no "
-        "longer needs to be specified."
-    )
-
-
 class PexStripEnvField(BoolField):
     alias = "strip_pex_env"
     default = True
@@ -415,21 +385,6 @@ class PexStripEnvField(BoolField):
         "transferring control to the application by default. This prevents any subprocesses that "
         "happen to execute other PEX files from inheriting these control knob values since most "
         "would be undesired; e.g.: PEX_MODULE or PEX_PATH."
-    )
-
-
-class PexAlwaysWriteCacheField(BoolField):
-    alias = "always_write_cache"
-    default = False
-    help = (
-        "Whether PEX should always write the .deps cache of the .pex file to disk or not. This "
-        "can use less memory in RAM-constrained environments."
-    )
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "This option never had any effect when passed to Pex and the Pex option is now removed "
-        "altogether. PEXes always write all their internal dependencies out to disk as part of "
-        "first execution bootstrapping."
     )
 
 
@@ -464,7 +419,6 @@ class PexEmitWarningsField(TriBoolField):
 
 class PexExecutionMode(Enum):
     ZIPAPP = "zipapp"
-    UNZIP = "unzip"
     VENV = "venv"
 
 
@@ -482,24 +436,8 @@ class PexExecutionModeField(StringField):
         f"the steady state is {PexExecutionMode.VENV.value!r}, which generates a virtual "
         "environment from the PEX file on first run, but then achieves near native virtual "
         "environment start times. This mode also benefits from a traditional virtual environment "
-        "`sys.path`, giving maximum compatibility with stdlib and third party APIs.\n\nThe "
-        f"{PexExecutionMode.UNZIP.value!r} mode is deprecated since the default "
-        f"{PexExecutionMode.ZIPAPP.value!r} mode now executes this way."
+        "`sys.path`, giving maximum compatibility with stdlib and third party APIs."
     )
-
-    @classmethod
-    def _check_deprecated(cls, raw_value: Optional[Any], address_: Address) -> None:
-        if PexExecutionMode.UNZIP.value == raw_value:
-            warn_or_error(
-                removal_version="2.9.0.dev0",
-                entity=f"the {cls.alias!r} field {PexExecutionMode.UNZIP.value!r} value",
-                hint=(
-                    f"The {PexExecutionMode.UNZIP.value!r} mode is now the default PEX execution "
-                    "mode; so you can remove this field setting or explicitly choose the default "
-                    f"of {PexExecutionMode.ZIPAPP.value!r} and get the same benefits you already "
-                    "enjoy from this mode."
-                ),
-            )
 
 
 class PexIncludeToolsField(BoolField):
@@ -524,9 +462,7 @@ class PexBinary(Target):
         PexScriptField,
         PexPlatformsField,
         PexInheritPathField,
-        PexZipSafeField,
         PexStripEnvField,
-        PexAlwaysWriteCacheField,
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
@@ -554,10 +490,21 @@ class PexBinary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
-#  message to use `python_source`/`python_test_utils` instead.
 class PythonTestSourceField(PythonSourceField):
-    pass
+    expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        super().validate_resolved_files(files)
+        file = files[0]
+        file_name = os.path.basename(file)
+        if file_name == "conftest.py":
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} should not be set to the "
+                f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
+                "`python_source` target or the target generator `python_test_utils`. You can run "
+                f"`./pants tailor` after removing this target ({self.address}) to autogenerate a "
+                "`python_test_utils` target."
+            )
 
 
 class PythonTestsDependencies(Dependencies):
@@ -630,39 +577,29 @@ class PythonTestTarget(Target):
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
-        "target and then be included in the `dependencies` field.\n\n"
+        "target and then be included in the `dependencies` field. (You can use the "
+        "`python_test_utils` target to generate these `python_source` targets.)\n\n"
         f"See {doc_url('python-test-goal')}"
     )
 
 
-# TODO(#13238): Update this to ban `.pyi` file extensions and ban `conftest.py` with a helpful
-#  message to use `python_test_utils` instead.
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
+    expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
     default = ("test_*.py", "*_test.py", "tests.py")
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
-        deprecated_files = []
-        for fp in files:
-            file_name = os.path.basename(fp)
-            if file_name == "conftest.py" or file_name.endswith(".pyi"):
-                deprecated_files.append(fp)
-
-        if deprecated_files:
-            # NOTE: Update `pytest.py` to stop special-casing file targets once this is removed!
-            warn_or_error(
-                "2.9.0.dev0",
-                entity=(
-                    "including `conftest.py` and `.pyi` stubs in a `python_tests` target's "
-                    "`sources` field"
-                ),
-                hint=(
-                    f"The `python_tests` target {self.address} includes these bad files in its "
-                    f"`sources` field: {deprecated_files}. "
-                    "To fix, please remove these files from the `sources` field and instead add "
-                    "them to a `python_test_utils` target. You can run `./pants tailor` after "
-                    "removing the files from the `sources` field to auto-generate this new target."
-                ),
+        # We don't technically need to error for `conftest.py` here because `PythonTestSourceField`
+        # already validates this, but we get a better error message this way so that users don't
+        # have to reason about generated targets.
+        conftest_files = [fp for fp in files if os.path.basename(fp) == "conftest.py"]
+        if conftest_files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} should not include the "
+                f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
+                "`python_source` target or the target generator `python_test_utils`. You can run "
+                f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
+                f"this target ({self.address}) to autogenerate a `python_test_utils` target."
             )
 
 
@@ -765,9 +702,6 @@ class PythonSourcesGeneratorTarget(Target):
         "like `conftest.py`. They behave identically, but can help to better model and keep "
         "separate test support files vs. production files."
     )
-
-    deprecated_alias = "python_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -903,65 +837,6 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class ModuleMappingField(DictStringToStringSequenceField):
-    alias = "module_mapping"
-    help = (
-        "A mapping of requirement names to a list of the modules they provide.\n\n"
-        'For example, `{"ansicolors": ["colors"]}`.\n\n'
-        "Any unspecified requirements will use the requirement name as the default module, "
-        'e.g. "Django" will default to `["django"]`.\n\n'
-        "This is used to infer dependencies."
-    )
-    value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "Use the field `modules` instead, which takes a list of modules the `python_requirement` "
-        "target provides.\n\n"
-        "If this `python_requirement` target has multiple distinct 3rd-party "
-        "projects in its `requirements` field, you should split those up into one `"
-        "python_requirement` target per distinct project."
-    )
-
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        return normalize_module_mapping(value_or_default)
-
-
-class TypeStubsModuleMappingField(DictStringToStringSequenceField):
-    alias = "type_stubs_module_mapping"
-    help = (
-        "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
-        'For example, `{"types-requests": ["requests"]}`.\n\n'
-        "If the requirement is not specified _and_ it starts with `types-` or `stubs-`, or ends "
-        "with `-types` or `-stubs`, the requirement will be treated as a type stub for the "
-        'corresponding module, e.g. "types-request" has the module "requests". Otherwise, '
-        "the requirement is treated like a normal dependency (see the field "
-        f"{ModuleMappingField.alias}).\n\n"
-        "This is used to infer dependencies for type stubs."
-    )
-    value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "Use the field `type_stub_modules` instead, which takes a list of modules the "
-        "`python_requirement` target provides type stubs for.\n\n"
-        "If this `python_requirement` target has multiple distinct 3rd-party "
-        "projects in its `requirements` field, you should split those up into one `"
-        "python_requirement` target per distinct project."
-    )
-
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[str, Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        return normalize_module_mapping(value_or_default)
-
-
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -970,8 +845,6 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        ModuleMappingField,
-        TypeStubsModuleMappingField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
@@ -983,9 +856,6 @@ class PythonRequirementTarget(Target):
         "\n\n"
         f"See {doc_url('python-third-party-dependencies')}."
     )
-
-    deprecated_alias = "python_requirement_library"
-    deprecated_alias_removal_version = "2.9.0.dev0"
 
     def validate(self) -> None:
         if (
@@ -1046,7 +916,8 @@ class PythonDistributionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonProvidesField(ScalarField, ProvidesField, AsyncFieldMixin):
+class PythonProvidesField(ScalarField, AsyncFieldMixin):
+    alias = "provides"
     expected_type = PythonArtifact
     expected_type_help = "setup_py(name='my-dist', **kwargs)"
     value: PythonArtifact
@@ -1214,22 +1085,6 @@ class SDistConfigSettingsField(ConfigSettingsField):
     help = "PEP-517 config settings to pass to the build backend when building an sdist."
 
 
-class SetupPyCommandsField(StringSequenceField):
-    removal_version = "2.9.0.dev0"
-    removal_hint = "Set the boolean `wheel` and/or `sdist` fields instead."
-
-    alias = "setup_py_commands"
-    expected_type_help = (
-        "an iterable of string commands to invoke setup.py with, or "
-        "an empty list to just create a chroot with a setup() function."
-    )
-    help = (
-        "The runtime commands to invoke setup.py with to create the distribution, e.g. "
-        '["bdist_wheel", "--python-tag=py36.py37", "sdist"].\n\nIf empty or unspecified, '
-        "will just create a chroot with a setup() function."
-    )
-
-
 class GenerateSetupField(TriBoolField):
     alias = "generate_setup"
     required = False
@@ -1256,7 +1111,6 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
-        SetupPyCommandsField,
     )
     help = (
         "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "

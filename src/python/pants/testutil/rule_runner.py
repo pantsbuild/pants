@@ -591,6 +591,7 @@ def run_rule_with_mocks(
                     mock_get.input_type == type(res.input)  # noqa: E721
                     or (
                         union_membership
+                        and union_membership.has_members(mock_get.input_type)
                         and union_membership.is_member(mock_get.input_type, res.input)
                     )
                 )

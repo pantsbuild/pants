@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
-    BuildGoPackageTargetRequest,
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
+from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -20,8 +20,6 @@ from pants.util.logging import LogLevel
 @dataclass(frozen=True)
 class GoCheckFieldSet(FieldSet):
     required_fields = (GoFirstPartyPackageSourcesField,)
-
-    sources: GoFirstPartyPackageSourcesField
 
 
 class GoCheckRequest(CheckRequest):

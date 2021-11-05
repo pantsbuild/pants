@@ -51,8 +51,9 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
             python_distribution(
                 name = "dist",
                 dependencies = [":foo"],
-                provides = python_artifact(name="foo", version="9.8.7", setup_script="setup.py"),
-                sdist = False
+                provides = python_artifact(name="foo", version="9.8.7"),
+                sdist = False,
+                generate_setup = False,
             )
             """
             ),

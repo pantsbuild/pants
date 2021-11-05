@@ -63,9 +63,8 @@ def single_target_run(
         res = run_rule_with_mocks(
             run,
             rule_args=[
-                create_goal_subsystem(RunSubsystem, args=[]),
+                create_goal_subsystem(RunSubsystem, args=[], cleanup=True),
                 create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
-                console,
                 workspace,
                 BuildRoot(),
                 rule_runner.environment,

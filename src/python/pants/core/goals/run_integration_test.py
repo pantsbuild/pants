@@ -25,7 +25,7 @@ def test_run_then_edit(use_pantsd: bool) -> None:
         ),
         "BUILD": dedent(
             f"""\
-        python_library(name='lib')
+        python_sources(name='lib')
         pex_binary(name='bin', entry_point='{slow}', restartable=True)
         """
         ),

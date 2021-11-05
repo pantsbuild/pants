@@ -616,15 +616,6 @@ class GlobalOptions(Subsystem):
             "per-workspace subdirectory.",
         )
         register(
-            "--pants-supportdir",
-            advanced=True,
-            metavar="<dir>",
-            removal_version="2.9.0.dev0",
-            removal_hint="Unused: this option has no necessary equivalent in v2.",
-            default=os.path.join(buildroot, "build-support"),
-            help="Does not do anything.",
-        )
-        register(
             "--pants-distdir",
             advanced=True,
             metavar="<dir>",
@@ -1355,9 +1346,11 @@ class GlobalOptions(Subsystem):
             type=list,
             default=["BUILD", "BUILD.*"],
             help=(
-                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
-                "the naming scheme, not the directory paths to look for. To add ignore"
-                "patterns, use the option `--build-ignore`."
+                "The naming scheme for BUILD files, i.e. where you define targets.\n\n"
+                "This only sets the naming scheme, not the directory paths to look for. To add "
+                "ignore patterns, use the option `[GLOBAL].build_ignore`.\n\n"
+                "You may also need to update the option `[tailor].build_file_name` so that it is "
+                "compatible with this option."
             ),
         )
         register(
@@ -1366,9 +1359,10 @@ class GlobalOptions(Subsystem):
             type=list,
             default=[],
             help=(
-                "Paths to ignore when identifying BUILD files. This does not affect any other "
-                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
-                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+                "Paths to ignore when identifying BUILD files.\n\n"
+                "This does not affect any other filesystem operations; use `--pants-ignore` for "
+                "that instead.\n\n"
+                "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
             ),
         )
         register(

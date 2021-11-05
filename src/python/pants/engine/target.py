@@ -588,7 +588,12 @@ class Target:
         return UnionRule(cls._plugin_field_cls, field)
 
     def validate(self) -> None:
-        """Validate the target, such as checking for mutually exclusive fields."""
+        """Validate the target, such as checking for mutually exclusive fields.
+
+        N.B.: The validation should only be of properties intrinsic to the associated files in any
+        context. If the validation only makes sense for certain goals acting on targets; those
+        validations should be done in the associated rules.
+        """
 
 
 @dataclass(frozen=True)
@@ -633,21 +638,16 @@ class UnexpandedTargets(Collection[Target]):
 
 
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisible.
-
-    Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
-    recursive portion.
-    """
-
-    # The members of the cycle.
-    members: FrozenOrderedSet[Target]
-    # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
-    # between members of the cycle are excluded.
-    dependencies: FrozenOrderedSet[CoarsenedTarget]
-    # Pre-computed hashcode: see the class doc.
-    _hashcode: int
-
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
+        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+
+        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
+        recursive portion.
+
+        :param members: The members of the cycle.
+        :param dependencies: The deduped direct (not transitive) dependencies of all Targets in
+            the cycle. Dependencies between members of the cycle are excluded.
+        """
         self.members = FrozenOrderedSet(members)
         self.dependencies = FrozenOrderedSet(dependencies)
         self._hashcode = hash((self.members, self.dependencies))
@@ -672,6 +672,7 @@ class CoarsenedTarget(EngineAwareParameter):
         return (
             self._hashcode == other._hashcode
             and self.members == other.members
+            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.dependencies == other.dependencies
         )
 
@@ -767,16 +768,17 @@ class RegisteredTargetTypes:
         return FrozenOrderedSet(self.aliases_to_types.values())
 
 
-class AllTargets(Targets):
-    """All targets in the project.
+class AllTargets(Collection[Target]):
+    """All targets in the project, but with target generators replaced by their generated targets,
+    unlike `AllUnexpandedTargets`."""
 
-    This should generally be avoided because it is relatively expensive to compute and is
-    frequently invalidated, but it can be necessary for things like dependency inference to build
-    a global mapping of imports to targets.
 
-    You can either request via `Get(AllTargets, AllTargetsRequest)`, or as a singleton, i.e. using
-    `AllTargets` as a parameter to the `@rule`. When used as a singleton, all target generators
-    will be replaced by their generated targets.
+class AllUnexpandedTargets(Collection[Target]):
+    """All targets in the project, including generated targets.
+
+    This should generally be avoided because it is relatively expensive to compute and is frequently
+    invalidated, but it can be necessary for things like dependency inference to build a global
+    mapping of imports to targets.
     """
 
 
@@ -784,11 +786,8 @@ class AllTargets(Targets):
 class AllTargetsRequest:
     """Find all targets in the project.
 
-    Will always include generated targets. If `include_target_generators` is True, will also include
-    target generators rather than replacing them with their generated targets.
+    Use with either `AllUnexpandedTargets` or `AllTargets`.
     """
-
-    include_target_generators: bool = False
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1111,8 +1110,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
-    # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
-    #  `util_rules/filter_empty_sources.py`.
 
     def __init__(
         self,
@@ -1674,17 +1671,6 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         return self.value or ()
 
 
-class Sources(MultipleSourcesField):
-    removal_version = "2.9.0.dev0"
-    removal_hint = (
-        "The `Sources` type has been removed in favor of `SourcesField`, `SingleSourceField`, and "
-        "`MultipleSourcesField`. Update your field definitions to subclass either "
-        "`SingleSourceField` or `MultipleSourcesField`, depending on if you want the field "
-        "`source: str` or `sources: list[str]`. Update all rules to use `tgt.get(SourcesField)` "
-        "instead of `tgt.get(Sources)`."
-    )
-
-
 class SingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
@@ -2137,28 +2123,8 @@ class InferDependenciesRequest(EngineAwareParameter):
 class InferredDependencies:
     dependencies: FrozenOrderedSet[Address]
 
-    def __init__(
-        self,
-        dependencies: Iterable[Address],
-        *,
-        sibling_dependencies_inferrable: bool | None = None,
-    ) -> None:
+    def __init__(self, dependencies: Iterable[Address]) -> None:
         """The result of inferring dependencies."""
-        if sibling_dependencies_inferrable is not None:
-            warn_or_error(
-                "2.9.0.dev0",
-                "the `sibling_dependencies_inferrable` kwarg for InferredDependencies",
-                (
-                    "Pants no longer automatically generates 'file targets' automatically for "
-                    "you. You must now opt in to generating file targets by subclassing "
-                    "`GenerateTargetsRequest` and registering a rule that goes from your subclass "
-                    "to `GeneratedTargets`. Use `generate_file_level_targets()` from "
-                    "`pants.engine.target` to emulate the old 'file target' semantics. If you were "
-                    "setting `sibling_dependencies_inferrable=False` before, then you should use  "
-                    "set `add_dependencies_on_all_siblings=True` in your call to "
-                    "`generate_file_level_targets`."
-                ),
-            )
         self.dependencies = FrozenOrderedSet(sorted(dependencies))
 
     def __bool__(self) -> bool:
@@ -2335,10 +2301,3 @@ def generate_file_based_overrides_field_help_message(
         "You can specify the same file name in multiple keys, so long as you don't override the "
         "same field more than one time for the file."
     )
-
-
-class ProvidesField(Field):
-    """An `artifact` that describes how to represent this target to the outside world."""
-
-    alias = "provides"
-    default: ClassVar[Optional[Any]] = None

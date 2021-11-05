@@ -31,12 +31,15 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
-    CoursierLockfileForTargetRequest,
+    Coordinates,
     CoursierResolvedLockfile,
+    CoursierResolveKey,
+    FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -56,6 +59,7 @@ class ScalacCheckRequest(CheckRequest):
 @dataclass(frozen=True)
 class CompileScalaSourceRequest:
     component: CoarsenedTarget
+    resolve: CoursierResolveKey
 
 
 @rule(desc="Compile with scalac")
@@ -98,12 +102,25 @@ async def compile_scala_source(
             exit_code=0,
         )
 
-    lockfile = await Get(
-        CoursierResolvedLockfile,
-        CoursierLockfileForTargetRequest(Targets(request.component.members)),
+    filter_coords = Coordinates(
+        (
+            Coordinate.from_jvm_artifact_target(dep)
+            for item in CoarsenedTargets(request.component.dependencies).closure()
+            for dep in item.members
+            if JvmArtifactFieldSet.is_applicable(dep)
+        )
     )
+
+    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    lockfile = await Get(
+        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
+    )
+
     transitive_dependency_classfiles_fallible = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=component))
+        Get(
+            FallibleCompiledClassfiles,
+            CompileScalaSourceRequest(component=component, resolve=request.resolve),
+        )
         for component in CoarsenedTargets(request.component.dependencies).closure()
     )
     transitive_dependency_classfiles = [
@@ -233,10 +250,14 @@ async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
+    resolves = await MultiGet(
+        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
+    )
+
     # TODO: This should be fallible so that we exit cleanly.
     results = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t))
-        for t in coarsened_targets
+        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t, resolve=r))
+        for t, r in zip(coarsened_targets, resolves)
     )
 
     # NB: We return CheckResults with exit codes for the root targets, but we do not pass
