@@ -22,23 +22,75 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
 
 
-@dataclass(frozen=True)
 class BuildGoPackageRequest(EngineAwareParameter):
-    """Build a package and its dependencies as `__pkg__.a` files."""
+    def __init__(
+        self,
+        *,
+        import_path: str,
+        digest: Digest,
+        subpath: str,
+        go_file_names: tuple[str, ...],
+        s_file_names: tuple[str, ...],
+        direct_dependencies: tuple[BuildGoPackageRequest, ...],
+        for_tests: bool = False,
+    ) -> None:
+        """Build a package and its dependencies as `__pkg__.a` files.
 
-    import_path: str
+        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for
+        the recursive portion.
+        """
 
-    digest: Digest
-    # Path from the root of the digest to the package to build.
-    subpath: str
+        self.import_path = import_path
+        self.digest = digest
+        self.subpath = subpath
+        self.go_file_names = go_file_names
+        self.s_file_names = s_file_names
+        self.direct_dependencies = direct_dependencies
+        self.for_tests = for_tests
+        self._hashcode = hash(
+            (
+                self.import_path,
+                self.digest,
+                self.subpath,
+                self.go_file_names,
+                self.s_file_names,
+                self.direct_dependencies,
+                self.for_tests,
+            )
+        )
 
-    go_file_names: tuple[str, ...]
-    s_file_names: tuple[str, ...]
+    def __repr__(self) -> str:
+        # NB: We must override the default `__repr__` so that `direct_dependencies` does not
+        # traverse into transitive dependencies, which was pathologically slow.
+        return (
+            f"{self.__class__}("
+            f"import_path={repr(self.import_path)}, "
+            f"digest={self.digest}, "
+            f"subpath={self.subpath}, "
+            f"go_file_names={self.go_file_names}, "
+            f"go_file_names={self.s_file_names}, "
+            f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
+            f"for_tests={self.for_tests}"
+            ")"
+        )
 
-    # These dependencies themselves often have dependencies, such that we recursively build.
-    direct_dependencies: tuple[BuildGoPackageRequest, ...]
+    def __hash__(self) -> int:
+        return self._hashcode
 
-    for_tests: bool = False
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (
+            self._hashcode == other._hashcode
+            and self.import_path == other.import_path
+            and self.digest == other.digest
+            and self.subpath == other.subpath
+            and self.go_file_names == other.go_file_names
+            and self.s_file_names == other.s_file_names
+            and self.for_tests == other.for_tests
+            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
+            and self.direct_dependencies == other.direct_dependencies
+        )
 
     def debug_hint(self) -> str | None:
         return self.import_path

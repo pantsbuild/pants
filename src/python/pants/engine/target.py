@@ -633,21 +633,16 @@ class UnexpandedTargets(Collection[Target]):
 
 
 class CoarsenedTarget(EngineAwareParameter):
-    """A set of Targets which cyclicly reach one another, and are thus indivisible.
-
-    Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
-    recursive portion.
-    """
-
-    # The members of the cycle.
-    members: FrozenOrderedSet[Target]
-    # The deduped direct (not transitive) dependencies of all Targets in the cycle. Dependencies
-    # between members of the cycle are excluded.
-    dependencies: FrozenOrderedSet[CoarsenedTarget]
-    # Pre-computed hashcode: see the class doc.
-    _hashcode: int
-
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
+        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+
+        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
+        recursive portion.
+
+        :param members: The members of the cycle.
+        :param dependencies: The deduped direct (not transitive) dependencies of all Targets in
+            the cycle. Dependencies between members of the cycle are excluded.
+        """
         self.members = FrozenOrderedSet(members)
         self.dependencies = FrozenOrderedSet(dependencies)
         self._hashcode = hash((self.members, self.dependencies))
@@ -672,6 +667,7 @@ class CoarsenedTarget(EngineAwareParameter):
         return (
             self._hashcode == other._hashcode
             and self.members == other.members
+            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.dependencies == other.dependencies
         )
 
