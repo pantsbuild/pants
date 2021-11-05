@@ -8,19 +8,18 @@ import tempfile
 from pathlib import Path
 from typing import Union
 
-import humanize
-
 from pants.base.build_environment import get_pants_cachedir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.options_parsing import _Options
 from pants.engine.rules import collect_rules, goal_rule
-from pants.option.global_options import LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.util.dirutil import rm_rf
+from pants.util.strutil import HumanReadable
 
 # N.B. We use a list so that named-caches can go last, as it is quite large and for dry-run
 # it's a nicer UX if it's last.
+# @TODO: Is there a way to collect these programmatically?
 _NAMED_CACHE_FLAGS_INFO = [
     (
         "process-execution-temp-dirs",
@@ -66,7 +65,10 @@ class CleanSubsystem(GoalSubsystem):
             advanced=False,
             type=bool,
             default=True,
-            help=("Whether to just report what would be cleaned. @TODO: more"),
+            help=(
+                "Whether to just report what would be cleaned. Set to --no-dry-run for actual "
+                "cleaning, as well"
+            ),
         )
         register(
             "--all",
@@ -78,7 +80,6 @@ class CleanSubsystem(GoalSubsystem):
             ),
         )
 
-        # @TODO: Is there a way to collect these programmatically?
         for flag_slug, help in _NAMED_CACHE_FLAGS_INFO:
             register(
                 f"--keep-{flag_slug}",
@@ -97,7 +98,7 @@ class Clean(Goal):
 async def clean(
     clean_subsystem: CleanSubsystem,
     console: Console,
-    real_opts: _Options,
+    global_options: GlobalOptions,
     dist_dir: DistDir,
 ) -> Clean:
     def _maybe_clean(
@@ -106,6 +107,8 @@ async def clean(
         path: Union[str, Path],
         glob: str = "*",
     ):
+        # N.B. It's safe to use stdlib Path instead of Pants' engine type because these files don't
+        # need file-watching and are usually ignored by Pants.
         path = Path(path)
         paths = list(path.glob(glob))
         should_clean = (clean_subsystem.options.all and not keep_flag_value) or (
@@ -121,7 +124,7 @@ async def clean(
             # @TODO: Print the relevant flag that gave us this directory?
             console.print_stdout(f"  Controlled by {console.blue(f'--[no-]keep-{keep_flag_slug}')}")
             console.print_stdout(
-                f"  {len(paths)} dirs, spanning {humanize.intword(num_files)} files totalling {humanize.naturalsize(total_size)}"
+                f"  {len(paths)} dirs, spanning {humanize.intword(num_files)} files totalling {HumanReadable.bytes(total_size)}"
             )
         elif should_clean:
             # @TODO: Should we multi-process this?
@@ -129,8 +132,6 @@ async def clean(
             for path in paths:
                 rm_rf(str(path))
 
-    global_options = real_opts.options.for_global_scope()
-    bootstrap_options = real_opts.options.bootstrap_option_values()
     pants_cache_dir = get_pants_cachedir()
 
     for flag_slug, _ in _NAMED_CACHE_FLAGS_INFO:
@@ -138,18 +139,24 @@ async def clean(
             flag_slug,
             getattr(clean_subsystem.options, f"keep_{flag_slug.replace('-', '_')}"),
             *{
-                "process-execution-temp-dirs": (Path(tempfile.gettempdir()), "pants-pe*"),
-                "lmdb-store": (LocalStoreOptions.from_options(global_options).store_dir,),
+                "process-execution-temp-dirs": (
+                    Path(tempfile.gettempdir()),
+                    "pants-process-execution*",
+                ),
+                "lmdb-store": (local_store_options.store_dir,),
                 "run-tracker": (Path(global_options.pants_workdir) / "run-tracker",),
                 "repl-temp-dirs": (Path(global_options.pants_workdir), "repl*"),
                 "dist-dir": (dist_dir.relpath,),
                 "bootstrap-dir": (Path(pants_cache_dir) / "setup",),
-                "named-caches": (bootstrap_options.named_caches_dir,),
+                "named-caches": (global_options.named_caches_dir,),
             }[flag_slug],
         )
 
     if clean_subsystem.options.dry_run:
-        console.print_stdout(f"Specify {console.blue('--no-dry-run')} to actually do the cleaning")
+        console.print_stdout(
+            f"Specify {console.blue('--no-dry-run')} along with {console.blue('--all')} "
+            "(and/or one of the advanced options clean instead of report."
+        )
 
     return Clean(exit_code=0)
 

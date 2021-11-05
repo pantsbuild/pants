@@ -397,7 +397,7 @@ async fn test_directory_preservation() {
   let subdirs = testutil::file::list_dir(&preserved_work_root);
   assert_eq!(subdirs.len(), 1);
 
-  // Then look for a file like e.g. `/tmp/abc1234/pants-pe7zt4pH/roland.ext`
+  // Then look for a file like e.g. `/tmp/abc1234/pants-process-execution7zt4pH/roland.ext`
   let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
   assert!(&rolands_path.exists());
 

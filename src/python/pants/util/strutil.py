@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+import enum
 
 import re
 import shlex
@@ -141,7 +142,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/pants-pe[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/.*/pants-process-execution[a-zA-Z0-9]+/", "", v)
 
 
 def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
@@ -194,3 +195,61 @@ _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
 def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
+
+class HumanReadable:
+    """Namespace for "human-readable" string utilities."""
+    # These are inspired by the "humanize" library: https://github.com/jmoiron/humanize
+
+    @staticmethod
+    def bytes(value):
+        """Return value as a human-readable value of decimal bytes
+
+        E.g.
+            0 -> "0 Bytes"
+            1 -> "1 Byte"
+            22 -> "22 Bytes"
+            1000 -> " 1.0 kB"
+            1500 -> " 1.5 kB"
+            1_000_000 -> "1.0 MB"
+            ...
+        """
+        base = 1000
+
+        if value < base:
+            return pluralize(value, "Byte")
+
+        for s in ("kB", "MB", "GB", "TB", "PB"):
+            value = round(value / base, 1)
+            if value < base:
+                break
+
+        return f"{value:.1f} {s}"
+
+
+    @staticmethod
+    def intword(value):
+        """Return value as a human-readable number.
+
+        E.g.
+            100 -> "100"
+            22000 -> "22 thousand"
+            1_500_000 -> "1.5 million"
+            ...
+        """
+        base = 1000
+
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            return value
+
+        if value < base:
+            return str(value)
+
+        for i, human_power in enumerate(["thousand", "million", "billion", "trillion"]):
+            value = round(value / base, 1)
+            if value < base:
+                break
+
+        digits = 0 if value == int(value) else 1
+        return f"{(value):.{digits}f} {human_power}"

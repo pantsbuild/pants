@@ -15,6 +15,7 @@ from pants.util.strutil import (
     pluralize,
     strip_prefix,
     strip_v2_chroot_path,
+    HumanReadable
 )
 
 
@@ -56,9 +57,9 @@ def test_strip_chroot_path() -> None:
         strip_v2_chroot_path(
             dedent(
                 """\
-            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-pe3zt5Ph/src/python/example.py
-            Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-peOCnquv/test.py
-            Would reformat /custom-tmpdir/pants-pe7zt4pH/custom_tmpdir.py
+            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-process-execution3zt5Ph/src/python/example.py
+            Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-process-executionOCnquv/test.py
+            Would reformat /custom-tmpdir/pants-process-execution7zt4pH/custom_tmpdir.py
 
             Some other output.
             """
@@ -75,15 +76,15 @@ def test_strip_chroot_path() -> None:
         )
     )
 
-    # A subdir must be prefixed with `pants-pe`, then some characters after it.
+    # A subdir must be prefixed with `pants-process-execution`, then some characters after it.
     assert (
         strip_v2_chroot_path("/var/process_executionOCnquv/test.py")
         == "/var/process_executionOCnquv/test.py"
     )
-    assert strip_v2_chroot_path("/var/pants-pe/test.py") == "/var/pants-pe/test.py"
+    assert strip_v2_chroot_path("/var/pants-process-execution/test.py") == "/var/pants-process-execution/test.py"
 
     # Our heuristic requires absolute paths.
-    assert strip_v2_chroot_path("var/pants-peOCnquv/test.py") == "var/pants-peOCnquv/test.py"
+    assert strip_v2_chroot_path("var/pants-process-executionOCnquv/test.py") == "var/pants-process-executionOCnquv/test.py"
 
     # Confirm we can handle values with no chroot path.
     assert strip_v2_chroot_path("") == ""
@@ -146,3 +147,52 @@ def test_bullet_list() -> None:
     )
     assert bullet_list(["a"]) == "  * a"
     assert bullet_list([]) == ""
+
+
+def test_human_readable_bytes() -> None:
+    assert HumanReadable.bytes(0) == "0 Bytes"
+    assert HumanReadable.bytes(1) == "1 Byte"
+    assert HumanReadable.bytes(999) == "999 Bytes"
+    assert HumanReadable.bytes(1000) == "1.0 kB"
+    assert HumanReadable.bytes(1500) == "1.5 kB"
+    assert HumanReadable.bytes(999_900) == "999.9 kB"
+    assert HumanReadable.bytes(999_999) == "1.0 MB"  # Rounded
+    assert HumanReadable.bytes(1_000_000) == "1.0 MB"
+    assert HumanReadable.bytes(999_999_999) == "1.0 GB"  # Rounded
+    assert HumanReadable.bytes(1_000_000_000) == "1.0 GB"
+    assert HumanReadable.bytes(999_999_999_999) == "1.0 TB"  # Rounded
+    assert HumanReadable.bytes(1_000_000_000_000) == "1.0 TB"
+    assert HumanReadable.bytes(999_999_999_999_999) == "1.0 PB"  # Rounded
+    assert HumanReadable.bytes(1_000_000_000_000_000) == "1.0 PB"
+
+    # We stop at PB
+    assert HumanReadable.bytes(999_999_999_999_999_999) == "1000.0 PB"  # Rounded
+
+def test_human_readable_intword() -> None:
+    assert HumanReadable.intword(0) == "0"
+    assert HumanReadable.intword(1) == "1"
+    assert HumanReadable.intword(22) == "22"
+    # assert HumanReadable.intword(999) == "1 thousand"
+    assert HumanReadable.intword(1000) == "1 thousand"
+    assert HumanReadable.intword(1001) == "1 thousand"  # Rounded
+    assert HumanReadable.intword(1200) == "1.2 thousand"
+    assert HumanReadable.intword(999_999) == "1 million"
+
+    assert HumanReadable.intword(1_000) == "1 thousand"
+    assert HumanReadable.intword(1001) == "1 thousand"  # Rounded
+    assert HumanReadable.intword(1200) == "1.2 thousand"
+
+    assert HumanReadable.intword(1_000_000) == "1 million"
+    assert HumanReadable.intword(1_000_001) == "1 million"  # Rounded
+    assert HumanReadable.intword(1_200_000) == "1.2 million"
+
+    assert HumanReadable.intword(1_000_000_000) == "1 billion"
+    assert HumanReadable.intword(1_000_000_001) == "1 billion"  # Rounded
+    assert HumanReadable.intword(1_200_000_000) == "1.2 billion"
+
+    assert HumanReadable.intword(1_000_000_000_000) == "1 trillion"
+    assert HumanReadable.intword(1_000_000_000_001) == "1 trillion"  # Rounded
+    assert HumanReadable.intword(1_200_000_000_000) == "1.2 trillion"
+
+    # We stop at trillion
+    assert HumanReadable.intword(999_999_999_999_999) == "1000 trillion"
