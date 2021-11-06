@@ -10,8 +10,8 @@ from typing import Any, Iterable
 import pytest
 from packaging.version import Version
 
-from pants.backend.python.macros.poetry_requirements import (
-    PoetryRequirements,
+from pants.backend.python.macros.poetry_requirements_caof import (
+    PoetryRequirementsCAOF,
     PyprojectAttr,
     PyProjectToml,
     add_markers,
@@ -392,7 +392,7 @@ def test_parse_multi_reqs() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[PythonRequirementTarget, PythonRequirementsFile],
-        context_aware_object_factories={"poetry_requirements": PoetryRequirements},
+        context_aware_object_factories={"poetry_requirements": PoetryRequirementsCAOF},
     )
 
 
