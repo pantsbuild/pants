@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
 import os.path
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -14,11 +16,12 @@ from pants.backend.go.util_rules.assembly import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import path_safe
 
 
@@ -34,6 +37,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
         minimum_go_version: str | None,
         for_tests: bool = False,
+        embed_config: EmbedConfig | None = None,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -49,6 +53,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.direct_dependencies = direct_dependencies
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
+        self.embed_config = embed_config
         self._hashcode = hash(
             (
                 self.import_path,
@@ -59,6 +64,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.direct_dependencies,
                 self.minimum_go_version,
                 self.for_tests,
+                self.embed_config,
             )
         )
 
@@ -74,7 +80,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"go_file_names={self.s_file_names}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
             f"minimum_go_version={self.minimum_go_version}, "
-            f"for_tests={self.for_tests}"
+            f"for_tests={self.for_tests}, "
+            f"embed_config={self.embed_config}"
             ")"
         )
 
@@ -93,6 +100,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.s_file_names == other.s_file_names
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
+            and self.embed_config == other.embed_config
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -171,6 +179,45 @@ class BuiltGoPackage:
     import_paths_to_pkg_a_files: FrozenDict[str, str]
 
 
+@dataclass
+@frozen_after_init
+class EmbedConfig:
+    """Configuration passed to the compiler to configure file embedding. The compiler relies
+    entirely on the caller to map file patterns to actual filesystem paths.
+
+    patterns: Maps a pattern to a list of _relative_ file paths to use for that pattern. These relative file paths
+    are "virtual" because they will be resolved to actual filesystem paths by consulting the `files` dictionary.
+
+    files: Maps a "virtual" _relative_ file path used as a value in the `patterns` dictionary to the actual
+    filesystem path with the file's content.
+    """
+
+    patterns: FrozenDict[str, tuple[str, ...]]
+    files: FrozenDict[str, str]
+
+    def __init__(self, patterns: dict[str, Iterable[str]], files: dict[str, str]):
+        self.patterns = FrozenDict({k: tuple(v) for k, v in patterns.items()})
+        self.files = FrozenDict(files)
+
+    def to_embedcfg(self) -> bytes:
+        data = {
+            "Patterns": self.patterns,
+            "Files": self.files,
+        }
+        return json.dumps(data).encode("utf-8")
+
+
+@dataclass(frozen=True)
+class RenderEmbedConfigRequest:
+    embed_config: EmbedConfig | None
+
+
+@dataclass(frozen=True)
+class RenderedEmbedConfig:
+    digest: Digest
+    PATH = "./embedcfg"
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -189,13 +236,15 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
         dep_digests.append(dep.digest)
 
-    merged_deps_digest, import_config = await MultiGet(
+    merged_deps_digest, import_config, embedcfg = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
         Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
+        Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
     )
 
     input_digest = await Get(
-        Digest, MergeDigests([merged_deps_digest, import_config.digest, request.digest])
+        Digest,
+        MergeDigests([merged_deps_digest, import_config.digest, embedcfg.digest, request.digest]),
     )
 
     assembly_digests = None
@@ -234,10 +283,15 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
 
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
+
+    if embedcfg.digest != EMPTY_DIGEST:
+        compile_args.extend(["-embedcfg", RenderedEmbedConfig.PATH])
+
     if not request.s_file_names:
         # If there are no non-Go sources, then pass -complete flag which tells the compiler that the provided
         # Go files are the entire package.
         compile_args.append("-complete")
+
     relativized_sources = (
         f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
         for name in request.go_file_names
@@ -300,6 +354,19 @@ def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltG
         f"Failed to compile {fallible_result.import_path}:\n"
         f"{fallible_result.stdout}\n{fallible_result.stderr}"
     )
+
+
+@rule
+async def render_embed_config(request: RenderEmbedConfigRequest) -> RenderedEmbedConfig:
+    digest = EMPTY_DIGEST
+    if request.embed_config:
+        digest = await Get(
+            Digest,
+            CreateDigest(
+                [FileContent(RenderedEmbedConfig.PATH, request.embed_config.to_embedcfg())]
+            ),
+        )
+    return RenderedEmbedConfig(digest)
 
 
 def rules():
