@@ -193,6 +193,7 @@ class EngineInitializer:
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
+            use_deprecated_python_macros=bootstrap_options.use_deprecated_python_macros,
         )
 
     @staticmethod
@@ -211,6 +212,7 @@ class EngineInitializer:
         include_trace_on_error: bool = True,
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
+        use_deprecated_python_macros: bool = True,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -226,6 +228,7 @@ class EngineInitializer:
                 build_root=build_root_path,
                 target_type_aliases=registered_target_types.aliases,
                 object_aliases=build_configuration.registered_aliases,
+                use_deprecated_python_macros=use_deprecated_python_macros,
             )
 
         @rule

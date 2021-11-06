@@ -1276,6 +1276,25 @@ class GlobalOptions(Subsystem):
             "may not be enabled.",
         )
 
+        register(
+            "--use-deprecated-python-macros",
+            advanced=True,
+            type=bool,
+            default=True,
+            help=(
+                "If true, continue using Pants's deprecated macro system for `pants_requirement` "
+                "rather than target generation.\n\n"
+                "The address for target generation is different. Rather than "
+                "`3rdparty/python:Django`, the address will look like `3rdparty/python#Django`. "
+                "The target generator (`pants_requirement`, `python_requirements`, etc) is a "
+                "target itself now, meaning you can give it a `name`. If the target generator sets "
+                "its `name`, e.g. to `reqs`, generated targets will have an address like "
+                "`3rdparty/python:reqs#Django`.\n\n"
+                "Soon, this option will also toggle for `poetry_requirements`, "
+                "`pipenv_requirements`, and `python_requirements`."
+            ),
+        )
+
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
