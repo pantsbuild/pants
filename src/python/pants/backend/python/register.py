@@ -19,6 +19,7 @@ from pants.backend.python.goals import (
     setup_py,
     tailor,
 )
+from pants.backend.python.macros import pants_requirements
 from pants.backend.python.macros.pants_requirement_caof import PantsRequirementCAOF
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
@@ -84,6 +85,8 @@ def rules():
         *setuptools.rules(),
         *ipython.rules(),
         *pytest.rules(),
+        # Macros
+        *pants_requirements.rules(),
     )
 
 
@@ -98,4 +101,6 @@ def target_types():
         PythonTestTarget,
         PythonTestsGeneratorTarget,
         PythonTestUtilsGeneratorTarget,
+        # Macros
+        pants_requirements.PantsRequirementsTargetGenerator,
     ]
