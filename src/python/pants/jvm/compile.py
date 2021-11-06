@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABCMeta
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Iterable, Iterator, Sequence
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
@@ -17,6 +19,8 @@ from pants.engine.target import CoarsenedTarget, FieldSet
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -75,14 +79,72 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
             )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class ClasspathEntry:
-    """A JVM classpath entry, which will always be either zero or one JAR file.
+    """A JVM classpath entry represented as a series of JAR files, and their dependencies.
+
+    This is a series of JAR files in order to account for "exported" dependencies, when a node
+    and some of its dependencies are indistinguishable (such as for aliases, or potentially
+    explicitly declared or inferred `exported=` lists in the future).
+
+    This class additionally keeps filenames in order to preserve classpath ordering for the
+    `classpath_arg` method: although Digests encode filenames, they are stored sorted.
 
     TODO: Move to `classpath.py`.
+    TODO: Generalize via https://github.com/pantsbuild/pants/issues/13112.
     """
 
     digest: Digest
+    filenames: tuple[str, ...]
+    dependencies: FrozenOrderedSet[ClasspathEntry]
+
+    def __init__(
+        self,
+        digest: Digest,
+        filenames: Iterable[str] = (),
+        dependencies: Iterable[ClasspathEntry] = (),
+    ):
+        self.digest = digest
+        self.filenames = tuple(filenames)
+        self.dependencies = FrozenOrderedSet(dependencies)
+
+    @classmethod
+    def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
+        """After merging the Digests for entries, merge their filenames and dependencies."""
+        return cls(
+            digest,
+            (f for cpe in entries for f in cpe.filenames),
+            (d for cpe in entries for d in cpe.dependencies),
+        )
+
+    @classmethod
+    def arg(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> str:
+        """Builds the non-recursive classpath arg for the given entries.
+
+        To construct a recursive classpath arg, first expand the entries with `cls.closure()`.
+        """
+        return ":".join(os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
+
+    @classmethod
+    def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
+        """All ClasspathEntries reachable from the given roots."""
+
+        visited = set()
+        queue = deque(roots)
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
+
+    def __repr__(self):
+        return f"ClasspathEntry({self.filenames}, dependencies={len(self.dependencies)})"
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 class CompileResult(Enum):
@@ -127,6 +189,16 @@ class FallibleClasspathEntry(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=stderr,
         )
+
+    @classmethod
+    def if_all_succeeded(
+        cls, fallible_classpath_entries: Sequence[FallibleClasspathEntry]
+    ) -> tuple[ClasspathEntry, ...] | None:
+        """If all given FallibleClasspathEntries succeeded, return them as ClasspathEntries."""
+        classpath_entries = tuple(fcc.output for fcc in fallible_classpath_entries if fcc.output)
+        if len(classpath_entries) != len(fallible_classpath_entries):
+            return None
+        return classpath_entries
 
     def level(self) -> LogLevel:
         return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG

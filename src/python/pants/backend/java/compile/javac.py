@@ -20,7 +20,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, SourcesField
+from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -30,16 +30,6 @@ from pants.jvm.compile import (
 )
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    Coordinate,
-    Coordinates,
-    CoursierResolvedLockfile,
-    FilterDependenciesRequest,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -58,20 +48,19 @@ async def compile_java_source(
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath.
-    direct_dependency_classfiles_fallible = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(
-                union_membership, component=coarsened_dep, resolve=request.resolve
-            ),
+    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
+        await MultiGet(
+            Get(
+                FallibleClasspathEntry,
+                ClasspathEntryRequest,
+                ClasspathEntryRequest.for_targets(
+                    union_membership, component=coarsened_dep, resolve=request.resolve
+                ),
+            )
+            for coarsened_dep in request.component.dependencies
         )
-        for coarsened_dep in request.component.dependencies
     )
-    direct_dependency_classfiles = [
-        fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
-    ]
-    if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
+    if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
@@ -103,66 +92,41 @@ async def compile_java_source(
         if sources.snapshot.digest != EMPTY_DIGEST
     ]
     if not component_members_and_java_source_files:
-        # If the component has no sources, it is acting as an alias for its dependencies: return
-        # their merged classpaths.
-        dependencies_digest = await Get(
-            Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)
+        # Is a generator, and so exports all of its direct deps.
+        exported_digest = await Get(
+            Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
         )
+        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=ClasspathEntry(digest=dependencies_digest),
+            output=classpath_entry,
             exit_code=0,
         )
 
-    filter_coords = Coordinates(
-        (
-            Coordinate.from_jvm_artifact_target(dep)
-            for item in CoarsenedTargets(request.component.dependencies).closure()
-            for dep in item.members
-            if JvmArtifactFieldSet.is_applicable(dep)
-        )
-    )
-
-    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
-    lockfile = await Get(
-        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
-    )
-
     dest_dir = "classfiles"
-    (
-        materialized_classpath,
-        merged_direct_dependency_classpath_digest,
-        dest_dir_digest,
-    ) = await MultiGet(
+    (merged_direct_dependency_classpath_digest, dest_dir_digest) = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__thirdpartycp",
-                lockfiles=(lockfile,),
-            ),
+            Digest,
+            MergeDigests(classfiles.digest for classfiles in direct_dependency_classpath_entries),
         ),
-        Get(Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)),
         Get(
             Digest,
             CreateDigest([Directory(dest_dir)]),
         ),
     )
 
-    prefixed_direct_dependency_classpath = await Get(
-        Snapshot, AddPrefix(merged_direct_dependency_classpath_digest, "__usercp")
+    usercp = "__cp"
+    prefixed_direct_dependency_classpath_digest = await Get(
+        Digest, AddPrefix(merged_direct_dependency_classpath_digest, usercp)
     )
-
-    classpath_arg = ":".join(
-        [*prefixed_direct_dependency_classpath.files, *materialized_classpath.classpath_entries()]
-    )
+    classpath_arg = ClasspathEntry.arg(direct_dependency_classpath_entries, prefix=usercp)
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_direct_dependency_classpath.digest,
-                materialized_classpath.digest,
+                prefixed_direct_dependency_classpath_digest,
                 dest_dir_digest,
                 jdk_setup.digest,
                 *(
@@ -238,7 +202,7 @@ async def compile_java_source(
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         compile_result,
-        ClasspathEntry(jar_output_digest),
+        ClasspathEntry(jar_output_digest, (output_file,), direct_dependency_classpath_entries),
     )
 
 
