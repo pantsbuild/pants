@@ -10,15 +10,7 @@ from itertools import chain
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    RemovePrefix,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
@@ -127,12 +119,10 @@ async def compile_scala_source(
             exit_code=1,
         )
 
-    dest_dir = "classfiles"
     (
         tool_classpath,
-        third_party_classpath,
+        materialized_classpath,
         merged_transitive_dependency_classfiles_digest,
-        dest_dir_digest,
     ) = await MultiGet(
         Get(
             MaterializedClasspath,
@@ -167,25 +157,20 @@ async def compile_scala_source(
             Digest,
             MergeDigests(classfiles.digest for classfiles in transitive_dependency_classfiles),
         ),
-        Get(
-            Digest,
-            CreateDigest([Directory(dest_dir)]),
-        ),
     )
 
     usercp_relpath = "__usercp"
-    prefixed_transitive_dependency_classfiles_digest = await Get(
-        Digest, AddPrefix(merged_transitive_dependency_classfiles_digest, usercp_relpath)
+    prefixed_transitive_dependency_classpath = await Get(
+        Snapshot, AddPrefix(merged_transitive_dependency_classfiles_digest, usercp_relpath)
     )
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_transitive_dependency_classfiles_digest,
+                prefixed_transitive_dependency_classpath.digest,
                 tool_classpath.digest,
-                third_party_classpath.digest,
-                dest_dir_digest,
+                materialized_classpath.digest,
                 jdk_setup.digest,
                 *(
                     sources.snapshot.digest
@@ -195,6 +180,14 @@ async def compile_scala_source(
         ),
     )
 
+    classpath_arg = ":".join(
+        [
+            *prefixed_transitive_dependency_classpath.files,
+            *materialized_classpath.classpath_entries(),
+        ]
+    )
+
+    output_file = f"{request.component.representative.address.path_safe_spec}.jar"
     process_result = await Get(
         FallibleProcessResult,
         Process(
@@ -203,10 +196,9 @@ async def compile_scala_source(
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
-                "-classpath",
-                ":".join([*third_party_classpath.classpath_entries(), usercp_relpath]),
+                *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
-                dest_dir,
+                output_file,
                 *sorted(
                     chain.from_iterable(
                         sources.snapshot.files
@@ -216,8 +208,8 @@ async def compile_scala_source(
             ],
             input_digest=merged_digest,
             use_nailgun=jdk_setup.digest,
-            output_directories=(dest_dir,),
-            description=f"Compile {request.component.members} with scalac",
+            output_files=(output_file,),
+            description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
@@ -225,10 +217,7 @@ async def compile_scala_source(
     )
     output: CompiledClassfiles | None = None
     if process_result.exit_code == 0:
-        stripped_classfiles_digest = await Get(
-            Digest, RemovePrefix(process_result.output_digest, dest_dir)
-        )
-        output = CompiledClassfiles(stripped_classfiles_digest)
+        output = CompiledClassfiles(process_result.output_digest)
 
     return FallibleCompiledClassfiles.from_fallible_process_result(
         str(request.component),

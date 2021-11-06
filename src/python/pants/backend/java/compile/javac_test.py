@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
@@ -19,16 +18,13 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
-from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, FileDigest, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, FileDigest, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
-from pants.jvm import jdk_rules
+from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
@@ -41,7 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
-from pants.jvm.testutil import maybe_skip_jdk_test
+from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
@@ -53,8 +49,6 @@ DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            render_classpath,
-            QueryRule(RenderedClasspath, (Digest,)),
             *archive.rules(),
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -71,6 +65,7 @@ def rule_runner() -> RuleRunner:
             *java_parser.rules(),
             *java_parser_launcher.rules(),
             *source_files.rules(),
+            *testutil.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
@@ -114,43 +109,6 @@ JAVA_LIB_MAIN_SOURCE = dedent(
     }
     """
 )
-
-
-@dataclass(frozen=True)
-class RenderedClasspath:
-    """The contents of a classpath, organized as a key per entry with its contained classfiles."""
-
-    content: dict[str, set[str]]
-
-
-@rule
-async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> RenderedClasspath:
-    dest_dir = "dest"
-    process_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    unzip_binary.path,
-                    "-d",
-                    dest_dir,
-                    filename,
-                ],
-                input_digest=snapshot.digest,
-                output_directories=(dest_dir,),
-                description=f"Extract {filename}",
-            ),
-        )
-        for filename in snapshot.files
-    )
-
-    listing_snapshots = await MultiGet(
-        Get(Snapshot, RemovePrefix(pr.output_digest, dest_dir)) for pr in process_results
-    )
-
-    return RenderedClasspath(
-        {path: set(listing.files) for path, listing in zip(snapshot.files, listing_snapshots)}
-    )
 
 
 def expect_single_expanded_coarsened_target(

@@ -17,9 +17,9 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, FileDigest, PathGlobs
+from pants.engine.fs import Digest, FileDigest, PathGlobs
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
-from pants.jvm import jdk_rules
+from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
@@ -31,7 +31,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
-from pants.jvm.testutil import maybe_skip_jdk_test
+from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
@@ -45,12 +45,13 @@ def rule_runner() -> RuleRunner:
         rules=[
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
-            *source_files.rules(),
-            *scalac_rules(),
-            *scalac_check_rules(),
-            *util_rules(),
-            *target_types_rules(),
             *jdk_rules.rules(),
+            *scalac_check_rules(),
+            *scalac_rules(),
+            *source_files.rules(),
+            *target_types_rules(),
+            *testutil.rules(),
+            *util_rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(FallibleCompiledClassfiles, (CompileScalaSourceRequest,)),
             QueryRule(CompiledClassfiles, (CompileScalaSourceRequest,)),
@@ -143,10 +144,10 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
         [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/example/lib/C.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.jar": {"META-INF/MANIFEST.MF", "org/pantsbuild/example/lib/C.class"}
+    }
 
     # Additionally validate that `check` works.
     check_results = rule_runner.request(
@@ -203,10 +204,14 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/example/Main$.class", "org/pantsbuild/example/Main.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".Example.scala.main.jar": {
+            "META-INF/MANIFEST.MF",
+            "org/pantsbuild/example/Main$.class",
+            "org/pantsbuild/example/Main.class",
+        }
+    }
 
 
 @maybe_skip_jdk_test
@@ -298,10 +303,14 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
         resolve=make_resolve(rule_runner),
     )
     compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
-    classfile_digest_contents = rule_runner.request(DigestContents, [compiled_classfiles.digest])
-    assert frozenset(content.path for content in classfile_digest_contents) == frozenset(
-        ["org/pantsbuild/example/Main$.class", "org/pantsbuild/example/Main.class"]
-    )
+    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    assert classpath.content == {
+        ".Example.scala.main.jar": {
+            "META-INF/MANIFEST.MF",
+            "org/pantsbuild/example/Main$.class",
+            "org/pantsbuild/example/Main.class",
+        }
+    }
 
 
 @maybe_skip_jdk_test
