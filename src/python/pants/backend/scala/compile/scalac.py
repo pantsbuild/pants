@@ -14,7 +14,7 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Snaps
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
@@ -54,7 +54,7 @@ async def compile_scala_source(
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
     request: CompileScalaSourceRequest,
-) -> FallibleCompiledClassfiles:
+) -> FallibleClasspathEntry:
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
     )
@@ -80,10 +80,10 @@ async def compile_scala_source(
     ]
 
     if not component_members_and_scala_source_files:
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=CompiledClassfiles(digest=EMPTY_DIGEST),
+            output=ClasspathEntry(digest=EMPTY_DIGEST),
             exit_code=0,
         )
 
@@ -103,7 +103,7 @@ async def compile_scala_source(
 
     transitive_dependency_classfiles_fallible = await MultiGet(
         Get(
-            FallibleCompiledClassfiles,
+            FallibleClasspathEntry,
             CompileScalaSourceRequest(component=component, resolve=request.resolve),
         )
         for component in CoarsenedTargets(request.component.dependencies).closure()
@@ -112,7 +112,7 @@ async def compile_scala_source(
         fcc.output for fcc in transitive_dependency_classfiles_fallible if fcc.output
     ]
     if len(transitive_dependency_classfiles) != len(transitive_dependency_classfiles_fallible):
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
             output=None,
@@ -215,11 +215,11 @@ async def compile_scala_source(
             env=jdk_setup.env,
         ),
     )
-    output: CompiledClassfiles | None = None
+    output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
-        output = CompiledClassfiles(process_result.output_digest)
+        output = ClasspathEntry(process_result.output_digest)
 
-    return FallibleCompiledClassfiles.from_fallible_process_result(
+    return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         process_result,
         output,

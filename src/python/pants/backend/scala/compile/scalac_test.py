@@ -20,7 +20,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, FileDigest, PathGlobs
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
@@ -53,8 +53,8 @@ def rule_runner() -> RuleRunner:
             *testutil.rules(),
             *util_rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
-            QueryRule(FallibleCompiledClassfiles, (CompileScalaSourceRequest,)),
-            QueryRule(CompiledClassfiles, (CompileScalaSourceRequest,)),
+            QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
+            QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
         target_types=[JvmDependencyLockfile, ScalaSourcesGeneratorTarget, JvmArtifact],
@@ -140,7 +140,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     print(coarsened_target)
 
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
@@ -194,7 +194,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
         }
     )
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -238,7 +238,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert (
         "error: object lib is not a member of package org.pantsbuild.example"
@@ -302,7 +302,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".Example.scala.main.jar": {
@@ -350,7 +350,7 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
         ),
         resolve=make_resolve(rule_runner),
     )
-    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "error: object joda is not a member of package org" in fallible_result.stderr
 
@@ -399,6 +399,6 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
         ),
         resolve=make_resolve(rule_runner),
     )
-    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "error: object joda is not a member of package org" in fallible_result.stderr
