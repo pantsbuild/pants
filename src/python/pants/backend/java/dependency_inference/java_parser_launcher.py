@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 import pkg_resources
 
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.compile import CompiledClassfiles
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
@@ -45,8 +45,9 @@ def java_parser_artifact_requirements() -> ArtifactRequirements:
     )
 
 
-class JavaParserCompiledClassfiles(CompiledClassfiles):
-    pass
+@dataclass(frozen=True)
+class JavaParserCompiledClassfiles:
+    digest: Digest
 
 
 @rule

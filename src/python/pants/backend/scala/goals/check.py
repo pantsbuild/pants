@@ -11,7 +11,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
 from pants.engine.unions import UnionRule
-from pants.jvm.compile import FallibleCompiledClassfiles
+from pants.jvm.compile import FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import CoursierResolveKey
 from pants.util.logging import LogLevel
 
@@ -34,7 +34,7 @@ async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
 
     # TODO: This should be fallible so that we exit cleanly.
     results = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t, resolve=r))
+        Get(FallibleClasspathEntry, CompileScalaSourceRequest(component=t, resolve=r))
         for t, r in zip(coarsened_targets, resolves)
     )
 

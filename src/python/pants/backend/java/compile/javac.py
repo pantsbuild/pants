@@ -22,7 +22,7 @@ from pants.engine.fs import (
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
@@ -59,11 +59,11 @@ async def compile_java_source(
     jdk_setup: JdkSetup,
     zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
-) -> FallibleCompiledClassfiles:
+) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath.
     direct_dependency_classfiles_fallible = await MultiGet(
         Get(
-            FallibleCompiledClassfiles,
+            FallibleClasspathEntry,
             CompileJavaSourceRequest(component=coarsened_dep, resolve=request.resolve),
         )
         for coarsened_dep in request.component.dependencies
@@ -72,7 +72,7 @@ async def compile_java_source(
         fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
     ]
     if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
             output=None,
@@ -108,10 +108,10 @@ async def compile_java_source(
         dependencies_digest = await Get(
             Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)
         )
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=CompiledClassfiles(digest=dependencies_digest),
+            output=ClasspathEntry(digest=dependencies_digest),
             exit_code=0,
         )
 
@@ -200,7 +200,7 @@ async def compile_java_source(
         ),
     )
     if compile_result.exit_code != 0:
-        return FallibleCompiledClassfiles.from_fallible_process_result(
+        return FallibleClasspathEntry.from_fallible_process_result(
             str(request.component),
             compile_result,
             None,
@@ -235,10 +235,10 @@ async def compile_java_source(
         # a `package-info.java` in a single partition.
         jar_output_digest = EMPTY_DIGEST
 
-    return FallibleCompiledClassfiles.from_fallible_process_result(
+    return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         compile_result,
-        CompiledClassfiles(jar_output_digest),
+        ClasspathEntry(jar_output_digest),
     )
 
 
