@@ -50,7 +50,7 @@ class PantsRequirementCAOF:
             "2.10.0.dev0",
             "the `pants_requirement` macro",
             (
-                "Use the target generator `pants_requirements` instead. Specifically, we recommend "
+                "Use the target `pants_requirements` instead. Specifically, we recommend "
                 "deleting all `pants_requirement` calls and replace with a single "
                 "`pants_requirements(name='pants')`.\n\n"
                 "By default, `pants_requirements` will generate a `python_requirement` target for "
@@ -62,9 +62,10 @@ class PantsRequirementCAOF:
                 "The version of Pants is more useful now. If you're using a dev release, the "
                 "version will be the exact release you're on, like before, to reduce the risk of "
                 "a Plugin API change breaking your plugin. But if you're using a release candidate "
-                "or stable release, the version will now be any version in the release series, "
-                "e.g. any release in Pants 2.9. This allows consumers of your plugin to use "
-                "different patch versions than what you release the plugin with."
+                "or stable release, the version will now be any non-dev release in the release "
+                "series, e.g. any release candidate or stable release in Pants 2.9. This allows "
+                "consumers of your plugin to use different patch versions than what you release "
+                "the plugin with."
             ),
         )
         name = name or dist or os.path.basename(self._parse_context.rel_path)
