@@ -29,11 +29,11 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
     CoursierResolvedLockfile,
-    CoursierResolveKey,
     FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 

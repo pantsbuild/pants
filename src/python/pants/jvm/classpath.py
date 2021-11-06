@@ -14,10 +14,10 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    CoursierResolveKey,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.jvm.resolve.key import CoursierResolveKey
 
 _USERCP_RELPATH = "__usercp"
 

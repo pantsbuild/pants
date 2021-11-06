@@ -30,6 +30,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -502,13 +503,6 @@ async def load_coursier_lockfile_from_source(
     )
     source_lockfile_content = source_lockfile_digest_contents[0]
     return CoursierResolvedLockfile.from_json_dict(json.loads(source_lockfile_content.content))
-
-
-@dataclass(frozen=True)
-class CoursierResolveKey:
-    name: str
-    path: str
-    digest: Digest
 
 
 @rule
