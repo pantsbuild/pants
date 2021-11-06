@@ -4,7 +4,6 @@
 use std::path::Path;
 
 use pyo3::basic::CompareOp;
-use pyo3::class::basic::PyObjectProtocol;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyTuple, PyType};
@@ -105,19 +104,14 @@ impl PyDigest {
     Ok(Self(Digest::new(fingerprint, serialized_bytes_length)))
   }
 
-  #[getter]
-  fn fingerprint(&self) -> String {
-    self.0.hash.to_hex()
+  fn __hash__(&self) -> u64 {
+    self.0.hash.prefix_hash()
   }
 
-  #[getter]
-  fn serialized_bytes_length(&self) -> usize {
-    self.0.size_bytes
+  fn __repr__(&self) -> String {
+    format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
   }
-}
 
-#[pyproto]
-impl PyObjectProtocol for PyDigest {
   fn __richcmp__(&self, other: PyRef<PyDigest>, op: CompareOp) -> Py<PyAny> {
     let py = other.py();
     match op {
@@ -127,12 +121,14 @@ impl PyObjectProtocol for PyDigest {
     }
   }
 
-  fn __hash__(&self) -> u64 {
-    self.0.hash.prefix_hash()
+  #[getter]
+  fn fingerprint(&self) -> String {
+    self.0.hash.to_hex()
   }
 
-  fn __repr__(&self) -> String {
-    format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
+  #[getter]
+  fn serialized_bytes_length(&self) -> usize {
+    self.0.size_bytes
   }
 }
 
@@ -159,6 +155,34 @@ impl PySnapshot {
   ) -> Self {
     let snapshot = unsafe { Snapshot::create_for_testing_ffi(py_digest.0, files, dirs) };
     Self(snapshot)
+  }
+
+  fn __hash__(&self) -> u64 {
+    self.0.digest.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> PyResult<String> {
+    let (dirs, files): (Vec<_>, Vec<_>) = self.0.path_stats.iter().partition_map(|ps| match ps {
+      PathStat::Dir { path, .. } => Either::Left(path.to_string_lossy()),
+      PathStat::File { path, .. } => Either::Right(path.to_string_lossy()),
+    });
+
+    Ok(format!(
+      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
+      self.0.digest.hash.to_hex(),
+      self.0.digest.size_bytes,
+      dirs.join(","),
+      files.join(",")
+    ))
+  }
+
+  fn __richcmp__(&self, other: PyRef<PySnapshot>, op: CompareOp) -> Py<PyAny> {
+    let py = other.py();
+    match op {
+      CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
+      CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
+      _ => py.NotImplemented(),
+    }
   }
 
   #[getter]
@@ -194,37 +218,6 @@ impl PySnapshot {
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
     PyTuple::new(py, dirs).into()
-  }
-}
-
-#[pyproto]
-impl PyObjectProtocol for PySnapshot {
-  fn __richcmp__(&self, other: PyRef<PySnapshot>, op: CompareOp) -> Py<PyAny> {
-    let py = other.py();
-    match op {
-      CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
-      CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
-      _ => py.NotImplemented(),
-    }
-  }
-
-  fn __hash__(&self) -> u64 {
-    self.0.digest.hash.prefix_hash()
-  }
-
-  fn __repr__(&self) -> PyResult<String> {
-    let (dirs, files): (Vec<_>, Vec<_>) = self.0.path_stats.iter().partition_map(|ps| match ps {
-      PathStat::Dir { path, .. } => Either::Left(path.to_string_lossy()),
-      PathStat::File { path, .. } => Either::Right(path.to_string_lossy()),
-    });
-
-    Ok(format!(
-      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
-      self.0.digest.hash.to_hex(),
-      self.0.digest.size_bytes,
-      dirs.join(","),
-      files.join(",")
-    ))
   }
 }
 
