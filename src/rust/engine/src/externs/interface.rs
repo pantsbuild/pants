@@ -765,36 +765,36 @@ fn nailgun_server_create(
       let runner: Value = runner.into();
       let executor = executor.clone();
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
-        let command = externs::store_utf8(&exe.cmd.command);
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let command = externs::store_utf8(py, &exe.cmd.command);
         let args = externs::store_tuple(
+          py,
           exe
             .cmd
             .args
             .iter()
-            .map(|s| externs::store_utf8(s))
+            .map(|s| externs::store_utf8(py, s))
             .collect::<Vec<_>>(),
         );
         let env = externs::store_dict(
+          py,
           exe
             .cmd
             .env
             .iter()
-            .map(|(k, v)| (externs::store_utf8(k), externs::store_utf8(v)))
+            .map(|(k, v)| (externs::store_utf8(py, k), externs::store_utf8(py, v)))
             .collect::<Vec<_>>(),
         )
         .unwrap();
-        let working_dir = externs::store_bytes(exe.cmd.working_dir.as_os_str().as_bytes());
-        let stdin_fd = externs::store_i64(exe.stdin_fd.into());
-        let stdout_fd = externs::store_i64(exe.stdout_fd.into());
-        let stderr_fd = externs::store_i64(exe.stderr_fd.into());
-        let cancellation_latch = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          PySessionCancellationLatch::create_instance(py, exe.cancelled)
-            .unwrap()
-            .into_object()
-            .into()
-        };
+        let working_dir = externs::store_bytes(py, exe.cmd.working_dir.as_os_str().as_bytes());
+        let stdin_fd = externs::store_i64(py, exe.stdin_fd.into());
+        let stdout_fd = externs::store_i64(py, exe.stdout_fd.into());
+        let stderr_fd = externs::store_i64(py, exe.stderr_fd.into());
+        let cancellation_latch = PySessionCancellationLatch::create_instance(py, exe.cancelled)
+          .unwrap()
+          .into_object()
+          .into();
         let runner_args = vec![
           command,
           args,
@@ -807,8 +807,6 @@ fn nailgun_server_create(
         ];
         match externs::call_function(&runner, &runner_args) {
           Ok(exit_code) => {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
             let code: i32 = exit_code.extract(py).unwrap();
             nailgun::ExitCode(code)
           }
@@ -943,73 +941,77 @@ async fn workunit_to_py_value(
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
-  use std::time::UNIX_EPOCH;
+  let mut dict_entries = {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let mut dict_entries = vec![
+      (
+        externs::store_utf8(py, "name"),
+        externs::store_utf8(py, &workunit.name),
+      ),
+      (
+        externs::store_utf8(py, "span_id"),
+        externs::store_utf8(py, &format!("{}", workunit.span_id)),
+      ),
+      (
+        externs::store_utf8(py, "level"),
+        externs::store_utf8(py, &workunit.metadata.level.to_string()),
+      ),
+    ];
 
-  let mut dict_entries = vec![
-    (
-      externs::store_utf8("name"),
-      externs::store_utf8(&workunit.name),
-    ),
-    (
-      externs::store_utf8("span_id"),
-      externs::store_utf8(&format!("{}", workunit.span_id)),
-    ),
-    (
-      externs::store_utf8("level"),
-      externs::store_utf8(&workunit.metadata.level.to_string()),
-    ),
-  ];
-  if let Some(parent_id) = workunit.parent_id {
-    dict_entries.push((
-      externs::store_utf8("parent_id"),
-      externs::store_utf8(&format!("{}", parent_id)),
-    ));
-  }
+    if let Some(parent_id) = workunit.parent_id {
+      dict_entries.push((
+        externs::store_utf8(py, "parent_id"),
+        externs::store_utf8(py, &format!("{}", parent_id)),
+      ));
+    }
 
-  match workunit.state {
-    WorkunitState::Started { start_time, .. } => {
-      let duration = start_time
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|_| Duration::default());
-      dict_entries.extend_from_slice(&[
-        (
-          externs::store_utf8("start_secs"),
-          externs::store_u64(duration.as_secs()),
-        ),
-        (
-          externs::store_utf8("start_nanos"),
-          externs::store_u64(duration.subsec_nanos() as u64),
-        ),
-      ])
+    match workunit.state {
+      WorkunitState::Started { start_time, .. } => {
+        let duration = start_time
+          .duration_since(std::time::UNIX_EPOCH)
+          .unwrap_or_else(|_| Duration::default());
+        dict_entries.extend_from_slice(&[
+          (
+            externs::store_utf8(py, "start_secs"),
+            externs::store_u64(py, duration.as_secs()),
+          ),
+          (
+            externs::store_utf8(py, "start_nanos"),
+            externs::store_u64(py, duration.subsec_nanos() as u64),
+          ),
+        ])
+      }
+      WorkunitState::Completed { time_span } => {
+        dict_entries.extend_from_slice(&[
+          (
+            externs::store_utf8(py, "start_secs"),
+            externs::store_u64(py, time_span.start.secs),
+          ),
+          (
+            externs::store_utf8(py, "start_nanos"),
+            externs::store_u64(py, u64::from(time_span.start.nanos)),
+          ),
+          (
+            externs::store_utf8(py, "duration_secs"),
+            externs::store_u64(py, time_span.duration.secs),
+          ),
+          (
+            externs::store_utf8(py, "duration_nanos"),
+            externs::store_u64(py, u64::from(time_span.duration.nanos)),
+          ),
+        ]);
+      }
+    };
+
+    if let Some(desc) = &workunit.metadata.desc.as_ref() {
+      dict_entries.push((
+        externs::store_utf8(py, "description"),
+        externs::store_utf8(py, desc),
+      ));
     }
-    WorkunitState::Completed { time_span } => {
-      dict_entries.extend_from_slice(&[
-        (
-          externs::store_utf8("start_secs"),
-          externs::store_u64(time_span.start.secs),
-        ),
-        (
-          externs::store_utf8("start_nanos"),
-          externs::store_u64(u64::from(time_span.start.nanos)),
-        ),
-        (
-          externs::store_utf8("duration_secs"),
-          externs::store_u64(time_span.duration.secs),
-        ),
-        (
-          externs::store_utf8("duration_nanos"),
-          externs::store_u64(u64::from(time_span.duration.nanos)),
-        ),
-      ]);
-    }
+    dict_entries
   };
-
-  if let Some(desc) = &workunit.metadata.desc.as_ref() {
-    dict_entries.push((
-      externs::store_utf8("description"),
-      externs::store_utf8(desc),
-    ));
-  }
 
   let mut artifact_entries = Vec::new();
 
@@ -1017,32 +1019,38 @@ async fn workunit_to_py_value(
     let store = core.store();
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
-        crate::nodes::Snapshot::store_file_digest(&core.types, digest)
+        let gil = Python::acquire_gil();
+        crate::nodes::Snapshot::store_file_digest(gil.python(), &core.types, digest)
       }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
           .map_err(|err_str| {
             let gil = Python::acquire_gil();
-            let py = gil.python();
-            PyErr::new::<exc::Exception, _>(py, (err_str,))
+            PyErr::new::<exc::Exception, _>(gil.python(), (err_str,))
           })?;
-        crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          PyErr::new::<exc::Exception, _>(py, (err_str,))
-        })?
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        crate::nodes::Snapshot::store_snapshot(py, snapshot)
+          .map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?
       }
     };
 
-    artifact_entries.push((externs::store_utf8(artifact_name.as_str()), py_val))
+    let gil = Python::acquire_gil();
+    artifact_entries.push((
+      externs::store_utf8(gil.python(), artifact_name.as_str()),
+      py_val,
+    ))
   }
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
 
   let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => externs::store_utf8(v),
-      UserMetadataItem::ImmediateInt(n) => externs::store_i64(*n),
+      UserMetadataItem::ImmediateString(v) => externs::store_utf8(py, v),
+      UserMetadataItem::ImmediateInt(n) => externs::store_i64(py, *n),
       UserMetadataItem::PyValue(py_val_handle) => {
         match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
           None => {
@@ -1056,31 +1064,31 @@ async fn workunit_to_py_value(
         }
       }
     };
-    user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), value));
+    user_metadata_entries.push((externs::store_utf8(py, user_metadata_key.as_str()), value));
   }
 
   dict_entries.push((
-    externs::store_utf8("metadata"),
-    externs::store_dict(user_metadata_entries)?,
+    externs::store_utf8(py, "metadata"),
+    externs::store_dict(py, user_metadata_entries)?,
   ));
 
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
-      externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(&core.types, stdout_digest),
+      externs::store_utf8(py, "stdout_digest"),
+      crate::nodes::Snapshot::store_file_digest(py, &core.types, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
-      externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(&core.types, stderr_digest),
+      externs::store_utf8(py, "stderr_digest"),
+      crate::nodes::Snapshot::store_file_digest(py, &core.types, stderr_digest),
     ));
   }
 
   dict_entries.push((
-    externs::store_utf8("artifacts"),
-    externs::store_dict(artifact_entries)?,
+    externs::store_utf8(py, "artifacts"),
+    externs::store_dict(py, artifact_entries)?,
   ));
 
   if !workunit.counters.is_empty() {
@@ -1089,19 +1097,19 @@ async fn workunit_to_py_value(
       .iter()
       .map(|(counter_name, counter_value)| {
         (
-          externs::store_utf8(counter_name.as_ref()),
-          externs::store_u64(*counter_value),
+          externs::store_utf8(py, counter_name.as_ref()),
+          externs::store_u64(py, *counter_value),
         )
       })
       .collect();
 
     dict_entries.push((
-      externs::store_utf8("counters"),
-      externs::store_dict(counters_entries)?,
+      externs::store_utf8(py, "counters"),
+      externs::store_dict(py, counters_entries)?,
     ));
   }
 
-  externs::store_dict(dict_entries)
+  externs::store_dict(py, dict_entries)
 }
 
 async fn workunits_to_py_tuple_value<'a>(
@@ -1109,17 +1117,14 @@ async fn workunits_to_py_tuple_value<'a>(
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
-  // Acquire the GIL here so that calls into the externs::store_* helpers via workunit_to_py_value
-  // do not block on obtaining the GIL for every value conversion. (This API supports recursive
-  // acquisition of the GIL.)
-  let _gil = Python::acquire_gil();
-
   let mut workunit_values = Vec::new();
   for workunit in workunits {
     let py_value = workunit_to_py_value(workunit, core, session).await?;
     workunit_values.push(py_value);
   }
-  Ok(externs::store_tuple(workunit_values))
+
+  let gil = Python::acquire_gil();
+  Ok(externs::store_tuple(gil.python(), workunit_values))
 }
 
 fn session_poll_workunits(
@@ -1152,7 +1157,8 @@ fn session_poll_workunits(
               session,
             ))?;
 
-            Ok(externs::store_tuple(vec![started, completed]).into())
+            let gil = Python::acquire_gil();
+            Ok(externs::store_tuple(gil.python(), vec![started, completed]).into())
           })
       })
     })
@@ -1201,9 +1207,14 @@ fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(value)))
+        .map(|(metric, value)| {
+          (
+            externs::store_utf8(py, metric),
+            externs::store_i64(py, value),
+          )
+        })
         .collect::<Vec<_>>();
-      externs::store_dict(values).map(|d| d.consume_into_py_object(py))
+      externs::store_dict(py, values).map(|d| d.consume_into_py_object(py))
     })
   })
 }
@@ -1703,14 +1714,16 @@ fn capture_snapshots(
               digest_hint,
             )
             .await?;
-            nodes::Snapshot::store_snapshot(snapshot)
+            let gil = Python::acquire_gil();
+            nodes::Snapshot::store_snapshot(gil.python(), snapshot)
           }
         })
         .collect::<Vec<_>>();
       py.allow_threads(|| {
+        let gil = Python::acquire_gil();
         core.executor.block_on(
           future::try_join_all(snapshot_futures)
-            .map_ok(|values| externs::store_tuple(values).into()),
+            .map_ok(|values| externs::store_tuple(gil.python(), values).into()),
         )
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
@@ -1768,7 +1781,11 @@ fn single_file_digests_to_bytes(
       let store = core.store();
       async move {
         store
-          .load_file_bytes_with(digest, externs::store_bytes)
+          .load_file_bytes_with(digest, |bytes| {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            externs::store_bytes(py, bytes)
+          })
           .await
           .and_then(|maybe_bytes| {
             maybe_bytes.ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))

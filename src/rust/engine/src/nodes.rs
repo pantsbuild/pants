@@ -635,22 +635,25 @@ impl Paths {
       .await
   }
 
-  pub fn store_paths(core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
+  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in item.iter() {
       match ps {
         &PathStat::File { ref path, .. } => {
-          files.push(Snapshot::store_path(path)?);
+          files.push(Snapshot::store_path(py, path)?);
         }
         &PathStat::Dir { ref path, .. } => {
-          dirs.push(Snapshot::store_path(path)?);
+          dirs.push(Snapshot::store_path(py, path)?);
         }
       }
     }
     Ok(externs::unsafe_call(
       core.types.paths,
-      &[externs::store_tuple(files), externs::store_tuple(dirs)],
+      &[
+        externs::store_tuple(py, files),
+        externs::store_tuple(py, dirs),
+      ],
     ))
   }
 }
@@ -752,8 +755,8 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::to_py_digest(*item)
+  pub fn store_directory_digest(py: Python, item: &hashing::Digest) -> Result<Value, String> {
+    externs::fs::to_py_digest(py, *item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
@@ -767,81 +770,109 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_file_digest(types: &crate::types::Types, item: &hashing::Digest) -> Value {
+  pub fn store_file_digest(
+    py: Python,
+    types: &crate::types::Types,
+    item: &hashing::Digest,
+  ) -> Value {
     externs::unsafe_call(
       types.file_digest,
       &[
-        externs::store_utf8(&item.hash.to_hex()),
-        externs::store_i64(item.size_bytes as i64),
+        externs::store_utf8(py, &item.hash.to_hex()),
+        externs::store_i64(py, item.size_bytes as i64),
       ],
     )
   }
 
-  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
-    externs::fs::to_py_snapshot(item)
+  pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::to_py_snapshot(py, item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
 
-  fn store_path(item: &Path) -> Result<Value, String> {
+  fn store_path(py: Python, item: &Path) -> Result<Value, String> {
     if let Some(p) = item.as_os_str().to_str() {
-      Ok(externs::store_utf8(p))
+      Ok(externs::store_utf8(py, p))
     } else {
       Err(format!("Could not decode path `{:?}` as UTF8.", item))
     }
   }
 
-  fn store_file_content(types: &crate::types::Types, item: &FileContent) -> Result<Value, String> {
+  fn store_file_content(
+    py: Python,
+    types: &crate::types::Types,
+    item: &FileContent,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       types.file_content,
       &[
-        Self::store_path(&item.path)?,
-        externs::store_bytes(&item.content),
-        externs::store_bool(item.is_executable),
+        Self::store_path(py, &item.path)?,
+        externs::store_bytes(py, &item.content),
+        externs::store_bool(py, item.is_executable),
       ],
     ))
   }
 
-  fn store_file_entry(types: &crate::types::Types, item: &FileEntry) -> Result<Value, String> {
+  fn store_file_entry(
+    py: Python,
+    types: &crate::types::Types,
+    item: &FileEntry,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       types.file_entry,
       &[
-        Self::store_path(&item.path)?,
-        Self::store_file_digest(types, &item.digest),
-        externs::store_bool(item.is_executable),
+        Self::store_path(py, &item.path)?,
+        Self::store_file_digest(py, types, &item.digest),
+        externs::store_bool(py, item.is_executable),
       ],
     ))
   }
 
-  fn store_empty_directory(types: &crate::types::Types, path: &Path) -> Result<Value, String> {
+  fn store_empty_directory(
+    py: Python,
+    types: &crate::types::Types,
+    path: &Path,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       types.directory,
-      &[Self::store_path(path)?],
+      &[Self::store_path(py, path)?],
     ))
   }
 
-  pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
+  pub fn store_digest_contents(
+    py: Python,
+    context: &Context,
+    item: &[FileContent],
+  ) -> Result<Value, String> {
     let entries = item
       .iter()
-      .map(|e| Self::store_file_content(&context.core.types, e))
+      .map(|e| Self::store_file_content(py, &context.core.types, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_contents,
-      &[externs::store_tuple(entries)],
+      &[externs::store_tuple(py, entries)],
     ))
   }
 
-  pub fn store_digest_entries(context: &Context, item: &[DigestEntry]) -> Result<Value, String> {
+  pub fn store_digest_entries(
+    py: Python,
+    context: &Context,
+    item: &[DigestEntry],
+  ) -> Result<Value, String> {
     let entries = item
       .iter()
       .map(|digest_entry| match digest_entry {
-        DigestEntry::File(file_entry) => Self::store_file_entry(&context.core.types, file_entry),
-        DigestEntry::EmptyDirectory(path) => Self::store_empty_directory(&context.core.types, path),
+        DigestEntry::File(file_entry) => {
+          Self::store_file_entry(py, &context.core.types, file_entry)
+        }
+        DigestEntry::EmptyDirectory(path) => {
+          Self::store_empty_directory(py, &context.core.types, path)
+        }
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_entries,
-      &[externs::store_tuple(entries)],
+      &[externs::store_tuple(py, entries)],
     ))
   }
 }
@@ -1079,7 +1110,8 @@ impl Task {
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
-          input = externs::store_tuple(values);
+          let gil = Python::acquire_gil();
+          input = externs::store_tuple(gil.python(), values);
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(val);
