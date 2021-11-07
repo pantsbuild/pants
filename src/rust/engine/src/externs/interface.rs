@@ -939,73 +939,77 @@ async fn workunit_to_py_value(
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
-  use std::time::UNIX_EPOCH;
+  let mut dict_entries = {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let mut dict_entries = vec![
+      (
+        externs::store_utf8("name"),
+        externs::store_utf8(&workunit.name),
+      ),
+      (
+        externs::store_utf8("span_id"),
+        externs::store_utf8(&format!("{}", workunit.span_id)),
+      ),
+      (
+        externs::store_utf8("level"),
+        externs::store_utf8(&workunit.metadata.level.to_string()),
+      ),
+    ];
 
-  let mut dict_entries = vec![
-    (
-      externs::store_utf8("name"),
-      externs::store_utf8(&workunit.name),
-    ),
-    (
-      externs::store_utf8("span_id"),
-      externs::store_utf8(&format!("{}", workunit.span_id)),
-    ),
-    (
-      externs::store_utf8("level"),
-      externs::store_utf8(&workunit.metadata.level.to_string()),
-    ),
-  ];
-  if let Some(parent_id) = workunit.parent_id {
-    dict_entries.push((
-      externs::store_utf8("parent_id"),
-      externs::store_utf8(&format!("{}", parent_id)),
-    ));
-  }
+    if let Some(parent_id) = workunit.parent_id {
+      dict_entries.push((
+        externs::store_utf8("parent_id"),
+        externs::store_utf8(&format!("{}", parent_id)),
+      ));
+    }
 
-  match workunit.state {
-    WorkunitState::Started { start_time, .. } => {
-      let duration = start_time
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|_| Duration::default());
-      dict_entries.extend_from_slice(&[
-        (
-          externs::store_utf8("start_secs"),
-          externs::store_u64(duration.as_secs()),
-        ),
-        (
-          externs::store_utf8("start_nanos"),
-          externs::store_u64(duration.subsec_nanos() as u64),
-        ),
-      ])
+    match workunit.state {
+      WorkunitState::Started { start_time, .. } => {
+        let duration = start_time
+          .duration_since(std::time::UNIX_EPOCH)
+          .unwrap_or_else(|_| Duration::default());
+        dict_entries.extend_from_slice(&[
+          (
+            externs::store_utf8("start_secs"),
+            externs::store_u64(py, duration.as_secs()),
+          ),
+          (
+            externs::store_utf8("start_nanos"),
+            externs::store_u64(py, duration.subsec_nanos() as u64),
+          ),
+        ])
+      }
+      WorkunitState::Completed { time_span } => {
+        dict_entries.extend_from_slice(&[
+          (
+            externs::store_utf8("start_secs"),
+            externs::store_u64(py, time_span.start.secs),
+          ),
+          (
+            externs::store_utf8("start_nanos"),
+            externs::store_u64(py, u64::from(time_span.start.nanos)),
+          ),
+          (
+            externs::store_utf8("duration_secs"),
+            externs::store_u64(py, time_span.duration.secs),
+          ),
+          (
+            externs::store_utf8("duration_nanos"),
+            externs::store_u64(py, u64::from(time_span.duration.nanos)),
+          ),
+        ]);
+      }
+    };
+
+    if let Some(desc) = &workunit.metadata.desc.as_ref() {
+      dict_entries.push((
+        externs::store_utf8("description"),
+        externs::store_utf8(desc),
+      ));
     }
-    WorkunitState::Completed { time_span } => {
-      dict_entries.extend_from_slice(&[
-        (
-          externs::store_utf8("start_secs"),
-          externs::store_u64(time_span.start.secs),
-        ),
-        (
-          externs::store_utf8("start_nanos"),
-          externs::store_u64(u64::from(time_span.start.nanos)),
-        ),
-        (
-          externs::store_utf8("duration_secs"),
-          externs::store_u64(time_span.duration.secs),
-        ),
-        (
-          externs::store_utf8("duration_nanos"),
-          externs::store_u64(u64::from(time_span.duration.nanos)),
-        ),
-      ]);
-    }
+    dict_entries
   };
-
-  if let Some(desc) = &workunit.metadata.desc.as_ref() {
-    dict_entries.push((
-      externs::store_utf8("description"),
-      externs::store_utf8(desc),
-    ));
-  }
 
   let mut artifact_entries = Vec::new();
 
@@ -1091,7 +1095,7 @@ async fn workunit_to_py_value(
       .map(|(counter_name, counter_value)| {
         (
           externs::store_utf8(counter_name.as_ref()),
-          externs::store_u64(*counter_value),
+          externs::store_u64(py, *counter_value),
         )
       })
       .collect();

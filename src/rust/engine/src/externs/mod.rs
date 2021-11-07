@@ -91,9 +91,8 @@ pub fn store_utf8(utf8: &str) -> Value {
   Value::from(utf8.to_py_object(gil.python()).into_object())
 }
 
-pub fn store_u64(val: u64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_u64(py: Python, val: u64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
 pub fn store_i64(py: Python, val: i64) -> Value {
