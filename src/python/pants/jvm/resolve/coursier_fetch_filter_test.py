@@ -43,7 +43,7 @@ coord4 = Coordinate("test", "art4", "1.0.0")
 coord5 = Coordinate("test", "art5", "1.0.0")
 
 
-# No depedencies (coord1)
+# No dependencies (coord1)
 # 1 direct dependency, more transitive dependencies (coord2)
 # 1 where direct dependencies provide no transitive dependencies (coord 4)
 # 1 where direct dependencies provide repeated dependencies (coord5)
