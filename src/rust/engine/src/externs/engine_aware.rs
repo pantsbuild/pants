@@ -4,7 +4,7 @@
 use crate::context::Context;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
-use crate::python::Value;
+use crate::python::{TypeId, Value};
 use crate::Failure;
 use crate::Types;
 
@@ -66,7 +66,7 @@ impl EngineAwareReturnType {
         }
       };
 
-      let artifact_output = if externs::get_type_for(&value) == types.file_digest {
+      let artifact_output = if TypeId::new(&value.get_type(py)) == types.file_digest {
         match lift_file_digest(types, &value) {
           Ok(digest) => ArtifactOutput::FileDigest(digest),
           Err(e) => {
