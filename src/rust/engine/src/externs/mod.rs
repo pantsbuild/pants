@@ -229,20 +229,8 @@ pub fn create_exception(msg: &str) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
-pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  if value == py.None() {
-    return None;
-  }
-  Some(value)
-}
-
-pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyObject, PyErr> {
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let gil = Python::acquire_gil();
-  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  value.call_method(gil.python(), method, args_tuple, None)
+pub fn call_method0(py: Python, value: &PyObject, method: &str) -> Result<PyObject, PyErr> {
+  value.call_method(py, method, PyTuple::new(py, &[]), None)
 }
 
 pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {

@@ -15,21 +15,29 @@ pub struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
   pub fn level(value: &Value) -> Option<Level> {
-    let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
-    let new_level_val = externs::check_for_python_none(new_level_val)?;
-    externs::val_to_log_level(&new_level_val).ok()
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let level_val = externs::call_method0(py, value.as_ref(), "level").ok()?;
+    if level_val.is_none(py) {
+      return None;
+    }
+    externs::val_to_log_level(&level_val).ok()
   }
 
   pub fn message(value: &Value) -> Option<String> {
-    let msg_val = externs::call_method(value, "message", &[]).ok()?;
-    let msg_val = externs::check_for_python_none(msg_val)?;
-    Some(externs::val_to_str(&msg_val))
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let msg_val = externs::call_method0(py, value, "message").ok()?;
+    if msg_val.is_none(py) {
+      return None;
+    }
+    msg_val.extract(py).ok()
   }
 
   pub fn cacheable(value: &Value) -> Option<bool> {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    externs::call_method(value, "cacheable", &[])
+    externs::call_method0(py, value, "cacheable")
       .ok()?
       .extract(py)
       .ok()
@@ -40,7 +48,9 @@ impl EngineAwareReturnType {
   }
 
   pub fn artifacts(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
-    let artifacts_val = match externs::call_method(value, "artifacts", &[]) {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let artifacts_val = match externs::call_method0(py, value, "artifacts") {
       Ok(value) => value,
       Err(py_err) => {
         let failure = Failure::from_py_err(py_err);
@@ -48,9 +58,10 @@ impl EngineAwareReturnType {
         return None;
       }
     };
-    let artifacts_val = externs::check_for_python_none(artifacts_val)?;
-    let gil = Python::acquire_gil();
-    let py = gil.python();
+    if artifacts_val.is_none(py) {
+      return None;
+    }
+
     let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
     let mut output = Vec::new();
 
@@ -99,10 +110,13 @@ pub struct EngineAwareParameter;
 
 impl EngineAwareParameter {
   pub fn debug_hint(value: &Value) -> Option<String> {
-    externs::call_method(value, "debug_hint", &[])
-      .ok()
-      .and_then(externs::check_for_python_none)
-      .map(|val| externs::val_to_str(&val))
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let hint = externs::call_method0(py, value, "debug_hint").ok()?;
+    if hint.is_none(py) {
+      return None;
+    }
+    hint.extract(py).ok()
   }
 
   pub fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
@@ -111,7 +125,9 @@ impl EngineAwareParameter {
 }
 
 fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
-  let metadata_val = match externs::call_method(value, "metadata", &[]) {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  let metadata_val = match externs::call_method0(py, value, "metadata") {
     Ok(value) => value,
     Err(py_err) => {
       let failure = Failure::from_py_err(py_err);
@@ -119,10 +135,9 @@ fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadat
       return None;
     }
   };
-
-  let metadata_val = externs::check_for_python_none(metadata_val)?;
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+  if metadata_val.is_none(py) {
+    return None;
+  }
 
   let mut output = Vec::new();
   let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
