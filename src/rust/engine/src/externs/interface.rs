@@ -54,7 +54,7 @@ use workunit_store::{
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
-  Scheduler, Session, Tasks, Types, Value,
+  Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -452,30 +452,30 @@ py_class!(class PyTypes |py| {
     Self::create_instance(
         py,
         RefCell::new(Some(Types {
-        directory_digest: externs::type_for(py.get_type::<externs::fs::PyDigest>()),
-        file_digest: externs::type_for(file_digest),
-        snapshot: externs::type_for(snapshot),
-        paths: externs::type_for(paths),
-        file_content: externs::type_for(file_content),
-        file_entry: externs::type_for(file_entry),
-        directory: externs::type_for(directory),
-        digest_contents: externs::type_for(digest_contents),
-        digest_entries: externs::type_for(digest_entries),
-        path_globs: externs::type_for(path_globs),
-        merge_digests: externs::type_for(merge_digests),
-        add_prefix: externs::type_for(add_prefix),
-        remove_prefix: externs::type_for(remove_prefix),
-        create_digest: externs::type_for(create_digest),
-        digest_subset: externs::type_for(digest_subset),
-        download_file: externs::type_for(download_file),
-        platform: externs::type_for(platform),
-        multi_platform_process: externs::type_for(multi_platform_process),
-        process_result: externs::type_for(process_result),
-        coroutine: externs::type_for(coroutine),
-        session_values: externs::type_for(session_values),
-        interactive_process: externs::type_for(interactive_process),
-        interactive_process_result: externs::type_for(interactive_process_result),
-        engine_aware_parameter: externs::type_for(engine_aware_parameter),
+        directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
+        file_digest: TypeId::new(&file_digest),
+        snapshot: TypeId::new(&snapshot),
+        paths: TypeId::new(&paths),
+        file_content: TypeId::new(&file_content),
+        file_entry: TypeId::new(&file_entry),
+        directory: TypeId::new(&directory),
+        digest_contents: TypeId::new(&digest_contents),
+        digest_entries: TypeId::new(&digest_entries),
+        path_globs: TypeId::new(&path_globs),
+        merge_digests: TypeId::new(&merge_digests),
+        add_prefix: TypeId::new(&add_prefix),
+        remove_prefix: TypeId::new(&remove_prefix),
+        create_digest: TypeId::new(&create_digest),
+        digest_subset: TypeId::new(&digest_subset),
+        download_file: TypeId::new(&download_file),
+        platform: TypeId::new(&platform),
+        multi_platform_process: TypeId::new(&multi_platform_process),
+        process_result: TypeId::new(&process_result),
+        coroutine: TypeId::new(&coroutine),
+        session_values: TypeId::new(&session_values),
+        interactive_process: TypeId::new(&interactive_process),
+        interactive_process_result: TypeId::new(&interactive_process_result),
+        engine_aware_parameter: TypeId::new(&engine_aware_parameter),
     })),
     )
   }
@@ -848,12 +848,12 @@ fn strongly_connected_components(
   let mut node_ids: HashMap<Key, _> = HashMap::new();
 
   for (node, adjacency_list) in adjacency_lists {
-    let node_key = externs::key_for(node.clone_ref(py).into())?;
+    let node_key = Key::from_value(node.clone_ref(py).into())?;
     let node_id = *node_ids
       .entry(node_key)
       .or_insert_with(|| graph.add_node(node_key));
     for dependency in adjacency_list {
-      let dependency_key = externs::key_for(dependency.clone_ref(py).into())?;
+      let dependency_key = Key::from_value(dependency.clone_ref(py).into())?;
       let dependency_id = node_ids
         .entry(dependency_key)
         .or_insert_with(|| graph.add_node(dependency_key));
@@ -867,7 +867,7 @@ fn strongly_connected_components(
       .map(|component| {
         component
           .into_iter()
-          .map(|node_id| externs::val_for(&graph[node_id]).consume_into_py_object(py))
+          .map(|node_id| graph[node_id].to_value().consume_into_py_object(py))
           .collect::<Vec<_>>()
       })
       .collect(),
@@ -1260,10 +1260,10 @@ fn execution_add_root_select(
 ) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_execution_request(py, execution_request_ptr, |execution_request| {
-      let product = externs::type_for(product);
+      let product = TypeId::new(&product);
       let keys = param_vals
         .into_iter()
-        .map(|p| externs::key_for(p.into()))
+        .map(|p| Key::from_value(p.into()))
         .collect::<Result<Vec<_>, _>>()?;
       Params::new(keys)
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
@@ -1289,8 +1289,8 @@ fn tasks_task_begin(
     .try_into()
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (format!("{}", e),)))?;
   with_tasks(py, tasks_ptr, |tasks| {
-    let func = Function(externs::key_for(func.into())?);
-    let output_type = externs::type_for(output_type);
+    let func = Function(Key::from_value(func.into())?);
+    let output_type = TypeId::new(&output_type);
     tasks.task_begin(
       func,
       output_type,
@@ -1314,8 +1314,8 @@ fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
 
 fn tasks_add_get(py: Python, tasks_ptr: PyTasks, output: PyType, input: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
-    let output = externs::type_for(output);
-    let input = externs::type_for(input);
+    let output = TypeId::new(&output);
+    let input = TypeId::new(&input);
     tasks.add_get(output, input);
     Ok(None)
   })
@@ -1329,8 +1329,11 @@ fn tasks_add_union(
 ) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     tasks.add_union(
-      externs::type_for(output_type),
-      input_types.into_iter().map(externs::type_for).collect(),
+      TypeId::new(&output_type),
+      input_types
+        .into_iter()
+        .map(|type_id| TypeId::new(&type_id))
+        .collect(),
     );
     Ok(None)
   })
@@ -1338,7 +1341,7 @@ fn tasks_add_union(
 
 fn tasks_add_select(py: Python, tasks_ptr: PyTasks, selector: PyType) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
-    let selector = externs::type_for(selector);
+    let selector = TypeId::new(&selector);
     tasks.add_select(selector);
     Ok(None)
   })
@@ -1352,8 +1355,11 @@ fn tasks_add_query(
 ) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     tasks.query_add(
-      externs::type_for(output_type),
-      input_types.into_iter().map(externs::type_for).collect(),
+      TypeId::new(&output_type),
+      input_types
+        .into_iter()
+        .map(|type_id| TypeId::new(&type_id))
+        .collect(),
     );
     Ok(None)
   })
@@ -1516,20 +1522,20 @@ fn rule_graph_consumed_types(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let param_types = param_types
       .into_iter()
-      .map(externs::type_for)
+      .map(|type_id| TypeId::new(&type_id))
       .collect::<Vec<_>>();
 
     let subgraph = scheduler
       .core
       .rule_graph
-      .subgraph(param_types, externs::type_for(product_type))
+      .subgraph(param_types, TypeId::new(&product_type))
       .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
 
     Ok(
       subgraph
         .consumed_types()
         .into_iter()
-        .map(externs::type_for_type_id)
+        .map(|type_id| type_id.as_py_type(py))
         .collect(),
     )
   })
@@ -1559,9 +1565,9 @@ fn rule_subgraph_visualize(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let param_types = param_types
       .into_iter()
-      .map(externs::type_for)
+      .map(|py_type| TypeId::new(&py_type))
       .collect::<Vec<_>>();
-    let product_type = externs::type_for(product_type);
+    let product_type = TypeId::new(&product_type);
     let path = PathBuf::from(path);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!

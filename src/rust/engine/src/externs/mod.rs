@@ -37,24 +37,6 @@ pub fn none() -> PyObject {
   gil.python().None()
 }
 
-pub fn get_type_for(val: &PyObject) -> TypeId {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  (&val.get_type(py)).into()
-}
-
-pub fn is_union(ty: TypeId) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  let py_type = (&ty).as_py_type(py);
-  let unions = py.import("pants.engine.unions").unwrap();
-  unions
-    .call(py, "is_union", (py_type,), None)
-    .unwrap()
-    .extract(py)
-    .unwrap()
-}
-
 pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();
@@ -70,24 +52,6 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
     .cast_as::<PyBool>(gil.python())
     .unwrap()
     .is_true()
-}
-
-pub fn type_for_type_id(ty: TypeId) -> PyType {
-  let gil = Python::acquire_gil();
-  (&ty).as_py_type(gil.python())
-}
-
-pub fn type_for(py_type: PyType) -> TypeId {
-  (&py_type).into()
-}
-
-pub fn key_for(val: Value) -> Result<Key, PyErr> {
-  let gil = Python::acquire_gil();
-  INTERNS.key_insert(gil.python(), val)
-}
-
-pub fn val_for(key: &Key) -> Value {
-  INTERNS.key_get(key)
 }
 
 pub fn store_tuple(values: Vec<Value>) -> Value {
@@ -225,14 +189,6 @@ pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
   val_to_str(&getattr(value, field).unwrap())
 }
 
-pub fn key_to_str(key: &Key) -> String {
-  val_to_str(val_for(key).as_ref())
-}
-
-pub fn type_to_str(type_id: TypeId) -> String {
-  getattr_as_string(&type_for_type_id(type_id).into_object(), "__name__")
-}
-
 pub fn val_to_str(obj: &PyObject) -> String {
   let gil = Python::acquire_gil();
   let py = gil.python();
@@ -341,25 +297,25 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
 /// those configured in types::Types.
 ///
 pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
-  let py_type = type_for_type_id(type_id);
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();
-  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
+  let py = gil.python();
+  let py_type = type_id.as_py_type(py);
+  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
+  let args_tuple = PyTuple::new(py, &arg_handles);
   py_type
     .call(gil.python(), args_tuple, None)
     .map(Value::from)
     .unwrap_or_else(|e| {
-      let gil = Python::acquire_gil();
       panic!(
         "Core type constructor `{}` failed: {:?}",
-        py_type.name(gil.python()),
+        py_type.name(py),
         e
       );
     })
 }
 
 lazy_static! {
-  static ref INTERNS: Interns = Interns::new();
+  pub static ref INTERNS: Interns = Interns::new();
 }
 
 py_class!(pub class PyGeneratorResponseBreak |py| {
@@ -406,12 +362,7 @@ impl Get {
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(
-      f,
-      "Get({}, {})",
-      type_to_str(self.output),
-      key_to_str(&self.input)
-    )
+    write!(f, "Get({}, {})", self.output, self.input)
   }
 }
 

@@ -223,7 +223,7 @@ impl Select {
       }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
-          Ok(externs::val_for(key))
+          Ok(key.to_value())
         } else {
           Err(throw(&format!(
             "Expected a Param of type {} to be present.",
@@ -269,7 +269,9 @@ pub fn lift_directory_digest(digest: &PyObject) -> Result<hashing::Digest, Strin
 }
 
 pub fn lift_file_digest(types: &Types, digest: &PyObject) -> Result<hashing::Digest, String> {
-  if types.file_digest != externs::get_type_for(digest) {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  if TypeId::new(&digest.get_type(py)) != types.file_digest {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
   let fingerprint = externs::getattr_as_string(digest, "fingerprint");
@@ -932,7 +934,7 @@ impl WrappedNode for DownloadedFile {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
-    let value = externs::val_for(&self.0);
+    let value = self.0.to_value();
     let url_str = externs::getattr_as_string(&value, "url");
 
     let url = Url::parse(&url_str)
@@ -1010,7 +1012,7 @@ impl Task {
               Select::new(params.clone(), get.output, entry)
             })
             .or_else(|| {
-              if externs::is_union(get.input_type) {
+              if get.input_type.is_union() {
                 // Is a union.
                 let (_, rule_edges) = context
                   .core
@@ -1023,7 +1025,7 @@ impl Task {
               }
             })
             .ok_or_else(|| {
-              if externs::is_union(get.input_type) {
+              if get.input_type.is_union() {
                 throw(&format!(
                   "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
                   with `@union`, the third argument should be a member of that union. Did you \
@@ -1135,11 +1137,15 @@ impl WrappedNode for Task {
     let engine_aware_return_type = self.task.engine_aware_return_type;
 
     let result_val = maybe_side_effecting(side_effecting, &self.side_effected, async move {
-      externs::call_function(&externs::val_for(&func.0), &deps).map_err(Failure::from_py_err)
+      externs::call_function(&func.0.to_value(), &deps).map_err(Failure::from_py_err)
     })
     .await?;
     let mut result_val: Value = result_val.into();
-    let mut result_type = externs::get_type_for(&result_val);
+    let mut result_type = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      TypeId::new(&result_val.get_type(py))
+    };
     if result_type == context.core.types.coroutine {
       result_val = maybe_side_effecting(
         side_effecting,
@@ -1147,7 +1153,9 @@ impl WrappedNode for Task {
         Self::generate(&context, workunit, params, entry, result_val),
       )
       .await?;
-      result_type = externs::get_type_for(&result_val);
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      result_type = TypeId::new(&result_val.get_type(py));
     }
 
     if result_type == product {
@@ -1345,10 +1353,9 @@ impl Node for NodeKey {
     let user_facing_name = self.user_facing_name();
     let engine_aware_params: Vec<_> = match &self {
       NodeKey::Task(ref task) => {
-        let engine_aware_param_ty =
-          externs::type_for_type_id(context.core.types.engine_aware_parameter);
         let gil = Python::acquire_gil();
         let py = gil.python();
+        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         task
           .params
           .keys()
@@ -1358,7 +1365,7 @@ impl Node for NodeKey {
               .as_py_type(py)
               .is_subtype_of(py, &engine_aware_param_ty)
             {
-              Some(externs::val_for(key))
+              Some(key.to_value())
             } else {
               None
             }
@@ -1549,7 +1556,7 @@ impl Display for NodeKey {
         let params = task
           .params
           .keys()
-          .filter_map(|k| engine_aware::EngineAwareParameter::debug_hint(&externs::val_for(k)))
+          .filter_map(|k| engine_aware::EngineAwareParameter::debug_hint(&k.to_value()))
           .collect::<Vec<_>>();
         write!(
           f,
