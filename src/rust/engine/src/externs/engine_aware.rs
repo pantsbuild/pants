@@ -12,6 +12,10 @@ use workunit_store::{
   ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
 };
 
+// Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
+// we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
+// be like the user did not set extra metadata.
+
 #[derive(Default, Clone, Debug)]
 pub(crate) struct EngineAwareReturnType {
   level: Option<Level>,
@@ -25,8 +29,8 @@ impl EngineAwareReturnType {
     Self {
       level: Self::level(py, task_result),
       message: Self::message(py, task_result),
-      artifacts: Self::artifacts(py, &context.core.types, task_result),
-      metadata: metadata(py, context, task_result),
+      artifacts: Self::artifacts(py, &context.core.types, task_result).unwrap_or_else(Vec::new),
+      metadata: metadata(py, context, task_result).unwrap_or_else(Vec::new),
     }
   }
 
@@ -43,54 +47,50 @@ impl EngineAwareReturnType {
   }
 
   fn level(py: Python, value: &Value) -> Option<Level> {
-    let level_val = externs::call_method0(py, value, "level").unwrap();
+    let level_val = externs::call_method0(py, value, "level").ok()?;
     if level_val.is_none(py) {
       return None;
     }
-    Some(externs::val_to_log_level(&level_val).unwrap())
+    externs::val_to_log_level(&level_val).ok()
   }
 
   fn message(py: Python, value: &Value) -> Option<String> {
-    let msg_val = externs::call_method0(py, value, "message").unwrap();
+    let msg_val = externs::call_method0(py, value, "message").ok()?;
     if msg_val.is_none(py) {
       return None;
     }
-    msg_val.extract(py).unwrap()
+    msg_val.extract(py).ok()
   }
 
-  fn artifacts(py: Python, types: &Types, value: &Value) -> Vec<(String, ArtifactOutput)> {
-    let artifacts_val = externs::call_method0(py, value, "artifacts").unwrap();
+  fn artifacts(py: Python, types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
+    let artifacts_val = externs::call_method0(py, value, "artifacts").ok()?;
     if artifacts_val.is_none(py) {
-      return vec![];
+      return None;
     }
 
-    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).unwrap();
+    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
     let mut output = Vec::new();
 
     for (key, value) in artifacts_dict.items(py).into_iter() {
-      let key_name: String = key
-        .cast_as::<PyString>(py)
-        .unwrap()
-        .to_string_lossy(py)
-        .into();
+      let key_name: String = key.cast_as::<PyString>(py).ok()?.to_string_lossy(py).into();
 
       let artifact_output = if TypeId::new(&value.get_type(py)) == types.file_digest {
         lift_file_digest(types, &value).map(ArtifactOutput::FileDigest)
       } else {
-        let digest_value = value.getattr(py, "digest").unwrap();
+        let digest_value = value.getattr(py, "digest").ok()?;
         lift_directory_digest(&digest_value).map(ArtifactOutput::Snapshot)
       }
-      .unwrap();
+      .ok()?;
       output.push((key_name, artifact_output));
     }
-    output
+    Some(output)
   }
 
-  pub(crate) fn is_cacheable(py: Python, value: &Value) -> bool {
+  pub(crate) fn is_cacheable(py: Python, value: &Value) -> Option<bool> {
     externs::call_method0(py, value, "cacheable")
-      .unwrap()
+      .ok()?
       .extract(py)
-      .unwrap()
+      .ok()
   }
 }
 
@@ -106,21 +106,25 @@ impl EngineAwareParameter {
   }
 
   pub fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
-    metadata(py, context, value)
+    metadata(py, context, value).unwrap_or_else(Vec::new)
   }
 }
 
-fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
-  let metadata_val = externs::call_method0(py, value, "metadata").unwrap();
+fn metadata(
+  py: Python,
+  context: &Context,
+  value: &Value,
+) -> Option<Vec<(String, UserMetadataItem)>> {
+  let metadata_val = externs::call_method0(py, value, "metadata").ok()?;
   if metadata_val.is_none(py) {
-    return vec![];
+    return None;
   }
 
   let mut output = Vec::new();
-  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).unwrap();
+  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
 
   for (key, value) in metadata_dict.items(py).into_iter() {
-    let key_name: String = key.extract(py).unwrap();
+    let key_name: String = key.extract(py).ok()?;
     let py_value_handle = UserMetadataPyValue::new();
     let umi = UserMetadataItem::PyValue(py_value_handle.clone());
     context.session.with_metadata_map(|map| {
@@ -128,5 +132,5 @@ fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMe
     });
     output.push((key_name, umi));
   }
-  output
+  Some(output)
 }

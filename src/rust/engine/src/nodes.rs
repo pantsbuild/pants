@@ -1529,7 +1529,7 @@ impl Node for NodeKey {
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        EngineAwareReturnType::is_cacheable(py, v)
+        EngineAwareReturnType::is_cacheable(py, v).unwrap_or(true)
       }
       _ => true,
     }
