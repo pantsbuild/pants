@@ -80,12 +80,9 @@ pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
   Value::from(PyBytes::new(py, bytes).into_object())
 }
 
-///
-/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
-///
-pub fn store_utf8(utf8: &str) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(utf8.to_py_object(gil.python()).into_object())
+/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
+pub fn store_utf8(py: Python, utf8: &str) -> Value {
+  Value::from(utf8.to_py_object(py).into_object())
 }
 
 pub fn store_u64(py: Python, val: u64) -> Value {

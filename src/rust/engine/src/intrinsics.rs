@@ -210,7 +210,7 @@ fn multi_platform_process_request_to_process_result(
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
           context.core.types.platform,
-          &[externs::store_utf8(&platform_name)],
+          &[externs::store_utf8(py, &platform_name)],
         ),
       ],
     ))

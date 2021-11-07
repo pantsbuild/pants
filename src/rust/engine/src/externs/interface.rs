@@ -767,14 +767,14 @@ fn nailgun_server_create(
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let command = externs::store_utf8(&exe.cmd.command);
+        let command = externs::store_utf8(py, &exe.cmd.command);
         let args = externs::store_tuple(
           py,
           exe
             .cmd
             .args
             .iter()
-            .map(|s| externs::store_utf8(s))
+            .map(|s| externs::store_utf8(py, s))
             .collect::<Vec<_>>(),
         );
         let env = externs::store_dict(
@@ -783,7 +783,7 @@ fn nailgun_server_create(
             .cmd
             .env
             .iter()
-            .map(|(k, v)| (externs::store_utf8(k), externs::store_utf8(v)))
+            .map(|(k, v)| (externs::store_utf8(py, k), externs::store_utf8(py, v)))
             .collect::<Vec<_>>(),
         )
         .unwrap();
@@ -946,23 +946,23 @@ async fn workunit_to_py_value(
     let py = gil.python();
     let mut dict_entries = vec![
       (
-        externs::store_utf8("name"),
-        externs::store_utf8(&workunit.name),
+        externs::store_utf8(py, "name"),
+        externs::store_utf8(py, &workunit.name),
       ),
       (
-        externs::store_utf8("span_id"),
-        externs::store_utf8(&format!("{}", workunit.span_id)),
+        externs::store_utf8(py, "span_id"),
+        externs::store_utf8(py, &format!("{}", workunit.span_id)),
       ),
       (
-        externs::store_utf8("level"),
-        externs::store_utf8(&workunit.metadata.level.to_string()),
+        externs::store_utf8(py, "level"),
+        externs::store_utf8(py, &workunit.metadata.level.to_string()),
       ),
     ];
 
     if let Some(parent_id) = workunit.parent_id {
       dict_entries.push((
-        externs::store_utf8("parent_id"),
-        externs::store_utf8(&format!("{}", parent_id)),
+        externs::store_utf8(py, "parent_id"),
+        externs::store_utf8(py, &format!("{}", parent_id)),
       ));
     }
 
@@ -973,11 +973,11 @@ async fn workunit_to_py_value(
           .unwrap_or_else(|_| Duration::default());
         dict_entries.extend_from_slice(&[
           (
-            externs::store_utf8("start_secs"),
+            externs::store_utf8(py, "start_secs"),
             externs::store_u64(py, duration.as_secs()),
           ),
           (
-            externs::store_utf8("start_nanos"),
+            externs::store_utf8(py, "start_nanos"),
             externs::store_u64(py, duration.subsec_nanos() as u64),
           ),
         ])
@@ -985,19 +985,19 @@ async fn workunit_to_py_value(
       WorkunitState::Completed { time_span } => {
         dict_entries.extend_from_slice(&[
           (
-            externs::store_utf8("start_secs"),
+            externs::store_utf8(py, "start_secs"),
             externs::store_u64(py, time_span.start.secs),
           ),
           (
-            externs::store_utf8("start_nanos"),
+            externs::store_utf8(py, "start_nanos"),
             externs::store_u64(py, u64::from(time_span.start.nanos)),
           ),
           (
-            externs::store_utf8("duration_secs"),
+            externs::store_utf8(py, "duration_secs"),
             externs::store_u64(py, time_span.duration.secs),
           ),
           (
-            externs::store_utf8("duration_nanos"),
+            externs::store_utf8(py, "duration_nanos"),
             externs::store_u64(py, u64::from(time_span.duration.nanos)),
           ),
         ]);
@@ -1006,8 +1006,8 @@ async fn workunit_to_py_value(
 
     if let Some(desc) = &workunit.metadata.desc.as_ref() {
       dict_entries.push((
-        externs::store_utf8("description"),
-        externs::store_utf8(desc),
+        externs::store_utf8(py, "description"),
+        externs::store_utf8(py, desc),
       ));
     }
     dict_entries
@@ -1020,26 +1020,27 @@ async fn workunit_to_py_value(
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
         let gil = Python::acquire_gil();
-        let py = gil.python();
-        crate::nodes::Snapshot::store_file_digest(py, &core.types, digest)
+        crate::nodes::Snapshot::store_file_digest(gil.python(), &core.types, digest)
       }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
           .await
           .map_err(|err_str| {
             let gil = Python::acquire_gil();
-            let py = gil.python();
-            PyErr::new::<exc::Exception, _>(py, (err_str,))
+            PyErr::new::<exc::Exception, _>(gil.python(), (err_str,))
           })?;
         crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
           let gil = Python::acquire_gil();
-          let py = gil.python();
-          PyErr::new::<exc::Exception, _>(py, (err_str,))
+          PyErr::new::<exc::Exception, _>(gil.python(), (err_str,))
         })?
       }
     };
 
-    artifact_entries.push((externs::store_utf8(artifact_name.as_str()), py_val))
+    let gil = Python::acquire_gil();
+    artifact_entries.push((
+      externs::store_utf8(gil.python(), artifact_name.as_str()),
+      py_val,
+    ))
   }
 
   let gil = Python::acquire_gil();
@@ -1048,7 +1049,7 @@ async fn workunit_to_py_value(
   let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => externs::store_utf8(v),
+      UserMetadataItem::ImmediateString(v) => externs::store_utf8(py, v),
       UserMetadataItem::ImmediateInt(n) => externs::store_i64(py, *n),
       UserMetadataItem::PyValue(py_val_handle) => {
         match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
@@ -1063,30 +1064,30 @@ async fn workunit_to_py_value(
         }
       }
     };
-    user_metadata_entries.push((externs::store_utf8(user_metadata_key.as_str()), value));
+    user_metadata_entries.push((externs::store_utf8(py, user_metadata_key.as_str()), value));
   }
 
   dict_entries.push((
-    externs::store_utf8("metadata"),
+    externs::store_utf8(py, "metadata"),
     externs::store_dict(py, user_metadata_entries)?,
   ));
 
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
-      externs::store_utf8("stdout_digest"),
+      externs::store_utf8(py, "stdout_digest"),
       crate::nodes::Snapshot::store_file_digest(py, &core.types, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
-      externs::store_utf8("stderr_digest"),
+      externs::store_utf8(py, "stderr_digest"),
       crate::nodes::Snapshot::store_file_digest(py, &core.types, stderr_digest),
     ));
   }
 
   dict_entries.push((
-    externs::store_utf8("artifacts"),
+    externs::store_utf8(py, "artifacts"),
     externs::store_dict(py, artifact_entries)?,
   ));
 
@@ -1096,14 +1097,14 @@ async fn workunit_to_py_value(
       .iter()
       .map(|(counter_name, counter_value)| {
         (
-          externs::store_utf8(counter_name.as_ref()),
+          externs::store_utf8(py, counter_name.as_ref()),
           externs::store_u64(py, *counter_value),
         )
       })
       .collect();
 
     dict_entries.push((
-      externs::store_utf8("counters"),
+      externs::store_utf8(py, "counters"),
       externs::store_dict(py, counters_entries)?,
     ));
   }
@@ -1206,7 +1207,12 @@ fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(py, value)))
+        .map(|(metric, value)| {
+          (
+            externs::store_utf8(py, metric),
+            externs::store_i64(py, value),
+          )
+        })
         .collect::<Vec<_>>();
       externs::store_dict(py, values).map(|d| d.consume_into_py_object(py))
     })

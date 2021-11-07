@@ -641,10 +641,10 @@ impl Paths {
     for ps in item.iter() {
       match ps {
         &PathStat::File { ref path, .. } => {
-          files.push(Snapshot::store_path(path)?);
+          files.push(Snapshot::store_path(py, path)?);
         }
         &PathStat::Dir { ref path, .. } => {
-          dirs.push(Snapshot::store_path(path)?);
+          dirs.push(Snapshot::store_path(py, path)?);
         }
       }
     }
@@ -778,7 +778,7 @@ impl Snapshot {
     externs::unsafe_call(
       types.file_digest,
       &[
-        externs::store_utf8(&item.hash.to_hex()),
+        externs::store_utf8(py, &item.hash.to_hex()),
         externs::store_i64(py, item.size_bytes as i64),
       ],
     )
@@ -790,9 +790,9 @@ impl Snapshot {
       .map_err(|e| format!("{:?}", e))
   }
 
-  fn store_path(item: &Path) -> Result<Value, String> {
+  fn store_path(py: Python, item: &Path) -> Result<Value, String> {
     if let Some(p) = item.as_os_str().to_str() {
-      Ok(externs::store_utf8(p))
+      Ok(externs::store_utf8(py, p))
     } else {
       Err(format!("Could not decode path `{:?}` as UTF8.", item))
     }
@@ -806,7 +806,7 @@ impl Snapshot {
     Ok(externs::unsafe_call(
       types.file_content,
       &[
-        Self::store_path(&item.path)?,
+        Self::store_path(py, &item.path)?,
         externs::store_bytes(py, &item.content),
         externs::store_bool(py, item.is_executable),
       ],
@@ -821,17 +821,21 @@ impl Snapshot {
     Ok(externs::unsafe_call(
       types.file_entry,
       &[
-        Self::store_path(&item.path)?,
+        Self::store_path(py, &item.path)?,
         Self::store_file_digest(py, types, &item.digest),
         externs::store_bool(py, item.is_executable),
       ],
     ))
   }
 
-  fn store_empty_directory(types: &crate::types::Types, path: &Path) -> Result<Value, String> {
+  fn store_empty_directory(
+    py: Python,
+    types: &crate::types::Types,
+    path: &Path,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       types.directory,
-      &[Self::store_path(path)?],
+      &[Self::store_path(py, path)?],
     ))
   }
 
@@ -861,7 +865,9 @@ impl Snapshot {
         DigestEntry::File(file_entry) => {
           Self::store_file_entry(py, &context.core.types, file_entry)
         }
-        DigestEntry::EmptyDirectory(path) => Self::store_empty_directory(&context.core.types, path),
+        DigestEntry::EmptyDirectory(path) => {
+          Self::store_empty_directory(py, &context.core.types, path)
+        }
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
