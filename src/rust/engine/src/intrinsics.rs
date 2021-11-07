@@ -374,7 +374,8 @@ fn path_globs_to_paths(
     let path_globs = Snapshot::lift_path_globs(&val)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
-    Paths::store_paths(&core, &paths).map_err(|e: String| throw(&e))
+    let gil = Python::acquire_gil();
+    Paths::store_paths(gil.python(), &core, &paths).map_err(|e: String| throw(&e))
   }
   .boxed()
 }

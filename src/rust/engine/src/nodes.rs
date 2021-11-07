@@ -635,7 +635,7 @@ impl Paths {
       .await
   }
 
-  pub fn store_paths(core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
+  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in item.iter() {
@@ -650,7 +650,10 @@ impl Paths {
     }
     Ok(externs::unsafe_call(
       core.types.paths,
-      &[externs::store_tuple(files), externs::store_tuple(dirs)],
+      &[
+        externs::store_tuple(py, files),
+        externs::store_tuple(py, dirs),
+      ],
     ))
   }
 }
@@ -843,7 +846,7 @@ impl Snapshot {
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_contents,
-      &[externs::store_tuple(entries)],
+      &[externs::store_tuple(py, entries)],
     ))
   }
 
@@ -863,7 +866,7 @@ impl Snapshot {
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
       context.core.types.digest_entries,
-      &[externs::store_tuple(entries)],
+      &[externs::store_tuple(py, entries)],
     ))
   }
 }
@@ -1101,7 +1104,8 @@ impl Task {
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
-          input = externs::store_tuple(values);
+          let gil = Python::acquire_gil();
+          input = externs::store_tuple(gil.python(), values);
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(val);

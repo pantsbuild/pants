@@ -769,6 +769,7 @@ fn nailgun_server_create(
         let py = gil.python();
         let command = externs::store_utf8(&exe.cmd.command);
         let args = externs::store_tuple(
+          py,
           exe
             .cmd
             .args
@@ -1114,17 +1115,14 @@ async fn workunits_to_py_tuple_value<'a>(
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
-  // Acquire the GIL here so that calls into the externs::store_* helpers via workunit_to_py_value
-  // do not block on obtaining the GIL for every value conversion. (This API supports recursive
-  // acquisition of the GIL.)
-  let _gil = Python::acquire_gil();
-
   let mut workunit_values = Vec::new();
   for workunit in workunits {
     let py_value = workunit_to_py_value(workunit, core, session).await?;
     workunit_values.push(py_value);
   }
-  Ok(externs::store_tuple(workunit_values))
+
+  let gil = Python::acquire_gil();
+  Ok(externs::store_tuple(gil.python(), workunit_values))
 }
 
 fn session_poll_workunits(
@@ -1157,7 +1155,8 @@ fn session_poll_workunits(
               session,
             ))?;
 
-            Ok(externs::store_tuple(vec![started, completed]).into())
+            let gil = Python::acquire_gil();
+            Ok(externs::store_tuple(gil.python(), vec![started, completed]).into())
           })
       })
     })
@@ -1713,9 +1712,10 @@ fn capture_snapshots(
         })
         .collect::<Vec<_>>();
       py.allow_threads(|| {
+        let gil = Python::acquire_gil();
         core.executor.block_on(
           future::try_join_all(snapshot_futures)
-            .map_ok(|values| externs::store_tuple(values).into()),
+            .map_ok(|values| externs::store_tuple(gil.python(), values).into()),
         )
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))

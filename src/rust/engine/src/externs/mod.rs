@@ -54,13 +54,12 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
     .is_true()
 }
 
-pub fn store_tuple(values: Vec<Value>) -> Value {
-  let gil = Python::acquire_gil();
+pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
   let arg_handles: Vec<_> = values
     .into_iter()
-    .map(|v| v.consume_into_py_object(gil.python()))
+    .map(|v| v.consume_into_py_object(py))
     .collect();
-  Value::from(PyTuple::new(gil.python(), &arg_handles).into_object())
+  Value::from(PyTuple::new(py, &arg_handles).into_object())
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
