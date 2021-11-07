@@ -344,7 +344,7 @@ async def resolve_python_distribution_entry_points(
     ]
 
     # Intermediate step, as Get(Targets) returns a deduplicated set.. which breaks in case of
-    # mulitple input refs that maps to the same target.
+    # multiple input refs that maps to the same target.
     target_addresses = await Get(
         Addresses, UnparsedAddressInputs(target_refs, owning_address=address)
     )
