@@ -31,12 +31,6 @@ use lazy_static::lazy_static;
 
 use logging::PythonLogLevel;
 
-/// Return the Python value None.
-pub fn none() -> PyObject {
-  let gil = Python::acquire_gil();
-  gil.python().None()
-}
-
 pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   let gil = Python::acquire_gil();
   let py = gil.python();

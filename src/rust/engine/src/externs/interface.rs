@@ -1690,7 +1690,7 @@ fn capture_snapshots(
           );
           let digest_hint = {
             let maybe_digest: PyObject = externs::getattr(value, "digest_hint").unwrap();
-            if maybe_digest == externs::none() {
+            if maybe_digest.is_none(py) {
               None
             } else {
               Some(nodes::lift_directory_digest(&Value::new(maybe_digest))?)

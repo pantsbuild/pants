@@ -1098,7 +1098,10 @@ impl Task {
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<Value> {
-    let mut input = Value::from(externs::none());
+    let mut input = {
+      let gil = Python::acquire_gil();
+      Value::from(gil.python().None())
+    };
     loop {
       let context = context.clone();
       let params = params.clone();
