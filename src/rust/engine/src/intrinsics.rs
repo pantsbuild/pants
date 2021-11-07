@@ -12,7 +12,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use cpython::Python;
+use cpython::{ObjectProtocol, Python};
 use fs::RelativePath;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -398,7 +398,16 @@ fn create_digest_to_digest(
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(&file_item, "content") {
+        let (is_file_content, is_file_entry) = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          (
+            file_item.hasattr(py, "content").unwrap(),
+            file_item.hasattr(py, "file_digest").unwrap(),
+          )
+        };
+
+        if is_file_content {
           let bytes =
             bytes::Bytes::from(externs::getattr::<Vec<u8>>(&file_item, "content").unwrap());
           let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
@@ -409,7 +418,7 @@ fn create_digest_to_digest(
             .await?;
           let res: Result<_, String> = Ok(snapshot.digest);
           res
-        } else if externs::hasattr(&file_item, "file_digest") {
+        } else if is_file_entry {
           let digest_obj = externs::getattr(&file_item, "file_digest")?;
           let digest = Snapshot::lift_file_digest(&digest_obj)?;
           let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
