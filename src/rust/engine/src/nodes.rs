@@ -1163,9 +1163,9 @@ impl WrappedNode for Task {
       )));
     }
 
-    let gil = Python::acquire_gil();
-    let py = gil.python();
     let engine_aware_return_type = if self.task.engine_aware_return_type {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
       EngineAwareReturnType::from_task_result(py, &result_val, &context)
     } else {
       EngineAwareReturnType::default()
