@@ -453,8 +453,9 @@ impl From<String> for Failure {
 }
 
 pub fn throw(msg: &str) -> Failure {
+  let gil = Python::acquire_gil();
   Failure::Throw {
-    val: externs::create_exception(msg),
+    val: externs::create_exception(gil.python(), msg),
     python_traceback: Failure::native_traceback(msg),
     engine_traceback: Vec::new(),
   }

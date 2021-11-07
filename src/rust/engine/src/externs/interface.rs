@@ -729,7 +729,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
         f @ Failure::Invalidated => {
           let msg = format!("{}", f);
           (
-            externs::create_exception(&msg),
+            externs::create_exception(py, &msg),
             Failure::native_traceback(&msg),
             Vec::new(),
           )

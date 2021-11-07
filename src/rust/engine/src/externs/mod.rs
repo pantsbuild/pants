@@ -194,9 +194,7 @@ pub fn doc_url(slug: &str) -> String {
     .unwrap()
 }
 
-pub fn create_exception(msg: &str) -> Value {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn create_exception(py: Python, msg: &str) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
