@@ -5,113 +5,99 @@ use crate::context::Context;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
 use crate::python::{TypeId, Value};
-use crate::Failure;
 use crate::Types;
 
-use cpython::{PyDict, PyString, Python};
-use workunit_store::{ArtifactOutput, Level, UserMetadataItem, UserMetadataPyValue};
+use cpython::{ObjectProtocol, PyDict, PyString, Python};
+use workunit_store::{
+  ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
+};
 
-pub struct EngineAwareReturnType;
+#[derive(Default, Clone, Debug)]
+pub(crate) struct EngineAwareReturnType {
+  level: Option<Level>,
+  message: Option<String>,
+  metadata: Vec<(String, UserMetadataItem)>,
+  artifacts: Vec<(String, ArtifactOutput)>,
+}
 
 impl EngineAwareReturnType {
-  pub fn level(value: &Value) -> Option<Level> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let level_val = externs::call_method0(py, value.as_ref(), "level").ok()?;
+  pub(crate) fn from_task_result(py: Python, task_result: &Value, context: &Context) -> Self {
+    Self {
+      level: Self::level(py, task_result),
+      message: Self::message(py, task_result),
+      artifacts: Self::artifacts(py, &context.core.types, task_result),
+      metadata: metadata(py, context, task_result),
+    }
+  }
+
+  pub(crate) fn update_workunit(self, workunit: &mut RunningWorkunit) {
+    workunit.update_metadata(|mut metadata| {
+      if let Some(new_level) = self.level {
+        metadata.level = new_level;
+      }
+      metadata.message = self.message;
+      metadata.artifacts.extend(self.artifacts);
+      metadata.user_metadata.extend(self.metadata);
+      metadata
+    });
+  }
+
+  fn level(py: Python, value: &Value) -> Option<Level> {
+    let level_val = externs::call_method0(py, value, "level").unwrap();
     if level_val.is_none(py) {
       return None;
     }
-    externs::val_to_log_level(&level_val).ok()
+    Some(externs::val_to_log_level(&level_val).unwrap())
   }
 
-  pub fn message(value: &Value) -> Option<String> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let msg_val = externs::call_method0(py, value, "message").ok()?;
+  fn message(py: Python, value: &Value) -> Option<String> {
+    let msg_val = externs::call_method0(py, value, "message").unwrap();
     if msg_val.is_none(py) {
       return None;
     }
-    msg_val.extract(py).ok()
+    msg_val.extract(py).unwrap()
   }
 
-  pub fn cacheable(value: &Value) -> Option<bool> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::call_method0(py, value, "cacheable")
-      .ok()?
-      .extract(py)
-      .ok()
-  }
-
-  pub fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
-    metadata(context, value)
-  }
-
-  pub fn artifacts(types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let artifacts_val = match externs::call_method0(py, value, "artifacts") {
-      Ok(value) => value,
-      Err(py_err) => {
-        let failure = Failure::from_py_err(py_err);
-        log::error!("Error calling `artifacts` method: {}", failure);
-        return None;
-      }
-    };
+  fn artifacts(py: Python, types: &Types, value: &Value) -> Vec<(String, ArtifactOutput)> {
+    let artifacts_val = externs::call_method0(py, value, "artifacts").unwrap();
     if artifacts_val.is_none(py) {
-      return None;
+      return vec![];
     }
 
-    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
+    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).unwrap();
     let mut output = Vec::new();
 
     for (key, value) in artifacts_dict.items(py).into_iter() {
-      let key_name: String = match key.cast_as::<PyString>(py) {
-        Ok(s) => s.to_string_lossy(py).into(),
-        Err(e) => {
-          log::error!(
-            "Error in EngineAware.artifacts() implementation - non-string key: {:?}",
-            e
-          );
-          return None;
-        }
-      };
+      let key_name: String = key
+        .cast_as::<PyString>(py)
+        .unwrap()
+        .to_string_lossy(py)
+        .into();
 
       let artifact_output = if TypeId::new(&value.get_type(py)) == types.file_digest {
-        match lift_file_digest(types, &value) {
-          Ok(digest) => ArtifactOutput::FileDigest(digest),
-          Err(e) => {
-            log::error!("Error in EngineAware.artifacts() implementation: {}", e);
-            return None;
-          }
-        }
+        lift_file_digest(types, &value).map(ArtifactOutput::FileDigest)
       } else {
-        let digest_value = externs::getattr(&value, "digest")
-          .map_err(|e| {
-            log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
-          })
-          .ok()?;
-
-        match lift_directory_digest(&Value::new(digest_value)) {
-          Ok(digest) => ArtifactOutput::Snapshot(digest),
-          Err(e) => {
-            log::error!("Error in EngineAware.artifacts() implementation: {}", e);
-            return None;
-          }
-        }
-      };
+        let digest_value = value.getattr(py, "digest").unwrap();
+        lift_directory_digest(&digest_value).map(ArtifactOutput::Snapshot)
+      }
+      .unwrap();
       output.push((key_name, artifact_output));
     }
-    Some(output)
+    output
+  }
+
+  pub(crate) fn is_cacheable(py: Python, value: &Value) -> bool {
+    externs::call_method0(py, value, "cacheable")
+      .unwrap()
+      .extract(py)
+      .unwrap()
   }
 }
 
 pub struct EngineAwareParameter;
 
 impl EngineAwareParameter {
-  pub fn debug_hint(value: &Value) -> Option<String> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
+  pub fn debug_hint(py: Python, value: &Value) -> Option<String> {
     let hint = externs::call_method0(py, value, "debug_hint").ok()?;
     if hint.is_none(py) {
       return None;
@@ -119,41 +105,22 @@ impl EngineAwareParameter {
     hint.extract(py).ok()
   }
 
-  pub fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
-    metadata(context, value)
+  pub fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
+    metadata(py, context, value)
   }
 }
 
-fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadataItem)>> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  let metadata_val = match externs::call_method0(py, value, "metadata") {
-    Ok(value) => value,
-    Err(py_err) => {
-      let failure = Failure::from_py_err(py_err);
-      log::error!("Error calling `metadata` method: {}", failure);
-      return None;
-    }
-  };
+fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
+  let metadata_val = externs::call_method0(py, value, "metadata").unwrap();
   if metadata_val.is_none(py) {
-    return None;
+    return vec![];
   }
 
   let mut output = Vec::new();
-  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
+  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).unwrap();
 
   for (key, value) in metadata_dict.items(py).into_iter() {
-    let key_name: String = match key.extract(py) {
-      Ok(s) => s,
-      Err(e) => {
-        log::error!(
-          "Error in EngineAware.metadata() implementation - non-string key: {:?}",
-          e
-        );
-        return None;
-      }
-    };
-
+    let key_name: String = key.extract(py).unwrap();
     let py_value_handle = UserMetadataPyValue::new();
     let umi = UserMetadataItem::PyValue(py_value_handle.clone());
     context.session.with_metadata_map(|map| {
@@ -161,5 +128,5 @@ fn metadata(context: &Context, value: &Value) -> Option<Vec<(String, UserMetadat
     });
     output.push((key_name, umi));
   }
-  Some(output)
+  output
 }

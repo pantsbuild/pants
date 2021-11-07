@@ -20,7 +20,6 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::downloads;
 use crate::externs;
-use crate::externs::engine_aware;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::selectors;
 use crate::tasks::{self, Rule};
@@ -36,6 +35,7 @@ use process_execution::{
   ProcessResultSource,
 };
 
+use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::{Digest, Fingerprint};
 use store::{self, StoreFileByDigest};
@@ -1131,26 +1131,24 @@ impl WrappedNode for Task {
     };
 
     let func = self.task.func;
-    let entry = self.entry;
-    let product = self.product;
-    let side_effecting = self.task.side_effecting;
-    let engine_aware_return_type = self.task.engine_aware_return_type;
 
-    let result_val = maybe_side_effecting(side_effecting, &self.side_effected, async move {
-      externs::call_function(&func.0.to_value(), &deps).map_err(Failure::from_py_err)
-    })
-    .await?;
-    let mut result_val: Value = result_val.into();
+    let mut result_val: Value =
+      maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
+        externs::call_function(&func.0.to_value(), &deps).map_err(Failure::from_py_err)
+      })
+      .await?
+      .into();
     let mut result_type = {
       let gil = Python::acquire_gil();
       let py = gil.python();
       TypeId::new(&result_val.get_type(py))
     };
+
     if result_type == context.core.types.coroutine {
       result_val = maybe_side_effecting(
-        side_effecting,
+        self.task.side_effecting,
         &self.side_effected,
-        Self::generate(&context, workunit, params, entry, result_val),
+        Self::generate(&context, workunit, params, self.entry, result_val),
       )
       .await?;
       let gil = Python::acquire_gil();
@@ -1158,35 +1156,23 @@ impl WrappedNode for Task {
       result_type = TypeId::new(&result_val.get_type(py));
     }
 
-    if result_type == product {
-      let (new_level, message, new_artifacts, new_metadata) = if engine_aware_return_type {
-        (
-          engine_aware::EngineAwareReturnType::level(&result_val),
-          engine_aware::EngineAwareReturnType::message(&result_val),
-          engine_aware::EngineAwareReturnType::artifacts(&context.core.types, &result_val)
-            .unwrap_or_else(Vec::new),
-          engine_aware::EngineAwareReturnType::metadata(&context, &result_val)
-            .unwrap_or_else(Vec::new),
-        )
-      } else {
-        (None, None, Vec::new(), Vec::new())
-      };
-      workunit.update_metadata(|mut metadata| {
-        if let Some(new_level) = new_level {
-          metadata.level = new_level;
-        }
-        metadata.message = message;
-        metadata.artifacts.extend(new_artifacts);
-        metadata.user_metadata.extend(new_metadata);
-        metadata
-      });
-      Ok(result_val)
-    } else {
-      Err(throw(&format!(
+    if result_type != self.product {
+      return Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         func, result_val
-      )))
+      )));
     }
+
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let engine_aware_return_type = if self.task.engine_aware_return_type {
+      EngineAwareReturnType::from_task_result(py, &result_val, &context)
+    } else {
+      EngineAwareReturnType::default()
+    };
+    engine_aware_return_type.update_workunit(workunit);
+
+    Ok(result_val)
   }
 }
 
@@ -1374,11 +1360,14 @@ impl Node for NodeKey {
       }
       _ => vec![],
     };
-    let user_metadata = engine_aware_params
-      .iter()
-      .filter_map(|val| engine_aware::EngineAwareParameter::metadata(&context, val))
-      .flatten()
-      .collect();
+    let user_metadata = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      engine_aware_params
+        .iter()
+        .flat_map(|val| EngineAwareParameter::metadata(py, &context, val))
+        .collect()
+    };
 
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
@@ -1475,10 +1464,14 @@ impl Node for NodeKey {
         // If the node failed, expand the Failure with a new frame.
         result = result.map_err(|failure| {
           let name = workunit_name;
-          let displayable_param_names: Vec<_> = engine_aware_params
-            .iter()
-            .filter_map(|val| engine_aware::EngineAwareParameter::debug_hint(val))
-            .collect();
+          let displayable_param_names: Vec<_> = {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            engine_aware_params
+              .iter()
+              .filter_map(|val| EngineAwareParameter::debug_hint(py, val))
+              .collect()
+          };
           let failure_name = if displayable_param_names.is_empty() {
             name
           } else if displayable_param_names.len() == 1 {
@@ -1534,7 +1527,9 @@ impl Node for NodeKey {
         ProcessCacheScope::PerSession => false,
       },
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
-        engine_aware::EngineAwareReturnType::cacheable(v).unwrap_or(true)
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        EngineAwareReturnType::is_cacheable(py, v)
       }
       _ => true,
     }
@@ -1553,11 +1548,15 @@ impl Display for NodeKey {
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {
-        let params = task
-          .params
-          .keys()
-          .filter_map(|k| engine_aware::EngineAwareParameter::debug_hint(&k.to_value()))
-          .collect::<Vec<_>>();
+        let params = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          task
+            .params
+            .keys()
+            .filter_map(|k| EngineAwareParameter::debug_hint(py, &k.to_value()))
+            .collect::<Vec<_>>()
+        };
         write!(
           f,
           "@rule({}({}))",
