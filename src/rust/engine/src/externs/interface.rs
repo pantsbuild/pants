@@ -765,6 +765,8 @@ fn nailgun_server_create(
       let runner: Value = runner.into();
       let executor = executor.clone();
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
         let command = externs::store_utf8(&exe.cmd.command);
         let args = externs::store_tuple(
           exe
@@ -783,18 +785,14 @@ fn nailgun_server_create(
             .collect::<Vec<_>>(),
         )
         .unwrap();
-        let working_dir = externs::store_bytes(exe.cmd.working_dir.as_os_str().as_bytes());
+        let working_dir = externs::store_bytes(py, exe.cmd.working_dir.as_os_str().as_bytes());
         let stdin_fd = externs::store_i64(exe.stdin_fd.into());
         let stdout_fd = externs::store_i64(exe.stdout_fd.into());
         let stderr_fd = externs::store_i64(exe.stderr_fd.into());
-        let cancellation_latch = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          PySessionCancellationLatch::create_instance(py, exe.cancelled)
-            .unwrap()
-            .into_object()
-            .into()
-        };
+        let cancellation_latch = PySessionCancellationLatch::create_instance(py, exe.cancelled)
+          .unwrap()
+          .into_object()
+          .into();
         let runner_args = vec![
           command,
           args,
@@ -807,8 +805,6 @@ fn nailgun_server_create(
         ];
         match externs::call_function(&runner, &runner_args) {
           Ok(exit_code) => {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
             let code: i32 = exit_code.extract(py).unwrap();
             nailgun::ExitCode(code)
           }
@@ -1768,7 +1764,11 @@ fn single_file_digests_to_bytes(
       let store = core.store();
       async move {
         store
-          .load_file_bytes_with(digest, externs::store_bytes)
+          .load_file_bytes_with(digest, |bytes| {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            externs::store_bytes(py, bytes)
+          })
           .await
           .and_then(|maybe_bytes| {
             maybe_bytes.ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))

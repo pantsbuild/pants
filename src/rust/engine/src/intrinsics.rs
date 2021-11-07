@@ -12,6 +12,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
+use cpython::Python;
 use fs::RelativePath;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -196,12 +197,14 @@ fn multi_platform_process_request_to_process_result(
     })?;
 
     let platform_name: String = result.platform.into();
+    let gil = Python::acquire_gil();
+    let py = gil.python();
     Ok(externs::unsafe_call(
       context.core.types.process_result,
       &[
-        externs::store_bytes(&stdout_bytes),
+        externs::store_bytes(py, &stdout_bytes),
         Snapshot::store_file_digest(&context.core.types, &result.stdout_digest),
-        externs::store_bytes(&stderr_bytes),
+        externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(&context.core.types, &result.stderr_digest),
         externs::store_i64(result.exit_code.into()),
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
@@ -226,7 +229,11 @@ fn directory_digest_to_digest_contents(
       .store()
       .contents_for_directory(digest)
       .await
-      .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
+      .and_then(move |digest_contents| {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        Snapshot::store_digest_contents(py, &context, &digest_contents)
+      })
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
   }

@@ -78,12 +78,9 @@ pub fn store_dict(keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> 
   Ok(Value::from(dict.into_object()))
 }
 
-///
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
-///
-pub fn store_bytes(bytes: &[u8]) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(PyBytes::new(gil.python(), bytes).into_object())
+pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
+  Value::from(PyBytes::new(py, bytes).into_object())
 }
 
 ///
