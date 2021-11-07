@@ -99,7 +99,8 @@ impl Eq for InternKey {}
 
 impl PartialEq for InternKey {
   fn eq(&self, other: &InternKey) -> bool {
-    externs::equals(&self.1, &other.1)
+    let gil = Python::acquire_gil();
+    externs::equals(gil.python(), &self.1, &other.1)
   }
 }
 

@@ -293,7 +293,8 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    externs::equals(&self.0, &other.0)
+    let gil = Python::acquire_gil();
+    externs::equals(gil.python(), &self.0, &other.0)
   }
 }
 
