@@ -605,11 +605,13 @@ impl From<Scandir> for NodeKey {
 }
 
 fn unmatched_globs_additional_context() -> Option<String> {
+  let gil = Python::acquire_gil();
+  let url = externs::doc_url(gil.python(), "troubleshooting#pants-cannot-find-a-file-in-your-project");
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {}.",
-    externs::doc_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+    url
   ))
 }
 
@@ -1617,6 +1619,8 @@ impl NodeError for Failure {
       path[0] += " <-";
       path[path_len - 1] += " <-"
     }
+    let gil = Python::acquire_gil();
+    let url = externs::doc_url(gil.python(), "targets#dependencies-and-dependency-inference");
     throw(&format!(
       "The dependency graph contained a cycle:\
       \n\n  \
@@ -1628,7 +1632,7 @@ impl NodeError for Failure {
       \n\n\
       See {} for more information.",
       path.join("\n  "),
-      externs::doc_url("targets#dependencies-and-dependency-inference")
+     url
     ))
   }
 }
