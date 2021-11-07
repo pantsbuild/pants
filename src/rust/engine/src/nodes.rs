@@ -805,7 +805,7 @@ impl Snapshot {
       &[
         Self::store_path(&item.path)?,
         externs::store_bytes(py, &item.content),
-        externs::store_bool(item.is_executable),
+        externs::store_bool(py, item.is_executable),
       ],
     ))
   }
@@ -820,7 +820,7 @@ impl Snapshot {
       &[
         Self::store_path(&item.path)?,
         Self::store_file_digest(py, types, &item.digest),
-        externs::store_bool(item.is_executable),
+        externs::store_bool(py, item.is_executable),
       ],
     ))
   }
