@@ -767,12 +767,16 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_file_digest(types: &crate::types::Types, item: &hashing::Digest) -> Value {
+  pub fn store_file_digest(
+    py: Python,
+    types: &crate::types::Types,
+    item: &hashing::Digest,
+  ) -> Value {
     externs::unsafe_call(
       types.file_digest,
       &[
         externs::store_utf8(&item.hash.to_hex()),
-        externs::store_i64(item.size_bytes as i64),
+        externs::store_i64(py, item.size_bytes as i64),
       ],
     )
   }
@@ -806,12 +810,16 @@ impl Snapshot {
     ))
   }
 
-  fn store_file_entry(types: &crate::types::Types, item: &FileEntry) -> Result<Value, String> {
+  fn store_file_entry(
+    py: Python,
+    types: &crate::types::Types,
+    item: &FileEntry,
+  ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       types.file_entry,
       &[
         Self::store_path(&item.path)?,
-        Self::store_file_digest(types, &item.digest),
+        Self::store_file_digest(py, types, &item.digest),
         externs::store_bool(item.is_executable),
       ],
     ))
@@ -839,11 +847,17 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_digest_entries(context: &Context, item: &[DigestEntry]) -> Result<Value, String> {
+  pub fn store_digest_entries(
+    py: Python,
+    context: &Context,
+    item: &[DigestEntry],
+  ) -> Result<Value, String> {
     let entries = item
       .iter()
       .map(|digest_entry| match digest_entry {
-        DigestEntry::File(file_entry) => Self::store_file_entry(&context.core.types, file_entry),
+        DigestEntry::File(file_entry) => {
+          Self::store_file_entry(py, &context.core.types, file_entry)
+        }
         DigestEntry::EmptyDirectory(path) => Self::store_empty_directory(&context.core.types, path),
       })
       .collect::<Result<Vec<_>, _>>()?;

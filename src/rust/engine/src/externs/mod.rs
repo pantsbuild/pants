@@ -96,9 +96,8 @@ pub fn store_u64(val: u64) -> Value {
   Value::from(val.to_py_object(gil.python()).into_object())
 }
 
-pub fn store_i64(val: i64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_i64(py: Python, val: i64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
 pub fn store_bool(val: bool) -> Value {

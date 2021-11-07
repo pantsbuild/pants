@@ -203,10 +203,10 @@ fn multi_platform_process_request_to_process_result(
       context.core.types.process_result,
       &[
         externs::store_bytes(py, &stdout_bytes),
-        Snapshot::store_file_digest(&context.core.types, &result.stdout_digest),
+        Snapshot::store_file_digest(py, &context.core.types, &result.stdout_digest),
         externs::store_bytes(py, &stderr_bytes),
-        Snapshot::store_file_digest(&context.core.types, &result.stderr_digest),
-        externs::store_i64(result.exit_code.into()),
+        Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
+        externs::store_i64(py, result.exit_code.into()),
         Snapshot::store_directory_digest(&result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
           context.core.types.platform,
@@ -251,7 +251,11 @@ fn directory_digest_to_digest_entries(
       .store()
       .entries_for_directory(digest)
       .await
-      .and_then(move |digest_entries| Snapshot::store_digest_entries(&context, &digest_entries))
+      .and_then(move |digest_entries| {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        Snapshot::store_digest_entries(py, &context, &digest_entries)
+      })
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
   }
@@ -577,11 +581,14 @@ fn interactive_process(
       .await?;
 
     let code = exit_status.code().unwrap_or(-1);
-    Ok(
+    let result = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
       externs::unsafe_call(
         interactive_process_result,
-        &[externs::store_i64(i64::from(code))],
-      ),
-    )
+        &[externs::store_i64(py, i64::from(code))],
+      )
+    };
+    Ok(result)
   }.boxed()
 }

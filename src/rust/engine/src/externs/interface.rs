@@ -786,9 +786,9 @@ fn nailgun_server_create(
         )
         .unwrap();
         let working_dir = externs::store_bytes(py, exe.cmd.working_dir.as_os_str().as_bytes());
-        let stdin_fd = externs::store_i64(exe.stdin_fd.into());
-        let stdout_fd = externs::store_i64(exe.stdout_fd.into());
-        let stderr_fd = externs::store_i64(exe.stderr_fd.into());
+        let stdin_fd = externs::store_i64(py, exe.stdin_fd.into());
+        let stdout_fd = externs::store_i64(py, exe.stdout_fd.into());
+        let stderr_fd = externs::store_i64(py, exe.stderr_fd.into());
         let cancellation_latch = PySessionCancellationLatch::create_instance(py, exe.cancelled)
           .unwrap()
           .into_object()
@@ -1013,7 +1013,9 @@ async fn workunit_to_py_value(
     let store = core.store();
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
-        crate::nodes::Snapshot::store_file_digest(&core.types, digest)
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        crate::nodes::Snapshot::store_file_digest(py, &core.types, digest)
       }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
@@ -1034,11 +1036,14 @@ async fn workunit_to_py_value(
     artifact_entries.push((externs::store_utf8(artifact_name.as_str()), py_val))
   }
 
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
   let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => externs::store_utf8(v),
-      UserMetadataItem::ImmediateInt(n) => externs::store_i64(*n),
+      UserMetadataItem::ImmediateInt(n) => externs::store_i64(py, *n),
       UserMetadataItem::PyValue(py_val_handle) => {
         match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
           None => {
@@ -1063,14 +1068,14 @@ async fn workunit_to_py_value(
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(&core.types, stdout_digest),
+      crate::nodes::Snapshot::store_file_digest(py, &core.types, stdout_digest),
     ));
   }
 
   if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(&core.types, stderr_digest),
+      crate::nodes::Snapshot::store_file_digest(py, &core.types, stderr_digest),
     ));
   }
 
@@ -1197,7 +1202,7 @@ fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(value)))
+        .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(py, value)))
         .collect::<Vec<_>>();
       externs::store_dict(values).map(|d| d.consume_into_py_object(py))
     })
