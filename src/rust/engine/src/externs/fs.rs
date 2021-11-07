@@ -29,9 +29,8 @@ use store::Snapshot;
 /// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
 ///
 
-pub fn to_py_digest(digest: Digest) -> PyResult<PyDigest> {
-  let gil = Python::acquire_gil();
-  PyDigest::create_instance(gil.python(), digest)
+pub fn to_py_digest(py: Python, digest: Digest) -> PyResult<PyDigest> {
+  PyDigest::create_instance(py, digest)
 }
 
 pub fn from_py_digest(digest: &PyObject) -> PyResult<Digest> {
@@ -82,9 +81,8 @@ py_class!(pub class PyDigest |py| {
     }
 });
 
-pub fn to_py_snapshot(snapshot: Snapshot) -> PyResult<PySnapshot> {
-  let gil = Python::acquire_gil();
-  PySnapshot::create_instance(gil.python(), snapshot)
+pub fn to_py_snapshot(py: Python, snapshot: Snapshot) -> PyResult<PySnapshot> {
+  PySnapshot::create_instance(py, snapshot)
 }
 
 py_class!(pub class PySnapshot |py| {
@@ -106,7 +104,7 @@ py_class!(pub class PySnapshot |py| {
     }
 
     @property def digest(&self) -> PyResult<PyDigest> {
-      to_py_digest(self.snapshot(py).digest)
+      to_py_digest(py, self.snapshot(py).digest)
     }
 
     @property def files(&self) -> PyResult<PyTuple> {

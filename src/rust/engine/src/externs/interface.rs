@@ -1029,10 +1029,10 @@ async fn workunit_to_py_value(
             let gil = Python::acquire_gil();
             PyErr::new::<exc::Exception, _>(gil.python(), (err_str,))
           })?;
-        crate::nodes::Snapshot::store_snapshot(snapshot).map_err(|err_str| {
-          let gil = Python::acquire_gil();
-          PyErr::new::<exc::Exception, _>(gil.python(), (err_str,))
-        })?
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        crate::nodes::Snapshot::store_snapshot(py, snapshot)
+          .map_err(|err_str| PyErr::new::<exc::Exception, _>(py, (err_str,)))?
       }
     };
 
@@ -1714,7 +1714,8 @@ fn capture_snapshots(
               digest_hint,
             )
             .await?;
-            nodes::Snapshot::store_snapshot(snapshot)
+            let gil = Python::acquire_gil();
+            nodes::Snapshot::store_snapshot(gil.python(), snapshot)
           }
         })
         .collect::<Vec<_>>();

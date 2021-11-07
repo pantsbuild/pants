@@ -755,8 +755,8 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::to_py_digest(*item)
+  pub fn store_directory_digest(py: Python, item: &hashing::Digest) -> Result<Value, String> {
+    externs::fs::to_py_digest(py, *item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
@@ -784,8 +784,8 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(item: store::Snapshot) -> Result<Value, String> {
-    externs::fs::to_py_snapshot(item)
+  pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
+    externs::fs::to_py_snapshot(py, item)
       .map(|d| d.into_object().into())
       .map_err(|e| format!("{:?}", e))
   }
