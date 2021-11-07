@@ -778,6 +778,7 @@ fn nailgun_server_create(
             .collect::<Vec<_>>(),
         );
         let env = externs::store_dict(
+          py,
           exe
             .cmd
             .env
@@ -1067,7 +1068,7 @@ async fn workunit_to_py_value(
 
   dict_entries.push((
     externs::store_utf8("metadata"),
-    externs::store_dict(user_metadata_entries)?,
+    externs::store_dict(py, user_metadata_entries)?,
   ));
 
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
@@ -1086,7 +1087,7 @@ async fn workunit_to_py_value(
 
   dict_entries.push((
     externs::store_utf8("artifacts"),
-    externs::store_dict(artifact_entries)?,
+    externs::store_dict(py, artifact_entries)?,
   ));
 
   if !workunit.counters.is_empty() {
@@ -1103,11 +1104,11 @@ async fn workunit_to_py_value(
 
     dict_entries.push((
       externs::store_utf8("counters"),
-      externs::store_dict(counters_entries)?,
+      externs::store_dict(py, counters_entries)?,
     ));
   }
 
-  externs::store_dict(dict_entries)
+  externs::store_dict(py, dict_entries)
 }
 
 async fn workunits_to_py_tuple_value<'a>(
@@ -1207,7 +1208,7 @@ fn scheduler_metrics(
         .into_iter()
         .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(py, value)))
         .collect::<Vec<_>>();
-      externs::store_dict(values).map(|d| d.consume_into_py_object(py))
+      externs::store_dict(py, values).map(|d| d.consume_into_py_object(py))
     })
   })
 }
