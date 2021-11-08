@@ -61,8 +61,11 @@ def _purge_env() -> None:
     # See https://docs.python.org/3/library/os.html#os.unsetenv for more info.
     #
     # Wraps iterable in list() to make a copy and avoid issues with deleting while iterating.
+    #
+    # A few env vars are reasonable and/or necessary to pass through.
     for k in list(os.environ.keys()):
-        del os.environ[k]
+        if k not in ('HOME', 'USER'):
+            del os.environ[k]
 
 
 def _restore_env(env: Mapping[str, str]) -> None:
