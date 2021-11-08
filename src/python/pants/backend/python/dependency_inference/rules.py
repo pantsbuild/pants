@@ -37,6 +37,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -188,30 +189,8 @@ async def infer_python_dependencies_via_imports(
         for imported_module in detected_imports
     )
 
-    unowned_dependency_behavior = python_infer_subsystem.options.unowned_dependency_behavior
-    if unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
-        unowned_imports = sorted(
-            imp
-            for owners, imp in zip(owners_per_import, detected_imports)
-            if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
-        )
-        if unowned_imports:
-            messaging = (
-                # @TODO: I don't like the manual tabbing here.
-                "The following imports have no unambiguous owner:\n"
-                + ("\n".join(f"    {imp}" for imp in unowned_imports))
-                + (
-                    # Don't forget to update when experimental_lockfile becomes nonexperimental
-                    "\n\n  If you are using [python-setup].requirement_constraints, consider adding the relevant "
-                    "package.\n  Otherwise consider specifying a python_requirement target as a dependency."
-                )
-            )
-            if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
-                logger.warn(messaging)
-            elif unowned_dependency_behavior is UnownedDependencyUsage.RaiseError:
-                raise UnownedDependencyError(messaging)
-
     merged_result: set[Address] = set()
+    unowned_imports: set[ParsedPythonImports] = set()
     for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
         address = wrapped_tgt.target.address
@@ -224,6 +203,25 @@ async def infer_python_dependencies_via_imports(
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
+
+        if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES:
+            unowned_imports.add(imp)
+
+    unowned_dependency_behavior = python_infer_subsystem.options.unowned_dependency_behavior
+    if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
+        raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
+        log = logger.error if raise_error else logger.warn
+        log(
+            f"The following imports have no unambiguous owner:\n\n{bullet_list(unowned_imports)}\n\n"
+            "If you are using [python-setup].requirement_constraints, consider adding the relevant package.\n"
+            "Otherwise consider specifying a python_requirement target as a dependency.\n"
+            "See https://www.pantsbuild.org/v2.8/docs/python-third-party-dependencies"
+        )
+
+        if raise_error:
+            raise UnownedDependencyError(
+                "One or more unowned dependencies detected. Check logs for more details."
+            )
 
     return InferredDependencies(sorted(merged_result))
 
