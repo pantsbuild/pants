@@ -93,12 +93,12 @@ SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
 
 @dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    provided_types: FrozenOrderedSet[str]
+    provided_names: FrozenOrderedSet[str]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            provided_types=FrozenOrderedSet(d["providedTypes"]),
+            provided_names=FrozenOrderedSet(d["providedNames"]),
         )
 
 

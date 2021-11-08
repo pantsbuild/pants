@@ -118,7 +118,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         [source_files],
     )
 
-    assert analysis.provided_types == FrozenOrderedSet(
+    assert analysis.provided_names == FrozenOrderedSet(
         [
             "org.pantsbuild.example.OuterClass",
             "org.pantsbuild.example.OuterClass.NestedVal",

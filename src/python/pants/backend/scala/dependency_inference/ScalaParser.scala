@@ -10,12 +10,12 @@ import scala.meta.transversers.Traverser
 import scala.collection.mutable.ArrayBuffer
 
 case class Analysis(
-  providedTypes: Vector[String]
+  providedNames: Vector[String]
 )
 
 class ProvidedTypesTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
-  val providedTypes = ArrayBuffer[String]()
+  val providedNames = ArrayBuffer[String]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -28,9 +28,9 @@ class ProvidedTypesTraverser extends Traverser {
     }
   }
 
-  def recordProvidedType(name: String): Unit = {
+  def recordProvidedName(name: String): Unit = {
     val fullPackageName = nameParts.mkString(".")
-    providedTypes.append(s"${fullPackageName}.${name}")
+    providedNames.append(s"${fullPackageName}.${name}")
   }
 
   def withNamePart[T](namePart: String, f: () => T): T = {
@@ -47,38 +47,38 @@ class ProvidedTypesTraverser extends Traverser {
 
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
-      recordProvidedType(name)
+      recordProvidedName(name)
       withNamePart(name, () => super.apply(templ))
     }
 
     case Defn.Trait(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
-      recordProvidedType(name)
+      recordProvidedName(name)
       withNamePart(name, () => super.apply(templ))
     }
 
     case Defn.Object(_mods, nameNode, templ) => {
       val name = extractName(nameNode)
-      recordProvidedType(name)
+      recordProvidedName(name)
       withNamePart(name, () => super.apply(templ))
     }
 
     case Defn.Type(_mods, nameNode, _tparams, _body) => {
       val name = extractName(nameNode)
-      recordProvidedType(name)
+      recordProvidedName(name)
     }
 
     case Defn.Val(_mods, pats, _decltpe, _rhs) => {
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
-        recordProvidedType(name)
+        recordProvidedName(name)
       })
     }
 
     case Defn.Var(_mods, pats, _decltpe, _rhs) => {
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
-        recordProvidedType(name)
+        recordProvidedName(name)
       })
     }
 
@@ -95,10 +95,10 @@ object ScalaParser {
 
     val tree = input.parse[Source].get
 
-    val providedTypesTraverser = new ProvidedTypesTraverser()
-    providedTypesTraverser.apply(tree)
+    val providedNamesTraverser = new ProvidedTypesTraverser()
+    providedNamesTraverser.apply(tree)
 
-    Analysis(providedTypes = providedTypesTraverser.providedTypes.toVector)
+    Analysis(providedNames = providedNamesTraverser.providedNames.toVector)
   }
 
   def main(args: Array[String]): Unit = {
