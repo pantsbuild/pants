@@ -5,34 +5,43 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.scala.compile.scalac import CompileScalaSourceRequest, ScalacFieldSet
+from pants.backend.scala.target_types import ScalaFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
-from pants.engine.unions import UnionRule
-from pants.jvm.compile import FallibleClasspathEntry
-from pants.jvm.resolve.coursier_fetch import CoursierResolveKey
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
 class ScalacCheckRequest(CheckRequest):
-    field_set_type = ScalacFieldSet
+    field_set_type = ScalaFieldSet
 
 
 @rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
-async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
+async def scalac_check(
+    request: ScalacCheckRequest,
+    union_membership: UnionMembership,
+) -> CheckResults:
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
+
     resolves = await MultiGet(
         Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
     )
+
     results = await MultiGet(
-        Get(FallibleClasspathEntry, CompileScalaSourceRequest(component=t, resolve=r))
-        for t, r in zip(coarsened_targets, resolves)
+        Get(
+            FallibleClasspathEntry,
+            ClasspathEntryRequest,
+            ClasspathEntryRequest.for_targets(union_membership, component=target, resolve=resolve),
+        )
+        for target, resolve in zip(coarsened_targets, resolves)
     )
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.

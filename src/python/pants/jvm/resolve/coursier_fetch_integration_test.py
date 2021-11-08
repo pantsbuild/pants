@@ -10,13 +10,13 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
+from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    ResolvedClasspathEntry,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *util_rules(),
             QueryRule(CoursierResolvedLockfile, (ArtifactRequirements,)),
-            QueryRule(ResolvedClasspathEntry, (CoursierLockfileEntry,)),
+            QueryRule(ClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
         ],
         target_types=[JvmDependencyLockfile, JvmArtifact],
@@ -174,7 +174,7 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
 def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
 
     classpath_entry = rule_runner.request(
-        ResolvedClasspathEntry,
+        ClasspathEntry,
         [
             CoursierLockfileEntry(
                 coord=HAMCREST_COORD,
@@ -188,8 +188,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == HAMCREST_COORD
-    assert classpath_entry.file_name == "hamcrest-core-1.3.jar"
+    assert classpath_entry.filenames == ("hamcrest-core-1.3.jar",)
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "hamcrest-core-1.3.jar")]
     )
@@ -203,7 +202,7 @@ def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
 def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     classpath_entry = rule_runner.request(
-        ResolvedClasspathEntry,
+        ClasspathEntry,
         [
             CoursierLockfileEntry(
                 coord=junit_coord,
@@ -217,8 +216,7 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.coord == junit_coord
-    assert classpath_entry.file_name == "junit-4.13.2.jar"
+    assert classpath_entry.filenames == ("junit-4.13.2.jar",)
     file_digest = rule_runner.request(
         FileDigest, [ExtractFileDigest(classpath_entry.digest, "junit-4.13.2.jar")]
     )
@@ -246,7 +244,7 @@ def test_fetch_one_coord_with_bad_fingerprint(rule_runner: RuleRunner) -> None:
         ),
     )
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(ResolvedClasspathEntry, [lockfile_entry])
+        rule_runner.request(ClasspathEntry, [lockfile_entry])
 
 
 @maybe_skip_jdk_test
@@ -269,7 +267,7 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
         ),
     )
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(ResolvedClasspathEntry, [lockfile_entry])
+        rule_runner.request(ClasspathEntry, [lockfile_entry])
 
 
 @maybe_skip_jdk_test
@@ -297,4 +295,4 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
         ),
     )
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(ResolvedClasspathEntry, [lockfile_entry])
+        rule_runner.request(ClasspathEntry, [lockfile_entry])
