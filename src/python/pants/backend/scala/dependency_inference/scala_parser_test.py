@@ -6,9 +6,7 @@ import pytest
 
 from pants.backend.scala import target_types
 from pants.backend.scala.dependency_inference import scala_parser
-from pants.backend.scala.dependency_inference.scala_parser import (
-    FallibleScalaSourceDependencyAnalysisResult,
-)
+from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
@@ -21,6 +19,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -37,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *target_types.rules(),
             *jvm_util_rules.rules(),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
-            QueryRule(FallibleScalaSourceDependencyAnalysisResult, (SourceFiles,)),
+            QueryRule(ScalaSourceDependencyAnalysis, (SourceFiles,)),
         ],
         target_types=[JvmDependencyLockfile, ScalaSourceTarget],
     )
@@ -58,9 +57,12 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             ),
             "SimpleSource.scala": textwrap.dedent(
                 """
-            package org.pantsbuild.example
+            package org.pantsbuild
+            package example
 
             class Foo {
+                class NestedClass {
+                }
             }
             """
             ),
@@ -81,9 +83,13 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     )
 
     analysis = rule_runner.request(
-        FallibleScalaSourceDependencyAnalysisResult,
+        ScalaSourceDependencyAnalysis,
         [source_files],
     )
 
-    assert analysis.process_result.exit_code == 0
-    assert analysis.process_result.stdout == b"""{"package":"foo"}\n"""
+    assert analysis.provided_types == FrozenOrderedSet(
+        [
+            "org.pantsbuild.example.Foo",
+            "org.pantsbuild.example.Foo.NestedClass",
+        ]
+    )
