@@ -31,15 +31,7 @@ use lazy_static::lazy_static;
 
 use logging::PythonLogLevel;
 
-/// Return the Python value None.
-pub fn none() -> PyObject {
-  let gil = Python::acquire_gil();
-  gil.python().None()
-}
-
-pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn equals(py: Python, h1: &PyObject, h2: &PyObject) -> bool {
   // NB: Although it does not precisely align with Python's definition of equality, we ban matches
   // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
   // surprising in interning, and would likely be surprising anywhere else in the engine where we
@@ -47,9 +39,9 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   if h1.get_type(py) != h2.get_type(py) {
     return false;
   }
-  h1.rich_compare(gil.python(), h2, CompareOp::Eq)
+  h1.rich_compare(py, h2, CompareOp::Eq)
     .unwrap()
-    .cast_as::<PyBool>(gil.python())
+    .cast_as::<PyBool>(py)
     .unwrap()
     .is_true()
 }
@@ -95,15 +87,6 @@ pub fn store_i64(py: Python, val: i64) -> Value {
 
 pub fn store_bool(py: Python, val: bool) -> Value {
   Value::from(val.to_py_object(py).into_object())
-}
-
-///
-/// Check if a Python object has the specified field.
-///
-pub fn hasattr(value: &PyObject, field: &str) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  value.hasattr(py, field).unwrap()
 }
 
 ///
@@ -169,12 +152,14 @@ pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String
     .collect()
 }
 
-pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
+pub fn getattr_as_optional_string(py: Python, value: &PyObject, field: &str) -> Option<String> {
+  let v = value.getattr(py, field).unwrap();
+  if v.is_none(py) {
+    return None;
+  }
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
-  // for None.
-  val_to_str(&getattr(value, field).unwrap())
+  Some(v.extract(py).unwrap())
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {
@@ -200,9 +185,7 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
 }
 
 /// Link to the Pants docs using the current version of Pants.
-pub fn doc_url(slug: &str) -> String {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn doc_url(py: Python, slug: &str) -> String {
   let docutil = py.import("pants.util.docutil").unwrap();
   docutil
     .call(py, "doc_url", (slug,), None)
@@ -211,9 +194,7 @@ pub fn doc_url(slug: &str) -> String {
     .unwrap()
 }
 
-pub fn create_exception(msg: &str) -> Value {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn create_exception(py: Python, msg: &str) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
@@ -268,18 +249,14 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
   }
 }
 
-///
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
-///
-pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
   let py_type = type_id.as_py_type(py);
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let args_tuple = PyTuple::new(py, &arg_handles);
   py_type
-    .call(gil.python(), args_tuple, None)
+    .call(py, args_tuple, None)
     .map(Value::from)
     .unwrap_or_else(|e| {
       panic!(

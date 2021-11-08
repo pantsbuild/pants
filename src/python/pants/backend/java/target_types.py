@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.core.goals.package import OutputPathField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
     MultipleSourcesField,
@@ -28,6 +31,20 @@ class JavaSourceField(SingleSourceField):
 
 class JavaGeneratorSources(MultipleSourcesField):
     expected_file_extensions = (".java",)
+
+
+@dataclass(frozen=True)
+class JavaFieldSet(FieldSet):
+    required_fields = (JavaSourceField,)
+
+    sources: JavaSourceField
+
+
+@dataclass(frozen=True)
+class JavaGeneratorFieldSet(FieldSet):
+    required_fields = (JavaGeneratorSources,)
+
+    sources: JavaGeneratorSources
 
 
 # -----------------------------------------------------------------------------------------------

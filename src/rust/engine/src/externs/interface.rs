@@ -729,7 +729,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
         f @ Failure::Invalidated => {
           let msg = format!("{}", f);
           (
-            externs::create_exception(&msg),
+            externs::create_exception(py, &msg),
             Failure::native_traceback(&msg),
             Vec::new(),
           )
@@ -1684,13 +1684,13 @@ fn capture_snapshots(
       let path_globs_and_roots = values
         .iter()
         .map(|value| {
-          let root = PathBuf::from(externs::getattr_as_string(value, "root"));
+          let root = PathBuf::from(externs::getattr::<String>(value, "root").unwrap());
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
             &externs::getattr(value, "path_globs").unwrap(),
           );
           let digest_hint = {
             let maybe_digest: PyObject = externs::getattr(value, "digest_hint").unwrap();
-            if maybe_digest == externs::none() {
+            if maybe_digest.is_none(py) {
               None
             } else {
               Some(nodes::lift_directory_digest(&Value::new(maybe_digest))?)

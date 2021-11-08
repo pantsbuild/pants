@@ -274,7 +274,7 @@ pub fn lift_file_digest(types: &Types, digest: &PyObject) -> Result<hashing::Dig
   if TypeId::new(&digest.get_type(py)) != types.file_digest {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
-  let fingerprint = externs::getattr_as_string(digest, "fingerprint");
+  let fingerprint: String = externs::getattr(digest, "fingerprint").unwrap();
   let digest_length: usize = externs::getattr(digest, "serialized_bytes_length").unwrap();
   Ok(hashing::Digest::new(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
@@ -292,16 +292,14 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
     let env = externs::getattr_from_frozendict(value, "env");
-
-    let working_directory = {
-      let val = externs::getattr_as_string(value, "working_directory");
-      if val.is_empty() {
-        None
-      } else {
-        Some(RelativePath::new(val.as_str())?)
-      }
-    };
+    let working_directory =
+      match externs::getattr_as_optional_string(py, value, "working_directory") {
+        None => None,
+        Some(dir) => Some(RelativePath::new(dir)?),
+      };
 
     let py_digest: Value = externs::getattr(value, "input_digest").unwrap();
     let digest = lift_directory_digest(&py_digest)
@@ -327,7 +325,7 @@ impl MultiPlatformExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description = externs::getattr_as_string(value, "description");
+    let description: String = externs::getattr(value, "description").unwrap();
     let py_level: PyObject = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(&py_level)?;
 
@@ -336,31 +334,21 @@ impl MultiPlatformExecuteProcess {
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
-    let jdk_home = {
-      let val = externs::getattr_as_string(value, "jdk_home");
-      if val.is_empty() {
-        None
-      } else {
-        Some(PathBuf::from(val))
-      }
-    };
+    let jdk_home = externs::getattr_as_optional_string(py, value, "jdk_home").map(PathBuf::from);
 
     let py_use_nailgun: Value = externs::getattr(value, "use_nailgun").unwrap();
     let use_nailgun = lift_directory_digest(&py_use_nailgun)
       .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
 
-    let execution_slot_variable = {
-      let s = externs::getattr_as_string(value, "execution_slot_variable");
-      if s.is_empty() {
-        None
-      } else {
-        Some(s)
-      }
-    };
+    let execution_slot_variable =
+      externs::getattr_as_optional_string(py, value, "execution_slot_variable");
 
-    let cache_scope =
-      externs::getattr_as_string(&externs::getattr(value, "cache_scope").unwrap(), "name")
-        .try_into()?;
+    let cache_scope: ProcessCacheScope = {
+      let cache_scope_enum: PyObject = externs::getattr(value, "cache_scope").unwrap();
+      externs::getattr::<String>(&cache_scope_enum, "name")
+        .unwrap()
+        .try_into()?
+    };
 
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
@@ -605,11 +593,16 @@ impl From<Scandir> for NodeKey {
 }
 
 fn unmatched_globs_additional_context() -> Option<String> {
+  let gil = Python::acquire_gil();
+  let url = externs::doc_url(
+    gil.python(),
+    "troubleshooting#pants-cannot-find-a-file-in-your-project",
+  );
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {}.",
-    externs::doc_url("troubleshooting#pants-cannot-find-a-file-in-your-project")
+    url
   ))
 }
 
@@ -649,6 +642,7 @@ impl Paths {
       }
     }
     Ok(externs::unsafe_call(
+      py,
       core.types.paths,
       &[
         externs::store_tuple(py, files),
@@ -727,23 +721,20 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
-
-    let description_of_origin_field = externs::getattr_as_string(item, "description_of_origin");
-    let description_of_origin = if description_of_origin_field.is_empty() {
-      None
-    } else {
-      Some(description_of_origin_field)
-    };
+    let description_of_origin =
+      externs::getattr_as_optional_string(py, item, "description_of_origin");
 
     let glob_match_error_behavior: PyObject =
       externs::getattr(item, "glob_match_error_behavior").unwrap();
-    let failure_behavior = externs::getattr_as_string(&glob_match_error_behavior, "value");
+    let failure_behavior: String = externs::getattr(&glob_match_error_behavior, "value").unwrap();
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
     let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
-    let conjunction_string = externs::getattr_as_string(&conjunction_obj, "value");
+    let conjunction_string: String = externs::getattr(&conjunction_obj, "value").unwrap();
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
@@ -762,8 +753,8 @@ impl Snapshot {
   }
 
   pub fn lift_file_digest(item: &PyObject) -> Result<hashing::Digest, String> {
-    let fingerprint = externs::getattr_as_string(item, "fingerprint");
-    let serialized_bytes_length = externs::getattr::<usize>(item, "serialized_bytes_length")?;
+    let fingerprint: String = externs::getattr(item, "fingerprint").unwrap();
+    let serialized_bytes_length: usize = externs::getattr(item, "serialized_bytes_length")?;
     Ok(hashing::Digest::new(
       Fingerprint::from_hex_string(&fingerprint)?,
       serialized_bytes_length,
@@ -776,6 +767,7 @@ impl Snapshot {
     item: &hashing::Digest,
   ) -> Value {
     externs::unsafe_call(
+      py,
       types.file_digest,
       &[
         externs::store_utf8(py, &item.hash.to_hex()),
@@ -804,6 +796,7 @@ impl Snapshot {
     item: &FileContent,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.file_content,
       &[
         Self::store_path(py, &item.path)?,
@@ -819,6 +812,7 @@ impl Snapshot {
     item: &FileEntry,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.file_entry,
       &[
         Self::store_path(py, &item.path)?,
@@ -834,6 +828,7 @@ impl Snapshot {
     path: &Path,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.directory,
       &[Self::store_path(py, path)?],
     ))
@@ -849,6 +844,7 @@ impl Snapshot {
       .map(|e| Self::store_file_content(py, &context.core.types, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
+      py,
       context.core.types.digest_contents,
       &[externs::store_tuple(py, entries)],
     ))
@@ -871,6 +867,7 @@ impl Snapshot {
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
+      py,
       context.core.types.digest_entries,
       &[externs::store_tuple(py, entries)],
     ))
@@ -966,7 +963,7 @@ impl WrappedNode for DownloadedFile {
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
     let value = self.0.to_value();
-    let url_str = externs::getattr_as_string(&value, "url");
+    let url_str: String = externs::getattr(&value, "url").unwrap();
 
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
@@ -1098,7 +1095,10 @@ impl Task {
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<Value> {
-    let mut input = Value::from(externs::none());
+    let mut input = {
+      let gil = Python::acquire_gil();
+      Value::from(gil.python().None())
+    };
     loop {
       let context = context.clone();
       let params = params.clone();
@@ -1614,6 +1614,11 @@ impl NodeError for Failure {
       path[0] += " <-";
       path[path_len - 1] += " <-"
     }
+    let gil = Python::acquire_gil();
+    let url = externs::doc_url(
+      gil.python(),
+      "targets#dependencies-and-dependency-inference",
+    );
     throw(&format!(
       "The dependency graph contained a cycle:\
       \n\n  \
@@ -1625,7 +1630,7 @@ impl NodeError for Failure {
       \n\n\
       See {} for more information.",
       path.join("\n  "),
-      externs::doc_url("targets#dependencies-and-dependency-inference")
+      url
     ))
   }
 }

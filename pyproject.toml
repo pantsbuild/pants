@@ -50,6 +50,7 @@ show_traceback = true
 [[tool.mypy.overrides]]
 module = [
     "bs4",
+    "chevron",
     "colors",
     "dockerfile",
     "fasteners",
@@ -59,7 +60,6 @@ module = [
     "ijson",
     "pex.*",
     "psutil",
-    "pystache",
     "setproctitle",
 ]
 ignore_missing_imports = true
