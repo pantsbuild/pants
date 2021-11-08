@@ -23,6 +23,7 @@ class ProvidedTypesTraverser extends Traverser {
       case Term.Select(qual, name) => s"${extractName(qual)}.${extractName(name)}"
       case Term.Name(name) => name
       case Type.Name(name) => name
+      case Pat.Var(node) => extractName(node)
       case _ => ""
     }
   }
@@ -54,6 +55,25 @@ class ProvidedTypesTraverser extends Traverser {
       val name = extractName(nameNode)
       recordProvidedType(name)
       withNamePart(name, () => super.apply(templ))
+    }
+
+    case Defn.Type(_mods, nameNode, _tparams, _body) => {
+      val name = extractName(nameNode)
+      recordProvidedType(name)
+    }
+
+    case Defn.Val(_mods, pats, _decltpe, _rhs) => {
+      pats.headOption.foreach(pat => {
+        val name = extractName(pat)
+        recordProvidedType(name)
+      })
+    }
+
+    case Defn.Var(_mods, pats, _decltpe, _rhs) => {
+      pats.headOption.foreach(pat => {
+        val name = extractName(pat)
+        recordProvidedType(name)
+      })
     }
 
     case node => super.apply(node)

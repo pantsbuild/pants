@@ -61,17 +61,23 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             package example
 
             class OuterClass {
+                val NestedVal = 3
+                var NestedVar = "foo"
                 trait NestedTrait {
                 }
                 class NestedClass {
                 }
+                type NestedType = Foo
             }
 
             trait OuterTrait {
+                val NestedVal = 3
+                var NestedVar = "foo"
                 trait NestedTrait {
                 }
                 class NestedClass {
                 }
+                type NestedType = Foo
             }
             """
             ),
@@ -99,10 +105,16 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert analysis.provided_types == FrozenOrderedSet(
         [
             "org.pantsbuild.example.OuterClass",
+            "org.pantsbuild.example.OuterClass.NestedVal",
+            "org.pantsbuild.example.OuterClass.NestedVar",
             "org.pantsbuild.example.OuterClass.NestedTrait",
             "org.pantsbuild.example.OuterClass.NestedClass",
+            "org.pantsbuild.example.OuterClass.NestedType",
             "org.pantsbuild.example.OuterTrait",
+            "org.pantsbuild.example.OuterTrait.NestedVal",
+            "org.pantsbuild.example.OuterTrait.NestedVar",
             "org.pantsbuild.example.OuterTrait.NestedTrait",
             "org.pantsbuild.example.OuterTrait.NestedClass",
+            "org.pantsbuild.example.OuterTrait.NestedType",
         ]
     )
