@@ -142,10 +142,9 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-
     assert len(check_results.results) == 1
     check_result = check_results.results[0]
-    assert check_result.partition_description == str(coarsened_target)
+    assert check_result.exit_code == 0
 
 
 @logging
