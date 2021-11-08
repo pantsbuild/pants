@@ -29,7 +29,15 @@ from pants.engine.fs import (
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    CompileResult,
+    FallibleClasspathEntry,
+)
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -45,6 +53,10 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
+
+
+class CoursierFetchRequest(ClasspathEntryRequest):
+    field_sets = (JvmArtifactFieldSet,)
 
 
 class CoursierError(Exception):
@@ -213,9 +225,35 @@ class CoursierLockfileEntry:
 
 @dataclass(frozen=True)
 class CoursierResolvedLockfile:
-    """An in-memory representation of Pants' Coursier lockfile format."""
+    """An in-memory representation of Pants' Coursier lockfile format.
+
+    All coordinates in the resolved lockfile will be compatible, so we do not need to do version
+    testing when looking up coordinates.
+    """
 
     entries: tuple[CoursierLockfileEntry, ...]
+
+    def direct_dependencies(
+        self, coord: Coordinate
+    ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
+        """Return the entry for the given Coordinate, and for its direct dependencies."""
+        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact))
+        if entry is None:
+            raise CoursierError(f"{coord} was not present in {self}")
+
+        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
+
+    def dependencies(
+        self, coord: Coordinate
+    ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
+        """Return the entry for the given Coordinate, and for its transitive dependencies."""
+        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
+        entry = entries.get((coord.group, coord.artifact))
+        if entry is None:
+            raise CoursierError(f"{coord} was not present in {self}")
+
+        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
     def from_json_dict(cls, lockfile) -> CoursierResolvedLockfile:
@@ -339,69 +377,47 @@ async def coursier_resolve_lockfile(
     )
 
 
-@dataclass(frozen=True)
-class FilterDependenciesRequest:
-    direct_dependencies: Coordinates
-    lockfile: CoursierResolvedLockfile
-    transitive: bool = True
+@rule(desc="Fetch with coursier")
+async def fetch_with_coursier(
+    coursier: Coursier,
+    request: CoursierFetchRequest,
+) -> FallibleClasspathEntry:
+    # TODO: Loading this per JvmArtifact.
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+
+    # All of the transitive dependencies are exported.
+    # TODO: Expose an option to control whether this exports only the root, direct dependencies,
+    # transitive dependencies, etc.
+    assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
+    root_entry, transitive_entries = lockfile.dependencies(
+        Coordinate.from_jvm_artifact_target(request.component.representative)
+    )
+
+    classpath_entries = await MultiGet(
+        Get(ClasspathEntry, CoursierLockfileEntry, entry)
+        for entry in (root_entry, *transitive_entries)
+    )
+    exported_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
+
+    return FallibleClasspathEntry(
+        description=str(request.component),
+        result=CompileResult.SUCCEEDED,
+        output=ClasspathEntry.merge(exported_digest, classpath_entries),
+        exit_code=0,
+    )
 
 
-@rule
-async def filter_for_dependencies(
-    request: FilterDependenciesRequest,
-) -> CoursierResolvedLockfile:
-    """Returns a filtered version of the input lockfile that only contains the direct dependencies
-    of a given target.
-
-    This should reduce the volume of files that are copied to various compilation tasks.
-    """
-
-    # Assumption: all coordinates in the resolved lockfile will be compatible with the
-    # direct_dependencies in some way, so we do not need to do version testing here.
-
-    entries = {(i.coord.group, i.coord.artifact): i for i in request.lockfile.entries}
-
-    dependencies = {(i.group, i.artifact) for i in request.direct_dependencies}
-
-    if request.transitive:
-        # Coursier already stores the transitive dependencies (`dependencies` vs `direct`
-        # dependencies), so we can just iterate through those to get the full transitive dep list.
-        dependencies |= {
-            (j.group, j.artifact)
-            for dependency in dependencies
-            for j in entries[dependency].dependencies
-        }
-
-    entries_out = (entries[dependency] for dependency in dependencies)
-    return CoursierResolvedLockfile(entries=tuple(entries_out))
-
-
-@dataclass(frozen=True)
-class FetchOneCoordRequest:
-    coord: Coordinate
-    expected_digest: FileDigest
-
-
-@dataclass(frozen=True)
-class ResolvedClasspathEntry:
-    """A single classpath entry from a resolver (e.g. Coursier), typically a jar."""
-
-    coord: Coordinate
-    file_name: str
-    digest: Digest
-
-
-class ResolvedClasspathEntries(Collection[ResolvedClasspathEntry]):
+class ResolvedClasspathEntries(Collection[ClasspathEntry]):
     """A collection of resolved classpath entries."""
 
 
-@rule(level=LogLevel.DEBUG)
+@rule
 async def coursier_fetch_one_coord(
     bash: BashBinary,
     coursier: Coursier,
     request: CoursierLockfileEntry,
-) -> ResolvedClasspathEntry:
-    """Run `coursier fetch --intrasitive` to fetch a single artifact.
+) -> ClasspathEntry:
+    """Run `coursier fetch --intransitive` to fetch a single artifact.
 
     This rule exists to permit efficient subsetting of a "global" classpath
     in the form of a lockfile.  Callers can determine what subset of dependencies
@@ -430,7 +446,7 @@ async def coursier_fetch_one_coord(
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
             env=coursier.env,
-            description=f"Resolving with coursier: {request.coord.to_coord_str()}",
+            description=f"Fetching with coursier: {request.coord.to_coord_str()}",
             level=LogLevel.DEBUG,
         ),
     )
@@ -471,16 +487,14 @@ async def coursier_fetch_one_coord(
         raise CoursierError(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
-    return ResolvedClasspathEntry(
-        coord=request.coord, file_name=file_path.name, digest=stripped_digest
-    )
+    return ClasspathEntry(digest=stripped_digest, filenames=(file_path.name,))
 
 
 @rule(level=LogLevel.DEBUG)
 async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> ResolvedClasspathEntries:
     """Fetch every artifact in a lockfile."""
     classpath_entries = await MultiGet(
-        Get(ResolvedClasspathEntry, CoursierLockfileEntry, entry) for entry in lockfile.entries
+        Get(ClasspathEntry, CoursierLockfileEntry, entry) for entry in lockfile.entries
     )
     return ResolvedClasspathEntries(classpath_entries)
 
@@ -505,13 +519,6 @@ async def load_coursier_lockfile_from_source(
     )
     source_lockfile_content = source_lockfile_digest_contents[0]
     return CoursierResolvedLockfile.from_json_dict(json.loads(source_lockfile_content.content))
-
-
-@dataclass(frozen=True)
-class CoursierResolveKey:
-    name: str
-    path: str
-    digest: Digest
 
 
 @rule
@@ -659,7 +666,6 @@ class MaterializedClasspathRequest:
 
     prefix: str | None = None
     lockfiles: tuple[CoursierResolvedLockfile, ...] = ()
-    resolved_classpaths: tuple[ResolvedClasspathEntries, ...] = ()
     artifact_requirements: tuple[ArtifactRequirements, ...] = ()
 
 
@@ -707,15 +713,11 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
         )
         for lockfile in (*request.lockfiles, *artifact_requirements_lockfiles)
     )
-    all_classpath_entries = (
-        *lockfile_and_requirements_classpath_entries,
-        *request.resolved_classpaths,
-    )
     merged_snapshot = await Get(
         Snapshot,
         MergeDigests(
             classpath_entry.digest
-            for classpath_entries in all_classpath_entries
+            for classpath_entries in lockfile_and_requirements_classpath_entries
             for classpath_entry in classpath_entries
         ),
     )
@@ -725,4 +727,7 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
 
 
 def rules():
-    return [*collect_rules()]
+    return [
+        *collect_rules(),
+        UnionRule(ClasspathEntryRequest, CoursierFetchRequest),
+    ]

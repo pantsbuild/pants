@@ -7,19 +7,14 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
-from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Targets
-from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    CoursierResolveKey,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.engine.unions import UnionMembership
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
+from pants.jvm.resolve.key import CoursierResolveKey
 
-_USERCP_RELPATH = "__usercp"
+_USERCP_RELPATH = "__cp"
 
 
 @dataclass(frozen=True)
@@ -27,6 +22,9 @@ class Classpath:
     """A transitive classpath which is sufficient to launch the target(s) it was generated for.
 
     This classpath is guaranteed to contain only JAR files.
+
+    TODO: Reuse `ClasspathEntry` prefixes, and replace `user_classpath` logic with inspecting only
+    the "root" `ClasspathEntry` for a test target.
     """
 
     content: Snapshot
@@ -58,40 +56,28 @@ class Classpath:
 
 
 @rule
-async def classpath(coarsened_targets: CoarsenedTargets) -> Classpath:
+async def classpath(
+    coarsened_targets: CoarsenedTargets,
+    union_membership: UnionMembership,
+) -> Classpath:
     targets = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
 
     resolve = await Get(CoursierResolveKey, Targets, targets)
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
 
-    materialized_classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__thirdpartycp",
-            lockfiles=(lockfile,),
-        ),
-    )
-    transitive_user_classfiles = await MultiGet(
-        Get(ClasspathEntry, CompileJavaSourceRequest(component=t, resolve=resolve))
+    transitive_classpath_entries = await MultiGet(
+        Get(
+            ClasspathEntry,
+            ClasspathEntryRequest,
+            ClasspathEntryRequest.for_targets(union_membership, component=t, resolve=resolve),
+        )
         for t in coarsened_targets.closure()
     )
-    merged_transitive_user_classfiles_digest = await Get(
-        Digest, MergeDigests(classfiles.digest for classfiles in transitive_user_classfiles)
-    )
-    prefixed_transitive_user_classfiles_digest = await Get(
-        Digest, AddPrefix(merged_transitive_user_classfiles_digest, _USERCP_RELPATH)
+    merged_transitive_classpath_entries_digest = await Get(
+        Digest, MergeDigests(classfiles.digest for classfiles in transitive_classpath_entries)
     )
 
     return Classpath(
-        await Get(
-            Snapshot,
-            MergeDigests(
-                (
-                    prefixed_transitive_user_classfiles_digest,
-                    materialized_classpath.digest,
-                )
-            ),
-        )
+        await Get(Snapshot, AddPrefix(merged_transitive_classpath_entries_digest, _USERCP_RELPATH))
     )
 
 
