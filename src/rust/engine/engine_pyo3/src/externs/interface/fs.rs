@@ -112,8 +112,7 @@ impl PyDigest {
     format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
   }
 
-  fn __richcmp__(&self, other: PyRef<PyDigest>, op: CompareOp) -> Py<PyAny> {
-    let py = other.py();
+  fn __richcmp__(&self, other: &PyDigest, op: CompareOp, py: Python) -> PyObject {
     match op {
       CompareOp::Eq => (self.0 == other.0).into_py(py),
       CompareOp::Ne => (self.0 != other.0).into_py(py),
@@ -176,8 +175,7 @@ impl PySnapshot {
     ))
   }
 
-  fn __richcmp__(&self, other: PyRef<PySnapshot>, op: CompareOp) -> Py<PyAny> {
-    let py = other.py();
+  fn __richcmp__(&self, other: &PySnapshot, op: CompareOp, py: Python) -> PyObject {
     match op {
       CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
       CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
@@ -191,7 +189,7 @@ impl PySnapshot {
   }
 
   #[getter]
-  fn files(&self, py: Python) -> Py<PyTuple> {
+  fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
     let files = self
       .0
       .path_stats
@@ -202,11 +200,11 @@ impl PySnapshot {
       })
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
-    PyTuple::new(py, files).into()
+    PyTuple::new(py, files)
   }
 
   #[getter]
-  fn dirs(&self, py: Python) -> Py<PyTuple> {
+  fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
     let dirs = self
       .0
       .path_stats
@@ -217,7 +215,7 @@ impl PySnapshot {
       })
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
-    PyTuple::new(py, dirs).into()
+    PyTuple::new(py, dirs)
   }
 }
 
