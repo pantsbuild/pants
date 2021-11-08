@@ -10,7 +10,7 @@ from pants.build_graph.address import Address
 from pants.util.meta import classproperty
 
 
-class PantsRequirement:
+class PantsRequirementCAOF:
     """Exports a `python_requirement` pointing at the active Pants's corresponding dist.
 
     This requirement is useful for custom plugin authors who want to build and test their plugin with

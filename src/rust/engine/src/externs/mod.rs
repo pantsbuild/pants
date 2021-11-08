@@ -31,33 +31,7 @@ use lazy_static::lazy_static;
 
 use logging::PythonLogLevel;
 
-/// Return the Python value None.
-pub fn none() -> PyObject {
-  let gil = Python::acquire_gil();
-  gil.python().None()
-}
-
-pub fn get_type_for(val: &PyObject) -> TypeId {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  (&val.get_type(py)).into()
-}
-
-pub fn is_union(ty: TypeId) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  let py_type = (&ty).as_py_type(py);
-  let unions = py.import("pants.engine.unions").unwrap();
-  unions
-    .call(py, "is_union", (py_type,), None)
-    .unwrap()
-    .extract(py)
-    .unwrap()
-}
-
-pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn equals(py: Python, h1: &PyObject, h2: &PyObject) -> bool {
   // NB: Although it does not precisely align with Python's definition of equality, we ban matches
   // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
   // surprising in interning, and would likely be surprising anywhere else in the engine where we
@@ -65,48 +39,27 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   if h1.get_type(py) != h2.get_type(py) {
     return false;
   }
-  h1.rich_compare(gil.python(), h2, CompareOp::Eq)
+  h1.rich_compare(py, h2, CompareOp::Eq)
     .unwrap()
-    .cast_as::<PyBool>(gil.python())
+    .cast_as::<PyBool>(py)
     .unwrap()
     .is_true()
 }
 
-pub fn type_for_type_id(ty: TypeId) -> PyType {
-  let gil = Python::acquire_gil();
-  (&ty).as_py_type(gil.python())
-}
-
-pub fn type_for(py_type: PyType) -> TypeId {
-  (&py_type).into()
-}
-
-pub fn key_for(val: Value) -> Result<Key, PyErr> {
-  let gil = Python::acquire_gil();
-  INTERNS.key_insert(gil.python(), val)
-}
-
-pub fn val_for(key: &Key) -> Value {
-  INTERNS.key_get(key)
-}
-
-pub fn store_tuple(values: Vec<Value>) -> Value {
-  let gil = Python::acquire_gil();
+pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
   let arg_handles: Vec<_> = values
     .into_iter()
-    .map(|v| v.consume_into_py_object(gil.python()))
+    .map(|v| v.consume_into_py_object(py))
     .collect();
-  Value::from(PyTuple::new(gil.python(), &arg_handles).into_object())
+  Value::from(PyTuple::new(py, &arg_handles).into_object())
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
-pub fn store_dict(keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn store_dict(py: Python, keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> {
   let dict = PyDict::new(py);
   for (k, v) in keys_and_values {
     dict.set_item(
-      gil.python(),
+      py,
       k.consume_into_py_object(py),
       v.consume_into_py_object(py),
     )?;
@@ -114,44 +67,26 @@ pub fn store_dict(keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> 
   Ok(Value::from(dict.into_object()))
 }
 
-///
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
-///
-pub fn store_bytes(bytes: &[u8]) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(PyBytes::new(gil.python(), bytes).into_object())
+pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
+  Value::from(PyBytes::new(py, bytes).into_object())
 }
 
-///
-/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
-///
-pub fn store_utf8(utf8: &str) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(utf8.to_py_object(gil.python()).into_object())
+/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
+pub fn store_utf8(py: Python, utf8: &str) -> Value {
+  Value::from(utf8.to_py_object(py).into_object())
 }
 
-pub fn store_u64(val: u64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_u64(py: Python, val: u64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
-pub fn store_i64(val: i64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_i64(py: Python, val: i64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
-pub fn store_bool(val: bool) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
-}
-
-///
-/// Check if a Python object has the specified field.
-///
-pub fn hasattr(value: &PyObject, field: &str) -> bool {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  value.hasattr(py, field).unwrap()
+pub fn store_bool(py: Python, val: bool) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
 ///
@@ -217,20 +152,14 @@ pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String
     .collect()
 }
 
-pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
+pub fn getattr_as_optional_string(py: Python, value: &PyObject, field: &str) -> Option<String> {
+  let v = value.getattr(py, field).unwrap();
+  if v.is_none(py) {
+    return None;
+  }
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
-  // for None.
-  val_to_str(&getattr(value, field).unwrap())
-}
-
-pub fn key_to_str(key: &Key) -> String {
-  val_to_str(val_for(key).as_ref())
-}
-
-pub fn type_to_str(type_id: TypeId) -> String {
-  getattr_as_string(&type_for_type_id(type_id).into_object(), "__name__")
+  Some(v.extract(py).unwrap())
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {
@@ -256,9 +185,7 @@ pub fn val_to_log_level(obj: &PyObject) -> Result<log::Level, String> {
 }
 
 /// Link to the Pants docs using the current version of Pants.
-pub fn doc_url(slug: &str) -> String {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn doc_url(py: Python, slug: &str) -> String {
   let docutil = py.import("pants.util.docutil").unwrap();
   docutil
     .call(py, "doc_url", (slug,), None)
@@ -267,26 +194,12 @@ pub fn doc_url(slug: &str) -> String {
     .unwrap()
 }
 
-pub fn create_exception(msg: &str) -> Value {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn create_exception(py: Python, msg: &str) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
-pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  if value == py.None() {
-    return None;
-  }
-  Some(value)
-}
-
-pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyObject, PyErr> {
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let gil = Python::acquire_gil();
-  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  value.call_method(gil.python(), method, args_tuple, None)
+pub fn call_method0(py: Python, value: &PyObject, method: &str) -> Result<PyObject, PyErr> {
+  value.call_method(py, method, PyTuple::new(py, &[]), None)
 }
 
 pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
@@ -336,30 +249,26 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
   }
 }
 
-///
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
-///
-pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
-  let py_type = type_for_type_id(type_id);
+pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
+  let py_type = type_id.as_py_type(py);
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let gil = Python::acquire_gil();
-  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
+  let args_tuple = PyTuple::new(py, &arg_handles);
   py_type
-    .call(gil.python(), args_tuple, None)
+    .call(py, args_tuple, None)
     .map(Value::from)
     .unwrap_or_else(|e| {
-      let gil = Python::acquire_gil();
       panic!(
         "Core type constructor `{}` failed: {:?}",
-        py_type.name(gil.python()),
+        py_type.name(py),
         e
       );
     })
 }
 
 lazy_static! {
-  static ref INTERNS: Interns = Interns::new();
+  pub static ref INTERNS: Interns = Interns::new();
 }
 
 py_class!(pub class PyGeneratorResponseBreak |py| {
@@ -406,12 +315,7 @@ impl Get {
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(
-      f,
-      "Get({}, {})",
-      type_to_str(self.output),
-      key_to_str(&self.input)
-    )
+    write!(f, "Get({}, {})", self.output, self.input)
   }
 }
 

@@ -21,6 +21,7 @@ backend_packages.add = [
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.scala",
   "internal_plugins.releases",
 ]
 plugins = [
@@ -83,6 +84,10 @@ root_patterns = [
 ]
 
 [tailor]
+build_file_header = """\
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""
 ignore_paths = ["build-support/migration-support/BUILD"]
 ignore_adding_targets = [
   "src/python/pants:__main__",
@@ -200,3 +205,4 @@ master = "src/python/pants/notes/master.rst"
 "2.6.x" = "src/python/pants/notes/2.6.x.md"
 "2.7.x" = "src/python/pants/notes/2.7.x.md"
 "2.8.x" = "src/python/pants/notes/2.8.x.md"
+"2.9.x" = "src/python/pants/notes/2.9.x.md"

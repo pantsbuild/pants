@@ -3,11 +3,12 @@
 
 use std::sync::Arc;
 
-use super::PyExecutor;
 use parking_lot::Mutex;
 use pyo3::exceptions::PyAssertionError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+
+use crate::externs::interface::scheduler::PyExecutor;
 use testutil_mock::{StubCAS, StubCASBuilder};
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {

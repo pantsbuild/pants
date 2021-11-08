@@ -4,12 +4,21 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import first_party_pkg, go_mod, sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgInfoRequest,
@@ -29,6 +38,9 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            *build_pkg.rules(),
+            *link.rules(),
+            *assembly.rules(),
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
@@ -107,6 +119,9 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         go_files: list[str],
         test_files: list[str],
         xtest_files: list[str],
+        embed_patterns: Iterable[str] = (),
+        test_embed_patterns: Iterable[str] = (),
+        xtest_embed_patterns: Iterable[str] = (),
     ) -> None:
         maybe_info = rule_runner.request(
             FallibleFirstPartyPkgInfo,
@@ -127,6 +142,10 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         assert not info.s_files
 
         assert info.minimum_go_version == "1.16"
+
+        assert info.embed_patterns == tuple(embed_patterns)
+        assert info.test_embed_patterns == tuple(test_embed_patterns)
+        assert info.xtest_embed_patterns == tuple(xtest_embed_patterns)
 
     assert_info(
         "pkg",
@@ -167,9 +186,10 @@ def test_invalid_package(rule_runner) -> None:
     )
     assert maybe_info.info is None
     assert maybe_info.exit_code == 1
-    assert maybe_info.stderr == "bad.go:1:1: expected 'package', found invalid\n"
+    assert "bad.go:1:1: expected 'package', found invalid\n" in maybe_info.stderr
 
 
+@pytest.mark.xfail(reason="cgo is ignored")
 def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -204,3 +224,53 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
             FallibleFirstPartyPkgInfo,
             [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
         )
+
+
+def test_embeds_supported(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "grok.txt": "This will be embedded in a Go binary.\n",
+            "test_grok.txt": "This will be embedded in a Go binary.\n",
+            "xtest_grok.txt": "This will be embedded in a Go binary.\n",
+            "foo.go": dedent(
+                """\
+                package foo
+                import _ "embed"
+                //go:embed grok.txt
+                var message
+                """
+            ),
+            "foo_test.go": dedent(
+                """\
+                package foo
+                import _ "embed"
+                //go:embed test_grok.txt
+                var testMessage
+                """
+            ),
+            "bar_test.go": dedent(
+                """\
+                package foo_test
+                import _ "embed"
+                //go:embed xtest_grok.txt
+                var testMessage
+                """
+            ),
+        }
+    )
+    maybe_info = rule_runner.request(
+        FallibleFirstPartyPkgInfo,
+        [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+    )
+    assert maybe_info.info is not None
+    info = maybe_info.info
+    assert info.embed_patterns == ("grok.txt",)
+    assert info.test_embed_patterns == ("test_grok.txt",)
+    assert info.xtest_embed_patterns == ("xtest_grok.txt",)

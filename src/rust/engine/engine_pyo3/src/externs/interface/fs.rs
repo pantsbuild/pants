@@ -4,7 +4,6 @@
 use std::path::Path;
 
 use pyo3::basic::CompareOp;
-use pyo3::class::basic::PyObjectProtocol;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyTuple, PyType};
@@ -45,11 +44,11 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
   fn extract(obj: &'source PyAny) -> PyResult<Self> {
     let globs: Vec<String> = obj.getattr("globs")?.extract()?;
 
-    let description_of_origin_field: String = obj.getattr("description_of_origin")?.extract()?;
-    let description_of_origin = if description_of_origin_field.is_empty() {
+    let description_of_origin_field = obj.getattr("description_of_origin")?;
+    let description_of_origin = if description_of_origin_field.is_none() {
       None
     } else {
-      Some(description_of_origin_field)
+      Some(description_of_origin_field.extract()?)
     };
 
     let match_behavior_str: &str = obj
@@ -105,6 +104,22 @@ impl PyDigest {
     Ok(Self(Digest::new(fingerprint, serialized_bytes_length)))
   }
 
+  fn __hash__(&self) -> u64 {
+    self.0.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> String {
+    format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
+  }
+
+  fn __richcmp__(&self, other: &PyDigest, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0 == other.0).into_py(py),
+      CompareOp::Ne => (self.0 != other.0).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
   #[getter]
   fn fingerprint(&self) -> String {
     self.0.hash.to_hex()
@@ -113,26 +128,6 @@ impl PyDigest {
   #[getter]
   fn serialized_bytes_length(&self) -> usize {
     self.0.size_bytes
-  }
-}
-
-#[pyproto]
-impl PyObjectProtocol for PyDigest {
-  fn __richcmp__(&self, other: PyRef<PyDigest>, op: CompareOp) -> Py<PyAny> {
-    let py = other.py();
-    match op {
-      CompareOp::Eq => (self.0 == other.0).into_py(py),
-      CompareOp::Ne => (self.0 != other.0).into_py(py),
-      _ => py.NotImplemented(),
-    }
-  }
-
-  fn __hash__(&self) -> u64 {
-    self.0.hash.prefix_hash()
-  }
-
-  fn __repr__(&self) -> String {
-    format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
   }
 }
 
@@ -161,53 +156,6 @@ impl PySnapshot {
     Self(snapshot)
   }
 
-  #[getter]
-  fn digest(&self) -> PyDigest {
-    PyDigest(self.0.digest)
-  }
-
-  #[getter]
-  fn files(&self, py: Python) -> Py<PyTuple> {
-    let files = self
-      .0
-      .path_stats
-      .iter()
-      .filter_map(|ps| match ps {
-        PathStat::File { path, .. } => path.to_str(),
-        _ => None,
-      })
-      .map(|ps| PyString::new(py, ps))
-      .collect::<Vec<_>>();
-    PyTuple::new(py, files).into()
-  }
-
-  #[getter]
-  fn dirs(&self, py: Python) -> Py<PyTuple> {
-    let dirs = self
-      .0
-      .path_stats
-      .iter()
-      .filter_map(|ps| match ps {
-        PathStat::Dir { path, .. } => path.to_str(),
-        _ => None,
-      })
-      .map(|ps| PyString::new(py, ps))
-      .collect::<Vec<_>>();
-    PyTuple::new(py, dirs).into()
-  }
-}
-
-#[pyproto]
-impl PyObjectProtocol for PySnapshot {
-  fn __richcmp__(&self, other: PyRef<PySnapshot>, op: CompareOp) -> Py<PyAny> {
-    let py = other.py();
-    match op {
-      CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
-      CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
-      _ => py.NotImplemented(),
-    }
-  }
-
   fn __hash__(&self) -> u64 {
     self.0.digest.hash.prefix_hash()
   }
@@ -225,6 +173,49 @@ impl PyObjectProtocol for PySnapshot {
       dirs.join(","),
       files.join(",")
     ))
+  }
+
+  fn __richcmp__(&self, other: &PySnapshot, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
+      CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  #[getter]
+  fn digest(&self) -> PyDigest {
+    PyDigest(self.0.digest)
+  }
+
+  #[getter]
+  fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+    let files = self
+      .0
+      .path_stats
+      .iter()
+      .filter_map(|ps| match ps {
+        PathStat::File { path, .. } => path.to_str(),
+        _ => None,
+      })
+      .map(|ps| PyString::new(py, ps))
+      .collect::<Vec<_>>();
+    PyTuple::new(py, files)
+  }
+
+  #[getter]
+  fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+    let dirs = self
+      .0
+      .path_stats
+      .iter()
+      .filter_map(|ps| match ps {
+        PathStat::Dir { path, .. } => path.to_str(),
+        _ => None,
+      })
+      .map(|ps| PyString::new(py, ps))
+      .collect::<Vec<_>>();
+    PyTuple::new(py, dirs)
   }
 }
 

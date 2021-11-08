@@ -8,10 +8,8 @@ from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -23,17 +21,20 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField, Targets
-from pants.engine.unions import UnionRule
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
+    Coordinate,
+    Coordinates,
     CoursierResolvedLockfile,
     CoursierResolveKey,
+    FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -44,10 +45,6 @@ class JavacFieldSet(FieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
-
-
-class JavacCheckRequest(CheckRequest):
-    field_set_type = JavacFieldSet
 
 
 @dataclass(frozen=True)
@@ -62,11 +59,11 @@ async def compile_java_source(
     jdk_setup: JdkSetup,
     zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
-) -> FallibleCompiledClassfiles:
+) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath.
     direct_dependency_classfiles_fallible = await MultiGet(
         Get(
-            FallibleCompiledClassfiles,
+            FallibleClasspathEntry,
             CompileJavaSourceRequest(component=coarsened_dep, resolve=request.resolve),
         )
         for coarsened_dep in request.component.dependencies
@@ -75,7 +72,7 @@ async def compile_java_source(
         fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
     ]
     if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
             output=None,
@@ -111,14 +108,26 @@ async def compile_java_source(
         dependencies_digest = await Get(
             Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)
         )
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=CompiledClassfiles(digest=dependencies_digest),
+            output=ClasspathEntry(digest=dependencies_digest),
             exit_code=0,
         )
 
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    filter_coords = Coordinates(
+        (
+            Coordinate.from_jvm_artifact_target(dep)
+            for item in CoarsenedTargets(request.component.dependencies).closure()
+            for dep in item.members
+            if JvmArtifactFieldSet.is_applicable(dep)
+        )
+    )
+
+    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
+    lockfile = await Get(
+        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
+    )
 
     dest_dir = "classfiles"
     (
@@ -191,7 +200,7 @@ async def compile_java_source(
         ),
     )
     if compile_result.exit_code != 0:
-        return FallibleCompiledClassfiles.from_fallible_process_result(
+        return FallibleClasspathEntry.from_fallible_process_result(
             str(request.component),
             compile_result,
             None,
@@ -226,39 +235,15 @@ async def compile_java_source(
         # a `package-info.java` in a single partition.
         jar_output_digest = EMPTY_DIGEST
 
-    return FallibleCompiledClassfiles.from_fallible_process_result(
+    return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         compile_result,
-        CompiledClassfiles(jar_output_digest),
+        ClasspathEntry(jar_output_digest),
     )
-
-
-@rule(desc="Check javac compilation", level=LogLevel.DEBUG)
-async def javac_check(request: JavacCheckRequest) -> CheckResults:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
-    )
-
-    resolves = await MultiGet(
-        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
-    )
-
-    results = await MultiGet(
-        Get(
-            FallibleCompiledClassfiles,
-            CompileJavaSourceRequest(component=target, resolve=resolve),
-        )
-        for target, resolve in zip(coarsened_targets, resolves)
-    )
-
-    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
-    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name="javac")
 
 
 def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
-        UnionRule(CheckRequest, JavacCheckRequest),
     ]

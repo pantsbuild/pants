@@ -8,6 +8,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 
+from pants.backend.java.dependency_inference import java_parser_launcher
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     JavaParserCompiledClassfiles,
     java_parser_artifact_requirements,
@@ -134,4 +135,5 @@ async def analyze_java_source_dependencies(
 def rules():
     return [
         *collect_rules(),
+        *java_parser_launcher.rules(),
     ]

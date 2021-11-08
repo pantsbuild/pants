@@ -5,57 +5,97 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoImportPathField,
-    GoThirdPartyPackageDependenciesField,
-)
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
     AssemblyPreCompilationRequest,
     FallibleAssemblyPreCompilation,
 )
-from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgInfo,
-    FirstPartyPkgInfoRequest,
-)
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
-from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
 
 
-@dataclass(frozen=True)
 class BuildGoPackageRequest(EngineAwareParameter):
-    """Build a package and its dependencies as `__pkg__.a` files."""
+    def __init__(
+        self,
+        *,
+        import_path: str,
+        digest: Digest,
+        subpath: str,
+        go_file_names: tuple[str, ...],
+        s_file_names: tuple[str, ...],
+        direct_dependencies: tuple[BuildGoPackageRequest, ...],
+        minimum_go_version: str | None,
+        for_tests: bool = False,
+    ) -> None:
+        """Build a package and its dependencies as `__pkg__.a` files.
 
-    import_path: str
+        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for
+        the recursive portion.
+        """
 
-    digest: Digest
-    # Path from the root of the digest to the package to build.
-    subpath: str
+        self.import_path = import_path
+        self.digest = digest
+        self.subpath = subpath
+        self.go_file_names = go_file_names
+        self.s_file_names = s_file_names
+        self.direct_dependencies = direct_dependencies
+        self.minimum_go_version = minimum_go_version
+        self.for_tests = for_tests
+        self._hashcode = hash(
+            (
+                self.import_path,
+                self.digest,
+                self.subpath,
+                self.go_file_names,
+                self.s_file_names,
+                self.direct_dependencies,
+                self.minimum_go_version,
+                self.for_tests,
+            )
+        )
 
-    go_file_names: tuple[str, ...]
-    s_file_names: tuple[str, ...]
+    def __repr__(self) -> str:
+        # NB: We must override the default `__repr__` so that `direct_dependencies` does not
+        # traverse into transitive dependencies, which was pathologically slow.
+        return (
+            f"{self.__class__}("
+            f"import_path={repr(self.import_path)}, "
+            f"digest={self.digest}, "
+            f"subpath={self.subpath}, "
+            f"go_file_names={self.go_file_names}, "
+            f"go_file_names={self.s_file_names}, "
+            f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
+            f"minimum_go_version={self.minimum_go_version}, "
+            f"for_tests={self.for_tests}"
+            ")"
+        )
 
-    # These dependencies themselves often have dependencies, such that we recursively build.
-    direct_dependencies: tuple[BuildGoPackageRequest, ...]
+    def __hash__(self) -> int:
+        return self._hashcode
 
-    # In the form `1.16`. This is declared in the `go` directive of `go.mod`.
-    minimum_go_version: str | None
-
-    for_tests: bool = False
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (
+            self._hashcode == other._hashcode
+            and self.import_path == other.import_path
+            and self.digest == other.digest
+            and self.subpath == other.subpath
+            and self.go_file_names == other.go_file_names
+            and self.s_file_names == other.s_file_names
+            and self.minimum_go_version == other.minimum_go_version
+            and self.for_tests == other.for_tests
+            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
+            and self.direct_dependencies == other.direct_dependencies
+        )
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -194,6 +234,10 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
 
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
+    if not request.s_file_names:
+        # If there are no non-Go sources, then pass -complete flag which tells the compiler that the provided
+        # Go files are the entire package.
+        compile_args.append("-complete")
     relativized_sources = (
         f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
         for name in request.go_file_names
@@ -255,126 +299,6 @@ def required_built_go_package(fallible_result: FallibleBuiltGoPackage) -> BuiltG
     raise Exception(
         f"Failed to compile {fallible_result.import_path}:\n"
         f"{fallible_result.stdout}\n{fallible_result.stderr}"
-    )
-
-
-@dataclass(frozen=True)
-class BuildGoPackageTargetRequest(EngineAwareParameter):
-    """Build a `go_first_party_package` or `go_third_party_package` target and its dependencies as
-    `__pkg__.a` files."""
-
-    address: Address
-    is_main: bool = False
-    for_tests: bool = False
-
-    def debug_hint(self) -> str:
-        return str(self.address)
-
-
-# NB: We must have a description for the streaming of this rule to work properly
-# (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
-@rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
-async def setup_build_go_package_target_request(
-    request: BuildGoPackageTargetRequest,
-) -> FallibleBuildGoPackageRequest:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
-    target = wrapped_target.target
-    import_path = target[GoImportPathField].value
-
-    if target.has_field(GoFirstPartyPackageSourcesField):
-        _maybe_first_party_pkg_info = await Get(
-            FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
-        )
-        if _maybe_first_party_pkg_info.info is None:
-            return FallibleBuildGoPackageRequest(
-                None,
-                import_path,
-                exit_code=_maybe_first_party_pkg_info.exit_code,
-                stderr=_maybe_first_party_pkg_info.stderr,
-            )
-        _first_party_pkg_info = _maybe_first_party_pkg_info.info
-
-        digest = _first_party_pkg_info.digest
-        subpath = os.path.join(
-            target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
-        )
-        minimum_go_version = _first_party_pkg_info.minimum_go_version
-
-        go_file_names = _first_party_pkg_info.go_files
-        if request.for_tests:
-            # TODO: Build the test sources separately and link the two object files into the package archive?
-            # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
-            #   need to do something similar?
-            go_file_names += _first_party_pkg_info.test_files
-        s_file_names = _first_party_pkg_info.s_files
-
-    elif target.has_field(GoThirdPartyPackageDependenciesField):
-        _go_mod_address = target.address.maybe_convert_to_target_generator()
-        _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
-        _third_party_pkg_info = await Get(
-            ThirdPartyPkgInfo,
-            ThirdPartyPkgInfoRequest(
-                import_path=import_path, go_mod_stripped_digest=_go_mod_info.stripped_digest
-            ),
-        )
-
-        # We error if trying to _build_ a package with issues (vs. only generating the target and
-        # using in project introspection).
-        if _third_party_pkg_info.error:
-            raise _third_party_pkg_info.error
-
-        subpath = _third_party_pkg_info.subpath
-        digest = _third_party_pkg_info.digest
-        minimum_go_version = _third_party_pkg_info.minimum_go_version
-        go_file_names = _third_party_pkg_info.go_files
-        s_file_names = _third_party_pkg_info.s_files
-
-    else:
-        raise AssertionError(
-            f"Unknown how to build `{target.alias}` target at address {request.address} with Go."
-            "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
-            "message!"
-        )
-
-    # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
-    #  of its generated targets...Figure this out.
-    all_deps = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
-    maybe_direct_dependencies = await MultiGet(
-        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
-        for tgt in all_deps
-        if (
-            tgt.has_field(GoFirstPartyPackageSourcesField)
-            or tgt.has_field(GoThirdPartyPackageDependenciesField)
-        )
-    )
-    direct_dependencies = []
-    for maybe_dep in maybe_direct_dependencies:
-        if maybe_dep.request is None:
-            return maybe_dep
-        direct_dependencies.append(maybe_dep.request)
-
-    result = BuildGoPackageRequest(
-        digest=digest,
-        import_path="main" if request.is_main else import_path,
-        subpath=subpath,
-        go_file_names=go_file_names,
-        s_file_names=s_file_names,
-        minimum_go_version=minimum_go_version,
-        direct_dependencies=tuple(direct_dependencies),
-        for_tests=request.for_tests,
-    )
-    return FallibleBuildGoPackageRequest(result, import_path)
-
-
-@rule
-def required_build_go_package_request(
-    fallible_request: FallibleBuildGoPackageRequest,
-) -> BuildGoPackageRequest:
-    if fallible_request.request is not None:
-        return fallible_request.request
-    raise Exception(
-        f"Failed to determine metadata to compile {fallible_request.import_path}:\n"
-        f"{fallible_request.stderr}"
     )
 
 

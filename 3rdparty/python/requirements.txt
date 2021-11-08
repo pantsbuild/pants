@@ -1,3 +1,8 @@
+# Note: Adding a third-party dependency is usually frowned upon because it increases the time to install Pants. 
+# This is particularly painful for CI, where the installation of Pants is often slow.
+# Additionally, it increases the surface area of Pants's supply chain for security.
+# Consider pinging us on Slack if you're thinking a new dependency might be needed.
+
 ansicolors==1.1.8
 fasteners==0.16.3
 freezegun==1.1.0

@@ -18,11 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class CompiledClassfiles:
-    """The outputs of a compilation contained in either zero or one JAR file.
-
-    TODO: Rename this type to align with the guarantee about its content.
-    """
+class ClasspathEntry:
+    """A JVM classpath entry, which will always be either zero or one JAR file."""
 
     digest: Digest
 
@@ -34,10 +31,10 @@ class CompileResult(Enum):
 
 
 @dataclass(frozen=True)
-class FallibleCompiledClassfiles(EngineAwareReturnType):
+class FallibleClasspathEntry(EngineAwareReturnType):
     description: str
     result: CompileResult
-    output: CompiledClassfiles | None
+    output: ClasspathEntry | None
     exit_code: int
     stdout: str | None = None
     stderr: str | None = None
@@ -47,10 +44,10 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
         cls,
         description: str,
         process_result: FallibleProcessResult,
-        output: CompiledClassfiles | None,
+        output: ClasspathEntry | None,
         *,
         strip_chroot_path: bool = False,
-    ) -> FallibleCompiledClassfiles:
+    ) -> FallibleClasspathEntry:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
@@ -90,11 +87,11 @@ class FallibleCompiledClassfiles(EngineAwareReturnType):
 
 
 @rule
-def required_classfiles(fallible_result: FallibleCompiledClassfiles) -> CompiledClassfiles:
+def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
     if fallible_result.result == CompileResult.SUCCEEDED:
         assert fallible_result.output
         return fallible_result.output
-    # NB: The compile outputs will already have been streamed as FallibleCompiledClassfiles finish.
+    # NB: The compile outputs will already have been streamed as FallibleClasspathEntries finish.
     raise Exception(
         f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
     )

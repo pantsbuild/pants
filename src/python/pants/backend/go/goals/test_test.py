@@ -15,6 +15,7 @@ from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
+    build_pkg_target,
     first_party_pkg,
     go_mod,
     link,
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *test_rules(),
             *assembly.rules(),
             *build_pkg.rules(),
+            *build_pkg_target.rules(),
             *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
@@ -236,12 +238,12 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
-    assert result.stderr == "bad_test.go:1:1: expected 'package', found invalid\n"
+    assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
 
     tgt = rule_runner.get_target(Address("foo", generated_name="./uses_dep"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
-    assert result.stderr == "dep/f.go:1:1: expected 'package', found invalid\n"
+    assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
 
 
 def test_external_test_success(rule_runner: RuleRunner) -> None:
