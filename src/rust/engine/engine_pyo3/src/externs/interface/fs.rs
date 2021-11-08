@@ -44,11 +44,11 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
   fn extract(obj: &'source PyAny) -> PyResult<Self> {
     let globs: Vec<String> = obj.getattr("globs")?.extract()?;
 
-    let description_of_origin_field: String = obj.getattr("description_of_origin")?.extract()?;
-    let description_of_origin = if description_of_origin_field.is_empty() {
+    let description_of_origin_field = obj.getattr("description_of_origin")?;
+    let description_of_origin = if description_of_origin_field.is_none() {
       None
     } else {
-      Some(description_of_origin_field)
+      Some(description_of_origin_field.extract()?)
     };
 
     let match_behavior_str: &str = obj

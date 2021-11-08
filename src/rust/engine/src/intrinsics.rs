@@ -12,7 +12,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use cpython::Python;
+use cpython::{ObjectProtocol, Python};
 use fs::RelativePath;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -200,6 +200,7 @@ fn multi_platform_process_request_to_process_result(
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
+      py,
       context.core.types.process_result,
       &[
         externs::store_bytes(py, &stdout_bytes),
@@ -209,6 +210,7 @@ fn multi_platform_process_request_to_process_result(
         externs::store_i64(py, result.exit_code.into()),
         Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
+          py,
           context.core.types.platform,
           &[externs::store_utf8(py, &platform_name)],
         ),
@@ -270,7 +272,7 @@ fn remove_prefix_request_to_digest(
   async move {
     let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
       .map_err(|e| throw(&e))?;
-    let prefix = externs::getattr_as_string(&args[0], "prefix");
+    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
@@ -292,7 +294,7 @@ fn add_prefix_request_to_digest(
   async move {
     let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
       .map_err(|e| throw(&e))?;
-    let prefix = externs::getattr_as_string(&args[0], "prefix");
+    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
@@ -392,13 +394,22 @@ fn create_digest_to_digest(
   let digests: Vec<_> = file_items
     .into_iter()
     .map(|file_item| {
-      let path = externs::getattr_as_string(&file_item, "path");
+      let path: String = externs::getattr(&file_item, "path").unwrap();
       let store = context.core.store();
       async move {
         let path = RelativePath::new(PathBuf::from(path))
           .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
 
-        if externs::hasattr(&file_item, "content") {
+        let (is_file_content, is_file_entry) = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          (
+            file_item.hasattr(py, "content").unwrap(),
+            file_item.hasattr(py, "file_digest").unwrap(),
+          )
+        };
+
+        if is_file_content {
           let bytes =
             bytes::Bytes::from(externs::getattr::<Vec<u8>>(&file_item, "content").unwrap());
           let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
@@ -409,7 +420,7 @@ fn create_digest_to_digest(
             .await?;
           let res: Result<_, String> = Ok(snapshot.digest);
           res
-        } else if externs::hasattr(&file_item, "file_digest") {
+        } else if is_file_entry {
           let digest_obj = externs::getattr(&file_item, "file_digest")?;
           let digest = Snapshot::lift_file_digest(&digest_obj)?;
           let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
@@ -592,6 +603,7 @@ fn interactive_process(
       let gil = Python::acquire_gil();
       let py = gil.python();
       externs::unsafe_call(
+        py,
         interactive_process_result,
         &[externs::store_i64(py, i64::from(code))],
       )
