@@ -15,6 +15,7 @@ use bytes::Bytes;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
+use pyo3::prelude::Python;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -24,7 +25,7 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use cpython::{PyObject, Python, PythonObject};
+use cpython::PythonObject;
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -264,12 +265,15 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &PyObject) -> Result<hashing::Digest, String> {
+pub fn lift_directory_digest(digest: &cpython::PyObject) -> Result<hashing::Digest, String> {
   externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
 }
 
-pub fn lift_file_digest(types: &Types, digest: &PyObject) -> Result<hashing::Digest, String> {
-  let gil = Python::acquire_gil();
+pub fn lift_file_digest(
+  types: &Types,
+  digest: &cpython::PyObject,
+) -> Result<hashing::Digest, String> {
+  let gil = cpython::Python::acquire_gil();
   let py = gil.python();
   if TypeId::new(&digest.get_type(py)) != types.file_digest {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
@@ -292,7 +296,7 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
-    let gil = Python::acquire_gil();
+    let gil = cpython::Python::acquire_gil();
     let py = gil.python();
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory =
@@ -326,7 +330,7 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description: String = externs::getattr(value, "description").unwrap();
-    let py_level: PyObject = externs::getattr(value, "level").unwrap();
+    let py_level: cpython::PyObject = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(&py_level)?;
 
     let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
@@ -344,7 +348,7 @@ impl MultiPlatformExecuteProcess {
       externs::getattr_as_optional_string(py, value, "execution_slot_variable");
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum: PyObject = externs::getattr(value, "cache_scope").unwrap();
+      let cache_scope_enum: cpython::PyObject = externs::getattr(value, "cache_scope").unwrap();
       externs::getattr::<String>(&cache_scope_enum, "name")
         .unwrap()
         .try_into()?
@@ -593,11 +597,12 @@ impl From<Scandir> for NodeKey {
 }
 
 fn unmatched_globs_additional_context() -> Option<String> {
-  let gil = Python::acquire_gil();
-  let url = externs::doc_url(
-    gil.python(),
-    "troubleshooting#pants-cannot-find-a-file-in-your-project",
-  );
+  let url = Python::with_gil(|py| {
+    externs::doc_url(
+      py,
+      "troubleshooting#pants-cannot-find-a-file-in-your-project",
+    )
+  });
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
@@ -721,19 +726,19 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let gil = Python::acquire_gil();
+    let gil = cpython::Python::acquire_gil();
     let py = gil.python();
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
     let description_of_origin =
       externs::getattr_as_optional_string(py, item, "description_of_origin");
 
-    let glob_match_error_behavior: PyObject =
+    let glob_match_error_behavior: cpython::PyObject =
       externs::getattr(item, "glob_match_error_behavior").unwrap();
     let failure_behavior: String = externs::getattr(&glob_match_error_behavior, "value").unwrap();
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
+    let conjunction_obj: cpython::PyObject = externs::getattr(item, "conjunction").unwrap();
     let conjunction_string: String = externs::getattr(&conjunction_obj, "value").unwrap();
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
@@ -752,7 +757,7 @@ impl Snapshot {
       .map_err(|e| format!("{:?}", e))
   }
 
-  pub fn lift_file_digest(item: &PyObject) -> Result<hashing::Digest, String> {
+  pub fn lift_file_digest(item: &cpython::PyObject) -> Result<hashing::Digest, String> {
     let fingerprint: String = externs::getattr(item, "fingerprint").unwrap();
     let serialized_bytes_length: usize = externs::getattr(item, "serialized_bytes_length")?;
     Ok(hashing::Digest::new(
@@ -1095,10 +1100,7 @@ impl Task {
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<Value> {
-    let mut input = {
-      let gil = Python::acquire_gil();
-      Value::from(gil.python().None())
-    };
+    let mut input = Python::with_gil(|py| Value::from(py.None()));
     loop {
       let context = context.clone();
       let params = params.clone();
@@ -1110,8 +1112,7 @@ impl Task {
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
-          let gil = Python::acquire_gil();
-          input = externs::store_tuple(gil.python(), values);
+          input = Python::with_gil(|py| externs::store_tuple(py, values));
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(val);
@@ -1171,7 +1172,7 @@ impl WrappedNode for Task {
       .await?
       .into();
     let mut result_type = {
-      let gil = Python::acquire_gil();
+      let gil = cpython::Python::acquire_gil();
       let py = gil.python();
       TypeId::new(&result_val.get_type(py))
     };
@@ -1183,7 +1184,7 @@ impl WrappedNode for Task {
         Self::generate(&context, workunit, params, self.entry, result_val),
       )
       .await?;
-      let gil = Python::acquire_gil();
+      let gil = cpython::Python::acquire_gil();
       let py = gil.python();
       result_type = TypeId::new(&result_val.get_type(py));
     }
@@ -1196,7 +1197,7 @@ impl WrappedNode for Task {
     }
 
     let engine_aware_return_type = if self.task.engine_aware_return_type {
-      let gil = Python::acquire_gil();
+      let gil = cpython::Python::acquire_gil();
       let py = gil.python();
       EngineAwareReturnType::from_task_result(py, &result_val, &context)
     } else {
@@ -1370,9 +1371,7 @@ impl Node for NodeKey {
     let workunit_name = self.workunit_name();
     let user_facing_name = self.user_facing_name();
     let engine_aware_params: Vec<_> = match &self {
-      NodeKey::Task(ref task) => {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+      NodeKey::Task(ref task) => Python::with_gil(|py| {
         let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         task
           .params
@@ -1389,17 +1388,15 @@ impl Node for NodeKey {
             }
           })
           .collect()
-      }
+      }),
       _ => vec![],
     };
-    let user_metadata = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
+    let user_metadata = Python::with_gil(|py| {
       engine_aware_params
         .iter()
         .flat_map(|val| EngineAwareParameter::metadata(py, &context, val))
         .collect()
-    };
+    });
 
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
@@ -1496,14 +1493,12 @@ impl Node for NodeKey {
         // If the node failed, expand the Failure with a new frame.
         result = result.map_err(|failure| {
           let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
+          let displayable_param_names: Vec<_> = Python::with_gil(|py| {
             engine_aware_params
               .iter()
               .filter_map(|val| EngineAwareParameter::debug_hint(py, val))
               .collect()
-          };
+          });
           let failure_name = if displayable_param_names.is_empty() {
             name
           } else if displayable_param_names.len() == 1 {
@@ -1559,9 +1554,7 @@ impl Node for NodeKey {
         ProcessCacheScope::PerSession => false,
       },
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        EngineAwareReturnType::is_cacheable(py, v).unwrap_or(true)
+        Python::with_gil(|py| EngineAwareReturnType::is_cacheable(py, v).unwrap_or(true))
       }
       _ => true,
     }
@@ -1580,15 +1573,13 @@ impl Display for NodeKey {
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {
-        let params = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
+        let params = Python::with_gil(|py| {
           task
             .params
             .keys()
             .filter_map(|k| EngineAwareParameter::debug_hint(py, &k.to_value()))
             .collect::<Vec<_>>()
-        };
+        });
         write!(
           f,
           "@rule({}({}))",
@@ -1614,11 +1605,8 @@ impl NodeError for Failure {
       path[0] += " <-";
       path[path_len - 1] += " <-"
     }
-    let gil = Python::acquire_gil();
-    let url = externs::doc_url(
-      gil.python(),
-      "targets#dependencies-and-dependency-inference",
-    );
+    let url =
+      Python::with_gil(|py| externs::doc_url(py, "targets#dependencies-and-dependency-inference"));
     throw(&format!(
       "The dependency graph contained a cycle:\
       \n\n  \

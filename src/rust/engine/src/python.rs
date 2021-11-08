@@ -1,19 +1,18 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use fnv::FnvHasher;
-
 use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::externs;
-
-use cpython::{
-  FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, PyType, Python, ToPyObject,
-};
+use fnv::FnvHasher;
+use pyo3::prelude::*;
+use pyo3::types::PyType;
+use pyo3::{FromPyObject, ToPyObject};
 use smallvec::SmallVec;
+
+use crate::externs;
 
 pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
 
@@ -115,13 +114,9 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-///
 /// A pointer to an underlying PyTypeObject instance.
-///
-/// NB: This is a void pointer because the `cpython::ffi::PyTypeObject` is not public.
-///
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeId(*mut std::ffi::c_void);
+pub struct TypeId(*mut pyo3::ffi::PyTypeObject);
 
 unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
@@ -131,38 +126,35 @@ impl TypeId {
     py_type.into()
   }
 
-  pub fn as_py_type(&self, py: Python) -> PyType {
+  pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
     // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
     // type is not unloaded. That is true today, but would not be if we implemented support for hot
     // reloading of plugins.
-    unsafe { PyType::from_type_ptr(py, self.0 as _) }
+    unsafe { PyType::from_type_ptr(py, self.0) }
   }
 
   pub fn is_union(&self) -> bool {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let unions = py.import("pants.engine.unions").unwrap();
-    unions
-      .call(py, "is_union", (self.as_py_type(py),), None)
-      .unwrap()
-      .extract(py)
-      .unwrap()
+    Python::with_gil(|py| {
+      let unions_module = py.import("pants.engine.unions").unwrap();
+      let is_union_func = unions_module.getattr("is_union").unwrap();
+      is_union_func
+        .call1((self.as_py_type(py),))
+        .unwrap()
+        .extract()
+        .unwrap()
+    })
   }
 }
 
 impl From<&PyType> for TypeId {
   fn from(py_type: &PyType) -> Self {
-    TypeId(py_type.as_type_ptr() as *mut std::ffi::c_void)
+    TypeId(py_type.as_type_ptr())
   }
 }
 
 impl fmt::Debug for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let name = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      self.as_py_type(py).name(py).into_owned()
-    };
+    let name = Python::with_gil(|py| self.as_py_type(py).name().unwrap());
     write!(f, "{}", name)
   }
 }
@@ -260,9 +252,8 @@ impl Key {
     &self.type_id
   }
 
-  pub fn from_value(val: Value) -> Result<Key, PyErr> {
-    let gil = Python::acquire_gil();
-    externs::INTERNS.key_insert(gil.python(), val)
+  pub fn from_value(val: Value) -> PyResult<Key> {
+    Python::with_gil(|py| externs::INTERNS.key_insert(py, val))
   }
 
   pub fn to_value(&self) -> Value {
@@ -270,22 +261,22 @@ impl Key {
   }
 }
 
-///
-/// We wrap PyObject (which cannot be cloned without acquiring the GIL) in an Arc in order to avoid
-/// accessing the Gil in many cases.
-///
+/// We wrap PyObject (aka Py<PyAny>) in an Arc in order to cheaply clone without needing to
+/// access the GIL. It's already cheap to clone `&PyAny` as it simply increases Python's ref
+/// count, but that type only works when we are holding the GIL. While we could clone the
+/// `PyObject` without the GIL, that would be an expensive deep clone.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
 
 impl Value {
-  pub fn new(handle: PyObject) -> Value {
-    Value(Arc::new(handle))
+  pub fn new(obj: PyObject) -> Value {
+    Value(Arc::new(obj))
   }
 
   // NB: Longer name because overloaded in a few places.
   pub fn consume_into_py_object(self, py: Python) -> PyObject {
     match Arc::try_unwrap(self.0) {
-      Ok(handle) => handle,
+      Ok(obj) => obj,
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
   }
@@ -293,8 +284,7 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    let gil = Python::acquire_gil();
-    externs::equals(gil.python(), &self.0, &other.0)
+    Python::with_gil(|py| externs::equals(self.0.into_ref(py), other.0.into_ref(py)))
   }
 }
 
@@ -326,15 +316,14 @@ impl fmt::Display for Value {
   }
 }
 
-impl FromPyObject<'_> for Value {
-  fn extract(py: Python, obj: &PyObject) -> PyResult<Self> {
-    Ok(obj.clone_ref(py).into())
+impl FromPyObject for Value {
+  fn extract(obj: &PyAny) -> PyResult<Self> {
+    Ok(obj.clone().into())
   }
 }
 
 impl ToPyObject for &Value {
-  type ObjectType = PyObject;
-  fn to_py_object(&self, py: Python) -> PyObject {
+  fn to_object(&self, py: Python) -> PyObject {
     self.0.clone_ref(py)
   }
 }
@@ -342,18 +331,15 @@ impl ToPyObject for &Value {
 impl From<Value> for PyObject {
   fn from(value: Value) -> Self {
     match Arc::try_unwrap(value.0) {
-      Ok(handle) => handle,
-      Err(arc_handle) => {
-        let gil = Python::acquire_gil();
-        arc_handle.clone_ref(gil.python())
-      }
+      Ok(obj) => obj,
+      Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
     }
   }
 }
 
 impl From<PyObject> for Value {
-  fn from(handle: PyObject) -> Self {
-    Value::new(handle)
+  fn from(obj: PyObject) -> Self {
+    Value::new(obj)
   }
 }
 
@@ -397,15 +383,15 @@ impl Failure {
 }
 
 impl Failure {
-  pub fn from_py_err(py_err: PyErr) -> Failure {
-    let gil = Python::acquire_gil();
+  pub fn from_py_err(py_err: cpython::PyErr) -> Failure {
+    let gil = cpython::Python::acquire_gil();
     let py = gil.python();
     Failure::from_py_err_with_gil(py, py_err)
   }
-  pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
+  pub fn from_py_err_with_gil(py: cpython::Python, mut py_err: cpython::PyErr) -> Failure {
     let val = Value::from(py_err.instance(py));
     let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
-      let locals = PyDict::new(py);
+      let locals = cpython::PyDict::new(py);
       locals
         .set_item(py, "traceback", py.import("traceback").unwrap())
         .unwrap();

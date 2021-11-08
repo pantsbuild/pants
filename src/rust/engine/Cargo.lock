@@ -672,6 +672,7 @@ dependencies = [
  "petgraph 0.5.1",
  "process_execution",
  "protos",
+ "pyo3",
  "rand 0.8.2",
  "regex",
  "reqwest",
