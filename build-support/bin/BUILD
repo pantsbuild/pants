@@ -14,13 +14,22 @@ python_sources(
     },
 )
 
+python_requirement(
+    name="chevron",
+    requirements=["chevron==0.14.0"],
+)
+
 python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
 
 pex_binary(name="changelog", entry_point="changelog.py")
 pex_binary(name="check_banned_imports", entry_point="check_banned_imports.py")
 pex_binary(name="check_inits", entry_point="check_inits.py")
 pex_binary(name="deploy_to_s3", entry_point="deploy_to_s3.py")
-pex_binary(name="generate_all_lockfiles_helper", entry_point="_generate_all_lockfiles_helper.py")
+pex_binary(
+    name="generate_all_lockfiles_helper",
+    entry_point="_generate_all_lockfiles_helper.py",
+    dependencies=[":chevron"],
+)
 pex_binary(name="generate_docs", entry_point="generate_docs.py")
 pex_binary(name="generate_github_workflows", entry_point="generate_github_workflows.py")
 pex_binary(name="generate_user_list", entry_point="generate_user_list.py")
