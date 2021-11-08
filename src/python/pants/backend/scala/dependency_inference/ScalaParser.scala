@@ -57,6 +57,12 @@ class ProvidedTypesTraverser extends Traverser {
       withNamePart(name, () => super.apply(templ))
     }
 
+    case Defn.Object(_mods, nameNode, templ) => {
+      val name = extractName(nameNode)
+      recordProvidedType(name)
+      withNamePart(name, () => super.apply(templ))
+    }
+
     case Defn.Type(_mods, nameNode, _tparams, _body) => {
       val name = extractName(nameNode)
       recordProvidedType(name)

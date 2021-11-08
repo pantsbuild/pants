@@ -68,6 +68,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 class NestedClass {
                 }
                 type NestedType = Foo
+                object NestedObject {
+                }
             }
 
             trait OuterTrait {
@@ -78,6 +80,20 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 class NestedClass {
                 }
                 type NestedType = Foo
+                object NestedObject {
+                }
+            }
+
+            object OuterObject {
+                val NestedVal = 3
+                var NestedVar = "foo"
+                trait NestedTrait {
+                }
+                class NestedClass {
+                }
+                type NestedType = Foo
+                object NestedObject {
+                }
             }
             """
             ),
@@ -110,11 +126,20 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterClass.NestedTrait",
             "org.pantsbuild.example.OuterClass.NestedClass",
             "org.pantsbuild.example.OuterClass.NestedType",
+            "org.pantsbuild.example.OuterClass.NestedObject",
             "org.pantsbuild.example.OuterTrait",
             "org.pantsbuild.example.OuterTrait.NestedVal",
             "org.pantsbuild.example.OuterTrait.NestedVar",
             "org.pantsbuild.example.OuterTrait.NestedTrait",
             "org.pantsbuild.example.OuterTrait.NestedClass",
             "org.pantsbuild.example.OuterTrait.NestedType",
+            "org.pantsbuild.example.OuterTrait.NestedObject",
+            "org.pantsbuild.example.OuterObject",
+            "org.pantsbuild.example.OuterObject.NestedVal",
+            "org.pantsbuild.example.OuterObject.NestedVar",
+            "org.pantsbuild.example.OuterObject.NestedTrait",
+            "org.pantsbuild.example.OuterObject.NestedClass",
+            "org.pantsbuild.example.OuterObject.NestedType",
+            "org.pantsbuild.example.OuterObject.NestedObject",
         ]
     )
