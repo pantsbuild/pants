@@ -290,21 +290,27 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
 
 @maybe_skip_jdk_test
 def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
-    # A source file without a package declaration lives in the "unnamed package", and does not
-    # export any symbols.
+    # A source file without a package declaration lives in the "unnamed package", but may still be
+    # consumed (but not `import`ed) by other files in the unnamed package.
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                java_sources(
-                    name = 'a',
-
-                )
+                java_sources(name = 'a')
                 """
             ),
             "Main.java": dedent(
                 """\
-                public class Main {}
+                public class Main {
+                    public static void main(String[] args) throws Exception {
+                        Lib l = new Lib();
+                    }
+                }
+                """
+            ),
+            "Lib.java": dedent(
+                """\
+                public class Lib {}
                 """
             ),
         }
@@ -313,7 +319,9 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies(
+        dependencies=[Address("", target_name="a", relative_file_path="Lib.java")]
+    )
 
 
 @maybe_skip_jdk_test

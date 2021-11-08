@@ -53,7 +53,54 @@
         "dependencies": [
             {
                 "group": "com.fasterxml.jackson.core",
+                "artifact": "jackson-annotations",
+                "version": "2.12.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
+                "version": "2.12.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "jackson-databind-2.12.4.jar",
+        "file_digest": {
+            "fingerprint": "e99a7b4b89074bc689aabcd9eb1f2c1318b68cc5c34979daf3e34edc558c7a01",
+            "serialized_bytes_length": 1516044
+        }
+    },
+    {
+        "coord": {
+            "group": "com.fasterxml.jackson.datatype",
+            "artifact": "jackson-datatype-jdk8",
+            "version": "2.12.4",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.fasterxml.jackson.core",
+                "artifact": "jackson-core",
+                "version": "2.12.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.fasterxml.jackson.core",
+                "artifact": "jackson-databind",
+                "version": "2.12.4",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.fasterxml.jackson.core",
+                "artifact": "jackson-core",
+                "version": "2.12.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.fasterxml.jackson.core",
+                "artifact": "jackson-databind",
                 "version": "2.12.4",
                 "packaging": "jar"
             },
@@ -64,10 +111,10 @@
                 "packaging": "jar"
             }
         ],
-        "file_name": "jackson-databind-2.12.4.jar",
+        "file_name": "jackson-datatype-jdk8-2.12.4.jar",
         "file_digest": {
-            "fingerprint": "e99a7b4b89074bc689aabcd9eb1f2c1318b68cc5c34979daf3e34edc558c7a01",
-            "serialized_bytes_length": 1516044
+            "fingerprint": "00852350fc1503344723b590f1afe9593ab732fb5b035659b503b49bbea5c9b2",
+            "serialized_bytes_length": 34438
         }
     },
     {

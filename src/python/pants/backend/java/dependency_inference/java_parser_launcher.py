@@ -31,10 +31,16 @@ def _load_javaparser_launcher_source() -> bytes:
 
 
 def java_parser_artifact_requirements() -> ArtifactRequirements:
+    # Update in concert with the target definition for `java_parser`.
     return ArtifactRequirements(
         [
             Coordinate(
                 group="com.fasterxml.jackson.core", artifact="jackson-databind", version="2.12.4"
+            ),
+            Coordinate(
+                group="com.fasterxml.jackson.datatype",
+                artifact="jackson-datatype-jdk8",
+                version="2.12.4",
             ),
             Coordinate(
                 group="com.github.javaparser",

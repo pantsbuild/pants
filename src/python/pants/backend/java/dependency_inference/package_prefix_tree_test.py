@@ -11,7 +11,7 @@ def test_package_rooted_dependency_map() -> None:
     dep_map = PackageRootedDependencyMap()
 
     a = Address("a")
-    dep_map.add_top_level_type(package="org.pantsbuild", type_="Foo", address=a)
+    dep_map.add_top_level_type(type_="org.pantsbuild.Foo", address=a)
     # An exact match yields the exact matching address
     assert dep_map.addresses_for_type("org.pantsbuild.Foo") == frozenset([a])
     # A miss returns nothing
@@ -19,7 +19,7 @@ def test_package_rooted_dependency_map() -> None:
     assert dep_map.addresses_for_type("org.other.Foo") == frozenset()
 
     b = Address("b")
-    dep_map.add_top_level_type(package="org.pantsbuild", type_="Baz", address=b)
+    dep_map.add_top_level_type(type_="org.pantsbuild.Baz", address=b)
     # Again, exact matches yield exact providers
     assert dep_map.addresses_for_type("org.pantsbuild.Foo") == frozenset([a])
     assert dep_map.addresses_for_type("org.pantsbuild.Baz") == frozenset([b])
