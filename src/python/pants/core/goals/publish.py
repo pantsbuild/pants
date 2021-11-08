@@ -90,7 +90,7 @@ _T = TypeVar("_T", bound=PublishRequest)
 class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """FieldSet for PublishRequest.
 
-    Union members may list any fields required to fullfill the instantiation of the
+    Union members may list any fields required to fulfill the instantiation of the
     `PublishProcesses` result of the publish rule.
     """
 
