@@ -20,7 +20,7 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.jvm.compile import CompiledClassfiles
+from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
@@ -97,7 +97,7 @@ class FallibleScalaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
 
 
-class ScalaParserCompiledClassfiles(CompiledClassfiles):
+class ScalaParserCompiledClassfiles(ClasspathEntry):
     pass
 
 
