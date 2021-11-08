@@ -5,7 +5,7 @@ docker_image(
     name="test-example",
     image_tags=["1.2.5"],
     source="Dockerfile",
-    # source=":example-dockerfile",
+    # dependencies=[":example-dockerfile"],
 )
 
 dockerfile(

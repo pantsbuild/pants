@@ -30,21 +30,12 @@ class DockerBuildArgsField(StringSequenceField):
 
 
 class DockerImageSourceField(SingleSourceField):
-    default = "Dockerfile"
     expected_num_files = range(0, 2)
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
-        "This should either be a filename for a Dockerfile in your project workspace, or the "
-        "address to a `dockerfile` target."
+        "Will default to `Dockerfile` if there is not a dependency to a `dockerfile` target."
     )
-
-    @property
-    def globs(self) -> tuple[str, ...]:
-        # Do not expose target addresses as path globs
-        if self.value and ":" not in self.value:
-            return (self.value,)
-        return ()
 
 
 class DockerImageTagsField(StringSequenceField):

@@ -8,16 +8,19 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generator
 
-from pants.backend.docker.target_types import DockerImageSourceField
+from pants.backend.docker.target_types import DockerfileInstructionsField, DockerImageSourceField
 from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
     InvalidFieldException,
@@ -150,19 +153,42 @@ def split_iterable(
 
 @rule
 async def resolve_dockerfile_address(wrapped_target: WrappedTarget) -> DockerfileAddress:
-    """Get address to target owning the Dockerfile by inspecting the source field of the target."""
+    """Get address to target owning the Dockerfile.
+
+    If the wrapped target provides a source field value, use the wrapped target address to hydrate
+    the Dockerfile, otherwise check the wrapped target's dependencies for exactly one `dockerfile`
+    target, and use that if found.
+
+    It is an error to provide both a source field value and have a dependency to a `dockerfile`
+    target.
+    """
     target = wrapped_target.target
-    dockerfile_targets = await Get(
-        Targets,
-        UnparsedAddressInputs(
-            [
-                address
-                for address in [target.get(DockerImageSourceField).value]
-                if address and ":" in address
-            ],
-            owning_address=target.address,
-        ),
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(target.get(Dependencies))
     )
+    dependencies = await Get(
+        Targets,
+        Addresses([addr for addr in explicit_deps.includes if addr not in explicit_deps.ignores]),
+    )
+
+    dockerfile_targets = [tgt for tgt in dependencies if tgt.has_field(DockerfileInstructionsField)]
+
+    if not dockerfile_targets:
+        return DockerfileAddress(target.address)
+
+    if len(dockerfile_targets) > 1:
+        deps_str = ", ".join(str(tgt.address) for tgt in dockerfile_targets)
+        raise InvalidFieldException(
+            f"The `{target.alias}` {target.address} may have at most one `dockerfile` "
+            f"dependency, but have {len(dockerfile_targets)}: {deps_str}."
+        )
+
+    if target.get(SourcesField).value:
+        raise InvalidFieldException(
+            f"The `{target.alias}` {target.address} must not provide both a `source` value "
+            "and have a dependency to a `dockerfile` target at the same time."
+        )
+
     dockerfile_address = dockerfile_targets[0].address if dockerfile_targets else target.address
     return DockerfileAddress(dockerfile_address)
 
@@ -182,14 +208,18 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
 
     if len(sources.snapshot.files) != 1:
         raise InvalidFieldException(
-            f"The `{target.alias}` {target.address} does not have any Dockerfile."
+            f"The `{target.alias}` {target.address} must have a single Dockerfile.\n\n"
+            "Provide either the filename to a `Dockerfile` in your project workspace as the "
+            "`source` field value, or add a dependency to a `dockerfile` target."
         )
+
+    dockerfile = sources.snapshot.files[0]
 
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
             sources.snapshot.digest,
-            ("version-tags,putative-targets", *sources.snapshot.files),
+            ("version-tags,putative-targets", dockerfile),
         ),
     )
 
@@ -198,7 +228,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
 
     return DockerfileInfo(
         digest=sources.snapshot.digest,
-        source=sources.snapshot.files[0],
+        source=dockerfile,
         putative_target_addresses=putative_targets,
         version_tags=version_tags,
     )

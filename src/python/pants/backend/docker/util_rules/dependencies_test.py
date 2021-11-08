@@ -47,7 +47,7 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
         "project/image/test",
         dedent(
             """\
-            docker_image(name="image")
+            docker_image(name="image", source="Dockerfile")
             """
         ),
     )
@@ -84,7 +84,7 @@ def test_inject_dockerfile_dependency(rule_runner: RuleRunner) -> None:
         {
             "test/BUILD": dedent(
                 """\
-                docker_image(source=":synthetic")
+                docker_image(dependencies=[":synthetic"])
                 dockerfile(name="synthetic", instructions=["FROM base"])
                 """
             ),
