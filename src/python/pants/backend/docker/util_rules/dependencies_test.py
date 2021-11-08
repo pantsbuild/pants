@@ -77,23 +77,3 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
     assert injected == InjectedDependencies(
         [Address("project/hello/main", target_name="main_binary")]
     )
-
-
-def test_inject_dockerfile_dependency(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "test/BUILD": dedent(
-                """\
-                docker_image(dependencies=[":synthetic"])
-                dockerfile(name="synthetic", instructions=["FROM base"])
-                """
-            ),
-        }
-    )
-
-    tgt = rule_runner.get_target(Address("test", target_name="test"))
-    injected = rule_runner.request(
-        InjectedDependencies,
-        [InjectDockerDependencies(tgt[DockerDependenciesField])],
-    )
-    assert injected == InjectedDependencies([Address("test", target_name="synthetic")])

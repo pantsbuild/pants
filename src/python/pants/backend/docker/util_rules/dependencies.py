@@ -32,10 +32,6 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     )
 
     referenced_targets = [tgt.address for tgt in targets if PexBinaryFieldSet.is_applicable(tgt)]
-
-    if dockerfile_address.address != request.dependencies_field.address:
-        referenced_targets.append(dockerfile_address.address)
-
     return InjectedDependencies(Addresses(referenced_targets))
 
 
