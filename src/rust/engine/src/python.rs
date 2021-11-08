@@ -36,10 +36,11 @@ impl<'x> Params {
       for param in &params[1..] {
         if param.type_id() == prev.type_id() {
           return Err(format!(
-            "Values used as `Params` must have distinct types, but the following values had the same type (`{}`):\n  {}\n  {}",
-            externs::type_to_str(*prev.type_id()),
-            externs::key_to_str(prev),
-            externs::key_to_str(param)
+            "Values used as `Params` must have distinct types, but the following \
+            values had the same type (`{}`):\n  {}\n  {}",
+            prev.type_id(),
+            prev,
+            param,
           ));
         }
         prev = param;
@@ -126,6 +127,10 @@ unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
+  pub fn new(py_type: &PyType) -> Self {
+    py_type.into()
+  }
+
   pub fn as_py_type(&self, py: Python) -> PyType {
     // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
     // type is not unloaded. That is true today, but would not be if we implemented support for hot
@@ -133,8 +138,15 @@ impl TypeId {
     unsafe { PyType::from_type_ptr(py, self.0 as _) }
   }
 
-  fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::type_to_str(self))
+  pub fn is_union(&self) -> bool {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let unions = py.import("pants.engine.unions").unwrap();
+    unions
+      .call(py, "is_union", (self.as_py_type(py),), None)
+      .unwrap()
+      .extract(py)
+      .unwrap()
   }
 }
 
@@ -144,27 +156,30 @@ impl From<&PyType> for TypeId {
   }
 }
 
+impl fmt::Debug for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let name = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      self.as_py_type(py).name(py).into_owned()
+    };
+    write!(f, "{}", name)
+  }
+}
+
+impl fmt::Display for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
+  }
+}
+
 impl rule_graph::TypeId for TypeId {
-  ///
   /// Render a string for a collection of TypeIds.
-  ///
   fn display<I>(type_ids: I) -> String
   where
     I: Iterator<Item = TypeId>,
   {
     display_sorted_in_parens(type_ids)
-  }
-}
-
-impl fmt::Debug for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
-  }
-}
-
-impl fmt::Display for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
   }
 }
 
@@ -174,58 +189,36 @@ impl fmt::Display for TypeId {
 pub struct Function(pub Key);
 
 impl Function {
-  /// A Python function's module, e.g. `project.app`.
-  pub fn module(&self) -> String {
-    let val = externs::val_for(&self.0);
-    externs::getattr_as_string(&val, "__module__")
-  }
-
-  /// A Python function's name, without its module.
-  pub fn name(&self) -> String {
-    let val = externs::val_for(&self.0);
-    externs::getattr_as_string(&val, "__name__")
-  }
-
-  /// The line number of a Python function's first line.
-  pub fn line_number(&self) -> u64 {
-    let val = externs::val_for(&self.0);
-    // NB: this is a custom dunder method that Python code should populate before sending the
-    // function (e.g. an `@rule`) through FFI.
-    externs::getattr(&val, "__line_number__").unwrap()
-  }
-
   /// The function represented as `path.to.module:lineno:func_name`.
   pub fn full_name(&self) -> String {
-    format!("{}:{}:{}", self.module(), self.line_number(), self.name())
-  }
-}
-
-impl fmt::Display for Function {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.full_name())
+    let val = self.0.to_value();
+    let module: String = externs::getattr(&val, "__module__").unwrap();
+    let name: String = externs::getattr(&val, "__name__").unwrap();
+    // NB: this is a custom dunder method that Python code should populate before sending the
+    // function (e.g. an `@rule`) through FFI.
+    let line_no: u64 = externs::getattr(&val, "__line_number__").unwrap();
+    format!("{}:{}:{}", module, line_no, name)
   }
 }
 
 impl fmt::Debug for Function {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}()", self.full_name())
   }
 }
 
-///
+impl fmt::Display for Function {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
+  }
+}
+
 /// An interned key for a Value for use as a key in HashMaps and sets.
-///
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
-}
-
-impl fmt::Debug for Key {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::key_to_str(self))
-  }
 }
 
 impl Eq for Key {}
@@ -242,9 +235,15 @@ impl hash::Hash for Key {
   }
 }
 
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self.to_value())
+  }
+}
+
 impl fmt::Display for Key {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::key_to_str(self))
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
@@ -259,6 +258,15 @@ impl Key {
 
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
+  }
+
+  pub fn from_value(val: Value) -> Result<Key, PyErr> {
+    let gil = Python::acquire_gil();
+    externs::INTERNS.key_insert(gil.python(), val)
+  }
+
+  pub fn to_value(&self) -> Value {
+    externs::INTERNS.key_get(self)
   }
 }
 
@@ -285,7 +293,8 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    externs::equals(&self.0, &other.0)
+    let gil = Python::acquire_gil();
+    externs::equals(gil.python(), &self.0, &other.0)
   }
 }
 
@@ -306,14 +315,14 @@ impl AsRef<PyObject> for Value {
 }
 
 impl fmt::Debug for Value {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", externs::val_to_str(self.as_ref()))
   }
 }
 
 impl fmt::Display for Value {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(self.as_ref()))
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
@@ -444,8 +453,9 @@ impl From<String> for Failure {
 }
 
 pub fn throw(msg: &str) -> Failure {
+  let gil = Python::acquire_gil();
   Failure::Throw {
-    val: externs::create_exception(msg),
+    val: externs::create_exception(gil.python(), msg),
     python_traceback: Failure::native_traceback(msg),
     engine_traceback: Vec::new(),
   }

@@ -3,31 +3,29 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import CompileJavaSourceRequest, JavacCheckRequest
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
+from pants.backend.java.goals.check import JavacCheckRequest
+from pants.backend.java.goals.check import rules as javac_check_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
-from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, FileDigest, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, FileDigest, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
-from pants.jvm import jdk_rules
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.jvm import jdk_rules, testutil
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
@@ -39,7 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
-from pants.jvm.testutil import maybe_skip_jdk_test
+from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
@@ -51,8 +49,6 @@ DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            render_classpath,
-            QueryRule(RenderedClasspath, (Digest,)),
             *archive.rules(),
             *config_files.rules(),
             *coursier_fetch_rules(),
@@ -60,6 +56,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *javac_rules(),
+            *javac_check_rules(),
             *util_rules(),
             *target_types_rules(),
             *coursier_rules(),
@@ -68,9 +65,10 @@ def rule_runner() -> RuleRunner:
             *java_parser.rules(),
             *java_parser_launcher.rules(),
             *source_files.rules(),
+            *testutil.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
-            QueryRule(FallibleCompiledClassfiles, (CompileJavaSourceRequest,)),
-            QueryRule(CompiledClassfiles, (CompileJavaSourceRequest,)),
+            QueryRule(FallibleClasspathEntry, (CompileJavaSourceRequest,)),
+            QueryRule(ClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -111,43 +109,6 @@ JAVA_LIB_MAIN_SOURCE = dedent(
     }
     """
 )
-
-
-@dataclass(frozen=True)
-class RenderedClasspath:
-    """The contents of a classpath, organized as a key per entry with its contained classfiles."""
-
-    content: dict[str, set[str]]
-
-
-@rule
-async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> RenderedClasspath:
-    dest_dir = "dest"
-    process_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    unzip_binary.path,
-                    "-d",
-                    dest_dir,
-                    filename,
-                ],
-                input_digest=snapshot.digest,
-                output_directories=(dest_dir,),
-                description=f"Extract {filename}",
-            ),
-        )
-        for filename in snapshot.files
-    )
-
-    listing_snapshots = await MultiGet(
-        Get(Snapshot, RemovePrefix(pr.output_digest, dest_dir)) for pr in process_results
-    )
-
-    return RenderedClasspath(
-        {path: set(listing.files) for path, listing in zip(snapshot.files, listing_snapshots)}
-    )
 
 
 def expect_single_expanded_coarsened_target(
@@ -193,7 +154,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     )
 
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [CompileJavaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
@@ -243,7 +204,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
@@ -255,7 +216,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     )
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
-        rule_runner.request(CompiledClassfiles, [request])
+        rule_runner.request(ClasspathEntry, [request])
 
 
 @maybe_skip_jdk_test
@@ -309,7 +270,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     request0 = CompileJavaSourceRequest(
         component=coarsened_targets_sorted[0], resolve=make_resolve(rule_runner)
     )
-    compiled_classfiles0 = rule_runner.request(CompiledClassfiles, [request0])
+    compiled_classfiles0 = rule_runner.request(ClasspathEntry, [request0])
     classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
     assert classpath0.content == {
         ".ExampleLib.java.lib.jar": {
@@ -320,7 +281,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     request1 = CompileJavaSourceRequest(
         component=coarsened_targets_sorted[1], resolve=make_resolve(rule_runner)
     )
-    compiled_classfiles1 = rule_runner.request(CompiledClassfiles, [request1])
+    compiled_classfiles1 = rule_runner.request(ClasspathEntry, [request1])
     classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
     assert classpath1.content == {
         ".OtherLib.java.lib.jar": {
@@ -404,7 +365,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
         component=coarsened_target, resolve=make_resolve(rule_runner)
     )
 
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         "a.A.java.jar": {
@@ -486,7 +447,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
     )
 
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -563,7 +524,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
     )
 
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [CompileJavaSourceRequest(component=ctgt, resolve=make_resolve(rule_runner))],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
@@ -603,7 +564,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
         }
     )
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -644,7 +605,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
         }
     )
     compiled_classfiles = rule_runner.request(
-        CompiledClassfiles,
+        ClasspathEntry,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -682,7 +643,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "package org.pantsbuild.example.lib does not exist" in fallible_result.stderr
 
@@ -746,7 +707,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    compiled_classfiles = rule_runner.request(CompiledClassfiles, [request])
+    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
 
@@ -789,6 +750,6 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    fallible_result = rule_runner.request(FallibleCompiledClassfiles, [request])
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "package org.joda.time does not exist" in fallible_result.stderr

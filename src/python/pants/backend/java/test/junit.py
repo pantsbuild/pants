@@ -4,7 +4,6 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.java.classpath import Classpath
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
@@ -13,6 +12,7 @@ from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Remov
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,

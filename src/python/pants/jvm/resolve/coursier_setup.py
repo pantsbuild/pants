@@ -8,6 +8,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable
 
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -154,4 +155,7 @@ async def setup_coursier(coursier_binary: CoursierBinary) -> Coursier:
 
 
 def rules():
-    return [*collect_rules()]
+    return [
+        *collect_rules(),
+        *external_tool.rules(),
+    ]

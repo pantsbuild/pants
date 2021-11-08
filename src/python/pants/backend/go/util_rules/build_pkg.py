@@ -243,6 +243,10 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
 
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
+    if not request.s_file_names:
+        # If there are no non-Go sources, then pass -complete flag which tells the compiler that the provided
+        # Go files are the entire package.
+        compile_args.append("-complete")
     relativized_sources = (
         f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
         for name in request.go_file_names

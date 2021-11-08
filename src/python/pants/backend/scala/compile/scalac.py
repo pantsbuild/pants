@@ -9,23 +9,12 @@ from itertools import chain
 
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    RemovePrefix,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField, Targets
-from pants.engine.unions import UnionRule
-from pants.jvm.compile import CompiledClassfiles, CompileResult, FallibleCompiledClassfiles
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
@@ -52,10 +41,6 @@ class ScalacFieldSet(FieldSet):
     sources: ScalaSourceField
 
 
-class ScalacCheckRequest(CheckRequest):
-    field_set_type = ScalacFieldSet
-
-
 @dataclass(frozen=True)
 class CompileScalaSourceRequest:
     component: CoarsenedTarget
@@ -69,7 +54,7 @@ async def compile_scala_source(
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
     request: CompileScalaSourceRequest,
-) -> FallibleCompiledClassfiles:
+) -> FallibleClasspathEntry:
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
     )
@@ -95,10 +80,10 @@ async def compile_scala_source(
     ]
 
     if not component_members_and_scala_source_files:
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=CompiledClassfiles(digest=EMPTY_DIGEST),
+            output=ClasspathEntry(digest=EMPTY_DIGEST),
             exit_code=0,
         )
 
@@ -118,7 +103,7 @@ async def compile_scala_source(
 
     transitive_dependency_classfiles_fallible = await MultiGet(
         Get(
-            FallibleCompiledClassfiles,
+            FallibleClasspathEntry,
             CompileScalaSourceRequest(component=component, resolve=request.resolve),
         )
         for component in CoarsenedTargets(request.component.dependencies).closure()
@@ -127,19 +112,17 @@ async def compile_scala_source(
         fcc.output for fcc in transitive_dependency_classfiles_fallible if fcc.output
     ]
     if len(transitive_dependency_classfiles) != len(transitive_dependency_classfiles_fallible):
-        return FallibleCompiledClassfiles(
+        return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
             output=None,
             exit_code=1,
         )
 
-    dest_dir = "classfiles"
     (
         tool_classpath,
-        third_party_classpath,
+        materialized_classpath,
         merged_transitive_dependency_classfiles_digest,
-        dest_dir_digest,
     ) = await MultiGet(
         Get(
             MaterializedClasspath,
@@ -174,25 +157,20 @@ async def compile_scala_source(
             Digest,
             MergeDigests(classfiles.digest for classfiles in transitive_dependency_classfiles),
         ),
-        Get(
-            Digest,
-            CreateDigest([Directory(dest_dir)]),
-        ),
     )
 
     usercp_relpath = "__usercp"
-    prefixed_transitive_dependency_classfiles_digest = await Get(
-        Digest, AddPrefix(merged_transitive_dependency_classfiles_digest, usercp_relpath)
+    prefixed_transitive_dependency_classpath = await Get(
+        Snapshot, AddPrefix(merged_transitive_dependency_classfiles_digest, usercp_relpath)
     )
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_transitive_dependency_classfiles_digest,
+                prefixed_transitive_dependency_classpath.digest,
                 tool_classpath.digest,
-                third_party_classpath.digest,
-                dest_dir_digest,
+                materialized_classpath.digest,
                 jdk_setup.digest,
                 *(
                     sources.snapshot.digest
@@ -202,6 +180,14 @@ async def compile_scala_source(
         ),
     )
 
+    classpath_arg = ":".join(
+        [
+            *prefixed_transitive_dependency_classpath.files,
+            *materialized_classpath.classpath_entries(),
+        ]
+    )
+
+    output_file = f"{request.component.representative.address.path_safe_spec}.jar"
     process_result = await Get(
         FallibleProcessResult,
         Process(
@@ -210,10 +196,9 @@ async def compile_scala_source(
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
-                "-classpath",
-                ":".join([*third_party_classpath.classpath_entries(), usercp_relpath]),
+                *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
-                dest_dir,
+                output_file,
                 *sorted(
                     chain.from_iterable(
                         sources.snapshot.files
@@ -223,51 +208,26 @@ async def compile_scala_source(
             ],
             input_digest=merged_digest,
             use_nailgun=jdk_setup.digest,
-            output_directories=(dest_dir,),
-            description=f"Compile {request.component.members} with scalac",
+            output_files=(output_file,),
+            description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
         ),
     )
-    output: CompiledClassfiles | None = None
+    output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
-        stripped_classfiles_digest = await Get(
-            Digest, RemovePrefix(process_result.output_digest, dest_dir)
-        )
-        output = CompiledClassfiles(stripped_classfiles_digest)
+        output = ClasspathEntry(process_result.output_digest)
 
-    return FallibleCompiledClassfiles.from_fallible_process_result(
+    return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         process_result,
         output,
     )
 
 
-@rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
-async def scalac_check(request: ScalacCheckRequest) -> CheckResults:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
-    )
-
-    resolves = await MultiGet(
-        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
-    )
-
-    # TODO: This should be fallible so that we exit cleanly.
-    results = await MultiGet(
-        Get(FallibleCompiledClassfiles, CompileScalaSourceRequest(component=t, resolve=r))
-        for t, r in zip(coarsened_targets, resolves)
-    )
-
-    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
-    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name="scalac")
-
-
 def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
-        UnionRule(CheckRequest, ScalacCheckRequest),
     ]
