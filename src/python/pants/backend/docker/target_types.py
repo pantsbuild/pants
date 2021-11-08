@@ -34,7 +34,7 @@ class DockerImageSourceField(SingleSourceField):
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
-        "Will default to `Dockerfile` if there is not a dependency to a `dockerfile` target."
+        "Leave this undefined when using a dependency to a `dockerfile` target."
     )
 
 
