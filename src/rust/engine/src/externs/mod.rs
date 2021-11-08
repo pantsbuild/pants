@@ -247,18 +247,14 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
   }
 }
 
-///
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
-///
-pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
   let py_type = type_id.as_py_type(py);
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let args_tuple = PyTuple::new(py, &arg_handles);
   py_type
-    .call(gil.python(), args_tuple, None)
+    .call(py, args_tuple, None)
     .map(Value::from)
     .unwrap_or_else(|e| {
       panic!(

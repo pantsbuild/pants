@@ -606,7 +606,10 @@ impl From<Scandir> for NodeKey {
 
 fn unmatched_globs_additional_context() -> Option<String> {
   let gil = Python::acquire_gil();
-  let url = externs::doc_url(gil.python(), "troubleshooting#pants-cannot-find-a-file-in-your-project");
+  let url = externs::doc_url(
+    gil.python(),
+    "troubleshooting#pants-cannot-find-a-file-in-your-project",
+  );
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
@@ -651,6 +654,7 @@ impl Paths {
       }
     }
     Ok(externs::unsafe_call(
+      py,
       core.types.paths,
       &[
         externs::store_tuple(py, files),
@@ -778,6 +782,7 @@ impl Snapshot {
     item: &hashing::Digest,
   ) -> Value {
     externs::unsafe_call(
+      py,
       types.file_digest,
       &[
         externs::store_utf8(py, &item.hash.to_hex()),
@@ -806,6 +811,7 @@ impl Snapshot {
     item: &FileContent,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.file_content,
       &[
         Self::store_path(py, &item.path)?,
@@ -821,6 +827,7 @@ impl Snapshot {
     item: &FileEntry,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.file_entry,
       &[
         Self::store_path(py, &item.path)?,
@@ -836,6 +843,7 @@ impl Snapshot {
     path: &Path,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
+      py,
       types.directory,
       &[Self::store_path(py, path)?],
     ))
@@ -851,6 +859,7 @@ impl Snapshot {
       .map(|e| Self::store_file_content(py, &context.core.types, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
+      py,
       context.core.types.digest_contents,
       &[externs::store_tuple(py, entries)],
     ))
@@ -873,6 +882,7 @@ impl Snapshot {
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
+      py,
       context.core.types.digest_entries,
       &[externs::store_tuple(py, entries)],
     ))
@@ -1620,7 +1630,10 @@ impl NodeError for Failure {
       path[path_len - 1] += " <-"
     }
     let gil = Python::acquire_gil();
-    let url = externs::doc_url(gil.python(), "targets#dependencies-and-dependency-inference");
+    let url = externs::doc_url(
+      gil.python(),
+      "targets#dependencies-and-dependency-inference",
+    );
     throw(&format!(
       "The dependency graph contained a cycle:\
       \n\n  \
@@ -1632,7 +1645,7 @@ impl NodeError for Failure {
       \n\n\
       See {} for more information.",
       path.join("\n  "),
-     url
+      url
     ))
   }
 }

@@ -200,6 +200,7 @@ fn multi_platform_process_request_to_process_result(
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
+      py,
       context.core.types.process_result,
       &[
         externs::store_bytes(py, &stdout_bytes),
@@ -209,6 +210,7 @@ fn multi_platform_process_request_to_process_result(
         externs::store_i64(py, result.exit_code.into()),
         Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
+          py,
           context.core.types.platform,
           &[externs::store_utf8(py, &platform_name)],
         ),
@@ -601,6 +603,7 @@ fn interactive_process(
       let gil = Python::acquire_gil();
       let py = gil.python();
       externs::unsafe_call(
+        py,
         interactive_process_result,
         &[externs::store_i64(py, i64::from(code))],
       )
