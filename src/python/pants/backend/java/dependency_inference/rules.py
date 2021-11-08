@@ -104,7 +104,7 @@ def dependency_name(name: str, static: bool):
     if not static:
         return name
     else:
-        return ".".join(name.split(".")[:-1])
+        return name.rsplit(".", maxsplit=1)[0]
 
 
 def rules():
