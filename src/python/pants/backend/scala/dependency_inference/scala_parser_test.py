@@ -60,7 +60,16 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             package org.pantsbuild
             package example
 
-            class Foo {
+            class OuterClass {
+                trait NestedTrait {
+                }
+                class NestedClass {
+                }
+            }
+
+            trait OuterTrait {
+                trait NestedTrait {
+                }
                 class NestedClass {
                 }
             }
@@ -89,7 +98,11 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
     assert analysis.provided_types == FrozenOrderedSet(
         [
-            "org.pantsbuild.example.Foo",
-            "org.pantsbuild.example.Foo.NestedClass",
+            "org.pantsbuild.example.OuterClass",
+            "org.pantsbuild.example.OuterClass.NestedTrait",
+            "org.pantsbuild.example.OuterClass.NestedClass",
+            "org.pantsbuild.example.OuterTrait",
+            "org.pantsbuild.example.OuterTrait.NestedTrait",
+            "org.pantsbuild.example.OuterTrait.NestedClass",
         ]
     )

@@ -32,23 +32,28 @@ class ProvidedTypesTraverser extends Traverser {
     providedTypes.append(s"${fullPackageName}.${name}")
   }
 
-  def withNamePart[T](namePart: String, f: => T): T = {
+  def withNamePart[T](namePart: String, f: () => T): T = {
     nameParts.append(namePart)
-    val result = f
+    val result = f()
     nameParts.remove(nameParts.length - 1)
     result
   }
 
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
-      val packageName = extractName(ref)
-      withNamePart(extractName(ref), super.apply(stats))
+      withNamePart(extractName(ref), () => super.apply(stats))
     }
 
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
       recordProvidedType(name)
-      withNamePart(name, super.apply(templ))
+      withNamePart(name, () => super.apply(templ))
+    }
+
+    case Defn.Trait(_mods, nameNode, _tparams, _ctor, templ) => {
+      val name = extractName(nameNode)
+      recordProvidedType(name)
+      withNamePart(name, () => super.apply(templ))
     }
 
     case node => super.apply(node)
