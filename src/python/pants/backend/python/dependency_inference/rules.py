@@ -191,9 +191,9 @@ async def infer_python_dependencies_via_imports(
 
     merged_result: set[Address] = set()
     unowned_imports: set[ParsedPythonImports] = set()
+    address = wrapped_tgt.target.address
     for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
-        address = wrapped_tgt.target.address
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
@@ -212,7 +212,7 @@ async def infer_python_dependencies_via_imports(
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
         log = logger.error if raise_error else logger.warn
         log(
-            f"The following imports have no unambiguous owner:\n\n{bullet_list(unowned_imports)}\n\n"
+            f"The following imports in {address} have no unambiguous owner:\n\n{bullet_list(unowned_imports)}\n\n"
             "If you are using [python-setup].requirement_constraints, consider adding the relevant package.\n"
             "Otherwise consider specifying a python_requirement target as a dependency.\n"
             "See https://www.pantsbuild.org/v2.8/docs/python-third-party-dependencies"
