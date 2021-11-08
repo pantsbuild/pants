@@ -5,7 +5,7 @@
 import pkgutil
 from dataclasses import dataclass
 
-import pystache
+import chevron
 
 """Generates the custom HTML/CSS block in https://www.pantsbuild.org/docs/who-uses-pants .
 
@@ -104,7 +104,7 @@ def main():
         orgs.append(Org("", "", ""))
     org_pairs = tuple(OrgPair(orgs[i], orgs[i + 1]) for i in range(0, len(orgs), 2))
     buf = pkgutil.get_data("generate_user_list", "user_list_templates/table.html.mustache")
-    print(pystache.render(buf.decode(), context={"org_pairs": org_pairs}))
+    print(chevron.render(buf.decode(), context={"org_pairs": org_pairs}))
 
 
 if __name__ == "__main__":
