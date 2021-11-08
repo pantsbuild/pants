@@ -19,7 +19,6 @@
 #     "packaging==21.0",
 #     "pex==2.1.54",
 #     "psutil==5.8.0",
-#     "pystache==0.5.4",
 #     "pytest<6.3,>=6.2.4",
 #     "requests[security]>=2.25.1",
 #     "setproctitle==1.2.2",
@@ -180,8 +179,6 @@ py==1.11.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_
 pyparsing==3.0.5; python_version >= "3.6" \
     --hash=sha256:4881e3d2979f27b41a3a2421b10be9cbfa7ce2baa6c7117952222f8bbea6650c \
     --hash=sha256:9329d1c1b51f0f76371c4ded42c5ec4cc0be18456b22193e0570c2da98ed288b
-pystache==0.5.4 \
-    --hash=sha256:f7bbc265fb957b4d6c7c042b336563179444ab313fb93a719759111eabd3b85a
 pytest==6.2.5; python_version >= "3.6" \
     --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134 \
     --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89
