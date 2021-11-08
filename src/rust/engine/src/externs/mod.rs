@@ -54,23 +54,20 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
     .is_true()
 }
 
-pub fn store_tuple(values: Vec<Value>) -> Value {
-  let gil = Python::acquire_gil();
+pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
   let arg_handles: Vec<_> = values
     .into_iter()
-    .map(|v| v.consume_into_py_object(gil.python()))
+    .map(|v| v.consume_into_py_object(py))
     .collect();
-  Value::from(PyTuple::new(gil.python(), &arg_handles).into_object())
+  Value::from(PyTuple::new(py, &arg_handles).into_object())
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
-pub fn store_dict(keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn store_dict(py: Python, keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> {
   let dict = PyDict::new(py);
   for (k, v) in keys_and_values {
     dict.set_item(
-      gil.python(),
+      py,
       k.consume_into_py_object(py),
       v.consume_into_py_object(py),
     )?;
@@ -78,35 +75,26 @@ pub fn store_dict(keys_and_values: Vec<(Value, Value)>) -> Result<Value, PyErr> 
   Ok(Value::from(dict.into_object()))
 }
 
-///
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
-///
-pub fn store_bytes(bytes: &[u8]) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(PyBytes::new(gil.python(), bytes).into_object())
+pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
+  Value::from(PyBytes::new(py, bytes).into_object())
 }
 
-///
-/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
-///
-pub fn store_utf8(utf8: &str) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(utf8.to_py_object(gil.python()).into_object())
+/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
+pub fn store_utf8(py: Python, utf8: &str) -> Value {
+  Value::from(utf8.to_py_object(py).into_object())
 }
 
-pub fn store_u64(val: u64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_u64(py: Python, val: u64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
-pub fn store_i64(val: i64) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_i64(py: Python, val: i64) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
-pub fn store_bool(val: bool) -> Value {
-  let gil = Python::acquire_gil();
-  Value::from(val.to_py_object(gil.python()).into_object())
+pub fn store_bool(py: Python, val: bool) -> Value {
+  Value::from(val.to_py_object(py).into_object())
 }
 
 ///
@@ -229,20 +217,8 @@ pub fn create_exception(msg: &str) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
-pub fn check_for_python_none(value: PyObject) -> Option<PyObject> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  if value == py.None() {
-    return None;
-  }
-  Some(value)
-}
-
-pub fn call_method(value: &PyObject, method: &str, args: &[Value]) -> Result<PyObject, PyErr> {
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let gil = Python::acquire_gil();
-  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
-  value.call_method(gil.python(), method, args_tuple, None)
+pub fn call_method0(py: Python, value: &PyObject, method: &str) -> Result<PyObject, PyErr> {
+  value.call_method(py, method, PyTuple::new(py, &[]), None)
 }
 
 pub fn call_function<T: AsRef<PyObject>>(func: T, args: &[Value]) -> Result<PyObject, PyErr> {
