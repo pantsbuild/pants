@@ -65,7 +65,7 @@ async def infer_java_dependencies_via_imports(
 
     types: OrderedSet[str] = OrderedSet()
     if java_infer_subsystem.imports:
-        types.update(imp.name for imp in analysis.imports)
+        types.update(dependency_name(imp.name, imp.is_static) for imp in analysis.imports)
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
         types.update(
@@ -98,6 +98,13 @@ async def infer_java_dependencies_via_imports(
             dependencies.add(maybe_disambiguated)
 
     return InferredDependencies(dependencies)
+
+
+def dependency_name(name: str, static: bool):
+    if not static:
+        return name
+    else:
+        return name.rsplit(".", maxsplit=1)[0]
 
 
 def rules():
