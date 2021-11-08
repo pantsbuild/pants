@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
@@ -139,14 +141,14 @@ class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
-    description_of_origin: str
+    description_of_origin: str | None
 
     def __init__(
         self,
         globs: Iterable[str],
         glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
         conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
-        description_of_origin: Optional[str] = None,
+        description_of_origin: str | None = None,
     ) -> None:
         """A request to find files given a set of globs.
 
@@ -167,7 +169,7 @@ class PathGlobs:
         self.globs = tuple(sorted(globs))
         self.glob_match_error_behavior = glob_match_error_behavior
         self.conjunction = conjunction
-        self.description_of_origin = description_of_origin or ""
+        self.description_of_origin = description_of_origin
         self.__post_init__()
 
     def __post_init__(self) -> None:

@@ -272,7 +272,7 @@ fn remove_prefix_request_to_digest(
   async move {
     let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
       .map_err(|e| throw(&e))?;
-    let prefix = externs::getattr_as_string(&args[0], "prefix");
+    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
@@ -294,7 +294,7 @@ fn add_prefix_request_to_digest(
   async move {
     let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
       .map_err(|e| throw(&e))?;
-    let prefix = externs::getattr_as_string(&args[0], "prefix");
+    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
@@ -394,7 +394,7 @@ fn create_digest_to_digest(
   let digests: Vec<_> = file_items
     .into_iter()
     .map(|file_item| {
-      let path = externs::getattr_as_string(&file_item, "path");
+      let path: String = externs::getattr(&file_item, "path").unwrap();
       let store = context.core.store();
       async move {
         let path = RelativePath::new(PathBuf::from(path))

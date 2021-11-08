@@ -1684,7 +1684,7 @@ fn capture_snapshots(
       let path_globs_and_roots = values
         .iter()
         .map(|value| {
-          let root = PathBuf::from(externs::getattr_as_string(value, "root"));
+          let root = PathBuf::from(externs::getattr::<String>(value, "root").unwrap());
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
             &externs::getattr(value, "path_globs").unwrap(),
           );

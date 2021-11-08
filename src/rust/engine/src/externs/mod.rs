@@ -152,12 +152,14 @@ pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String
     .collect()
 }
 
-pub fn getattr_as_string(value: &PyObject, field: &str) -> String {
+pub fn getattr_as_optional_string(py: Python, value: &PyObject, field: &str) -> Option<String> {
+  let v = value.getattr(py, field).unwrap();
+  if v.is_none(py) {
+    return None;
+  }
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  // TODO: We can't directly extract as a string here, because val_to_str defaults to empty string
-  // for None.
-  val_to_str(&getattr(value, field).unwrap())
+  Some(v.extract(py).unwrap())
 }
 
 pub fn val_to_str(obj: &PyObject) -> String {
