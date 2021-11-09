@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
 import logging
 import os
 import pkgutil
@@ -12,13 +13,20 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
     Directory,
     FileContent,
     MergeDigests,
     RemovePrefix,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import (
+    BashBinary,
+    FallibleProcessResult,
+    Process,
+    ProcessExecutionFailure,
+    ProcessResult,
+)
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import JdkSetup
@@ -28,7 +36,9 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +93,12 @@ SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
 
 @dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    package: str
+    provided_names: FrozenOrderedSet[str]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            package=d["package"],
+            provided_names=FrozenOrderedSet(d["providedNames"]),
         )
 
 
@@ -164,7 +174,7 @@ async def analyze_scala_source_dependencies(
             argv=[
                 *jdk_setup.args(bash, [*tool_classpath.classpath_entries(), processorcp_relpath]),
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
-                # analysis_output_path,
+                analysis_output_path,
                 source_path,
             ],
             input_digest=merged_digest,
@@ -178,6 +188,28 @@ async def analyze_scala_source_dependencies(
     )
 
     return FallibleScalaSourceDependencyAnalysisResult(process_result=process_result)
+
+
+@rule(level=LogLevel.DEBUG)
+async def resolve_fallible_result_to_analysis(
+    fallible_result: FallibleScalaSourceDependencyAnalysisResult,
+    global_options: GlobalOptions,
+) -> ScalaSourceDependencyAnalysis:
+    # TODO(#12725): Just convert directly to a ProcessResult like this:
+    # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
+    if fallible_result.process_result.exit_code == 0:
+        analysis_contents = await Get(
+            DigestContents, Digest, fallible_result.process_result.output_digest
+        )
+        analysis = json.loads(analysis_contents[0].content)
+        return ScalaSourceDependencyAnalysis.from_json_dict(analysis)
+    raise ProcessExecutionFailure(
+        fallible_result.process_result.exit_code,
+        fallible_result.process_result.stdout,
+        fallible_result.process_result.stderr,
+        "Scala source dependency analysis failed.",
+        local_cleanup=global_options.options.process_execution_local_cleanup,
+    )
 
 
 @rule
