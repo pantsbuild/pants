@@ -9,9 +9,9 @@ from pants.option.custom_types import file_option
 
 
 class LifecycleStubsSubsystem(GoalSubsystem):
-    """Configure workflows for lifecycle tests (Pants stopping and starting)."""
 
     name = "lifecycle-stub-goal"
+    help = """Configure workflows for lifecycle tests (Pants stopping and starting)."""
 
     @classmethod
     def register_options(cls, register):
@@ -39,6 +39,5 @@ async def run_lifecycle_stubs(opts: LifecycleStubsSubsystem) -> LifecycleStubsGo
 def rules():
     return collect_rules()
 
-
-if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):
-    raise KeyboardInterrupt("ctrl-c during import!")
+if os.environ.get("_RAISE_EXCEPTION_ON_IMPORT", False):
+    raise Exception("exception during import!")

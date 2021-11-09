@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import ast
 import itertools
-import os
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
@@ -683,14 +682,9 @@ class Params:
         self.params = tuple(args)
 
 
-_RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
-
-
 def native_engine_generator_send(
     func, arg
 ) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
-    if _RAISE_KEYBOARD_INTERRUPT:
-        raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
     try:
         res = func.send(arg)
         if isinstance(res, Get):
