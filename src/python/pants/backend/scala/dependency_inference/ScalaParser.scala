@@ -8,14 +8,20 @@ import scala.meta._
 import scala.meta.transversers.Traverser
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashMap
+
+case class AnImport(name: String, isWildcard: Boolean)
 
 case class Analysis(
-  providedNames: Vector[String]
+  providedNames: Vector[String],
+  importsByScope: HashMap[String, ArrayBuffer[AnImport]],
 )
 
-class ProvidedTypesTraverser extends Traverser {
+class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
+
   val providedNames = ArrayBuffer[String]()
+  val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -24,6 +30,7 @@ class ProvidedTypesTraverser extends Traverser {
       case Term.Name(name) => name
       case Type.Name(name) => name
       case Pat.Var(node) => extractName(node)
+      case Name.Indeterminate(name) => name
       case _ => ""
     }
   }
@@ -38,6 +45,14 @@ class ProvidedTypesTraverser extends Traverser {
     val result = f()
     nameParts.remove(nameParts.length - 1)
     result
+  }
+
+  def recordImport(name: String, isWildcard: Boolean): Unit = {
+    val fullPackageName = nameParts.mkString(".")
+    if (!importsByScope.contains(fullPackageName)) {
+      importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
+    }
+    importsByScope(fullPackageName).append(AnImport(name, isWildcard))
   }
 
   override def apply(tree: Tree): Unit = tree match {
@@ -82,6 +97,20 @@ class ProvidedTypesTraverser extends Traverser {
       })
     }
 
+    case Import(importers) => {
+      importers.foreach({ case Importer(ref, importees) =>
+        val baseName = extractName(ref)
+        importees.foreach(importee => {
+          importee match {
+            case Importee.Wildcard() => recordImport(baseName, true)
+            case Importee.Name(nameNode) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
+            case Importee.Rename(nameNode, _) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
+            case _ =>
+          }
+        })
+      })
+    }
+
     case node => super.apply(node)
   }
 }
@@ -95,10 +124,13 @@ object ScalaParser {
 
     val tree = input.parse[Source].get
 
-    val providedNamesTraverser = new ProvidedTypesTraverser()
-    providedNamesTraverser.apply(tree)
+    val analysisTraverser = new SourceAnalysisTraverser()
+    analysisTraverser.apply(tree)
 
-    Analysis(providedNames = providedNamesTraverser.providedNames.toVector)
+    Analysis(
+      providedNames = analysisTraverser.providedNames.toVector,
+      importsByScope = analysisTraverser.importsByScope,
+    )
   }
 
   def main(args: Array[String]): Unit = {
