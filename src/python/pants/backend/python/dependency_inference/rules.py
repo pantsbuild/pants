@@ -210,7 +210,7 @@ async def infer_python_dependencies_via_imports(
     unowned_dependency_behavior = python_infer_subsystem.options.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
-        log = logger.error if raise_error else logger.warn
+        log = logger.error if raise_error else logger.warning
         log(
             f"The following imports in {address} have no unambiguous owner:\n\n{bullet_list(unowned_imports)}\n\n"
             "If you are using [python-setup].requirement_constraints, consider adding the relevant package.\n"
