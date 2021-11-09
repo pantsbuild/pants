@@ -597,12 +597,11 @@ impl From<Scandir> for NodeKey {
 }
 
 fn unmatched_globs_additional_context() -> Option<String> {
-  let url = Python::with_gil(|py| {
-    externs::doc_url(
-      py,
-      "troubleshooting#pants-cannot-find-a-file-in-your-project",
-    )
-  });
+  let gil = Python::acquire_gil();
+  let url = externs::doc_url(
+    gil.python(),
+    "troubleshooting#pants-cannot-find-a-file-in-your-project",
+  );
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
@@ -1100,7 +1099,10 @@ impl Task {
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<Value> {
-    let mut input = Python::with_gil(|py| Value::from(py.None()));
+    let mut input = {
+      let gil = Python::acquire_gil();
+      Value::from(gil.python().None())
+    };
     loop {
       let context = context.clone();
       let params = params.clone();
@@ -1112,7 +1114,8 @@ impl Task {
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
-          input = Python::with_gil(|py| externs::store_tuple(py, values));
+          let gil = Python::acquire_gil();
+          input = externs::store_tuple(gil.python(), values);
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(val);
@@ -1371,7 +1374,9 @@ impl Node for NodeKey {
     let workunit_name = self.workunit_name();
     let user_facing_name = self.user_facing_name();
     let engine_aware_params: Vec<_> = match &self {
-      NodeKey::Task(ref task) => Python::with_gil(|py| {
+      NodeKey::Task(ref task) => {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
         let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
         task
           .params
@@ -1388,15 +1393,17 @@ impl Node for NodeKey {
             }
           })
           .collect()
-      }),
+      }
       _ => vec![],
     };
-    let user_metadata = Python::with_gil(|py| {
+    let user_metadata = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
       engine_aware_params
         .iter()
         .flat_map(|val| EngineAwareParameter::metadata(py, &context, val))
         .collect()
-    });
+    };
 
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
@@ -1493,12 +1500,14 @@ impl Node for NodeKey {
         // If the node failed, expand the Failure with a new frame.
         result = result.map_err(|failure| {
           let name = workunit_name;
-          let displayable_param_names: Vec<_> = Python::with_gil(|py| {
+          let displayable_param_names: Vec<_> = {
+            let gil = Python::acquire_gil();
+            let py = gil.python();
             engine_aware_params
               .iter()
               .filter_map(|val| EngineAwareParameter::debug_hint(py, val))
               .collect()
-          });
+          };
           let failure_name = if displayable_param_names.is_empty() {
             name
           } else if displayable_param_names.len() == 1 {
@@ -1554,7 +1563,8 @@ impl Node for NodeKey {
         ProcessCacheScope::PerSession => false,
       },
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
-        Python::with_gil(|py| EngineAwareReturnType::is_cacheable(py, v).unwrap_or(true))
+        let gil = Python::acquire_gil();
+        EngineAwareReturnType::is_cacheable(gil.python(), v).unwrap_or(true)
       }
       _ => true,
     }
@@ -1573,13 +1583,15 @@ impl Display for NodeKey {
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {
-        let params = Python::with_gil(|py| {
+        let params = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
           task
             .params
             .keys()
             .filter_map(|k| EngineAwareParameter::debug_hint(py, &k.to_value()))
             .collect::<Vec<_>>()
-        });
+        };
         write!(
           f,
           "@rule({}({}))",
@@ -1605,8 +1617,11 @@ impl NodeError for Failure {
       path[0] += " <-";
       path[path_len - 1] += " <-"
     }
-    let url =
-      Python::with_gil(|py| externs::doc_url(py, "targets#dependencies-and-dependency-inference"));
+    let gil = Python::acquire_gil();
+    let url = externs::doc_url(
+      gil.python(),
+      "targets#dependencies-and-dependency-inference",
+    );
     throw(&format!(
       "The dependency graph contained a cycle:\
       \n\n  \

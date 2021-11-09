@@ -198,26 +198,25 @@ fn multi_platform_process_request_to_process_result(
     })?;
 
     let platform_name: String = result.platform.into();
-    let res = Python::with_gil(|py| {
-      externs::unsafe_call(
-        py,
-        context.core.types.process_result,
-        &[
-          externs::store_bytes(py, &stdout_bytes),
-          Snapshot::store_file_digest(py, &context.core.types, &result.stdout_digest),
-          externs::store_bytes(py, &stderr_bytes),
-          Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
-          externs::store_i64(py, result.exit_code.into()),
-          Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
-          externs::unsafe_call(
-            py,
-            context.core.types.platform,
-            &[externs::store_utf8(py, &platform_name)],
-          ),
-        ],
-      )
-    });
-    Ok(res)
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.process_result,
+      &[
+        externs::store_bytes(py, &stdout_bytes),
+        Snapshot::store_file_digest(py, &context.core.types, &result.stdout_digest),
+        externs::store_bytes(py, &stderr_bytes),
+        Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
+        externs::store_i64(py, result.exit_code.into()),
+        Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
+        externs::unsafe_call(
+          py,
+          context.core.types.platform,
+          &[externs::store_utf8(py, &platform_name)],
+        ),
+      ],
+    ))
   }
   .boxed()
 }
@@ -234,7 +233,8 @@ fn directory_digest_to_digest_contents(
       .contents_for_directory(digest)
       .await
       .and_then(move |digest_contents| {
-        Python::with_gil(|py| Snapshot::store_digest_contents(py, &context, &digest_contents))
+        let gil = Python::acquire_gil();
+        Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
       })
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
@@ -254,7 +254,8 @@ fn directory_digest_to_digest_entries(
       .entries_for_directory(digest)
       .await
       .and_then(move |digest_entries| {
-        Python::with_gil(|py| Snapshot::store_digest_entries(py, &context, &digest_entries))
+        let gil = Python::acquire_gil();
+        Snapshot::store_digest_entries(gil.python(), &context, &digest_entries)
       })
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
@@ -279,7 +280,8 @@ fn remove_prefix_request_to_digest(
       .strip_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -300,7 +302,8 @@ fn add_prefix_request_to_digest(
       .add_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -310,7 +313,8 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
   async move {
     let digest = lift_directory_digest(&args[0])?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
-    Python::with_gil(|py| Snapshot::store_snapshot(py, snapshot))
+    let gil = Python::acquire_gil();
+    Snapshot::store_snapshot(gil.python(), snapshot)
   }
   .map_err(|e: String| throw(&e))
   .boxed()
@@ -333,7 +337,8 @@ fn merge_digests_request_to_digest(
       .merge(digests.map_err(|e| throw(&e))?)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -345,7 +350,8 @@ fn download_file_to_digest(
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
     let digest = context.get(DownloadedFile(key)).await?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -359,7 +365,8 @@ fn path_globs_to_digest(
     let path_globs = Snapshot::lift_path_globs(&val)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -374,7 +381,8 @@ fn path_globs_to_paths(
     let path_globs = Snapshot::lift_path_globs(&val)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
-    Python::with_gil(|py| Paths::store_paths(py, &core, &paths).map_err(|e: String| throw(&e)))
+    let gil = Python::acquire_gil();
+    Paths::store_paths(gil.python(), &core, &paths).map_err(|e: String| throw(&e))
   }
   .boxed()
 }
@@ -453,7 +461,8 @@ fn create_digest_to_digest(
       .merge(digests)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -474,7 +483,8 @@ fn digest_subset_to_digest(
       .subset(original_digest, subset_params)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
-    Python::with_gil(|py| Snapshot::store_directory_digest(py, &digest).map_err(|s| throw(&s)))
+    let gil = Python::acquire_gil();
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -604,13 +614,15 @@ fn interactive_process(
       .await?;
 
     let code = exit_status.code().unwrap_or(-1);
-    let result = Python::with_gil(|py| {
+    let result = {
+       let gil = Python::acquire_gil();
+       let py = gil.python();
       externs::unsafe_call(
         py,
         interactive_process_result,
         &[externs::store_i64(py, i64::from(code))],
       )
-    });
+    };
     Ok(result)
   }.boxed()
 }

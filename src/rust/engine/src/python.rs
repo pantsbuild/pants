@@ -134,15 +134,15 @@ impl TypeId {
   }
 
   pub fn is_union(&self) -> bool {
-    Python::with_gil(|py| {
-      let unions_module = py.import("pants.engine.unions").unwrap();
-      let is_union_func = unions_module.getattr("is_union").unwrap();
-      is_union_func
-        .call1((self.as_py_type(py),))
-        .unwrap()
-        .extract()
-        .unwrap()
-    })
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let unions_module = py.import("pants.engine.unions").unwrap();
+    let is_union_func = unions_module.getattr("is_union").unwrap();
+    is_union_func
+      .call1((self.as_py_type(py),))
+      .unwrap()
+      .extract()
+      .unwrap()
   }
 }
 
@@ -253,7 +253,8 @@ impl Key {
   }
 
   pub fn from_value(val: Value) -> PyResult<Key> {
-    Python::with_gil(|py| externs::INTERNS.key_insert(py, val))
+    let gil = Python::acquire_gil();
+    externs::INTERNS.key_insert(gil.python(), val)
   }
 
   pub fn to_value(&self) -> Value {
