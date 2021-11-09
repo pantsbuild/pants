@@ -40,6 +40,7 @@ use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
+use pyo3::prelude::{pymodule, PyModule, PyResult as PyO3Result, Python};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
@@ -52,6 +53,14 @@ use crate::{
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
   Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+
+#[pymodule]
+fn native_engine_new(py: Python, m: &PyModule) -> PyO3Result<()> {
+  m.add_class::<externs::PyGeneratorResponseBreak>()?;
+  m.add_class::<externs::PyGeneratorResponseGet>()?;
+  m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
+  Ok(())
+}
 
 cpython::py_exception!(native_engine, PollTimeout);
 
@@ -433,10 +442,6 @@ cpython::py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PySessionCancellationLatch>(py)?;
   m.add_class::<PyTasks>(py)?;
   m.add_class::<PyTypes>(py)?;
-
-  m.add_class::<externs::PyGeneratorResponseBreak>(py)?;
-  m.add_class::<externs::PyGeneratorResponseGet>(py)?;
-  m.add_class::<externs::PyGeneratorResponseGetMulti>(py)?;
 
   m.add_class::<externs::fs::PyDigest>(py)?;
   m.add_class::<externs::fs::PySnapshot>(py)?;

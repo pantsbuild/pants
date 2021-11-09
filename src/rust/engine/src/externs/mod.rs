@@ -23,11 +23,11 @@ use std::fmt;
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
-use cpython::{ObjectProtocol, PyClone};
+use cpython::ObjectProtocol;
 use lazy_static::lazy_static;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
 use pyo3::ToPyObject;
 
 use logging::PythonLogLevel;
@@ -220,31 +220,26 @@ pub fn call_function<T: AsRef<cpython::PyObject>>(
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let gil = cpython::Python::acquire_gil();
+  let gil = Python::acquire_gil();
   let py = gil.python();
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
-  let response = selectors
-    .call(
-      py,
-      "native_engine_generator_send",
-      (generator as &cpython::PyObject, arg as &cpython::PyObject),
-      None,
-    )
+  let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
+  let response = native_engine_generator_send
+    .call1((generator, arg))
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  if let Ok(b) = response.cast_as::<PyGeneratorResponseBreak>(py) {
-    Ok(GeneratorResponse::Break(Value::new(
-      b.val(py).clone_ref(py),
-    )))
-  } else if let Ok(get) = response.cast_as::<PyGeneratorResponseGet>(py) {
+  if let Ok(b) = response.cast_as::<PyGeneratorResponseBreak>() {
+    Ok(GeneratorResponse::Break(Value::new(b.0.clone_ref(py))))
+  } else if let Ok(get) = response.cast_as::<PyGeneratorResponseGet>() {
     Ok(GeneratorResponse::Get(Get::new(py, get)?))
-  } else if let Ok(get_multi) = response.cast_as::<PyGeneratorResponseGetMulti>(py) {
+  } else if let Ok(get_multi) = response.cast_as::<PyGeneratorResponseGetMulti>() {
     let gets = get_multi
-      .gets(py)
-      .iter(py)
+      .0
+      .into_ref(py)
+      .iter()
       .map(|g| {
         let get = g
-          .cast_as::<PyGeneratorResponseGet>(py)
+          .cast_as::<PyGeneratorResponseGet>()
           .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
         Get::new(py, get)
       })
@@ -262,11 +257,11 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
   let py_type = type_id.as_py_type(py);
-  let arg_handles: Vec<cpython::PyObject> = args.iter().map(|v| v.clone().into()).collect();
+  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let args_tuple = PyTuple::new(py, &arg_handles);
   py_type
-    .call(args_tuple, None)
-    .map(Value::from)
+    .call1(args_tuple)
+    .map(|obj| Value::new(obj.into_py(py)))
     .unwrap_or_else(|e| {
       panic!(
         "Core type constructor `{}` failed: {:?}",
@@ -280,44 +275,62 @@ lazy_static! {
   pub static ref INTERNS: Interns = Interns::new();
 }
 
-cpython::py_class!(pub class PyGeneratorResponseBreak |py| {
-    data val: cpython::PyObject;
-    def __new__(_cls, val: cpython::PyObject) -> cpython::PyResult<Self> {
-      Self::create_instance(py, val)
-    }
-});
+#[pyclass]
+pub struct PyGeneratorResponseBreak(PyObject);
 
-cpython::py_class!(pub class PyGeneratorResponseGet |py| {
-    data product: cpython::PyType;
-    data declared_subject: cpython::PyType;
-    data subject: cpython::PyObject;
-    def __new__(_cls, product: cpython::PyType, declared_subject: cpython::PyType, subject: cpython::PyObject) -> cpython::PyResult<Self> {
-      Self::create_instance(py, product, declared_subject, subject)
-    }
-});
+#[pymethods]
+impl PyGeneratorResponseBreak {
+  #[new]
+  fn __new__(val: PyObject) -> Self {
+    Self(val)
+  }
+}
 
-cpython::py_class!(pub class PyGeneratorResponseGetMulti |py| {
-    data gets: cpython::PyTuple;
-    def __new__(_cls, gets: cpython::PyTuple) -> cpython::PyResult<Self> {
-      Self::create_instance(py, gets)
+#[pyclass]
+pub struct PyGeneratorResponseGet {
+  product: Py<PyType>,
+  declared_subject: Py<PyType>,
+  subject: PyObject,
+}
+
+#[pymethods]
+impl PyGeneratorResponseGet {
+  #[new]
+  fn __new__(product: Py<PyType>, declared_subject: Py<PyType>, subject: PyObject) -> Self {
+    Self {
+      product,
+      declared_subject,
+      subject,
     }
-});
+  }
+}
+
+#[pyclass]
+pub struct PyGeneratorResponseGetMulti(Py<PyTuple>);
+
+#[pymethods]
+impl PyGeneratorResponseGetMulti {
+  #[new]
+  fn __new__(gets: Py<PyTuple>) -> Self {
+    Self(gets)
+  }
+}
 
 #[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
-  pub input: Key,
   pub input_type: TypeId,
+  pub input: Key,
 }
 
 impl Get {
-  fn new(py: cpython::Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
+  fn new(py: Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
     Ok(Get {
-      output: get.product(py).into(),
+      output: TypeId::new(get.product.into_ref(py)),
+      input_type: TypeId::new(get.declared_subject.into_ref(py)),
       input: INTERNS
-        .key_insert(py, get.subject(py).clone_ref(py).into())
+        .key_insert(py, get.subject.clone_ref(py).into())
         .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-      input_type: get.declared_subject(py).into(),
     })
   }
 }
