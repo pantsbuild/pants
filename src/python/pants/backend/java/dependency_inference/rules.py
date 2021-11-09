@@ -69,9 +69,12 @@ async def infer_java_dependencies_via_imports(
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
+        # 13545: `analysis.consumed_types` may be unqualified (package-local or imported) or qualified
+        # (prefixed by package name). Heuristic for now is that if there's a `.` in the type name, it's
+        # probably fully qualified. This is probably fine for now.
         maybe_qualify_types = (
             f"{package}.{consumed_type}" if package and "." not in consumed_type else consumed_type
-            for consumed_type in analysis.consumed_unqualified_types
+            for consumed_type in analysis.consumed_types
         )
 
         types.update(maybe_qualify_types)
