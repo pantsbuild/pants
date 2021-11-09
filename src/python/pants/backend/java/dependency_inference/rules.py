@@ -68,13 +68,13 @@ async def infer_java_dependencies_via_imports(
         types.update(dependency_name(imp.name, imp.is_static) for imp in analysis.imports)
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
-        if package:
-            types.update(
-                f"{package}.{consumed_type}"
-                for consumed_type in analysis.consumed_unqualified_types
-            )
-        else:
-            types.update(analysis.consumed_unqualified_types)
+
+        maybe_qualify_types = (
+            f"{package}.{consumed_type}" if package and "." not in consumed_type else consumed_type
+            for consumed_type in analysis.consumed_unqualified_types
+        )
+
+        types.update(maybe_qualify_types)
 
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
