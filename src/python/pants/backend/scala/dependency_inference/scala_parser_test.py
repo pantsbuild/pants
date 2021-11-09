@@ -153,7 +153,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         ]
     )
 
-    assert analysis.imports_by_namespace == FrozenDict(
+    assert analysis.imports_by_scope == FrozenDict(
         {
             "org.pantsbuild.example.OuterClass": (
                 ScalaImport(name="foo.bar.SomeItem", is_wildcard=False),

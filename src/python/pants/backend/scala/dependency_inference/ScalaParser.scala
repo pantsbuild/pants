@@ -14,14 +14,14 @@ case class AnImport(name: String, isWildcard: Boolean)
 
 case class Analysis(
   providedNames: Vector[String],
-  importsByNamespace: HashMap[String, ArrayBuffer[AnImport]],
+  importsByScope: HashMap[String, ArrayBuffer[AnImport]],
 )
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
 
   val providedNames = ArrayBuffer[String]()
-  val importsByNamespace = HashMap[String, ArrayBuffer[AnImport]]()
+  val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -49,10 +49,10 @@ class SourceAnalysisTraverser extends Traverser {
 
   def recordImport(name: String, isWildcard: Boolean): Unit = {
     val fullPackageName = nameParts.mkString(".")
-    if (!importsByNamespace.contains(fullPackageName)) {
-      importsByNamespace(fullPackageName) = ArrayBuffer[AnImport]()
+    if (!importsByScope.contains(fullPackageName)) {
+      importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
     }
-    importsByNamespace(fullPackageName).append(AnImport(name, isWildcard))
+    importsByScope(fullPackageName).append(AnImport(name, isWildcard))
   }
 
   override def apply(tree: Tree): Unit = tree match {
@@ -129,7 +129,7 @@ object ScalaParser {
 
     Analysis(
       providedNames = analysisTraverser.providedNames.toVector,
-      importsByNamespace = analysisTraverser.importsByNamespace,
+      importsByScope = analysisTraverser.importsByScope,
     )
   }
 

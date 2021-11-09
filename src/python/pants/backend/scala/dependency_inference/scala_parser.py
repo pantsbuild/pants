@@ -112,16 +112,16 @@ class ScalaImport:
 @dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
     provided_names: FrozenOrderedSet[str]
-    imports_by_namespace: FrozenDict[str, tuple[ScalaImport, ...]]
+    imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
             provided_names=FrozenOrderedSet(d["providedNames"]),
-            imports_by_namespace=FrozenDict(
+            imports_by_scope=FrozenDict(
                 {
                     key: tuple([ScalaImport.from_json_dict(v) for v in values])
-                    for key, values in d["importsByNamespace"].items()
+                    for key, values in d["importsByScope"].items()
                 }
             ),
         )
@@ -129,9 +129,9 @@ class ScalaSourceDependencyAnalysis:
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
             "provided_names": self.provided_names,
-            "imports_by_namespace": {
+            "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
-                for key, values in self.imports_by_namespace.items()
+                for key, values in self.imports_by_scope.items()
             },
         }
 
