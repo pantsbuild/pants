@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -183,7 +182,7 @@ class LocalPantsRunner:
             try:
                 exit_code = self._perform_run_body(goals, poll=True)
             except ExecutionError as e:
-                logger.warning(e)
+                logger.error(e)
             iterations -= 1
 
         return exit_code
@@ -235,7 +234,7 @@ class LocalPantsRunner:
         try:
             return self._perform_run(goals)
         except Exception as e:
-            ExceptionSink.log_exception(e)
+            logger.error(e)
             return PANTS_FAILED_EXIT_CODE
         except KeyboardInterrupt:
             print("Interrupted by user.\n", file=sys.stderr)
