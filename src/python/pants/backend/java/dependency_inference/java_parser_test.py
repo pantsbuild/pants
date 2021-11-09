@@ -124,7 +124,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     )
-    assert sorted(analysis.consumed__types) == [
+    assert sorted(analysis.consumed_types) == [
         "Date",
         "System",
         "date",  # note: false positive on a variable identifier
