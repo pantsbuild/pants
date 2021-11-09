@@ -124,7 +124,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     )
-    assert sorted(analysis.consumed_unqualified_types) == [
+    assert sorted(analysis.consumed_types) == [
         "Date",
         "System",
         "date",  # note: false positive on a variable identifier
@@ -223,11 +223,11 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     assert analysis.declared_package is None
     assert analysis.imports == ()
     assert analysis.top_level_types == ("SimpleSource", "Foo")
-    assert analysis.consumed_unqualified_types == ("System",)
+    assert analysis.consumed_types == ("System",)
 
 
 @maybe_skip_jdk_test
-def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None:
+def test_java_parser_consumed_types(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -283,7 +283,7 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
     assert analysis.declared_package == "org.pantsbuild.test"
     assert analysis.imports == ()
     assert analysis.top_level_types == ("org.pantsbuild.test.AnImpl",)
-    assert sorted(analysis.consumed_unqualified_types) == [
+    assert sorted(analysis.consumed_types) == [
         "AThrownException",
         "ClassAnnotation",
         "FieldAnnotation",

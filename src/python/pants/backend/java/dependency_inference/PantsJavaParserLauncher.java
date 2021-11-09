@@ -57,18 +57,18 @@ class CompilationUnitAnalysis {
         Optional<String> declaredPackage,
         ArrayList<Import> imports,
         ArrayList<String> topLevelTypes,
-        ArrayList<String> consumedUnqualifiedTypes
+        ArrayList<String> consumedTypes
     ) {
         this.declaredPackage = declaredPackage;
         this.imports = imports;
         this.topLevelTypes = topLevelTypes;
-        this.consumedUnqualifiedTypes = consumedUnqualifiedTypes;
+        this.consumedTypes = consumedTypes;
     }
 
     public final Optional<String> declaredPackage;
     public final ArrayList<Import> imports;
     public final ArrayList<String> topLevelTypes;
-    public final ArrayList<String> consumedUnqualifiedTypes;
+    public final ArrayList<String> consumedTypes;
 }
 
 
@@ -199,9 +199,9 @@ public class PantsJavaParserLauncher {
             identifiers.addAll(identifiersForType);
         }
 
-        ArrayList<String> consumedUnqualifiedTypes = new ArrayList<>(identifiers);
+        ArrayList<String> consumedTypes = new ArrayList<>(identifiers);
 
-        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedUnqualifiedTypes);
+        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedTypes);
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new Jdk8Module());
         mapper.writeValue(new File(analysisOutputPath), analysis);

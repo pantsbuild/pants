@@ -632,6 +632,49 @@ def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "joda-time_joda-time",
+                    group = "joda-time",
+                    artifact = "joda-time",
+                    version = "2.10.10",
+                )
+
+                java_sources(name = 'lib')
+                """
+            ),
+            "PrintDate.java": dedent(
+                """\
+                package org.pantsbuild.example;
+
+                public class PrintDate {
+                    public static void main(String[] args) {
+                        org.joda.time.DateTime dt = new DateTime();
+                        System.out.println(dt.toString());
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    lib = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="PrintDate.java")
+    )
+    assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(
+        [Address("", target_name="joda-time_joda-time")]
+    )
+
+
+@maybe_skip_jdk_test
 def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
