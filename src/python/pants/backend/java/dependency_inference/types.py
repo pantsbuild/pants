@@ -21,6 +21,13 @@ class JavaImport:
             is_static=imp["isStatic"],
         )
 
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "is_static": self.is_static,
+            "is_asterisk": self.is_asterisk,
+        }
+
 
 @dataclass(frozen=True)
 class JavaSourceDependencyAnalysis:
@@ -37,3 +44,11 @@ class JavaSourceDependencyAnalysis:
             top_level_types=tuple(analysis["topLevelTypes"]),
             consumed_unqualified_types=tuple(analysis["consumedUnqualifiedTypes"]),
         )
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "declared_package": self.declared_package,
+            "imports": [imp.to_debug_json_dict() for imp in self.imports],
+            "top_level_types": self.top_level_types,
+            "consumed_unqualified_types": self.consumed_unqualified_types,
+        }
