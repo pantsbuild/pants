@@ -158,6 +158,7 @@ class PythonInferSubsystem(Subsystem):
     def unowned_dependency_behavior(self) -> UnownedDependencyUsage:
         return cast(UnownedDependencyUsage, self.options.unowned_dependency_behavior)
 
+
 class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSourceField
 

@@ -10,8 +10,8 @@ from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
-    UnownedDependencyError,
     PythonInferSubsystem,
+    UnownedDependencyError,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
@@ -25,10 +25,10 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import ancestor_files
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.engine.internals.scheduler import ExecutionError
 
 
 def test_infer_python_imports(caplog) -> None:
@@ -253,6 +253,7 @@ def test_infer_python_conftests() -> None:
             Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
         ],
     )
+
 
 def test_infer_python_strict(caplog) -> None:
     rule_runner = RuleRunner(
