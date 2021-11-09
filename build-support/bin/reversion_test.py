@@ -27,7 +27,11 @@ def test_reversion(tmp_path: Path) -> None:
     output_name = name_template.format(output_version)
     output_whl_file = tmp_path / output_name
 
-    reversion(whl_file=input_whl_file.as_posix(), dest_dir=tmp_path.as_posix(), target_version=output_version)
+    reversion(
+        whl_file=input_whl_file.as_posix(),
+        dest_dir=tmp_path.as_posix(),
+        target_version=output_version,
+    )
 
     assert output_whl_file.is_file() is True
 
