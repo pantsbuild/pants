@@ -2292,7 +2292,7 @@ def generate_file_based_overrides_field_help_message(
         "overrides. You may either use a string for a single path / glob, "
         "or a string tuple for multiple paths / globs. Each override is a dictionary of "
         "field names to the overridden value.\n\n"
-        f"For example:\n\n{example}\n\n"
+        f"For example:\n\n```\n{example}\n```\n\n"
         "File paths and globs are relative to the BUILD file's directory. Every overridden file is "
         "validated to belong to this target's `sources` field.\n\n"
         f"If you'd like to override a field's value for every `{generated_target_name}` target "
