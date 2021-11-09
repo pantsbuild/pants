@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import os.path
 from dataclasses import dataclass
 
@@ -108,9 +109,12 @@ class FallibleBuildGoPackageRequest(EngineAwareParameter, EngineAwareReturnType)
     import_path: str
     exit_code: int = 0
     stderr: str | None = None
+    dependency_failed: bool = False
 
     def level(self) -> LogLevel:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+        return (
+            LogLevel.ERROR if self.exit_code != 0 and not self.dependency_failed else LogLevel.DEBUG
+        )
 
     def message(self) -> str:
         message = self.import_path
@@ -135,9 +139,12 @@ class FallibleBuiltGoPackage(EngineAwareReturnType):
     exit_code: int = 0
     stdout: str | None = None
     stderr: str | None = None
+    dependency_failed: bool = False
 
     def level(self) -> LogLevel:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+        return (
+            LogLevel.ERROR if self.exit_code != 0 and not self.dependency_failed else LogLevel.DEBUG
+        )
 
     def message(self) -> str:
         message = self.import_path
@@ -179,7 +186,9 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
     dep_digests = []
     for maybe_dep in maybe_built_deps:
         if maybe_dep.output is None:
-            return maybe_dep
+            return dataclasses.replace(
+                maybe_dep, import_path=request.import_path, dependency_failed=True
+            )
         dep = maybe_dep.output
         import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
         dep_digests.append(dep.digest)
