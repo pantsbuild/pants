@@ -8,7 +8,6 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
-    MutableTrieNode,
     ThirdPartyJavaPackageToArtifactMapping,
     UnversionedCoordinate,
 )
@@ -564,26 +563,37 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        [
+            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}"
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    actual_mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+    mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+    root_node = mapping.mapping_root
 
-    root_node = MutableTrieNode()
+    # Handy trie traversal function to placate mypy
+    def traverse(*children) -> FrozenTrieNode:
+        node = root_node
+        for child in children:
+            new_node = node.find_child(child)
+            if not new_node:
+                coord = ".".join(children)
+                raise Exception(f"Could not find the package specifed by {coord}.")
+            node = new_node
+        return node
 
-    # Supplied by JVM_ARTIFACT_MAPPINGS
-    node = root_node.ensure_child("org")
-    node = node.ensure_child("junit")
-    node.coordinates = {UnversionedCoordinate(group="junit", artifact="junit")}
-    node.recursive = True
+    # Verify some provided by `JVM_ARTFACT_MAPPINGS`
+    assert set(traverse("org", "junit").coordinates) == {
+        UnversionedCoordinate(group="junit", artifact="junit")
+    }
+    assert set(traverse("org", "aopalliance").coordinates) == {
+        UnversionedCoordinate(group="aopalliance", artifact="aopalliance")
+    }
 
-    node = root_node.ensure_child("org")
-    node = node.ensure_child("joda")
-    node = node.ensure_child("time")
-    node.coordinates = {UnversionedCoordinate(group="joda-time", artifact="joda-time")}
-    node.recursive = True
-
-    assert actual_mapping.mapping_root == FrozenTrieNode(root_node)
+    # Verify the one that we provided in the options is there too.
+    assert set(traverse("io", "github", "frenchtoast", "savory").coordinates) == {
+        UnversionedCoordinate(group="github-frenchtoast", artifact="savory")
+    }
 
 
 @maybe_skip_jdk_test
