@@ -221,7 +221,7 @@ class ExceptionSink:
             assert isinstance(for_pid, Pid)
             intermediate_filename_component = f".{for_pid}"
         in_dir = in_dir or cls._log_dir
-        return os.path.join(in_dir, ".pids", f"exceptions{intermediate_filename_component}.log")
+        return os.path.join(in_dir, f"exceptions{intermediate_filename_component}.log")
 
     @classmethod
     def _log_exception(cls, msg):

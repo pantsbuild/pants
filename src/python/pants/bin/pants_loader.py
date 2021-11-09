@@ -3,7 +3,6 @@
 
 import importlib
 import locale
-import logging
 import os
 import sys
 import time
@@ -87,7 +86,6 @@ class PantsLoader:
 
     @staticmethod
     def run_default_entrypoint() -> None:
-        logger = logging.getLogger(__name__)
         with maybe_profiled(os.environ.get(PANTSC_PROFILE)):
             start_time = time.time()
             try:
@@ -95,9 +93,6 @@ class PantsLoader:
                 exit_code = runner.run(start_time)
             except KeyboardInterrupt as e:
                 print(f"Interrupted by user:\n{e}", file=sys.stderr)
-                exit_code = PANTS_FAILED_EXIT_CODE
-            except Exception as e:
-                logger.exception(e)
                 exit_code = PANTS_FAILED_EXIT_CODE
         sys.exit(exit_code)
 
