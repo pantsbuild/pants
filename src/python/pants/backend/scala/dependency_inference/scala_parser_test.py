@@ -6,7 +6,10 @@ import pytest
 
 from pants.backend.scala import target_types
 from pants.backend.scala.dependency_inference import scala_parser
-from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.dependency_inference.scala_parser import (
+    ScalaImport,
+    ScalaSourceDependencyAnalysis,
+)
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
@@ -19,6 +22,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -60,7 +64,12 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             package org.pantsbuild
             package example
 
+            import scala.collection.mutable.{ArrayBuffer, HashMap => RenamedHashMap}
+            import java.io._
+
             class OuterClass {
+                import foo.bar.SomeItem
+
                 val NestedVal = 3
                 var NestedVar = "foo"
                 trait NestedTrait {
@@ -142,4 +151,17 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterObject.NestedType",
             "org.pantsbuild.example.OuterObject.NestedObject",
         ]
+    )
+
+    assert analysis.imports_by_namespace == FrozenDict(
+        {
+            "org.pantsbuild.example.OuterClass": (
+                ScalaImport(name="foo.bar.SomeItem", is_wildcard=False),
+            ),
+            "org.pantsbuild.example": (
+                ScalaImport(name="scala.collection.mutable.ArrayBuffer", is_wildcard=False),
+                ScalaImport(name="scala.collection.mutable.HashMap", is_wildcard=False),
+                ScalaImport(name="java.io", is_wildcard=True),
+            ),
+        }
     )

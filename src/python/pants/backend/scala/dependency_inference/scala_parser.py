@@ -7,7 +7,7 @@ import logging
 import os
 import pkgutil
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
@@ -38,6 +38,7 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspathRequest,
 )
 from pants.option.global_options import GlobalOptions
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -93,18 +94,45 @@ SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
 
 
 @dataclass(frozen=True)
+class ScalaImport:
+    name: str
+    is_wildcard: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], is_wildcard=data["isWildcard"])
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "is_wildcard": self.is_wildcard,
+        }
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
     provided_names: FrozenOrderedSet[str]
+    imports_by_namespace: FrozenDict[str, tuple[ScalaImport, ...]]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
             provided_names=FrozenOrderedSet(d["providedNames"]),
+            imports_by_namespace=FrozenDict(
+                {
+                    key: tuple([ScalaImport.from_json_dict(v) for v in values])
+                    for key, values in d["importsByNamespace"].items()
+                }
+            ),
         )
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
             "provided_names": self.provided_names,
+            "imports_by_namespace": {
+                key: [v.to_debug_json_dict() for v in values]
+                for key, values in self.imports_by_namespace.items()
+            },
         }
 
 
