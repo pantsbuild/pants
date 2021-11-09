@@ -57,11 +57,11 @@ def test_set_invalid_log_location():
         ),
         Platform.linux_arm64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
-            "denied: '/.pids'"
+            "denied:"
         ),
         Platform.linux_x86_64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
-            "denied: '/.pids'"
+            "denied:"
         ),
     }
     assert match(Platform.current, err_str) in str(exc.value)
@@ -83,7 +83,9 @@ def test_log_exception():
             getproctitle_mock.assert_called_once()
 
         # This should have created two log files, one specific to the current pid.
-        assert os.listdir(tmpdir) == [".pids"]
+        logfiles = os.listdir(tmpdir)
+        assert len(logfiles) == 2
+        assert "exceptions.log" in logfiles
 
         cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
         assert os.path.isfile(cur_process_error_log_path) is True
