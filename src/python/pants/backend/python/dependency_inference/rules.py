@@ -129,8 +129,6 @@ class PythonInferSubsystem(Subsystem):
             default=UnownedDependencyUsage.DoNothing,
             help=("How to handle inferred dependencies that don't have any owner."),
         )
-        # @TODO: Add a way for people to whitelist ok unowned dependencies?
-        # Or just use python_requirement()?
 
     @property
     def imports(self) -> bool:
@@ -156,6 +154,9 @@ class PythonInferSubsystem(Subsystem):
     def entry_points(self) -> bool:
         return cast(bool, self.options.entry_points)
 
+    @property
+    def unowned_dependency_behavior(self) -> UnownedDependencyUsage:
+        return cast(UnownedDependencyUsage, self.options.unowned_dependency_behavior)
 
 class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSourceField
@@ -207,7 +208,7 @@ async def infer_python_dependencies_via_imports(
         if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES:
             unowned_imports.add(imp)
 
-    unowned_dependency_behavior = python_infer_subsystem.options.unowned_dependency_behavior
+    unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
         log = logger.error if raise_error else logger.warning

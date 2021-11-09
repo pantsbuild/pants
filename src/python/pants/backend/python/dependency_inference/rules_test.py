@@ -3,11 +3,14 @@
 
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
+    UnownedDependencyError,
     PythonInferSubsystem,
     import_rules,
     infer_python_conftest_dependencies,
@@ -25,6 +28,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.internals.scheduler import ExecutionError
 
 
 def test_infer_python_imports(caplog) -> None:
@@ -249,3 +253,61 @@ def test_infer_python_conftests() -> None:
             Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
         ],
     )
+
+def test_infer_python_strict(caplog) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *import_rules(),
+            *target_types_rules.rules(),
+            QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+
+    rule_runner.create_file(
+        "src/python/cheesey.py",
+        "import venezuelan_beaver_cheese",
+    )
+    rule_runner.add_to_build_file("src/python", "python_sources()")
+
+    def run_dep_inference(address: Address) -> InferredDependencies:
+        target = rule_runner.get_target(address)
+        return rule_runner.request(
+            InferredDependencies,
+            [InferPythonImportDependencies(target[PythonSourceField])],
+        )
+
+    # First test with "warning"
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-infer-unowned-dependency-behavior=warning",
+            "--source-root-patterns=src/python",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="cheesey.py")
+    ) == InferredDependencies([])
+    assert len(caplog.records) == 1
+    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
+    assert "  * venezuelan_beaver_cheese" in caplog.text
+
+    # Now test with "error"
+    caplog.clear()
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-infer-unowned-dependency-behavior=error",
+            "--source-root-patterns=src/python",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    with pytest.raises(ExecutionError) as exc_info:
+        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"))
+
+    assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
+    assert len(caplog.records) == 2  # one for the error being raised and one for our message
+    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
+    assert "  * venezuelan_beaver_cheese" in caplog.text
