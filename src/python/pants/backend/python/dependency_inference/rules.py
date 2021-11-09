@@ -212,7 +212,7 @@ async def infer_python_dependencies_via_imports(
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
         log = logger.error if raise_error else logger.warning
         log(
-            f"The following imports in {address} have no unambiguous owner:\n\n{bullet_list(unowned_imports)}\n\n"
+            f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports)}\n\n"
             "If you are using [python-setup].requirement_constraints, consider adding the relevant package.\n"
             "Otherwise consider specifying a python_requirement target as a dependency.\n"
             "See https://www.pantsbuild.org/v2.8/docs/python-third-party-dependencies"
