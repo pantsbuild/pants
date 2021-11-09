@@ -7,6 +7,7 @@ import logging
 import os
 import pkgutil
 from dataclasses import dataclass
+from typing import Any
 
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
@@ -100,6 +101,11 @@ class ScalaSourceDependencyAnalysis:
         return cls(
             provided_names=FrozenOrderedSet(d["providedNames"]),
         )
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "provided_names": self.provided_names,
+        }
 
 
 @dataclass(frozen=True)
