@@ -23,7 +23,7 @@ use std::fmt;
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
-use cpython::ObjectProtocol;
+use cpython::{ObjectProtocol, PyClone};
 use lazy_static::lazy_static;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
@@ -52,7 +52,7 @@ pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
     .into_iter()
     .map(|v| v.consume_into_py_object(py))
     .collect();
-  Value::from(PyTuple::new(py, &arg_handles).into_object())
+  Value::from(PyTuple::new(py, &arg_handles).to_object(py))
 }
 
 /// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
@@ -61,29 +61,29 @@ pub fn store_dict(py: Python, keys_and_values: Vec<(Value, Value)>) -> PyResult<
   for (k, v) in keys_and_values {
     dict.set_item(k.consume_into_py_object(py), v.consume_into_py_object(py))?;
   }
-  Ok(Value::from(dict.into_object()))
+  Ok(Value::from(dict.to_object(py)))
 }
 
 /// Store an opaque buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 pub fn store_bytes(py: Python, bytes: &[u8]) -> Value {
-  Value::from(PyBytes::new(py, bytes).into_object())
+  Value::from(PyBytes::new(py, bytes).to_object(py))
 }
 
 /// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `str`.
 pub fn store_utf8(py: Python, utf8: &str) -> Value {
-  Value::from(utf8.to_object(py).into_object())
+  Value::from(utf8.to_object(py))
 }
 
 pub fn store_u64(py: Python, val: u64) -> Value {
-  Value::from(val.to_object(py).into_object())
+  Value::from(val.to_object(py))
 }
 
 pub fn store_i64(py: Python, val: i64) -> Value {
-  Value::from(val.to_object(py).into_object())
+  Value::from(val.to_object(py))
 }
 
 pub fn store_bool(py: Python, val: bool) -> Value {
-  Value::from(val.to_object(py).into_object())
+  Value::from(val.to_object(py))
 }
 
 ///
@@ -280,25 +280,25 @@ lazy_static! {
   pub static ref INTERNS: Interns = Interns::new();
 }
 
-py_class!(pub class PyGeneratorResponseBreak |py| {
-    data val: PyObject;
-    def __new__(_cls, val: PyObject) -> CPyResult<Self> {
+cpython::py_class!(pub class PyGeneratorResponseBreak |py| {
+    data val: cpython::PyObject;
+    def __new__(_cls, val: cpython::PyObject) -> cpython::PyResult<Self> {
       Self::create_instance(py, val)
     }
 });
 
-py_class!(pub class PyGeneratorResponseGet |py| {
-    data product: PyType;
-    data declared_subject: PyType;
-    data subject: PyObject;
-    def __new__(_cls, product: PyType, declared_subject: PyType, subject: PyObject) -> CPyResult<Self> {
+cpython::py_class!(pub class PyGeneratorResponseGet |py| {
+    data product: cpython::PyType;
+    data declared_subject: cpython::PyType;
+    data subject: cpython::PyObject;
+    def __new__(_cls, product: cpython::PyType, declared_subject: cpython::PyType, subject: cpython::PyObject) -> cpython::PyResult<Self> {
       Self::create_instance(py, product, declared_subject, subject)
     }
 });
 
-py_class!(pub class PyGeneratorResponseGetMulti |py| {
-    data gets: PyTuple;
-    def __new__(_cls, gets: PyTuple) -> CPyResult<Self> {
+cpython::py_class!(pub class PyGeneratorResponseGetMulti |py| {
+    data gets: cpython::PyTuple;
+    def __new__(_cls, gets: cpython::PyTuple) -> cpython::PyResult<Self> {
       Self::create_instance(py, gets)
     }
 });
@@ -311,7 +311,7 @@ pub struct Get {
 }
 
 impl Get {
-  fn new(py: Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
+  fn new(py: cpython::Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
     Ok(Get {
       output: get.product(py).into(),
       input: INTERNS

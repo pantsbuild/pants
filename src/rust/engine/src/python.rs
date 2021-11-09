@@ -317,9 +317,10 @@ impl fmt::Display for Value {
   }
 }
 
-impl FromPyObject for Value {
-  fn extract(obj: &PyAny) -> PyResult<Self> {
-    Ok(obj.clone().into())
+impl<'source> FromPyObject<'source> for Value {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py = obj.py();
+    Ok(obj.into_py(py).into())
   }
 }
 
