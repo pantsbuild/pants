@@ -24,7 +24,7 @@ class JavaImport:
 
 @dataclass(frozen=True)
 class JavaSourceDependencyAnalysis:
-    declared_package: str
+    declared_package: str | None
     imports: Sequence[JavaImport]
     top_level_types: Sequence[str]
     consumed_unqualified_types: Sequence[str]
@@ -32,7 +32,7 @@ class JavaSourceDependencyAnalysis:
     @classmethod
     def from_json_dict(cls, analysis: dict[str, Any]) -> JavaSourceDependencyAnalysis:
         return cls(
-            declared_package=analysis["declaredPackage"],
+            declared_package=analysis.get("declaredPackage"),
             imports=tuple(JavaImport.from_json_dict(imp) for imp in analysis["imports"]),
             top_level_types=tuple(analysis["topLevelTypes"]),
             consumed_unqualified_types=tuple(analysis["consumedUnqualifiedTypes"]),

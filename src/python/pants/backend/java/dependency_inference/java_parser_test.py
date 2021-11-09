@@ -220,7 +220,7 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     )
 
     analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
-    assert analysis.declared_package == ""
+    assert analysis.declared_package is None
     assert analysis.imports == ()
     assert analysis.top_level_types == ("SimpleSource", "Foo")
     assert analysis.consumed_unqualified_types == ("System",)

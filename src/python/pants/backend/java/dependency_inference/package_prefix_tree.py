@@ -17,17 +17,9 @@ class PackageRootedDependencyMap:
     def __init__(self):
         self._type_map: dict[str, set[Address]] = defaultdict(set)
 
-    def add_top_level_type(self, package: str, type_: str, address: Address):
-        """Declare a single Address as a provider of a top level type.
-
-        This method also associates the address with the type's package, and there can be more than
-        one address associated with a given package.
-        """
-        fqt = ".".join([package, type_])
-        self._type_map[fqt].add(address)
-
-    def add_package(self, package: str, address: Address):
-        """Add an address as one of the providers of a package."""
+    def add_top_level_type(self, type_: str, address: Address):
+        """Declare a single Address as a provider of a top level type."""
+        self._type_map[type_].add(address)
 
     def addresses_for_type(self, symbol: str) -> frozenset[Address]:
         """Returns the set of addresses that provide the passed type.
