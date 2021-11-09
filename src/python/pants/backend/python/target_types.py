@@ -607,11 +607,11 @@ class PythonTestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonTestTarget.alias,
         (
-            "  overrides={\n"
-            '    "foo_test.py": {"timeout": 120]},\n'
-            '    "bar_test.py": {"timeout": 200]},\n'
-            '    ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
-            "  }"
+            "overrides={\n"
+            '  "foo_test.py": {"timeout": 120]},\n'
+            '  "bar_test.py": {"timeout": 200]},\n'
+            '  ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
+            "}"
         ),
     )
 
@@ -646,11 +646,11 @@ class PythonSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonSourceTarget.alias,
         (
-            "  overrides={\n"
-            '    "foo.py": {"skip_pylint": True]},\n'
-            '    "bar.py": {"skip_flake8": True]},\n'
-            '    ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
-            "  }"
+            "overrides={\n"
+            '  "foo.py": {"skip_pylint": True]},\n'
+            '  "bar.py": {"skip_flake8": True]},\n'
+            '  ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
+            "}"
         ),
     )
 

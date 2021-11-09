@@ -162,11 +162,11 @@ class Shunit2TestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         Shunit2TestTarget.alias,
         (
-            "  overrides={\n"
-            '    "foo_test.sh": {"timeout": 120]},\n'
-            '    "bar_test.sh": {"timeout": 200]},\n'
-            '    ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},\n'
-            "  }"
+            "overrides={\n"
+            '  "foo_test.sh": {"timeout": 120]},\n'
+            '  "bar_test.sh": {"timeout": 200]},\n'
+            '  ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},\n'
+            "}"
         ),
     )
 
@@ -240,11 +240,11 @@ class ShellSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ShellSourceTarget.alias,
         (
-            "  overrides={\n"
-            '    "foo.sh": {"skip_shellcheck": True]},\n'
-            '    "bar.sh": {"skip_shfmt": True]},\n'
-            '    ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},\n'
-            "  }"
+            "overrides={\n"
+            '  "foo.sh": {"skip_shellcheck": True]},\n'
+            '  "bar.sh": {"skip_shfmt": True]},\n'
+            '  ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},\n'
+            "}"
         ),
     )
 
