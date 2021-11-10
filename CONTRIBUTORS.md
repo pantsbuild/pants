@@ -116,7 +116,6 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jonathan Sokolowski
 + Josh Reed
 + Josh Soref
-+ Joshua Cannon
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec

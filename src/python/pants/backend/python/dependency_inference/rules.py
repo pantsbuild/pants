@@ -215,9 +215,10 @@ async def infer_python_dependencies_via_imports(
         log = logger.error if raise_error else logger.warning
         log(
             f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports)}\n\n"
-            "If you are using [python].requirement_constraints, consider adding the relevant package.\n"
-            "Otherwise consider specifying a python_requirement target as a dependency.\n"
-            "See https://www.pantsbuild.org/v2.8/docs/python-third-party-dependencies"
+            "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
+            "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
+            "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred\n"
+            "See {doc_url(python-third-party-dependencies)}"
         )
 
         if raise_error:
