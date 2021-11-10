@@ -571,7 +571,9 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                # NB: Since a failure is a valid result for this script, we always cache it for
+                # `pantsd`'s lifetime, regardless of success or failure.
+                cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
             ),
         )
         for path in found_paths
