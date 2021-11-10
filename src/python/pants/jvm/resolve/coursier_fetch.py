@@ -40,6 +40,7 @@ from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JvmArtifact,
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
@@ -233,25 +234,35 @@ class CoursierResolvedLockfile:
 
     entries: tuple[CoursierLockfileEntry, ...]
 
+    @classmethod
+    def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
+        # TODO: After fixing https://github.com/pantsbuild/pants/issues/13496, coordinate matches
+        # should become exact, and this error message will capture all cases of stale lockfiles.
+        return CoursierError(
+            f"{coord} was not present in resolve `{key.name}` at `{key.path}`.\n"
+            f"If you have recently added new `{JvmArtifact.alias}` targets, you might need to "
+            f"update your lockfile by running `coursier-resolve --names={key.name}`."
+        )
+
     def direct_dependencies(
-        self, coord: Coordinate
+        self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its direct dependencies."""
         entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
         entry = entries.get((coord.group, coord.artifact))
         if entry is None:
-            raise CoursierError(f"{coord} was not present in {self}")
+            raise self._coordinate_not_found(key, coord)
 
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
 
     def dependencies(
-        self, coord: Coordinate
+        self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its transitive dependencies."""
         entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
         entry = entries.get((coord.group, coord.artifact))
         if entry is None:
-            raise CoursierError(f"{coord} was not present in {self}")
+            raise self._coordinate_not_found(key, coord)
 
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
@@ -390,7 +401,7 @@ async def fetch_with_coursier(
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
-        Coordinate.from_jvm_artifact_target(request.component.representative)
+        request.resolve, Coordinate.from_jvm_artifact_target(request.component.representative)
     )
 
     classpath_entries = await MultiGet(
