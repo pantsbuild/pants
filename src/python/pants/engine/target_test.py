@@ -1,6 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -8,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 import pytest
 
 from pants.engine.addresses import Address
-from pants.engine.fs import Paths
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, Paths
 from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
@@ -1006,6 +1009,113 @@ def test_targets_with_sources_types() -> None:
         union_membership=UnionMembership({GenerateSourcesRequest: [GenSources]}),
     )
     assert set(result) == {tgt2}
+
+
+SKIP = object()
+expected_path_globs = namedtuple(
+    "expected_path_globs",
+    ["globs", "glob_match_error_behavior", "conjunction", "description_of_origin"],
+    defaults=(SKIP, SKIP, SKIP, SKIP),
+)
+
+
+@pytest.mark.parametrize(
+    "default_value, field_value, expected",
+    [
+        pytest.param(
+            None,
+            None,
+            expected_path_globs(globs=()),
+            id="empty",
+        ),
+        pytest.param(
+            ["*"],
+            None,
+            expected_path_globs(
+                globs=("test/*",),
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                conjunction=GlobExpansionConjunction.any_match,
+                description_of_origin=None,
+            ),
+            id="default ignores glob match error",
+        ),
+        pytest.param(
+            ["*"],
+            ["a", "b"],
+            expected_path_globs(
+                globs=(
+                    "test/a",
+                    "test/b",
+                ),
+                glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="test:test's `sources` field",
+            ),
+            id="provided value warns on glob match error",
+        ),
+    ],
+)
+def test_multiple_sources_path_globs(
+    default_value: Any, field_value: Any, expected: expected_path_globs
+) -> None:
+    class TestMultipleSourcesField(MultipleSourcesField):
+        default = default_value
+        default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
+
+    sources = TestMultipleSourcesField(field_value, Address("test"))
+    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    for attr, expect in zip(expected._fields, expected):
+        if expect is not SKIP:
+            assert getattr(actual, attr) == expect
+
+
+@pytest.mark.parametrize(
+    "default_value, field_value, expected",
+    [
+        pytest.param(
+            None,
+            None,
+            expected_path_globs(globs=()),
+            id="empty",
+        ),
+        pytest.param(
+            "file",
+            None,
+            expected_path_globs(
+                globs=("test/file",),
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                conjunction=GlobExpansionConjunction.any_match,
+                description_of_origin=None,
+            ),
+            id="default ignores glob match error",
+        ),
+        pytest.param(
+            "default_file",
+            "other_file",
+            expected_path_globs(
+                globs=("test/other_file",),
+                glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="test:test's `source` field",
+            ),
+            id="provided value warns on glob match error",
+        ),
+    ],
+)
+def test_single_source_path_globs(
+    default_value: Any, field_value: Any, expected: expected_path_globs
+) -> None:
+    class TestSingleSourceField(SingleSourceField):
+        default = default_value
+        default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
+        required = False
+
+    sources = TestSingleSourceField(field_value, Address("test"))
+
+    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    for attr, expect in zip(expected._fields, expected):
+        if expect is not SKIP:
+            assert getattr(actual, attr) == expect
 
 
 # -----------------------------------------------------------------------------------------------
