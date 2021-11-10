@@ -294,7 +294,7 @@ impl MultiPlatformExecuteProcess {
   fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let env = externs::getattr_from_frozendict(value, "env");
+    let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory =
       match externs::getattr_as_optional_string(py, value, "working_directory") {
         None => None,
@@ -329,7 +329,7 @@ impl MultiPlatformExecuteProcess {
     let py_level: PyObject = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(&py_level)?;
 
-    let append_only_caches = externs::getattr_from_frozendict(value, "append_only_caches")
+    let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;

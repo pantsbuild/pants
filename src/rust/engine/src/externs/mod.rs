@@ -140,7 +140,8 @@ pub fn collect_iterable(value: &PyObject) -> Result<Vec<PyObject>, String> {
   }
 }
 
-pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
+/// Read a `FrozenDict[str, str]`.
+pub fn getattr_from_str_frozendict(value: &PyObject, field: &str) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = Python::acquire_gil();
@@ -148,7 +149,7 @@ pub fn getattr_from_frozendict(value: &PyObject, field: &str) -> BTreeMap<String
   pydict
     .items(py)
     .into_iter()
-    .map(|(k, v)| (val_to_str(&Value::new(k)), val_to_str(&Value::new(v))))
+    .map(|(k, v)| (k.extract(py).unwrap(), v.extract(py).unwrap()))
     .collect()
 }
 
@@ -162,6 +163,9 @@ pub fn getattr_as_optional_string(py: Python, value: &PyObject, field: &str) -> 
   Some(v.extract(py).unwrap())
 }
 
+/// Call the equivalent of `str()` on an arbitrary Python object.
+///
+/// Converts `None` to the empty string.
 pub fn val_to_str(obj: &PyObject) -> String {
   let gil = Python::acquire_gil();
   let py = gil.python();
