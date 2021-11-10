@@ -38,7 +38,7 @@ use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
 use notify::event::Flag;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
 
@@ -63,7 +63,7 @@ type WatcherTaskInputs = (
   Arc<GitignoreStyleExcludes>,
   PathBuf,
   crossbeam_channel::Sender<String>,
-  Receiver<notify::Result<notify::Event>>,
+  Receiver<notify::Result<Event>>,
 );
 
 pub struct InvalidationWatcher(Mutex<Inner>);
@@ -145,7 +145,7 @@ impl InvalidationWatcher {
     ignorer: Arc<GitignoreStyleExcludes>,
     canonical_build_root: PathBuf,
     liveness_sender: crossbeam_channel::Sender<String>,
-    watch_receiver: Receiver<notify::Result<notify::Event>>,
+    watch_receiver: Receiver<notify::Result<Event>>,
   ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
       let exit_msg = loop {
@@ -157,55 +157,7 @@ impl InvalidationWatcher {
           break "The watcher was shut down.".to_string();
         };
         match event_res {
-          Ok(Ok(ev)) => {
-            let flag = ev.flag();
-            let paths: HashSet<_> = ev
-              .paths
-              .into_iter()
-              .filter_map(|path| {
-                // relativize paths to build root.
-                let path_relative_to_build_root = if path.starts_with(&canonical_build_root) {
-                  // Unwrapping is fine because we check that the path starts with
-                  // the build root above.
-                  path.strip_prefix(&canonical_build_root).unwrap().into()
-                } else {
-                  path
-                };
-                // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
-                // to say that no path is a directory, they could be if someone chmod's or creates a dir.
-                // This maintains correctness by ensuring that at worst we have false negative events, where a directory
-                // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
-                // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
-                // out of our purview.
-                if ignorer.is_ignored_or_child_of_ignored_path(
-                  &path_relative_to_build_root,
-                  /* is_dir */ false,
-                ) {
-                  trace!("notify ignoring {:?}", path_relative_to_build_root);
-                  None
-                } else {
-                  Some(path_relative_to_build_root)
-                }
-              })
-              .flat_map(|path_relative_to_build_root| {
-                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
-                if let Some(parent_dir) = path_relative_to_build_root.parent() {
-                  paths_to_invalidate.push(parent_dir.to_path_buf());
-                }
-                paths_to_invalidate.push(path_relative_to_build_root);
-                paths_to_invalidate
-              })
-              .collect();
-
-            // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
-            if flag == Some(Flag::Rescan) {
-              debug!("notify queue overflowed: invalidating all paths");
-              invalidatable.invalidate_all("notify");
-            } else if !paths.is_empty() {
-              debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-              invalidatable.invalidate(&paths, "notify");
-            }
-          }
+          Ok(Ok(ev)) => Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev),
           Ok(Err(err)) => {
             if let notify::ErrorKind::PathNotFound = err.kind {
               warn!("Path(s) did not exist: {:?}", err.paths);
@@ -225,6 +177,64 @@ impl InvalidationWatcher {
       warn!("File watcher exiting with: {}", exit_msg);
       let _ = liveness_sender.send(exit_msg);
     })
+  }
+
+  fn handle_event<I: Invalidatable>(
+    invalidatable: &I,
+    ignorer: &GitignoreStyleExcludes,
+    canonical_build_root: &Path,
+    ev: Event,
+  ) {
+    let flag = ev.flag();
+    let paths: HashSet<_> = ev
+      .paths
+      .into_iter()
+      .filter_map(|path| {
+        // relativize paths to build root.
+        let path_relative_to_build_root = if path.starts_with(canonical_build_root) {
+          // Unwrapping is fine because we check that the path starts with
+          // the build root above.
+          path.strip_prefix(canonical_build_root).unwrap().into()
+        } else {
+          path
+        };
+        // To avoid having to stat paths for events we will eventually ignore we "lie" to
+        // the ignorer to say that no path is a directory (although they could be if someone
+        // chmod's or creates a dir).
+        //
+        // This maintains correctness by ensuring that at worst we have false negative
+        // events, where a directory-only glob (one that ends in `/` ) was supposed to
+        // ignore a directory path, but didn't because we claimed it was a file. That
+        // directory path will be used to invalidate nodes, but won't invalidate anything
+        // because its path is somewhere out of our purview.
+        if ignorer.is_ignored_or_child_of_ignored_path(
+          &path_relative_to_build_root,
+          /* is_dir */ false,
+        ) {
+          trace!("notify ignoring {:?}", path_relative_to_build_root);
+          None
+        } else {
+          Some(path_relative_to_build_root)
+        }
+      })
+      .flat_map(|path_relative_to_build_root| {
+        let mut paths_to_invalidate: Vec<PathBuf> = vec![];
+        if let Some(parent_dir) = path_relative_to_build_root.parent() {
+          paths_to_invalidate.push(parent_dir.to_path_buf());
+        }
+        paths_to_invalidate.push(path_relative_to_build_root);
+        paths_to_invalidate
+      })
+      .collect();
+
+    // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
+    if flag == Some(Flag::Rescan) {
+      debug!("notify queue overflowed: invalidating all paths");
+      invalidatable.invalidate_all("notify");
+    } else if !paths.is_empty() {
+      debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+      invalidatable.invalidate(&paths, "notify");
+    }
   }
 
   ///
