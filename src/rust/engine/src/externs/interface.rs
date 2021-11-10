@@ -1,15 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// File-specific allowances to silence internal warnings of `py_class!`.
-#![allow(
-  unused_braces,
-  clippy::manual_strip,
-  clippy::used_underscore_binding,
-  clippy::transmute_ptr_to_ptr,
-  clippy::zero_ptr
-)]
-
 ///
 /// This crate is a wrapper around the engine crate which exposes a python module via cpython.
 ///
@@ -30,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_latch::AsyncLatch;
-use cpython::{PyClone, PyResult as CPythonPyResult, PythonObject, ToPyObject};
+use cpython::{PyClone, PyResult as CPythonPyResult, ToPyObject};
 use futures::future::FutureExt;
 use futures::future::{self, TryFutureExt};
 use futures::Future;
@@ -40,7 +31,11 @@ use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
-use pyo3::prelude::{pymodule, PyModule, PyResult as PyO3Result, Python};
+use pyo3::exceptions::{PyException, PyValueError};
+use pyo3::prelude::{
+  pyclass, pymethods, pymodule, Py, PyModule, PyObject, PyResult as PyO3Result, Python,
+};
+use pyo3::types::{PyList, PyString, PyTuple, PyType};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
@@ -56,6 +51,20 @@ use crate::{
 
 #[pymodule]
 fn native_engine_new(py: Python, m: &PyModule) -> PyO3Result<()> {
+  m.add_class::<PyExecutionRequest>()?;
+  m.add_class::<PyExecutionStrategyOptions>()?;
+  m.add_class::<PyExecutor>()?;
+  m.add_class::<PyNailgunServer>()?;
+  m.add_class::<PyRemotingOptions>()?;
+  m.add_class::<PyLocalStoreOptions>()?;
+  m.add_class::<PyResult>()?;
+  m.add_class::<PyScheduler>()?;
+  m.add_class::<PySession>()?;
+  m.add_class::<PySessionCancellationLatch>()?;
+  m.add_class::<PyStdioDestination>()?;
+  m.add_class::<PyTasks>()?;
+  m.add_class::<PyTypes>()?;
+
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
   m.add_class::<externs::PyGeneratorResponseGet>()?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
@@ -434,146 +443,139 @@ cpython::py_module_initializer!(native_engine, |py, m| {
     ),
   )?;
 
-  m.add_class::<PyExecutionRequest>(py)?;
-  m.add_class::<PyExecutionStrategyOptions>(py)?;
-  m.add_class::<PyExecutor>(py)?;
-  m.add_class::<PyNailgunServer>(py)?;
-  m.add_class::<PyRemotingOptions>(py)?;
-  m.add_class::<PyLocalStoreOptions>(py)?;
-  m.add_class::<PyResult>(py)?;
-  m.add_class::<PyScheduler>(py)?;
-  m.add_class::<PySession>(py)?;
-  m.add_class::<PySessionCancellationLatch>(py)?;
-  m.add_class::<PyTasks>(py)?;
-  m.add_class::<PyTypes>(py)?;
-
-  m.add_class::<PyStdioDestination>(py)?;
-
   Ok(())
 });
 
-cpython::py_class!(class PyTasks |py| {
-    data tasks: RefCell<Tasks>;
-    def __new__(_cls) -> CPythonPyResult<Self> {
-      Self::create_instance(py, RefCell::new(Tasks::new()))
-    }
-});
+#[pyclass]
+struct PyTasks(RefCell<Tasks>);
 
-cpython::py_class!(class PyTypes |py| {
-  data types: RefCell<Option<Types>>;
-
-  def __new__(
-      _cls,
-      file_digest: cpython::PyType,
-      snapshot: cpython::PyType,
-      paths: cpython::PyType,
-      file_content: cpython::PyType,
-      file_entry: cpython::PyType,
-      directory: cpython::PyType,
-      digest_contents: cpython::PyType,
-      digest_entries: cpython::PyType,
-      path_globs: cpython::PyType,
-      merge_digests: cpython::PyType,
-      add_prefix: cpython::PyType,
-      remove_prefix: cpython::PyType,
-      create_digest: cpython::PyType,
-      digest_subset: cpython::PyType,
-      download_file: cpython::PyType,
-      platform: cpython::PyType,
-      multi_platform_process: cpython::PyType,
-      process_result: cpython::PyType,
-      coroutine: cpython::PyType,
-      session_values: cpython::PyType,
-      interactive_process: cpython::PyType,
-      interactive_process_result: cpython::PyType,
-      engine_aware_parameter: cpython::PyType
-  ) -> CPythonPyResult<Self> {
-    Self::create_instance(
-        py,
-        RefCell::new(Some(Types {
-        directory_digest: TypeId::new(&py.get_type::<externs::fs::PyDigest>()),
-        file_digest: TypeId::new(&file_digest),
-        snapshot: TypeId::new(&snapshot),
-        paths: TypeId::new(&paths),
-        file_content: TypeId::new(&file_content),
-        file_entry: TypeId::new(&file_entry),
-        directory: TypeId::new(&directory),
-        digest_contents: TypeId::new(&digest_contents),
-        digest_entries: TypeId::new(&digest_entries),
-        path_globs: TypeId::new(&path_globs),
-        merge_digests: TypeId::new(&merge_digests),
-        add_prefix: TypeId::new(&add_prefix),
-        remove_prefix: TypeId::new(&remove_prefix),
-        create_digest: TypeId::new(&create_digest),
-        digest_subset: TypeId::new(&digest_subset),
-        download_file: TypeId::new(&download_file),
-        platform: TypeId::new(&platform),
-        multi_platform_process: TypeId::new(&multi_platform_process),
-        process_result: TypeId::new(&process_result),
-        coroutine: TypeId::new(&coroutine),
-        session_values: TypeId::new(&session_values),
-        interactive_process: TypeId::new(&interactive_process),
-        interactive_process_result: TypeId::new(&interactive_process_result),
-        engine_aware_parameter: TypeId::new(&engine_aware_parameter),
-    })),
-    )
+#[pymethods]
+impl PyTasks {
+  #[new]
+  fn __new__() -> Self {
+    Self(RefCell::new(Tasks::new()))
   }
-});
+}
 
-cpython::py_class!(pub class PyExecutor |py| {
-    data executor: Executor;
-    def __new__(_cls, core_threads: usize, max_threads: usize) -> CPythonPyResult<Self> {
-      let executor = Executor::global(core_threads, max_threads).map_err(|e| cpython::PyErr::new::<cpython::exc::Exception, _>(py, (e,)))?;
-      Self::create_instance(py, executor)
-    }
-});
+#[pyclass]
+struct PyTypes(RefCell<Option<Types>>);
 
-cpython::py_class!(class PyScheduler |py| {
-    data scheduler: Scheduler;
-});
+#[pymethods]
+impl PyTypes {
+  #[new]
+  fn __new__(
+    file_digest: &PyType,
+    snapshot: &PyType,
+    paths: &PyType,
+    file_content: &PyType,
+    file_entry: &PyType,
+    directory: &PyType,
+    digest_contents: &PyType,
+    digest_entries: &PyType,
+    path_globs: &PyType,
+    merge_digests: &PyType,
+    add_prefix: &PyType,
+    remove_prefix: &PyType,
+    create_digest: &PyType,
+    digest_subset: &PyType,
+    download_file: &PyType,
+    platform: &PyType,
+    multi_platform_process: &PyType,
+    process_result: &PyType,
+    coroutine: &PyType,
+    session_values: &PyType,
+    interactive_process: &PyType,
+    interactive_process_result: &PyType,
+    engine_aware_parameter: &PyType,
+    py: Python,
+  ) -> Self {
+    Self(RefCell::new(Some(Types {
+      directory_digest: TypeId::new(py.get_type::<externs::fs::PyDigest>()),
+      file_digest: TypeId::new(file_digest),
+      snapshot: TypeId::new(snapshot),
+      paths: TypeId::new(paths),
+      file_content: TypeId::new(file_content),
+      file_entry: TypeId::new(file_entry),
+      directory: TypeId::new(directory),
+      digest_contents: TypeId::new(digest_contents),
+      digest_entries: TypeId::new(digest_entries),
+      path_globs: TypeId::new(path_globs),
+      merge_digests: TypeId::new(merge_digests),
+      add_prefix: TypeId::new(add_prefix),
+      remove_prefix: TypeId::new(remove_prefix),
+      create_digest: TypeId::new(create_digest),
+      digest_subset: TypeId::new(digest_subset),
+      download_file: TypeId::new(download_file),
+      platform: TypeId::new(platform),
+      multi_platform_process: TypeId::new(multi_platform_process),
+      process_result: TypeId::new(process_result),
+      coroutine: TypeId::new(coroutine),
+      session_values: TypeId::new(session_values),
+      interactive_process: TypeId::new(interactive_process),
+      interactive_process_result: TypeId::new(interactive_process_result),
+      engine_aware_parameter: TypeId::new(engine_aware_parameter),
+    })))
+  }
+}
 
-cpython::py_class!(class PyStdioDestination |py| {
-  data destination: Arc<stdio::Destination>;
-});
+#[pyclass]
+struct PyExecutor(task_executor::Executor);
 
-// Represents configuration related to process execution strategies.
-//
-// The data stored by PyExecutionStrategyOptions originally was passed directly into
-// scheduler_create but has been broken out separately because the large number of options
-// became unwieldy.
-cpython::py_class!(class PyExecutionStrategyOptions |py| {
-  data options: ExecutionStrategyOptions;
+#[pymethods]
+impl PyExecutor {
+  #[new]
+  fn __new__(core_threads: usize, max_threads: usize) -> PyO3Result<Self> {
+    let executor = Executor::global(core_threads, max_threads).map_err(PyException::new_err)?;
+    Ok(Self(executor))
+  }
+}
 
-  def __new__(
-    _cls,
+#[pyclass]
+struct PyScheduler(Scheduler);
+
+#[pyclass]
+struct PyStdioDestination(Arc<stdio::Destination>);
+
+/// Represents configuration related to process execution strategies.
+///
+/// The data stored by PyExecutionStrategyOptions originally was passed directly into
+/// scheduler_create but has been broken out separately because the large number of options
+/// became unwieldy.
+#[pyclass]
+struct PyExecutionStrategyOptions(ExecutionStrategyOptions);
+
+#[pymethods]
+impl PyExecutionStrategyOptions {
+  #[new]
+  fn __new__(
     local_parallelism: usize,
     remote_parallelism: usize,
     local_cleanup: bool,
     local_cache: bool,
     local_enable_nailgun: bool,
     remote_cache_read: bool,
-    remote_cache_write: bool
-  ) -> CPythonPyResult<Self> {
-    Self::create_instance(py,
-      ExecutionStrategyOptions {
-        local_parallelism,
-        remote_parallelism,
-        local_cleanup,
-        local_cache,
-        local_enable_nailgun,
-        remote_cache_read,
-        remote_cache_write,
-      }
-    )
+    remote_cache_write: bool,
+  ) -> Self {
+    Self(ExecutionStrategyOptions {
+      local_parallelism,
+      remote_parallelism,
+      local_cleanup,
+      local_cache,
+      local_enable_nailgun,
+      remote_cache_read,
+      remote_cache_write,
+    })
   }
-});
+}
 
-// Represents configuration related to remote execution and caching.
-cpython::py_class!(class PyRemotingOptions |py| {
-  data options: RemotingOptions;
+/// Represents configuration related to remote execution and caching.
+#[pyclass]
+struct PyRemotingOptions(RemotingOptions);
 
-  def __new__(
-    _cls,
+#[pymethods]
+impl PyRemotingOptions {
+  #[new]
+  fn __new__(
     execution_enable: bool,
     store_address: Option<String>,
     execution_address: Option<String>,
@@ -593,177 +595,177 @@ cpython::py_class!(class PyRemotingOptions |py| {
     execution_headers: Vec<(String, String)>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
-  ) -> CPythonPyResult<Self> {
-    Self::create_instance(py,
-      RemotingOptions {
-        execution_enable,
-        store_address,
-        execution_address,
-        execution_process_cache_namespace,
-        instance_name,
-        root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
-        store_headers: store_headers.into_iter().collect(),
-        store_chunk_bytes,
-        store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
-        store_rpc_retries,
-        store_rpc_concurrency,
-        store_batch_api_size_limit,
-        cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior).unwrap(),
-        cache_eager_fetch,
-        cache_rpc_concurrency,
-        execution_extra_platform_properties,
-        execution_headers: execution_headers.into_iter().collect(),
-        execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
-        execution_rpc_concurrency,
-      }
-    )
+  ) -> Self {
+    Self(RemotingOptions {
+      execution_enable,
+      store_address,
+      execution_address,
+      execution_process_cache_namespace,
+      instance_name,
+      root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
+      store_headers: store_headers.into_iter().collect(),
+      store_chunk_bytes,
+      store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
+      store_rpc_retries,
+      store_rpc_concurrency,
+      store_batch_api_size_limit,
+      cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior)
+        .unwrap(),
+      cache_eager_fetch,
+      cache_rpc_concurrency,
+      execution_extra_platform_properties,
+      execution_headers: execution_headers.into_iter().collect(),
+      execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+      execution_rpc_concurrency,
+    })
   }
-});
+}
 
-cpython::py_class!(class PyLocalStoreOptions |py| {
-  data options: LocalStoreOptions;
+#[pyclass]
+struct PyLocalStoreOptions(LocalStoreOptions);
 
-  def __new__(
-    _cls,
+#[pymethods]
+impl PyLocalStoreOptions {
+  #[new]
+  fn __new__(
     store_dir: String,
     process_cache_max_size_bytes: usize,
     files_max_size_bytes: usize,
     directories_max_size_bytes: usize,
     lease_time_millis: u64,
     shard_count: u8,
-  ) -> CPythonPyResult<Self> {
+  ) -> PyO3Result<Self> {
     if shard_count.count_ones() != 1 {
-        let err_string = format!("The local store shard count must be a power of two: got {}", shard_count);
-        return Err(cpython::PyErr::new::<cpython::exc::ValueError, _>(py, (err_string,)));
+      return Err(PyValueError::new_err(format!(
+        "The local store shard count must be a power of two: got {}",
+        shard_count
+      )));
     }
-    Self::create_instance(py,
-      LocalStoreOptions {
-        store_dir: PathBuf::from(store_dir),
-        process_cache_max_size_bytes,
-        files_max_size_bytes,
-        directories_max_size_bytes,
-        lease_time: Duration::from_millis(lease_time_millis),
-        shard_count,
-      }
-    )
+    Self(LocalStoreOptions {
+      store_dir: PathBuf::from(store_dir),
+      process_cache_max_size_bytes,
+      files_max_size_bytes,
+      directories_max_size_bytes,
+      lease_time: Duration::from_millis(lease_time_millis),
+      shard_count,
+    })
   }
-});
+}
 
-cpython::py_class!(class PySession |py| {
-    data session: Session;
-    def __new__(_cls,
-          scheduler: PyScheduler,
-          should_render_ui: bool,
-          build_id: String,
-          session_values: cpython::PyObject,
-          cancellation_latch: PySessionCancellationLatch,
-    ) -> CPythonPyResult<Self> {
-      // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
-      // held.
-      let core = scheduler.scheduler(py).core.clone();
-      let cancellation_latch = cancellation_latch.cancelled(py).clone();
-      let session = py.allow_threads(|| Session::new(
+#[pyclass]
+struct PySession(Session);
+
+#[pymethods]
+impl PySession {
+  #[new]
+  fn __new__(
+    scheduler: PyScheduler,
+    should_render_ui: bool,
+    build_id: String,
+    session_values: PyObject,
+    cancellation_latch: PySessionCancellationLatch,
+    py: Python,
+  ) -> PyO3Result<Self> {
+    let core = scheduler.0.core.clone();
+    let cancellation_latch = cancellation_latch.0.clone();
+    // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
+    // held.
+    let session = py
+      .allow_threads(|| {
+        Session::new(
           core,
           should_render_ui,
           build_id,
           session_values.into(),
           cancellation_latch,
-        )).map_err(|err_str| cpython::PyErr::new::<cpython::exc::Exception, _>(py, (err_str,)))?;
-      Self::create_instance(py, session)
-    }
+        )
+      })
+      .map_err(PyException::new_err)?;
+    Ok(Self(session))
+  }
 
-    def cancel(&self) -> PyUnitResult {
-        self.session(py).cancel();
-        Ok(None)
-    }
+  fn cancel(&self) {
+    self.0.cancel()
+  }
 
-    def is_cancelled(&self) -> CPythonPyResult<bool> {
-        Ok(self.session(py).is_cancelled())
-    }
-});
+  fn is_cancelled(&self) -> bool {
+    self.0.is_cancelled()
+  }
+}
 
-cpython::py_class!(class PySessionCancellationLatch |py| {
-    data cancelled: AsyncLatch;
-    def __new__(_cls) -> CPythonPyResult<Self> {
-      Self::create_instance(py, AsyncLatch::new())
-    }
+#[pyclass]
+struct PySessionCancellationLatch(AsyncLatch);
 
-    def is_cancelled(&self) -> CPythonPyResult<bool> {
-        Ok(self.cancelled(py).poll_triggered())
-    }
-});
+#[pymethods]
+impl PySessionCancellationLatch {
+  #[new]
+  fn __new__() -> Self {
+    Self(AsyncLatch::new())
+  }
 
-cpython::py_class!(class PyNailgunServer |py| {
-    data server: RefCell<Option<nailgun::Server>>;
-    data executor: Executor;
+  fn is_cancelled(&self) -> bool {
+    self.0.poll_triggered()
+  }
+}
 
-    def port(&self) -> CPythonPyResult<u16> {
-        let borrowed_server = self.server(py).borrow();
-        let server = borrowed_server.as_ref().ok_or_else(|| {
-          cpython::PyErr::new::<cpython::exc::Exception, _>(py, ("Cannot get the port of a server that has already shut down.",))
-        })?;
-        Ok(server.port())
-    }
-});
+#[pyclass]
+struct PyNailgunServer {
+  server: RefCell<Option<nailgun::Server>>,
+  executor: Executor,
+}
 
-cpython::py_class!(class PyExecutionRequest |py| {
-    data execution_request: RefCell<ExecutionRequest>;
-    def __new__(
-      _cls,
-      poll: bool,
-      poll_delay_in_ms: Option<u64>,
-      timeout_in_ms: Option<u64>,
-    ) -> CPythonPyResult<Self> {
-      let request = ExecutionRequest {
-        poll,
-        poll_delay: poll_delay_in_ms.map(Duration::from_millis),
-        timeout: timeout_in_ms.map(Duration::from_millis),
-        ..ExecutionRequest::default()
-      };
-      Self::create_instance(py, RefCell::new(request))
-    }
-});
+#[pymethods]
+impl PyNailgunServer {
+  fn port(&self) -> PyO3Result<u16> {
+    let borrowed_server = self.server.borrow();
+    let server = borrowed_server.as_ref().ok_or_else(|| {
+      PyException::new_err("Cannot get the port of a server that has already shut down.")
+    })?;
+    Ok(server.port())
+  }
+}
 
-cpython::py_class!(class PyResult |py| {
-    data _is_throw: bool;
-    data _result: cpython::PyObject;
-    data _python_traceback: cpython::PyString;
-    data _engine_traceback: cpython::PyList;
+#[pyclass]
+struct PyExecutionRequest(RefCell<ExecutionRequest>);
 
-    def __new__(_cls, is_throw: bool, result: cpython::PyObject, python_traceback: cpython::PyString, engine_traceback: cpython::PyList) -> CPythonPyResult<Self> {
-      Self::create_instance(py, is_throw, result, python_traceback, engine_traceback)
-    }
+#[pymethods]
+impl PyExecutionRequest {
+  #[new]
+  fn __new__(poll: bool, poll_delay_in_ms: Option<u64>, timeout_in_ms: Option<u64>) -> Self {
+    let request = ExecutionRequest {
+      poll,
+      poll_delay: poll_delay_in_ms.map(Duration::from_millis),
+      timeout: timeout_in_ms.map(Duration::from_millis),
+      ..ExecutionRequest::default()
+    };
+    Self(RefCell::new(request))
+  }
+}
 
-    def is_throw(&self) -> CPythonPyResult<bool> {
-        Ok(*self._is_throw(py))
-    }
+#[pyclass]
+struct PyResult {
+  #[pyo3(get)]
+  is_throw: bool,
+  #[pyo3(get)]
+  result: PyObject,
+  #[pyo3(get)]
+  python_traceback: Py<PyString>,
+  #[pyo3(get)]
+  engine_traceback: Py<PyList>,
+}
 
-    def result(&self) -> CPythonPyResult<cpython::PyObject> {
-        Ok(self._result(py).clone_ref(py))
-    }
-
-    def python_traceback(&self) -> CPythonPyResult<cpython::PyString> {
-        Ok(self._python_traceback(py).clone_ref(py))
-    }
-
-    def engine_traceback(&self) -> CPythonPyResult<cpython::PyList> {
-        Ok(self._engine_traceback(py).clone_ref(py))
-    }
-});
-
-fn py_result_from_root(
-  py: cpython::Python,
-  result: Result<Value, Failure>,
-) -> CPythonPyResult<PyResult> {
+fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyO3Result<Py<PyResult>> {
   match result {
     Ok(val) => {
       let engine_traceback: Vec<String> = vec![];
-      PyResult::create_instance(
+      Py::new(
         py,
-        false,
-        val.into(),
-        "".to_py_object(py),
-        engine_traceback.to_py_object(py),
+        PyResult {
+          is_throw: false,
+          result: val.into(),
+          python_traceback: "".into(),
+          engine_traceback: engine_traceback.into(),
+        },
       )
     }
     Err(f) => {
@@ -782,12 +784,14 @@ fn py_result_from_root(
           engine_traceback,
         } => (val, python_traceback, engine_traceback),
       };
-      PyResult::create_instance(
+      Py::new(
         py,
-        true,
-        val.into(),
-        python_traceback.to_py_object(py),
-        engine_traceback.to_py_object(py),
+        PyResult {
+          is_throw: true,
+          result: val.into(),
+          python_traceback: python_traceback.into(),
+          engine_traceback: engine_traceback.into(),
+        },
       )
     }
   }
@@ -945,7 +949,7 @@ fn scheduler_create(
   }
   let core: Result<Core, String> = with_executor(py, &executor_ptr, |executor| {
     let types = types_ptr
-      .types(py)
+      .0
       .borrow_mut()
       .take()
       .ok_or_else(|| "An instance of PyTypes may only be used once.".to_owned())?;
@@ -1961,12 +1965,12 @@ fn stdio_initialize(
     )
   })?;
 
-  Ok(cpython::PyTuple::new(
+  Ok(PyTuple::new(
     py,
     &[
-      externs::stdio::py_stdio_read()?.into_object(),
-      externs::stdio::py_stdio_write(true)?.into_object(),
-      externs::stdio::py_stdio_write(false)?.into_object(),
+      Py::new(py, externs::stdio::PyStdioRead)?,
+      Py::new(py, externs::stdio::PyStdioWrite { is_stdout: true })?,
+      Py::new(py, externs::stdio::PyStdioWrite { is_stdout: false })?,
     ],
   ))
 }

@@ -1,13 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// File-specific allowances to silence internal warnings of `py_class!`.
-#![allow(
-  clippy::used_underscore_binding,
-  clippy::transmute_ptr_to_ptr,
-  clippy::zero_ptr
-)]
-
 pub mod engine_aware;
 pub mod fs;
 mod interface;
