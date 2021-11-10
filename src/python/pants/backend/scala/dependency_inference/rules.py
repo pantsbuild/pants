@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.dependency_inference.symbol_mapper import FirstPartyScalaSymbolMapping
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
@@ -70,4 +71,8 @@ async def infer_scala_dependencies_via_source_analysis(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *scala_parser.rules(),
+        *symbol_mapper.rules(),
+    ]

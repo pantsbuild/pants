@@ -10,7 +10,6 @@ from pants.backend.java.target_types import (  # TODO: All of these should move 
 from pants.backend.java.test import junit  # TODO: Should move to the JVM package.
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
-from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.goals import check, tailor
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.backend.scala.target_types import rules as target_types_rules
@@ -46,8 +45,6 @@ def rules():
         *coursier_setup.rules(),
         *jvm_util_rules.rules(),
         *jdk_rules.rules(),
-        *scala_parser.rules(),
-        *symbol_mapper.rules(),
         *dep_inf_rules.rules(),
         *target_types_rules(),
     ]
