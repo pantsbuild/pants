@@ -277,10 +277,7 @@ class Scheduler:
             self.py_scheduler, root_subject_types, product_type
         )
 
-    def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
-        filenames = set(direct_filenames)
-        # TODO(#11707): Evaluate removing the invalidation of parent directories.
-        filenames.update(os.path.dirname(f) for f in direct_filenames)
+    def invalidate_files(self, filenames: Iterable[str]) -> int:
         return native_engine.graph_invalidate_paths(self.py_scheduler, tuple(filenames))
 
     def invalidate_all_files(self) -> int:

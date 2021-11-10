@@ -37,8 +37,8 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
-use notify::event::Flag;
-use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{Flag, ModifyKind};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
 
@@ -185,7 +185,9 @@ impl InvalidationWatcher {
     canonical_build_root: &Path,
     ev: Event,
   ) {
+    let is_data_only_event = matches!(ev.kind, EventKind::Modify(ModifyKind::Data(_)));
     let flag = ev.flag();
+
     let paths: HashSet<_> = ev
       .paths
       .into_iter()
@@ -218,16 +220,19 @@ impl InvalidationWatcher {
         }
       })
       .flat_map(|path_relative_to_build_root| {
-        let mut paths_to_invalidate: Vec<PathBuf> = vec![];
-        if let Some(parent_dir) = path_relative_to_build_root.parent() {
-          paths_to_invalidate.push(parent_dir.to_path_buf());
+        let mut paths_to_invalidate: Vec<PathBuf> = Vec::with_capacity(2);
+        if !is_data_only_event {
+          // If the event is anything other than a data change event (a change to the content of
+          // a file), then we additionally invalidate the parent of the path.
+          if let Some(parent_dir) = path_relative_to_build_root.parent() {
+            paths_to_invalidate.push(parent_dir.to_path_buf());
+          }
         }
         paths_to_invalidate.push(path_relative_to_build_root);
         paths_to_invalidate
       })
       .collect();
 
-    // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
     if flag == Some(Flag::Rescan) {
       debug!("notify queue overflowed: invalidating all paths");
       invalidatable.invalidate_all("notify");
