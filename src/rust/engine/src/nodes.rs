@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::Python;
+use pyo3::prelude::{Py, PyAny, Python};
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -25,7 +25,6 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use crate::Types;
-use cpython::PythonObject;
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -265,8 +264,9 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &cpython::PyObject) -> Result<hashing::Digest, String> {
-  externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
+pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+  let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  Ok(py_digest.0)
 }
 
 pub fn lift_file_digest(
@@ -751,9 +751,8 @@ impl Snapshot {
   }
 
   pub fn store_directory_digest(py: Python, item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::to_py_digest(py, *item)
-      .map(|d| d.into_object().into())
-      .map_err(|e| format!("{:?}", e))
+    let py_digest = Py::new(py, externs::fs::PyDigest(*item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_digest.into_py(py)))
   }
 
   pub fn lift_file_digest(item: &cpython::PyObject) -> Result<hashing::Digest, String> {
@@ -781,9 +780,8 @@ impl Snapshot {
   }
 
   pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
-    externs::fs::to_py_snapshot(py, item)
-      .map(|d| d.into_object().into())
-      .map_err(|e| format!("{:?}", e))
+    let py_snapshot = Py::new(py, externs::fs::PySnapshot(*item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_snapshot.into_py(py)))
   }
 
   fn store_path(py: Python, item: &Path) -> Result<Value, String> {

@@ -59,6 +59,10 @@ fn native_engine_new(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
   m.add_class::<externs::PyGeneratorResponseGet>()?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
+
+  m.add_class::<externs::fs::PyDigest>()?;
+  m.add_class::<externs::fs::PySnapshot>()?;
+
   Ok(())
 }
 
@@ -442,9 +446,6 @@ cpython::py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PySessionCancellationLatch>(py)?;
   m.add_class::<PyTasks>(py)?;
   m.add_class::<PyTypes>(py)?;
-
-  m.add_class::<externs::fs::PyDigest>(py)?;
-  m.add_class::<externs::fs::PySnapshot>(py)?;
 
   m.add_class::<PyStdioDestination>(py)?;
 

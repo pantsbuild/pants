@@ -699,16 +699,12 @@ dependencies = [
 name = "engine_pyo3"
 version = "0.0.1"
 dependencies = [
- "either",
  "fs",
- "hashing",
- "itertools 0.10.1",
  "mock",
  "nailgun",
  "parking_lot",
  "pyo3",
  "pyo3-build-config",
- "store",
  "task_executor",
  "workunit_store",
 ]
