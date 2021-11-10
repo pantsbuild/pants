@@ -7,7 +7,8 @@ use crate::nodes::{lift_directory_digest, lift_file_digest};
 use crate::python::{TypeId, Value};
 use crate::Types;
 
-use cpython::{ObjectProtocol, PyDict, PyString, Python};
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use workunit_store::{
   ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
 };
@@ -47,49 +48,50 @@ impl EngineAwareReturnType {
   }
 
   fn level(py: Python, value: &Value) -> Option<Level> {
-    let level_val = externs::call_method0(py, value, "level").ok()?;
-    if level_val.is_none(py) {
+    let level_val = value.into_ref(py).call_method0("level").ok()?;
+    if level_val.is_none() {
       return None;
     }
     externs::val_to_log_level(&level_val).ok()
   }
 
   fn message(py: Python, value: &Value) -> Option<String> {
-    let msg_val = externs::call_method0(py, value, "message").ok()?;
-    if msg_val.is_none(py) {
+    let msg_val = value.into_ref(py).call_method0("message").ok()?;
+    if msg_val.is_none() {
       return None;
     }
-    msg_val.extract(py).ok()
+    msg_val.extract().ok()
   }
 
   fn artifacts(py: Python, types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
-    let artifacts_val = externs::call_method0(py, value, "artifacts").ok()?;
-    if artifacts_val.is_none(py) {
+    let artifacts_val = value.into_ref(py).call_method0("artifacts").ok()?;
+    if artifacts_val.is_none() {
       return None;
     }
 
-    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
+    let artifacts_dict = artifacts_val.cast_as::<PyDict>().ok()?;
     let mut output = Vec::new();
 
-    for (key, value) in artifacts_dict.items(py).into_iter() {
-      let key_name: String = key.cast_as::<PyString>(py).ok()?.to_string_lossy(py).into();
-
-      let artifact_output = if TypeId::new(&value.get_type(py)) == types.file_digest {
-        lift_file_digest(types, &value).map(ArtifactOutput::FileDigest)
+    for kv_pair in artifacts_dict.items().into_iter() {
+      let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
+      let artifact_output = if TypeId::new(&value.get_type()) == types.file_digest {
+        lift_file_digest(types, value).map(ArtifactOutput::FileDigest)
       } else {
-        let digest_value = value.getattr(py, "digest").ok()?;
+        let digest_value = value.getattr("digest").ok()?;
         lift_directory_digest(&digest_value).map(ArtifactOutput::Snapshot)
       }
       .ok()?;
-      output.push((key_name, artifact_output));
+      output.push((key, artifact_output));
     }
     Some(output)
   }
 
   pub(crate) fn is_cacheable(py: Python, value: &Value) -> Option<bool> {
-    externs::call_method0(py, value, "cacheable")
+    value
+      .into_ref(py)
+      .call_method0("cacheable")
       .ok()?
-      .extract(py)
+      .extract()
       .ok()
   }
 }
@@ -98,11 +100,11 @@ pub struct EngineAwareParameter;
 
 impl EngineAwareParameter {
   pub fn debug_hint(py: Python, value: &Value) -> Option<String> {
-    let hint = externs::call_method0(py, value, "debug_hint").ok()?;
-    if hint.is_none(py) {
+    let hint = value.into_ref(py).call_method0("debug_hint").ok()?;
+    if hint.is_none() {
       return None;
     }
-    hint.extract(py).ok()
+    hint.extract().ok()
   }
 
   pub fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
@@ -115,22 +117,22 @@ fn metadata(
   context: &Context,
   value: &Value,
 ) -> Option<Vec<(String, UserMetadataItem)>> {
-  let metadata_val = externs::call_method0(py, value, "metadata").ok()?;
-  if metadata_val.is_none(py) {
+  let metadata_val = value.into_ref(py).call_method0("metadata").ok()?;
+  if metadata_val.is_none() {
     return None;
   }
 
   let mut output = Vec::new();
-  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
+  let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
 
-  for (key, value) in metadata_dict.items(py).into_iter() {
-    let key_name: String = key.extract(py).ok()?;
+  for kv_pair in metadata_dict.items().into_iter() {
+    let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
     let py_value_handle = UserMetadataPyValue::new();
     let umi = UserMetadataItem::PyValue(py_value_handle.clone());
     context.session.with_metadata_map(|map| {
-      map.insert(py_value_handle.clone(), value.into());
+      map.insert(py_value_handle.clone(), Value::new(value.into_py(py)));
     });
-    output.push((key_name, umi));
+    output.push((key, umi));
   }
   Some(output)
 }

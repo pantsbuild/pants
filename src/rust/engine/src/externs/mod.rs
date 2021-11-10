@@ -138,7 +138,10 @@ pub fn collect_iterable(value: &cpython::PyObject) -> Result<Vec<cpython::PyObje
 }
 
 /// Read a `FrozenDict[str, str]`.
-pub fn getattr_from_str_frozendict(value: &cpython::PyObject, field: &str) -> BTreeMap<String, String> {
+pub fn getattr_from_str_frozendict(
+  value: &cpython::PyObject,
+  field: &str,
+) -> BTreeMap<String, String> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: cpython::PyDict = getattr(&frozendict, "_data").unwrap();
   let gil = cpython::Python::acquire_gil();
@@ -179,7 +182,7 @@ pub fn val_to_str(obj: &cpython::PyObject) -> String {
   pystring.to_string(py).unwrap().into_owned()
 }
 
-pub fn val_to_log_level(obj: &cpython::PyObject) -> Result<log::Level, String> {
+pub fn val_to_log_level(obj: &PyAny) -> Result<log::Level, String> {
   let res: Result<PythonLogLevel, String> = getattr(obj, "_level").and_then(|n: u64| {
     n.try_into()
       .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
@@ -198,14 +201,6 @@ pub fn doc_url(py: Python, slug: &str) -> String {
 
 pub fn create_exception(py: cpython::Python, msg: &str) -> Value {
   Value::from(cpython::PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
-}
-
-pub fn call_method0(
-  py: cpython::Python,
-  value: &cpython::PyObject,
-  method: &str,
-) -> Result<cpython::PyObject, cpython::PyErr> {
-  value.call_method(py, method, cpython::PyTuple::new(py, &[]), None)
 }
 
 pub fn call_function<T: AsRef<cpython::PyObject>>(
