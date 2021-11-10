@@ -497,7 +497,7 @@ fn interactive_process(
     let restartable: bool = externs::getattr(&value, "restartable").unwrap();
     let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
     let input_digest: Digest = lift_directory_digest(&input_digest_value)?;
-    let env = externs::getattr_from_frozendict(&value, "env");
+    let env = externs::getattr_from_str_frozendict(&value, "env");
     let session = context.session;
 
     if !restartable {
