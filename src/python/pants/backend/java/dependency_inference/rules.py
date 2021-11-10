@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.java.dependency_inference import import_parser, java_parser
+from pants.backend.java.dependency_inference import import_parser, java_parser, symbol_mapper
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
@@ -21,13 +21,13 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference import artifact_mapper, package_mapper
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AvailableThirdPartyArtifacts,
     ThirdPartyPackageToArtifactMapping,
     find_artifact_mapping,
 )
-from pants.jvm.dependency_inference.package_mapper import FirstPartyPackageMapping
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
 async def infer_java_dependencies_via_imports(
     request: InferJavaSourceDependencies,
     java_infer_subsystem: JavaInferSubsystem,
-    first_party_dep_map: FirstPartyPackageMapping,
+    first_party_dep_map: FirstPartySymbolMapping,
     third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
 ) -> InferredDependencies:
@@ -75,12 +75,12 @@ async def infer_java_dependencies_via_imports(
 
         types.update(maybe_qualify_types)
 
-    dep_map = first_party_dep_map.package_rooted_dependency_map
+    dep_map = first_party_dep_map.symbols
 
     dependencies: OrderedSet[Address] = OrderedSet()
 
     for typ in types:
-        first_party_matches = dep_map.addresses_for_type(typ)
+        first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
         if java_infer_subsystem.third_party_imports:
             third_party_matches = find_artifact_mapping(
@@ -116,7 +116,7 @@ def rules():
         *artifact_mapper.rules(),
         *java_parser.rules(),
         *import_parser.rules(),
-        *package_mapper.rules(),
+        *symbol_mapper.rules(),
         *source_files_rules(),
         UnionRule(InferDependenciesRequest, InferJavaSourceDependencies),
     ]

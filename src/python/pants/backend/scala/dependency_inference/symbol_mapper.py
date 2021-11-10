@@ -2,52 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMap
 from pants.util.logging import LogLevel
-
-
-class SymbolMap:
-    def __init__(self):
-        self._symbol_map: dict[str, set[Address]] = defaultdict(set)
-
-    def add_symbol(self, symbol: str, address: Address):
-        """Declare a single Address as a provider of a symbol."""
-        self._symbol_map[symbol].add(address)
-
-    def addresses_for_symbol(self, symbol: str) -> frozenset[Address]:
-        """Returns the set of addresses that provide the passed symbol.
-
-        :param symbol: a fully-qualified Scala symbol (e.g. `foo.bar.Thing`).
-        """
-        return frozenset(self._symbol_map[symbol])
-
-    def merge(self, other: SymbolMap) -> None:
-        """Merge 'other' into this dependency map."""
-        for symbol, addresses in other._symbol_map.items():
-            self._symbol_map[symbol] |= addresses
-
-    def to_json_dict(self):
-        return {
-            "symbol_map": {
-                sym: [str(addr) for addr in addrs] for sym, addrs in self._symbol_map.items()
-            },
-        }
-
-    def __repr__(self) -> str:
-        symbol_map = ", ".join(
-            f"{ty}:{', '.join(str(addr) for addr in addrs)}"
-            for ty, addrs in self._symbol_map.items()
-        )
-        return f"SymbolMap(symbol_map={symbol_map})"
 
 
 @dataclass(frozen=True)
