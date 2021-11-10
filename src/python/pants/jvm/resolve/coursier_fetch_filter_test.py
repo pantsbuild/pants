@@ -8,12 +8,14 @@ from unittest import mock
 
 import pytest
 
+from pants.engine.fs import EMPTY_DIGEST
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
 )
+from pants.jvm.resolve.key import CoursierResolveKey
 
 coord1 = Coordinate("test", "art1", "1.0.0")
 coord2 = Coordinate("test", "art2", "1.0.0")
@@ -85,8 +87,9 @@ def test_filter_transitive_includes_transitive_deps(lockfile: CoursierResolvedLo
 
 
 def filter(coordinate, lockfile, transitive) -> Sequence[Coordinate]:
+    key = CoursierResolveKey("example", "example.json", EMPTY_DIGEST)
     if transitive:
-        root, deps = lockfile.dependencies(coordinate)
+        root, deps = lockfile.dependencies(key, coordinate)
     else:
-        root, deps = lockfile.direct_dependencies(coordinate)
+        root, deps = lockfile.direct_dependencies(key, coordinate)
     return list(i.coord for i in (root, *deps))
