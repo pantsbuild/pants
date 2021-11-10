@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import List
+
 _STDLIB_MODULES = [
     # See https://docs.python.org/3/library/sys.html#sys.stdlib_module_names
     # No modules should be removed, unless the version of Python that removed the module is no longer
@@ -309,7 +311,7 @@ _STDLIB_MODULES = [
     "zoneinfo",
 ]
 
-_KNOWN_SYSTEM_MODULES = [
+_KNOWN_SYSTEM_MODULES: List[str] = [
     # Add the first one, if ye dare!
 ]
 

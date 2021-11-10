@@ -192,7 +192,7 @@ async def infer_python_dependencies_via_imports(
     )
 
     merged_result: set[Address] = set()
-    unowned_imports: set[ParsedPythonImports] = set()
+    unowned_imports: set[str] = set()
     address = wrapped_tgt.target.address
     for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
