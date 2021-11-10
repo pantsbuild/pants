@@ -6,7 +6,6 @@ import logging
 
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.dependency_inference.symbol_mapper import FirstPartyScalaSymbolMapping
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.build_graph.address import Address
@@ -21,6 +20,8 @@ from pants.engine.target import (
     InferredDependencies,
     WrappedTarget,
 )
+from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class InferScalaSourceDependencies(InferDependenciesRequest):
 async def infer_scala_dependencies_via_source_analysis(
     request: InferScalaSourceDependencies,
     scala_infer_subsystem: ScalaInferSubsystem,
-    first_party_symbol_map: FirstPartyScalaSymbolMapping,
+    first_party_symbol_map: FirstPartySymbolMapping,
 ) -> InferredDependencies:
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])
@@ -75,4 +76,5 @@ def rules():
         *collect_rules(),
         *scala_parser.rules(),
         *symbol_mapper.rules(),
+        UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
     ]
