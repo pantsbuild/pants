@@ -218,7 +218,7 @@ async def infer_python_dependencies_via_imports(
             "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
             "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
             "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred\n"
-            "See {doc_url(python-third-party-dependencies)}"
+            "See {doc_url('python-third-party-dependencies')}"
         )
 
         if raise_error:
