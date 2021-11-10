@@ -3,8 +3,8 @@
 
 import pytest
 
-from pants.backend.java import tailor
-from pants.backend.java.tailor import PutativeJavaTargetsRequest, classify_source_files
+from pants.backend.java.goals import tailor
+from pants.backend.java.goals.tailor import PutativeJavaTargetsRequest, classify_source_files
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,

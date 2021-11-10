@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java import tailor
 from pants.backend.java.compile import javac
 from pants.backend.java.dependency_inference import (
     import_parser,
@@ -10,7 +9,7 @@ from pants.backend.java.dependency_inference import (
     package_mapper,
 )
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
-from pants.backend.java.goals import check
+from pants.backend.java.goals import check, tailor
 from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
     DeployJar,
