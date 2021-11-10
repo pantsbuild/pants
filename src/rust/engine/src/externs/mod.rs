@@ -26,6 +26,7 @@ use crate::python::{Failure, Key, TypeId, Value};
 use cpython::ObjectProtocol;
 use lazy_static::lazy_static;
 use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
 use pyo3::ToPyObject;
@@ -170,16 +171,11 @@ pub fn getattr_as_optional_string(
 /// Call the equivalent of `str()` on an arbitrary Python object.
 ///
 /// Converts `None` to the empty string.
-pub fn val_to_str(obj: &cpython::PyObject) -> String {
-  let gil = cpython::Python::acquire_gil();
-  let py = gil.python();
-
-  if *obj == py.None() {
+pub fn val_to_str(obj: &PyAny) -> String {
+  if obj.is_none() {
     return "".to_string();
   }
-
-  let pystring = obj.str(py).unwrap();
-  pystring.to_string(py).unwrap().into_owned()
+  obj.str().unwrap().extract().unwrap()
 }
 
 pub fn val_to_log_level(obj: &PyAny) -> Result<log::Level, String> {
@@ -199,8 +195,8 @@ pub fn doc_url(py: Python, slug: &str) -> String {
   doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }
 
-pub fn create_exception(py: cpython::Python, msg: &str) -> Value {
-  Value::from(cpython::PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
+pub fn create_exception(py: Python, msg: &str) -> Value {
+  Value::new(PyException::new_err(msg).into_py(py))
 }
 
 pub fn call_function<T: AsRef<cpython::PyObject>>(

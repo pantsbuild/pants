@@ -8,7 +8,7 @@ use std::{fmt, hash};
 
 use fnv::FnvHasher;
 use pyo3::prelude::*;
-use pyo3::types::PyType;
+use pyo3::types::{PyDict, PyType};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::SmallVec;
 
@@ -307,7 +307,11 @@ impl AsRef<PyObject> for Value {
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(self.as_ref()))
+    let repr = Python::with_gil(|py| {
+      let obj = self.into_ref(py);
+      externs::val_to_str(obj)
+    });
+    write!(f, "{}", repr)
   }
 }
 
@@ -385,30 +389,32 @@ impl Failure {
 }
 
 impl Failure {
-  pub fn from_py_err(py_err: cpython::PyErr) -> Failure {
-    let gil = cpython::Python::acquire_gil();
+  pub fn from_py_err(py_err: PyErr) -> Failure {
+    let gil = Python::acquire_gil();
     let py = gil.python();
     Failure::from_py_err_with_gil(py, py_err)
   }
-  pub fn from_py_err_with_gil(py: cpython::Python, mut py_err: cpython::PyErr) -> Failure {
-    let val = Value::from(py_err.instance(py));
-    let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
-      let locals = cpython::PyDict::new(py);
+
+  pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
+    let maybe_ptraceback = py_err.ptraceback(py);
+    let val = Value::from(py_err.into_py(py));
+    let python_traceback = if let Some(tb) = maybe_ptraceback {
+      let locals = PyDict::new(py);
       locals
-        .set_item(py, "traceback", py.import("traceback").unwrap())
+        .set_item("traceback", py.import("traceback").unwrap())
         .unwrap();
-      locals.set_item(py, "tb", tb).unwrap();
-      locals.set_item(py, "val", &val).unwrap();
+      locals.set_item("tb", tb).unwrap();
+      locals.set_item("val", &val).unwrap();
       py.eval(
         "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
         None,
         Some(&locals),
       )
       .unwrap()
-      .extract::<String>(py)
+      .extract::<String>()
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(val.as_ref()))
+      Self::native_traceback(&externs::val_to_str(val.into_ref(py)))
     };
     Failure::Throw {
       val,
@@ -429,7 +435,13 @@ impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val.as_ref())),
+      Failure::Throw { val, .. } => {
+        let repr = Python::with_gil(|py| {
+          let obj = val.into_ref(py);
+          externs::val_to_str(obj)
+        });
+        write!(f, "{}", repr)
+      }
     }
   }
 }
