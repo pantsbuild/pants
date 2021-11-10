@@ -9,7 +9,7 @@ from pants.engine.addresses import Address
 
 
 class PackageRootedDependencyMap:
-    """A utility class for mapping Java FQTs to owning source Addresses.
+    """A utility class for mapping JVM FQTs to owning source Addresses.
 
     Keep tracks of which Address provides a fully qualified symbol.
     """

@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from pants.backend.java.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
 from pants.engine.addresses import Address
+from pants.jvm.dependency_inference.package_prefix_tree import PackageRootedDependencyMap
 
 
 def test_package_rooted_dependency_map() -> None:

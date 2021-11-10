@@ -4,18 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.java.dependency_inference import (
-    artifact_mapper,
-    import_parser,
-    java_parser,
-    package_mapper,
-)
-from pants.backend.java.dependency_inference.artifact_mapper import (
-    AvailableThirdPartyArtifacts,
-    ThirdPartyJavaPackageToArtifactMapping,
-    find_artifact_mapping,
-)
-from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
+from pants.backend.java.dependency_inference import import_parser, java_parser
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
@@ -32,6 +21,13 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference import artifact_mapper, package_mapper
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AvailableThirdPartyArtifacts,
+    ThirdPartyPackageToArtifactMapping,
+    find_artifact_mapping,
+)
+from pants.jvm.dependency_inference.package_mapper import FirstPartyPackageMapping
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -45,8 +41,8 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
 async def infer_java_dependencies_via_imports(
     request: InferJavaSourceDependencies,
     java_infer_subsystem: JavaInferSubsystem,
-    first_party_dep_map: FirstPartyJavaPackageMapping,
-    third_party_artifact_mapping: ThirdPartyJavaPackageToArtifactMapping,
+    first_party_dep_map: FirstPartyPackageMapping,
+    third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
 ) -> InferredDependencies:
     if (
