@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from itertools import groupby
 
 from pants.backend.java.dependency_inference import (
     artifact_mapper,
@@ -79,9 +80,17 @@ async def infer_java_dependencies_via_imports(
 
         types.update(maybe_qualify_types)
 
+    # Resolve the export types into (probable) types:
+    consumed_type_mapping_ = sorted(((typ.rpartition(".")[2], typ) for typ in types))
+    consumed_type_mapping__ = groupby(consumed_type_mapping_, lambda i: i[0])
+    consumed_type_mapping = {i: {k[1] for k in j} for (i, j) in consumed_type_mapping__}
+    export_types = {i for typ in analysis.export_types for i in consumed_type_mapping.get(typ, [])}
+    export_types.update(typ for typ in analysis.export_types if "." in typ)
+
     dep_map = first_party_dep_map.package_rooted_dependency_map
 
     dependencies: OrderedSet[Address] = OrderedSet()
+    exports: OrderedSet[Address] = OrderedSet()
 
     for typ in types:
         first_party_matches = dep_map.addresses_for_type(typ)
@@ -101,8 +110,13 @@ async def infer_java_dependencies_via_imports(
             context=f"The target {address} imports `{typ}`",
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
+
         if maybe_disambiguated:
             dependencies.add(maybe_disambiguated)
+            if typ in export_types:
+                exports.add(maybe_disambiguated)
+
+    logger.warning("%s", exports)
 
     return InferredDependencies(dependencies)
 
