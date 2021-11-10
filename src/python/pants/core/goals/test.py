@@ -18,7 +18,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult
@@ -35,7 +35,6 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -501,19 +500,12 @@ async def run_tests(
 
 @dataclass(frozen=True)
 class TestExtraEnv:
-    env: FrozenDict[str, str]
+    env: Environment
 
 
 @rule
-def get_filtered_environment(
-    test_subsystem: TestSubsystem, complete_env: CompleteEnvironment
-) -> TestExtraEnv:
-    env = (
-        complete_env.get_subset(test_subsystem.extra_env_vars)
-        if test_subsystem.extra_env_vars
-        else FrozenDict({})
-    )
-    return TestExtraEnv(env)
+async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEnv:
+    return TestExtraEnv(await Get(Environment, EnvironmentRequest(test_subsystem.extra_env_vars)))
 
 
 # -------------------------------------------------------------------------------------------

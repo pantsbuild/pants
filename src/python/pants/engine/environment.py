@@ -17,12 +17,21 @@ logger = logging.getLogger(__name__)
 name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
+"""
+Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
+environment should use APIs from this module instead.
+
+Wherever possible, the `Environment` type should be consumed rather than the
+`CompleteEnvironment`, as it represents a filtered/relevant subset of the environment, rather
+than the entire unfiltered environment.
+"""
+
 
 class CompleteEnvironment(FrozenDict):
     """CompleteEnvironment contains all environment variables from the current Pants process.
 
-    Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
-    environment should request this type instead.
+    NB: Consumers should almost always prefer to consume the `Environment` type, which is
+    filtered to a relevant subset of the environment.
     """
 
     def get_subset(
