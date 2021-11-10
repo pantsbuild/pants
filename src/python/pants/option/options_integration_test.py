@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -109,4 +110,4 @@ def test_pants_symlink_workdirs(tmp_path: Path) -> None:
     )
     pants_run.assert_success()
     # Make sure symlink workdir is pointing to physical workdir
-    assert symlink_workdir.readlink() == physical_workdir
+    assert Path(os.readlink(symlink_workdir.as_posix())) == physical_workdir
