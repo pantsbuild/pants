@@ -37,6 +37,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -217,8 +218,8 @@ async def infer_python_dependencies_via_imports(
             f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports)}\n\n"
             "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
             "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
-            "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred\n"
-            "See {doc_url('python-third-party-dependencies')}"
+            "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred.\n"
+            f"See {doc_url('python-third-party-dependencies')}"
         )
 
         if raise_error:
