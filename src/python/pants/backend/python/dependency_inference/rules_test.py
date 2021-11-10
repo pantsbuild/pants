@@ -12,11 +12,14 @@ from pants.backend.python.dependency_inference.rules import (
     InferPythonImportDependencies,
     PythonInferSubsystem,
     UnownedDependencyError,
+    UnownedDependencyUsage,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
 )
+from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
 from pants.backend.python.target_types import (
+    PythonRequirementsFile,
     PythonRequirementTarget,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
@@ -262,7 +265,12 @@ def test_infer_python_strict(caplog) -> None:
             *target_types_rules.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            PythonRequirementsFile,
+        ],
+        context_aware_object_factories={"python_requirements": PythonRequirementsCAOF},
     )
 
     rule_runner.create_file(
@@ -271,7 +279,18 @@ def test_infer_python_strict(caplog) -> None:
     )
     rule_runner.add_to_build_file("src/python", "python_sources()")
 
-    def run_dep_inference(address: Address) -> InferredDependencies:
+    def run_dep_inference(
+        address: Address,
+        unowned_dependency_behavior: str,
+    ) -> InferredDependencies:
+        rule_runner.set_options(
+            [
+                "--backend-packages=pants.backend.python",
+                f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
+                "--source-root-patterns=src/python",
+            ],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        )
         target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
@@ -279,36 +298,63 @@ def test_infer_python_strict(caplog) -> None:
         )
 
     # First test with "warning"
-    rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.python",
-            "--python-infer-unowned-dependency-behavior=warning",
-            "--source-root-patterns=src/python",
-        ],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
-
-    assert run_dep_inference(
-        Address("src/python", relative_file_path="cheesey.py")
-    ) == InferredDependencies([])
+    run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "warning")
     assert len(caplog.records) == 1
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
     assert "  * venezuelan_beaver_cheese" in caplog.text
 
     # Now test with "error"
     caplog.clear()
-    rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.python",
-            "--python-infer-unowned-dependency-behavior=error",
-            "--source-root-patterns=src/python",
-        ],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
     with pytest.raises(ExecutionError) as exc_info:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"))
+        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "error")
 
     assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
     assert len(caplog.records) == 2  # one for the error being raised and one for our message
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
     assert "  * venezuelan_beaver_cheese" in caplog.text
+
+    caplog.clear()
+
+    # All modes should be fine if the module is explictly declared as a requirement
+    rule_runner.add_to_build_file(
+        "src/python",
+        dedent(
+            """\
+                python_requirement(
+                    name="venezuelan_beaver_cheese",
+                    modules=["venezuelan_beaver_cheese"],
+                    requirements=["venezuelan_beaver_cheese==1.0.0"],
+                )
+                python_sources(dependencies=[":venezuelan_beaver_cheese"])
+            """
+        ),
+        overwrite=True,
+    )
+    for mode in UnownedDependencyUsage:
+        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        assert not caplog.records
+
+    rule_runner.add_to_build_file("src/python", "python_sources()", overwrite=True)  # Cleanup
+
+    # All modes should be fine if the module is implictly found via requirements.txt
+    rule_runner.create_file("src/python/requirements.txt", "venezuelan_beaver_cheese==1.0.0")
+    rule_runner.add_to_build_file(
+        "src/python",
+        dedent(
+            """\
+                python_requirements()
+                python_sources()
+            """
+        ),
+        overwrite=True,
+    )
+    for mode in UnownedDependencyUsage:
+        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        assert not caplog.records
+
+    # All modes should be fine if the module is owned by a first party
+    rule_runner.create_file("src/python/venezuelan_beaver_cheese.py")
+    rule_runner.add_to_build_file("src/python", "python_sources()", overwrite=True)
+    for mode in UnownedDependencyUsage:
+        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        assert not caplog.records
