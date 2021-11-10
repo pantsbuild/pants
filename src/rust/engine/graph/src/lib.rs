@@ -708,6 +708,11 @@ impl<N: Node> Graph<N> {
   ) -> bool {
     let generation_matches = {
       let inner = self.inner.lock();
+      let entry = if log::log_enabled!(log::Level::Debug) {
+        Some(inner.pg[entry_id].clone())
+      } else {
+        None
+      };
       let dependency_ids = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
@@ -723,12 +728,13 @@ impl<N: Node> Graph<N> {
         .into_iter()
         .zip(previous_dep_generations.into_iter())
         .map(|(dep_id, previous_dep_generation)| {
-          let mut entry = inner
+          let entry = entry.clone();
+          let mut dep_entry = inner
             .entry_for_id(dep_id)
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
           async move {
-            let (_, generation) = entry
+            let (_, generation) = dep_entry
               .get_node_result(context, dep_id)
               .await
               .map_err(|_| ())?;
@@ -737,6 +743,11 @@ impl<N: Node> Graph<N> {
               Ok(())
             } else {
               // Did not match. We error here to trigger fail-fast in `try_join_all`.
+              log::debug!(
+                "Dependency {} of {:?} changed.",
+                dep_entry.node(),
+                entry.map(|e| e.node().to_string())
+              );
               Err(())
             }
           }
