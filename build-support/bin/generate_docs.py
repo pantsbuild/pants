@@ -29,7 +29,7 @@ from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, Optional, cast
 
-import pystache
+import chevron
 import requests
 from common import die
 
@@ -273,13 +273,13 @@ class ReferenceGenerator:
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
         target_tpl = get_tpl("target_reference.md.mustache")
-        self._renderer = pystache.Renderer(
-            partials={
+        self._renderer_args = {
+            "partials_dict": {
                 "scoped_options": options_scope_tpl,
                 "single_option": single_option_tpl,
                 "target": target_tpl,
             }
-        )
+        }
         self._category_id: Optional[str] = None  # Fetched lazily.
 
         # Load the data.
@@ -439,11 +439,15 @@ class ReferenceGenerator:
         return cast(str, self._access_readme_api(url, "GET", "")["_id"])
 
     def _render_target(self, alias: str) -> str:
-        return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
+        return cast(
+            str, chevron.render("{{> target}}", self._targets_info[alias], **self._renderer_args)
+        )
 
     def _render_options_body(self, scope_help_info: Dict) -> str:
         """Renders the body of a single options help page."""
-        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
+        return cast(
+            str, chevron.render("{{> scoped_options}}", scope_help_info, **self._renderer_args)
+        )
 
     @classmethod
     def _render_parent_page_body(cls, items: Iterable[str], *, sync: bool) -> str:
