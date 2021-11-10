@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
+from dataclasses import dataclass
 
 import logging
 from itertools import groupby
@@ -8,7 +9,6 @@ from itertools import groupby
 from pants.backend.java.dependency_inference import (
     artifact_mapper,
     import_parser,
-    java_parser,
     package_mapper,
 )
 from pants.backend.java.dependency_inference.artifact_mapper import (
@@ -20,9 +20,10 @@ from pants.backend.java.dependency_inference.package_mapper import FirstPartyJav
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -34,6 +35,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules, JavaSourceDependencyAnalysisRequest
 
 logger = logging.getLogger(__name__)
 
@@ -42,26 +44,49 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
     infer_from = JavaSourceField
 
 
-@rule(desc="Inferring Java dependencies by analyzing imports")
-async def infer_java_dependencies_via_imports(
+@dataclass(frozen=True)
+class JavaInferredDependencies:
+    dependencies: FrozenOrderedSet[Address]
+    exports: FrozenOrderedSet[Address]
+
+@dataclass(frozen=True)
+class JavaInferredDependenciesAndExportsRequest:
+    address: Address
+
+@rule(desc="Inferring Java dependencies by source analysis")
+async def infer_java_dependencies_via_source_analysis(
     request: InferJavaSourceDependencies,
+) -> InferredDependencies:
+
+    jids = await Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(request.sources_field.address))
+    return InferredDependencies(dependencies=jids.dependencies)
+
+
+@rule(desc="Inferring Java dependencies and exports by source analysis")
+async def infer_java_dependencies_and_exports_via_source_analysis(
+    request: JavaInferredDependenciesAndExportsRequest,
     java_infer_subsystem: JavaInferSubsystem,
     first_party_dep_map: FirstPartyJavaPackageMapping,
     third_party_artifact_mapping: ThirdPartyJavaPackageToArtifactMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
-) -> InferredDependencies:
+) -> JavaInferredDependencies:
     if (
         not java_infer_subsystem.imports
         and not java_infer_subsystem.consumed_types
         and not java_infer_subsystem.third_party_imports
     ):
-        return InferredDependencies([])
+        return JavaInferredDependencies([], [])
 
-    address = request.sources_field.address
+    address = request.address
+    if not address.is_file_target:
+        raise Exception("Can only analyse file targets, Java ones at that")
+    a = await Get(Digest, PathGlobs([address.filename]))
+    s = await Get(Snapshot, Digest, a)
+
     wrapped_tgt = await Get(WrappedTarget, Address, address)
     explicitly_provided_deps, analysis = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(JavaSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
+        Get(JavaSourceDependencyAnalysis, JavaSourceDependencyAnalysisRequest(snapshot=s)),
     )
 
     types: OrderedSet[str] = OrderedSet()
@@ -116,9 +141,9 @@ async def infer_java_dependencies_via_imports(
             if typ in export_types:
                 exports.add(maybe_disambiguated)
 
-    logger.warning("%s", exports)
+    #logger.warning("%s", exports)
 
-    return InferredDependencies(dependencies)
+    return JavaInferredDependencies(dependencies, exports)
 
 
 def dependency_name(name: str, static: bool):
@@ -132,7 +157,7 @@ def rules():
     return [
         *collect_rules(),
         *artifact_mapper.rules(),
-        *java_parser.rules(),
+        *java_parser_rules(),
         *import_parser.rules(),
         *package_mapper.rules(),
         *source_files_rules(),

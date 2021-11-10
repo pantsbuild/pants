@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from itertools import chain
+from pants.backend.java.dependency_inference.rules import JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
@@ -60,6 +61,16 @@ async def compile_java_source(
             for coarsened_dep in request.component.dependencies
         )
     )
+
+    # FLORB!
+    #florb = await Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(address=request.component.members))
+    addresses = [tgt.address for tgt in request.component.members]
+    inferred_dependencies = await MultiGet(Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(address)) for address in addresses)
+    exports = [i.exports for i in inferred_dependencies]
+    logger.warning("EXPORTS: %s %s", request.component, exports)
+
+    # EXPORTS TODO: Request inferred dependencies here
+
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
@@ -198,6 +209,8 @@ async def compile_java_source(
         # If there was no output, then do not create a jar file. This may occur, for example, when compiling
         # a `package-info.java` in a single partition.
         jar_output_digest = EMPTY_DIGEST
+
+    # EXPORTS TODO: fetch the exports and merge in at this point.
 
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
