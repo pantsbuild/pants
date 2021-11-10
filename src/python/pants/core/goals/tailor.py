@@ -321,7 +321,8 @@ class TailorSubsystem(GoalSubsystem):
                 "combine the BUILD file path with the target's name. For example, if `tailor` "
                 "would add the target `bin` to `project/BUILD`, then the address would be "
                 "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
-                "the path, e.g. `//:bin`."
+                "the path, e.g. `//:bin`.\n\n"
+                "Does not work with macros."
             ),
         )
 
@@ -646,7 +647,11 @@ async def tailor(
     )
     for build_file_path, ptgts in ptgts_by_build_file.items():
         formatted_changes = "\n".join(
-            f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
+            (
+                f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
+                if ptgt.addressable
+                else f"  - Add macro {console.green(ptgt.type_alias)}"
+            )
             for ptgt in ptgts
         )
         if build_file_path in updated_build_files:
