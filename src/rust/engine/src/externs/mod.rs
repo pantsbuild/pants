@@ -166,8 +166,9 @@ pub fn create_exception(py: Python, msg: String) -> Value {
 }
 
 pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  func.call1(arg_handles)
+  let args: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
+  let args_tuple = PyTuple::new(func.py(), &args);
+  func.call1(args_tuple)
 }
 
 pub fn generator_send(
@@ -210,10 +211,7 @@ pub fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
   let py_type = type_id.as_py_type(py);
-  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let args_tuple = PyTuple::new(py, &arg_handles);
-  py_type
-    .call1(args_tuple)
+  call_function(py_type, args)
     .map(|obj| Value::new(obj.into_py(py)))
     .unwrap_or_else(|e| {
       panic!(
