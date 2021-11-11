@@ -67,7 +67,7 @@ class Pylint(PythonToolBase):
     options_scope = "pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
-    default_version = "pylint>=2.7.0,<2.7.1"
+    default_version = "pylint>=2.11.0,<2.12"
     default_main = ConsoleScript("pylint")
 
     register_lockfile = True
