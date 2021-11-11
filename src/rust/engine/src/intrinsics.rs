@@ -396,28 +396,30 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let items: Vec<CreateDigestItem> = externs::collect_iterable(&args[0])
-    .unwrap()
-    .into_iter()
-    .map(|obj| {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      let raw_path: String = externs::getattr(&obj, "path").unwrap();
-      let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
-      if obj.hasattr(py, "content").unwrap() {
-        let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(&obj, "content").unwrap());
-        let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
-        CreateDigestItem::FileContent(path, bytes, is_executable)
-      } else if obj.hasattr(py, "file_digest").unwrap() {
-        let py_digest = externs::getattr(&obj, "file_digest").unwrap();
-        let digest = Snapshot::lift_file_digest(&py_digest).unwrap();
-        let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
-        CreateDigestItem::FileEntry(path, digest, is_executable)
-      } else {
-        CreateDigestItem::Dir(path)
-      }
-    })
-    .collect();
+  let items: Vec<CreateDigestItem> = {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    externs::collect_iterable(&args[0])
+      .unwrap()
+      .into_iter()
+      .map(|obj| {
+        let raw_path: String = externs::getattr(&obj, "path").unwrap();
+        let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
+        if obj.hasattr(py, "content").unwrap() {
+          let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(&obj, "content").unwrap());
+          let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
+          CreateDigestItem::FileContent(path, bytes, is_executable)
+        } else if obj.hasattr(py, "file_digest").unwrap() {
+          let py_digest = externs::getattr(&obj, "file_digest").unwrap();
+          let digest = Snapshot::lift_file_digest(&py_digest).unwrap();
+          let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
+          CreateDigestItem::FileEntry(path, digest, is_executable)
+        } else {
+          CreateDigestItem::Dir(path)
+        }
+      })
+      .collect()
+  };
 
   let digest_futures: Vec<_> = items
     .into_iter()
