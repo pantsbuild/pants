@@ -182,18 +182,22 @@ pub fn generator_send(
     .call1((generator.to_object(py), arg.to_object(py)))
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  if let Ok(b) = response.cast_as::<PyGeneratorResponseBreak>() {
-    Ok(GeneratorResponse::Break(Value::new(b.0.clone_ref(py))))
-  } else if let Ok(get) = response.cast_as::<PyGeneratorResponseGet>() {
+  if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {
+    let res = b.0.clone_ref(py);
+    Ok(GeneratorResponse::Break(
+      Value::new(res),
+      TypeId::new(res.into_ref(py).get_type()),
+    ))
+  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
     Ok(GeneratorResponse::Get(Get::new(py, get)?))
-  } else if let Ok(get_multi) = response.cast_as::<PyGeneratorResponseGetMulti>() {
+  } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
     let gets = get_multi
       .0
       .into_ref(py)
       .iter()
       .map(|g| {
         let get = g
-          .cast_as::<PyGeneratorResponseGet>()
+          .extract::<PyRef<PyGeneratorResponseGet>>()
           .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
         Get::new(py, get)
       })
@@ -275,7 +279,7 @@ pub struct Get {
 }
 
 impl Get {
-  fn new(py: Python, get: &PyGeneratorResponseGet) -> Result<Get, Failure> {
+  fn new(py: Python, get: PyRef<PyGeneratorResponseGet>) -> Result<Get, Failure> {
     Ok(Get {
       output: TypeId::new(get.product.into_ref(py)),
       input_type: TypeId::new(get.declared_subject.into_ref(py)),
@@ -293,7 +297,7 @@ impl fmt::Display for Get {
 }
 
 pub enum GeneratorResponse {
-  Break(Value),
+  Break(Value, TypeId),
   Get(Get),
   GetMulti(Vec<Get>),
 }

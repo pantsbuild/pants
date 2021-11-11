@@ -1087,7 +1087,7 @@ impl Task {
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-  ) -> NodeResult<Value> {
+  ) -> NodeResult<(Value, TypeId)> {
     let mut input = {
       let gil = Python::acquire_gil();
       Value::from(gil.python().None())
@@ -1107,8 +1107,8 @@ impl Task {
           let gil = Python::acquire_gil();
           input = externs::store_tuple(gil.python(), values);
         }
-        externs::GeneratorResponse::Break(val) => {
-          break Ok(val);
+        externs::GeneratorResponse::Break(val, type_id) => {
+          break Ok((val, type_id));
         }
       }
     }
@@ -1161,7 +1161,7 @@ impl WrappedNode for Task {
     let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
         Python::with_gil(|py| {
-          let func = func.0.to_value().into_ref(py);
+          let func = func.0.to_value().clone_ref(py).into_ref(py);
           externs::call_function(func, &deps)
             .map(|res| {
               let type_id = TypeId::new(res.get_type());
@@ -1174,15 +1174,14 @@ impl WrappedNode for Task {
       .await?;
 
     if result_type == context.core.types.coroutine {
-      result_val = maybe_side_effecting(
+      let (new_val, new_type) = maybe_side_effecting(
         self.task.side_effecting,
         &self.side_effected,
         Self::generate(&context, workunit, params, self.entry, result_val),
       )
       .await?;
-      let gil = cpython::Python::acquire_gil();
-      let py = gil.python();
-      result_type = TypeId::new(&result_val.get_type(py));
+      result_val = new_val;
+      result_type = new_type;
     }
 
     if result_type != self.product {
