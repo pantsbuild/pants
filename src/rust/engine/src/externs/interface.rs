@@ -8,7 +8,6 @@ use std::collections::hash_map::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
-use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -481,10 +480,9 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
 
 #[pyfunction]
 fn nailgun_server_create(
-  py: Python,
   executor_ptr: &PyExecutor,
   port: u16,
-  runner: &PyAny,
+  runner: PyObject,
 ) -> PyO3Result<PyNailgunServer> {
   with_executor(executor_ptr, |executor| {
     let server_future = {
@@ -492,45 +490,17 @@ fn nailgun_server_create(
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let command = externs::store_utf8(py, &exe.cmd.command);
-        let args = externs::store_tuple(
-          py,
-          exe
-            .cmd
-            .args
-            .iter()
-            .map(|s| externs::store_utf8(py, s))
-            .collect::<Vec<_>>(),
-        );
-        let env = externs::store_dict(
-          py,
-          exe
-            .cmd
-            .env
-            .iter()
-            .map(|(k, v)| (externs::store_utf8(py, k), externs::store_utf8(py, v)))
-            .collect::<Vec<_>>(),
-        )
-        .unwrap();
-        let working_dir = externs::store_bytes(py, exe.cmd.working_dir.as_os_str().as_bytes());
-        let stdin_fd = externs::store_i64(py, exe.stdin_fd.into());
-        let stdout_fd = externs::store_i64(py, exe.stdout_fd.into());
-        let stderr_fd = externs::store_i64(py, exe.stderr_fd.into());
-        let cancellation_latch = Py::new(py, PySessionCancellationLatch(exe.cancelled))
-          .unwrap()
-          .into_py(py)
-          .into();
-        let runner_args = vec![
-          command,
-          args,
-          env,
-          working_dir,
-          cancellation_latch,
-          stdin_fd,
-          stdout_fd,
-          stderr_fd,
-        ];
-        match externs::call_function(runner, &runner_args) {
+        let result = runner.as_ref(py).call1((
+          exe.cmd.command,
+          exe.cmd.args,
+          exe.cmd.env,
+          exe.cmd.working_dir,
+          PySessionCancellationLatch(exe.cancelled),
+          exe.stdin_fd as i64,
+          exe.stdout_fd as i64,
+          exe.stderr_fd as i64,
+        ));
+        match result {
           Ok(exit_code) => {
             let code: i32 = exit_code.extract().unwrap();
             nailgun::ExitCode(code)
