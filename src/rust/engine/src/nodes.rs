@@ -16,6 +16,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::IntoPy;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -269,13 +270,8 @@ pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> 
   Ok(py_digest.0)
 }
 
-pub fn lift_file_digest(
-  types: &Types,
-  digest: &cpython::PyObject,
-) -> Result<hashing::Digest, String> {
-  let gil = cpython::Python::acquire_gil();
-  let py = gil.python();
-  if TypeId::new(&digest.get_type(py)) != types.file_digest {
+pub fn lift_file_digest(types: &Types, digest: &PyAny) -> Result<hashing::Digest, String> {
+  if TypeId::new(digest.get_type()) != types.file_digest {
     return Err(format!("{} is not of type {}.", digest, types.file_digest));
   }
   let fingerprint: String = externs::getattr(digest, "fingerprint").unwrap();
@@ -295,18 +291,15 @@ pub struct MultiPlatformExecuteProcess {
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
-    let gil = cpython::Python::acquire_gil();
-    let py = gil.python();
-    let env = externs::getattr_from_str_frozendict(value, "env");
-    let working_directory =
-      match externs::getattr_as_optional_string(py, value, "working_directory") {
-        None => None,
-        Some(dir) => Some(RelativePath::new(dir)?),
-      };
+  fn lift_process(value: &PyAny, platform_constraint: Option<Platform>) -> Result<Process, String> {
+    let env: BTreeMap<String, String> = externs::getattr(value, "env").unwrap();
+    let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
+      None => None,
+      Some(dir) => Some(RelativePath::new(dir)?),
+    };
 
-    let py_digest: Value = externs::getattr(value, "input_digest").unwrap();
-    let digest = lift_directory_digest(&py_digest)
+    let py_digest = externs::getattr(value, "input_digest").unwrap();
+    let digest = lift_directory_digest(py_digest)
       .map_err(|err| format!("Error parsing input_digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
@@ -330,26 +323,27 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description: String = externs::getattr(value, "description").unwrap();
-    let py_level: cpython::PyObject = externs::getattr(value, "level").unwrap();
-    let level = externs::val_to_log_level(&py_level)?;
+    let py_level = externs::getattr(value, "level").unwrap();
+    let level = externs::val_to_log_level(py_level)?;
 
-    let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
-      .into_iter()
-      .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
-      .collect::<Result<_, String>>()?;
+    let append_only_caches =
+      externs::getattr::<BTreeMap<String, String>>(value, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
+        .collect::<Result<_, String>>()?;
 
-    let jdk_home = externs::getattr_as_optional_string(py, value, "jdk_home").map(PathBuf::from);
+    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
 
-    let py_use_nailgun: Value = externs::getattr(value, "use_nailgun").unwrap();
-    let use_nailgun = lift_directory_digest(&py_use_nailgun)
+    let py_use_nailgun = externs::getattr(value, "use_nailgun").unwrap();
+    let use_nailgun = lift_directory_digest(py_use_nailgun)
       .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
 
     let execution_slot_variable =
-      externs::getattr_as_optional_string(py, value, "execution_slot_variable");
+      externs::getattr_as_optional_string(value, "execution_slot_variable");
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum: cpython::PyObject = externs::getattr(value, "cache_scope").unwrap();
-      externs::getattr::<String>(&cache_scope_enum, "name")
+      let cache_scope_enum = externs::getattr(value, "cache_scope").unwrap();
+      externs::getattr::<String>(cache_scope_enum, "name")
         .unwrap()
         .try_into()?
     };
@@ -373,7 +367,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &PyAny) -> Result<MultiPlatformExecuteProcess, String> {
     let raw_constraints = externs::getattr::<Vec<Option<String>>>(value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
@@ -382,7 +376,7 @@ impl MultiPlatformExecuteProcess {
         None => Ok(None),
       })
       .collect::<Result<Vec<_>, _>>()?;
-    let processes = externs::getattr::<Vec<Value>>(value, "processes")?;
+    let processes = externs::getattr::<Vec<&PyAny>>(value, "processes")?;
     if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -392,7 +386,7 @@ impl MultiPlatformExecuteProcess {
     }
 
     let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
-    for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
+    for (constraint, execute_process) in constraints.iter().zip(processes.into_iter()) {
       let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
       request_by_constraint.insert(*constraint, underlying_req.clone());
     }
@@ -724,38 +718,34 @@ impl Snapshot {
       .await
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let gil = cpython::Python::acquire_gil();
-    let py = gil.python();
+  pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
-    let description_of_origin =
-      externs::getattr_as_optional_string(py, item, "description_of_origin");
+    let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin");
 
-    let glob_match_error_behavior: cpython::PyObject =
-      externs::getattr(item, "glob_match_error_behavior").unwrap();
-    let failure_behavior: String = externs::getattr(&glob_match_error_behavior, "value").unwrap();
+    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
+    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj: cpython::PyObject = externs::getattr(item, "conjunction").unwrap();
-    let conjunction_string: String = externs::getattr(&conjunction_obj, "value").unwrap();
+    let conjunction_obj = externs::getattr(item, "conjunction").unwrap();
+    let conjunction_string: String = externs::getattr(conjunction_obj, "value").unwrap();
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
 
-  pub fn lift_prepared_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
+  pub fn lift_prepared_path_globs(item: &PyAny) -> Result<PreparedPathGlobs, String> {
     let path_globs = Snapshot::lift_path_globs(item)?;
     path_globs
       .parse()
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(py: Python, item: &hashing::Digest) -> Result<Value, String> {
-    let py_digest = Py::new(py, externs::fs::PyDigest(*item)).map_err(|e| format!("{}", e))?;
+  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+    let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
     Ok(Value::new(py_digest.into_py(py)))
   }
 
-  pub fn lift_file_digest(item: &cpython::PyObject) -> Result<hashing::Digest, String> {
+  pub fn lift_file_digest(item: &PyAny) -> Result<hashing::Digest, String> {
     let fingerprint: String = externs::getattr(item, "fingerprint").unwrap();
     let serialized_bytes_length: usize = externs::getattr(item, "serialized_bytes_length")?;
     Ok(hashing::Digest::new(
@@ -780,7 +770,7 @@ impl Snapshot {
   }
 
   pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
-    let py_snapshot = Py::new(py, externs::fs::PySnapshot(*item)).map_err(|e| format!("{}", e))?;
+    let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{}", e))?;
     Ok(Value::new(py_snapshot.into_py(py)))
   }
 
@@ -964,16 +954,16 @@ impl WrappedNode for DownloadedFile {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
-    let value = self.0.to_value();
-    let url_str: String = externs::getattr(&value, "url").unwrap();
-
+    let (url_str, expected_digest) = Python::with_gil(|py| {
+      let py_download_file = self.0.to_value().into_ref(py);
+      let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
+      let expected_digest =
+        lift_file_digest(&context.core.types, py_digest).map_err(|s| throw(&s))?;
+      Ok((url_str, expected_digest))
+    })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
-
-    let py_digest: Value = externs::getattr(&value, "expected_digest").unwrap();
-    let expected_digest =
-      lift_file_digest(&context.core.types, &py_digest).map_err(|s| throw(&s))?;
-
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
       .await
@@ -1166,17 +1156,20 @@ impl WrappedNode for Task {
 
     let func = self.task.func;
 
-    let mut result_val: Value =
+    let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
-        externs::call_function(&func.0.to_value(), &deps).map_err(Failure::from_py_err)
+        Python::with_gil(|py| {
+          let func = func.0.to_value().into_ref(py);
+          externs::call_function(func, &deps)
+            .map(|res| {
+              let type_id = TypeId::new(res.get_type());
+              let val = Value::new(res.into_py(py));
+              (val, type_id)
+            })
+            .map_err(Failure::from_py_err)
+        })
       })
-      .await?
-      .into();
-    let mut result_type = {
-      let gil = cpython::Python::acquire_gil();
-      let py = gil.python();
-      TypeId::new(&result_val.get_type(py))
-    };
+      .await?;
 
     if result_type == context.core.types.coroutine {
       result_val = maybe_side_effecting(
@@ -1198,7 +1191,7 @@ impl WrappedNode for Task {
     }
 
     let engine_aware_return_type = if self.task.engine_aware_return_type {
-      let gil = cpython::Python::acquire_gil();
+      let gil = Python::acquire_gil();
       let py = gil.python();
       EngineAwareReturnType::from_task_result(py, &result_val, &context)
     } else {

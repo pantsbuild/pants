@@ -350,11 +350,11 @@ struct PySession(Session);
 impl PySession {
   #[new]
   fn __new__(
-    scheduler: PyScheduler,
+    scheduler: &PyScheduler,
     should_render_ui: bool,
     build_id: String,
     session_values: PyObject,
-    cancellation_latch: PySessionCancellationLatch,
+    cancellation_latch: &PySessionCancellationLatch,
     py: Python,
   ) -> PyO3Result<Self> {
     let core = scheduler.0.core.clone();
@@ -487,11 +487,10 @@ fn nailgun_server_create(
   py: Python,
   executor_ptr: &PyExecutor,
   port: u16,
-  runner: PyObject,
+  runner: &PyAny,
 ) -> PyO3Result<PyNailgunServer> {
   with_executor(executor_ptr, |executor| {
     let server_future = {
-      let runner: Value = runner.into();
       let executor = executor.clone();
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
         let gil = Python::acquire_gil();
@@ -520,9 +519,9 @@ fn nailgun_server_create(
         let stdin_fd = externs::store_i64(py, exe.stdin_fd.into());
         let stdout_fd = externs::store_i64(py, exe.stdout_fd.into());
         let stderr_fd = externs::store_i64(py, exe.stderr_fd.into());
-        let cancellation_latch = PySessionCancellationLatch::create_instance(py, exe.cancelled)
+        let cancellation_latch = Py::new(py, PySessionCancellationLatch(exe.cancelled))
           .unwrap()
-          .into_object()
+          .into_py(py)
           .into();
         let runner_args = vec![
           command,
@@ -534,7 +533,7 @@ fn nailgun_server_create(
           stdout_fd,
           stderr_fd,
         ];
-        match externs::call_function(&runner, &runner_args) {
+        match externs::call_function(runner, &runner_args) {
           Ok(exit_code) => {
             let code: i32 = exit_code.extract().unwrap();
             nailgun::ExitCode(code)
@@ -550,7 +549,10 @@ fn nailgun_server_create(
     let server = executor
       .block_on(server_future)
       .map_err(PyException::new_err)?;
-    PyNailgunServer::create_instance(py, RefCell::new(Some(server)), executor.clone())
+    Ok(PyNailgunServer {
+      server: RefCell::new(Some(server)),
+      executor: executor.clone(),
+    })
   })
 }
 
@@ -1387,7 +1389,7 @@ fn capture_snapshots(
   py: Python,
   scheduler_ptr: &PyScheduler,
   session_ptr: &PySession,
-  path_globs_and_root_tuple_wrapper: PyObject,
+  path_globs_and_root_tuple_wrapper: &PyAny,
 ) -> PyO3Result<PyObject> {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
@@ -1395,20 +1397,20 @@ fn capture_snapshots(
       session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
 
-      let values = externs::collect_iterable(&path_globs_and_root_tuple_wrapper).unwrap();
+      let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
       let path_globs_and_roots = values
-        .iter()
+        .into_iter()
         .map(|value| {
           let root = PathBuf::from(externs::getattr::<String>(value, "root").unwrap());
           let path_globs = nodes::Snapshot::lift_prepared_path_globs(
-            &externs::getattr(value, "path_globs").unwrap(),
+            externs::getattr(value, "path_globs").unwrap(),
           );
           let digest_hint = {
-            let maybe_digest: PyObject = externs::getattr(value, "digest_hint").unwrap();
-            if maybe_digest.is_none(py) {
+            let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+            if maybe_digest.is_none() {
               None
             } else {
-              Some(nodes::lift_directory_digest(&Value::new(maybe_digest))?)
+              Some(nodes::lift_directory_digest(maybe_digest)?)
             }
           };
           path_globs.map(|path_globs| (path_globs, root, digest_hint))

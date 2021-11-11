@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -12,12 +13,11 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use cpython::ObjectProtocol;
 use fs::RelativePath;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
-use pyo3::Python;
+use pyo3::{PyAny, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -157,16 +157,16 @@ fn multi_platform_process_request_to_process_result(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_val = &args[0];
-    // TODO: The platform will be used in a followup.
-    let _platform_val = &args[1];
+    let process_request = Python::with_gil(|py| {
+      let py_process = args[0].into_ref(py);
+      MultiPlatformExecuteProcess::lift(py_process).map_err(|str| {
+        throw(&format!(
+          "Error lifting MultiPlatformExecuteProcess: {}",
+          str
+        ))
+      })?
+    });
 
-    let process_request = MultiPlatformExecuteProcess::lift(process_val).map_err(|str| {
-      throw(&format!(
-        "Error lifting MultiPlatformExecuteProcess: {}",
-        str
-      ))
-    })?;
     let result = context.get(process_request).await?.0;
 
     let maybe_stdout = context
@@ -209,7 +209,7 @@ fn multi_platform_process_request_to_process_result(
         externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
         externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
+        Snapshot::store_directory_digest(py, result.output_directory).map_err(|s| throw(&s))?,
         externs::unsafe_call(
           py,
           context.core.types.platform,
@@ -226,7 +226,11 @@ fn directory_digest_to_digest_contents(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
+    let digest = Python::with_gil(|py| {
+      let py_digest = args[0].into_ref(py);
+      lift_directory_digest(py_digest)
+    })
+    .map_err(|s| throw(&s))?;
     let snapshot = context
       .core
       .store()
@@ -247,7 +251,11 @@ fn directory_digest_to_digest_entries(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
+    let digest = Python::with_gil(|py| {
+      let py_digest = args[0].into_ref(py);
+      lift_directory_digest(py_digest)
+    })
+    .map_err(|s| throw(&s))?;
     let snapshot = context
       .core
       .store()
@@ -269,19 +277,22 @@ fn remove_prefix_request_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
   let store = core.store();
-
   async move {
-    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
-    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
-    let prefix = RelativePath::new(PathBuf::from(prefix))
+    let (input_digest, raw_prefix) = Python::with_gil(|py| {
+      let py_remove_prefix = args[0].into_ref(py);
+      let py_digest = externs::getattr(py_remove_prefix, "digest").unwrap();
+      let input_digest = lift_directory_digest(py_digest).map_err(|e| throw(&e))?;
+      let prefix: String = externs::getattr(py_remove_prefix, "prefix").unwrap();
+      (input_digest, prefix)
+    });
+    let prefix = RelativePath::new(PathBuf::from(raw_prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
       .strip_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -293,17 +304,21 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
-    let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
-    let prefix = RelativePath::new(PathBuf::from(prefix))
+    let (input_digest, raw_prefix) = Python::with_gil(|py| {
+      let py_add_prefix = args[0].into_ref(py);
+      let py_digest = externs::getattr(py_add_prefix, "digest").unwrap();
+      let input_digest = lift_directory_digest(py_digest).map_err(|e| throw(&e))?;
+      let prefix: String = externs::getattr(py_add_prefix, "prefix").unwrap();
+      Ok((input_digest, prefix))
+    })?;
+    let prefix = RelativePath::new(PathBuf::from(raw_prefix))
       .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
       .add_prefix(input_digest, prefix)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -311,7 +326,10 @@ fn add_prefix_request_to_digest(
 fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
   let store = context.core.store();
   async move {
-    let digest = lift_directory_digest(&args[0])?;
+    let digest = Python::with_gil(|py| {
+      let py_digest = args[0].into_ref(py);
+      lift_directory_digest(py_digest)
+    })?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
     let gil = Python::acquire_gil();
     Snapshot::store_snapshot(gil.python(), snapshot)
@@ -326,19 +344,21 @@ fn merge_digests_request_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
   let store = core.store();
-  let digests: Result<Vec<hashing::Digest>, String> =
-    externs::getattr::<Vec<Value>>(&args[0], "digests")
-      .unwrap()
-      .into_iter()
-      .map(|val: Value| lift_directory_digest(&val))
-      .collect();
   async move {
+    let digests: Vec<hashing::Digest, String> = Python::with_gil(|py| {
+      let py_merge_digests = args[0].into_ref(py);
+      externs::getattr::<Vec<&PyAny>>(py_merge_digests, "digests")
+        .unwrap()
+        .into_iter()
+        .map(|val| lift_directory_digest(val))
+        .collect()
+    });
     let digest = store
       .merge(digests.map_err(|e| throw(&e))?)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -351,7 +371,7 @@ fn download_file_to_digest(
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
     let digest = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -361,12 +381,11 @@ fn path_globs_to_digest(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let val = args.pop().unwrap();
-    let path_globs = Snapshot::lift_path_globs(&val)
+    let path_globs = Python::with_gil(|py| Snapshot::lift_path_globs(args[0].into_ref(py)))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -377,8 +396,7 @@ fn path_globs_to_paths(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let val = args.pop().unwrap();
-    let path_globs = Snapshot::lift_path_globs(&val)
+    let path_globs = Python::with_gil(|py| Snapshot::lift_path_globs(args[0].into_ref(py)))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
@@ -400,17 +418,18 @@ fn create_digest_to_digest(
   let items: Vec<CreateDigestItem> = {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    externs::collect_iterable(&args[0])
+    let py_create_digest = args[0].into_ref(py);
+    externs::collect_iterable(py_create_digest)
       .unwrap()
       .into_iter()
       .map(|obj| {
         let raw_path: String = externs::getattr(&obj, "path").unwrap();
         let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
-        if obj.hasattr(py, "content").unwrap() {
+        if obj.hasattr("content").unwrap() {
           let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(&obj, "content").unwrap());
           let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
           CreateDigestItem::FileContent(path, bytes, is_executable)
-        } else if obj.hasattr(py, "file_digest").unwrap() {
+        } else if obj.hasattr("file_digest").unwrap() {
           let py_digest = externs::getattr(&obj, "file_digest").unwrap();
           let digest = Snapshot::lift_file_digest(&py_digest).unwrap();
           let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
@@ -462,7 +481,7 @@ fn create_digest_to_digest(
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -471,20 +490,24 @@ fn digest_subset_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let globs = externs::getattr(&args[0], "globs").unwrap();
   let store = context.core.store();
-
   async move {
-    let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
-    let original_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
+    let (path_globs, original_digest) = Python::with_gil(|py| {
+      let py_digest_subset = args[0].into_ref(py);
+      let py_path_globs = externs::getattr(py_digest_subset, "globs").unwrap();
+      let py_digest = externs::getattr(py_digest_subset, "digest").unwrap();
+      Ok((
+        Snapshot::lift_prepared_path_globs(py_path_globs).map_err(|e| throw(&e))?,
+        lift_directory_digest(py_digest).map_err(|e| throw(&e))?,
+      ))
+    })?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store
       .subset(original_digest, subset_params)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(|s| throw(&s))
   }
   .boxed()
 }
@@ -501,18 +524,20 @@ fn interactive_process(
     let types = &context.core.types;
     let interactive_process_result = types.interactive_process_result;
 
-    let value: Value = args.pop().unwrap();
+    let (argv, run_in_workspace, restartable, input_digest, env) = Python::with_gil(|py| {
+      let py_interactive_process = args[0].into_ref(py);
+      let argv: Vec<String> = externs::getattr(py_interactive_process, "argv").unwrap();
+      if argv.is_empty() {
+        return Err("Empty argv list not permitted".to_owned());
+      }
+      let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
+      let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
+      let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
+      let input_digest: Digest = lift_directory_digest(py_input_digest)?;
+      let env: BTreeMap<String, String> = externs::getattr(py_interactive_process, "env").unwrap();
+      Ok((argv, run_in_workspace, restartable, input_digest, env))
+    })?;
 
-    let argv: Vec<String> = externs::getattr(&value, "argv").unwrap();
-    if argv.is_empty() {
-      return Err("Empty argv list not permitted".to_owned().into());
-    }
-
-    let run_in_workspace: bool = externs::getattr(&value, "run_in_workspace").unwrap();
-    let restartable: bool = externs::getattr(&value, "restartable").unwrap();
-    let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
-    let input_digest: Digest = lift_directory_digest(&input_digest_value)?;
-    let env = externs::getattr_from_str_frozendict(&value, "env");
     let session = context.session;
 
     if !restartable {
@@ -615,8 +640,8 @@ fn interactive_process(
 
     let code = exit_status.code().unwrap_or(-1);
     let result = {
-       let gil = Python::acquire_gil();
-       let py = gil.python();
+      let gil = Python::acquire_gil();
+      let py = gil.python();
       externs::unsafe_call(
         py,
         interactive_process_result,

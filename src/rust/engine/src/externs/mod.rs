@@ -8,21 +8,18 @@ mod interface;
 mod interface_tests;
 mod stdio;
 
-use std::collections::BTreeMap;
-use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;
 
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
-use cpython::ObjectProtocol;
 use lazy_static::lazy_static;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
-use pyo3::ToPyObject;
+use pyo3::{FromPyObject, ToPyObject};
 
 use logging::PythonLogLevel;
 
@@ -83,16 +80,14 @@ pub fn store_bool(py: Python, val: bool) -> Value {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr<T>(value: &cpython::PyObject, field: &str) -> Result<T, String>
+pub fn getattr<'py, T>(value: &'py PyAny, field: &str) -> Result<T, String>
 where
-  for<'a> T: cpython::FromPyObject<'a>,
+  T: FromPyObject<'py>,
 {
-  let gil = cpython::Python::acquire_gil();
-  let py = gil.python();
   value
-    .getattr(py, field)
+    .getattr(field)
     .map_err(|e| format!("Could not get field `{}`: {:?}", field, e))?
-    .extract::<T>(py)
+    .extract::<T>()
     .map_err(|e| {
       format!(
         "Field `{}` was not convertible to type {}: {:?}",
@@ -106,10 +101,8 @@ where
 ///
 /// Collect the Values contained within an outer Python Iterable PyObject.
 ///
-pub fn collect_iterable(value: &cpython::PyObject) -> Result<Vec<cpython::PyObject>, String> {
-  let gil = cpython::Python::acquire_gil();
-  let py = gil.python();
-  match value.iter(py) {
+pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
+  match value.iter() {
     Ok(py_iter) => py_iter
       .enumerate()
       .map(|(i, py_res)| {
@@ -131,34 +124,14 @@ pub fn collect_iterable(value: &cpython::PyObject) -> Result<Vec<cpython::PyObje
   }
 }
 
-/// Read a `FrozenDict[str, str]`.
-pub fn getattr_from_str_frozendict(
-  value: &cpython::PyObject,
-  field: &str,
-) -> BTreeMap<String, String> {
-  let frozendict = getattr(value, field).unwrap();
-  let pydict: cpython::PyDict = getattr(&frozendict, "_data").unwrap();
-  let gil = cpython::Python::acquire_gil();
-  let py = gil.python();
-  pydict
-    .items(py)
-    .into_iter()
-    .map(|(k, v)| (k.extract(py).unwrap(), v.extract(py).unwrap()))
-    .collect()
-}
-
-pub fn getattr_as_optional_string(
-  py: cpython::Python,
-  value: &cpython::PyObject,
-  field: &str,
-) -> Option<String> {
-  let v = value.getattr(py, field).unwrap();
-  if v.is_none(py) {
+pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> Option<String> {
+  let v = value.getattr(field).unwrap();
+  if v.is_none() {
     return None;
   }
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  Some(v.extract(py).unwrap())
+  Some(v.extract().unwrap())
 }
 
 /// Call the equivalent of `str()` on an arbitrary Python object.
@@ -192,15 +165,9 @@ pub fn create_exception(py: Python, msg: &str) -> Value {
   Value::new(PyException::new_err(msg).into_py(py))
 }
 
-pub fn call_function<T: AsRef<cpython::PyObject>>(
-  func: T,
-  args: &[Value],
-) -> Result<cpython::PyObject, cpython::PyErr> {
-  let func: &cpython::PyObject = func.as_ref();
-  let arg_handles: Vec<cpython::PyObject> = args.iter().map(|v| v.clone().into()).collect();
-  let gil = cpython::Python::acquire_gil();
-  let args_tuple = cpython::PyTuple::new(gil.python(), &arg_handles);
-  func.call(gil.python(), args_tuple, None)
+pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
+  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
+  func.call1(arg_handles)
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {

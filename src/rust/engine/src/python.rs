@@ -183,12 +183,15 @@ pub struct Function(pub Key);
 impl Function {
   /// The function represented as `path.to.module:lineno:func_name`.
   pub fn full_name(&self) -> String {
-    let val = self.0.to_value();
-    let module: String = externs::getattr(&val, "__module__").unwrap();
-    let name: String = externs::getattr(&val, "__name__").unwrap();
-    // NB: this is a custom dunder method that Python code should populate before sending the
-    // function (e.g. an `@rule`) through FFI.
-    let line_no: u64 = externs::getattr(&val, "__line_number__").unwrap();
+    let (module, name, line_no) = Python::with_gil(|py| {
+      let val = self.0.to_value().into_ref(py);
+      let module: String = externs::getattr(val, "__module__").unwrap();
+      let name: String = externs::getattr(val, "__name__").unwrap();
+      // NB: this is a custom dunder method that Python code should populate before sending the
+      // function (e.g. an `@rule`) through FFI.
+      let line_no: u64 = externs::getattr(val, "__line_number__").unwrap();
+      (module, name, line_no)
+    });
     format!("{}:{}:{}", module, line_no, name)
   }
 }
