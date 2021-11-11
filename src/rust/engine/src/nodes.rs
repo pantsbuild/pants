@@ -327,7 +327,7 @@ impl MultiPlatformExecuteProcess {
     let level = externs::val_to_log_level(py_level)?;
 
     let append_only_caches =
-      externs::getattr::<BTreeMap<String, String>>(value, "append_only_caches")
+      externs::getattr::<BTreeMap<String, String>>(value, "append_only_caches")?
         .into_iter()
         .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
         .collect::<Result<_, String>>()?;

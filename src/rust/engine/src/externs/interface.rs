@@ -332,14 +332,14 @@ impl PyLocalStoreOptions {
         shard_count
       )));
     }
-    Self(LocalStoreOptions {
+    Ok(Self(LocalStoreOptions {
       store_dir: PathBuf::from(store_dir),
       process_cache_max_size_bytes,
       files_max_size_bytes,
       directories_max_size_bytes,
       lease_time: Duration::from_millis(lease_time_millis),
       shard_count,
-    })
+    }))
   }
 }
 
@@ -472,7 +472,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
           engine_traceback,
         } => (val, python_traceback, engine_traceback),
       };
-      PyResult {
+      &PyResult {
         is_throw: true,
         result: val.into(),
         python_traceback: python_traceback.into(),
@@ -624,9 +624,9 @@ fn scheduler_create(
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   watch_filesystem: bool,
-  remoting_options: PyRemotingOptions,
-  local_store_options: PyLocalStoreOptions,
-  exec_strategy_opts: PyExecutionStrategyOptions,
+  remoting_options: &PyRemotingOptions,
+  local_store_options: &PyLocalStoreOptions,
+  exec_strategy_opts: &PyExecutionStrategyOptions,
 ) -> PyO3Result<PyScheduler> {
   match fs::increase_limits() {
     Ok(msg) => debug!("{}", msg),
@@ -658,9 +658,9 @@ fn scheduler_create(
         PathBuf::from(local_execution_root_dir_buf),
         PathBuf::from(named_caches_dir_buf),
         ca_certs_path_buf.map(PathBuf::from),
-        local_store_options.0,
-        remoting_options.0,
-        exec_strategy_opts.0,
+        local_store_options.0.clone(),
+        remoting_options.0.clone(),
+        exec_strategy_opts.0.clone(),
       )
     })
   });
@@ -864,11 +864,11 @@ fn session_poll_workunits(
 ) -> PyO3Result<PyObject> {
   let py_level: PythonLogLevel = max_log_verbosity_level
     .try_into()
-    .map_err(PyException::new_err)?;
-  with_scheduler(scheduler_ptr, |scheduler| {
+    .map_err(|e| PyException::new_err(format!("{}", e)))?;
+  let (started, completed) = with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
       let core = scheduler.core.clone();
-      let (started, completed) = py.allow_threads(|| {
+      py.allow_threads(|| {
         session
           .workunit_store()
           .with_latest_workunits(py_level.into(), |started, completed| {
@@ -885,12 +885,13 @@ fn session_poll_workunits(
               &scheduler.core,
               session,
             ))?;
-            (started, completed)
+            let res: PyO3Result<(Value, Value)> = Ok((started, completed));
+            res
           })
-      });
-      Ok(externs::store_tuple(py, vec![started, completed]).into())
+      })
     })
-  })
+  })?;
+  Ok(externs::store_tuple(py, vec![started, completed]).into())
 }
 
 #[pyfunction]
@@ -1023,8 +1024,10 @@ fn tasks_task_begin(
   name: String,
   desc: String,
   level: u64,
-) {
-  let py_level: PythonLogLevel = level.try_into().map_err(PyException::new_err)?;
+) -> PyO3Result<()> {
+  let py_level: PythonLogLevel = level
+    .try_into()
+    .map_err(|e| PyException::new_err(format!("{}", e)))?;
   with_tasks(tasks_ptr, |tasks| {
     let func = Function(Key::from_value(func.into())?);
     let output_type = TypeId::new(output_type);
@@ -1038,6 +1041,7 @@ fn tasks_task_begin(
       if desc.is_empty() { None } else { Some(desc) },
       py_level.into(),
     );
+    Ok(())
   })
 }
 
@@ -1183,15 +1187,8 @@ fn session_get_observation_histograms<'py>(
       }
 
       let result = PyDict::new(py);
-      result.set_item(
-        PyString::new(py, "version"),
-        OBSERVATIONS_VERSION.into_py(py),
-      )?;
-      result.set_item(
-        PyString::new(py, "histograms"),
-        encoded_observations.into_py(py),
-      )?;
-
+      result.set_item(PyString::new(py, "version"), OBSERVATIONS_VERSION)?;
+      result.set_item(PyString::new(py, "histograms"), encoded_observations)?;
       Ok(result)
     })
   })
@@ -1474,6 +1471,7 @@ fn ensure_remote_has_recursive(
         .block_on(store.ensure_remote_has_recursive(digests))
     })
     .map_err(PyException::new_err)?;
+    Ok(())
   })
 }
 
