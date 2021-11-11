@@ -451,15 +451,15 @@ impl fmt::Display for Failure {
 
 impl From<String> for Failure {
   fn from(err: String) -> Self {
-    throw(&err)
+    throw(err)
   }
 }
 
-pub fn throw(msg: &str) -> Failure {
+pub fn throw(msg: String) -> Failure {
   let gil = Python::acquire_gil();
   Failure::Throw {
     val: externs::create_exception(gil.python(), msg),
-    python_traceback: Failure::native_traceback(msg),
+    python_traceback: Failure::native_traceback(&msg),
     engine_traceback: Vec::new(),
   }
 }

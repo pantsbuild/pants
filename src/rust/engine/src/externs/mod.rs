@@ -161,7 +161,7 @@ pub fn doc_url(py: Python, slug: &str) -> String {
   doc_url_func.call1((slug,)).unwrap().extract().unwrap()
 }
 
-pub fn create_exception(py: Python, msg: &str) -> Value {
+pub fn create_exception(py: Python, msg: String) -> Value {
   Value::new(PyException::new_err(msg).into_py(py))
 }
 

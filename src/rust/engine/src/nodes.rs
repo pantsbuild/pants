@@ -90,7 +90,7 @@ impl Vfs<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    throw(msg)
+    throw(msg.to_owned())
   }
 }
 
@@ -173,7 +173,7 @@ impl Select {
       .rule_graph
       .edges_for_inner(&self.entry)
       .ok_or_else(|| {
-        throw(&format!(
+        throw(format!(
           "Tried to select product {} for {} but found no edges",
           product, caller_description
         ))
@@ -226,7 +226,7 @@ impl Select {
         if let Some(key) = self.params.find(type_id) {
           Ok(key.to_value())
         } else {
-          Err(throw(&format!(
+          Err(throw(format!(
             "Expected a Param of type {} to be present.",
             type_id
           )))
@@ -435,10 +435,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       let res = command_runner
         .run(execution_context, workunit, request)
         .await
-        .map_err(|e| throw(&e))?;
+        .map_err(|e| throw(e))?;
 
       let definition = serde_json::to_string(&compatible_request)
-        .map_err(|e| throw(&format!("Failed to serialize process: {}", e)))?;
+        .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
       workunit.update_metadata(|initial| WorkunitMetadata {
         stdout: Some(res.stdout_digest),
         stderr: Some(res.stderr_digest),
@@ -481,7 +481,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
       Ok(ProcessResult(res))
     } else {
-      Err(throw(&format!(
+      Err(throw(format!(
         "No compatible platform found for request: {:?}",
         request
       )))
@@ -516,7 +516,7 @@ impl WrappedNode for ReadLink {
       .vfs
       .read_link(&node.0)
       .await
-      .map_err(|e| throw(&format!("{}", e)))?;
+      .map_err(|e| throw(format!("{}", e)))?;
     Ok(LinkDest(link_dest))
   }
 }
@@ -547,7 +547,7 @@ impl WrappedNode for DigestFile {
       .core
       .store()
       .store_file(true, false, move || std::fs::File::open(&path))
-      .map_err(|e| throw(&e))
+      .map_err(|e| throw(e))
       .await
   }
 }
@@ -579,7 +579,7 @@ impl WrappedNode for Scandir {
       .vfs
       .scandir(self.0)
       .await
-      .map_err(|e| throw(&format!("{}", e)))?;
+      .map_err(|e| throw(format!("{}", e)))?;
     Ok(Arc::new(directory_listing))
   }
 }
@@ -622,7 +622,7 @@ impl Paths {
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
       .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(&format!("{}", e)))
+      .map_err(|e| throw(format!("{}", e)))
       .await
   }
 
@@ -659,7 +659,7 @@ impl WrappedNode for Paths {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Arc<Vec<PathStat>>> {
-    let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
+    let path_globs = self.path_globs.parse().map_err(|e| throw(e))?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
   }
@@ -711,10 +711,10 @@ impl Snapshot {
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     let path_stats = context
       .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(&format!("{}", e)))
+      .map_err(|e| throw(format!("{}", e)))
       .await?;
     store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
-      .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
+      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
       .await
   }
 
@@ -875,7 +875,7 @@ impl WrappedNode for Snapshot {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
-    let path_globs = self.path_globs.parse().map_err(|e| throw(&e))?;
+    let path_globs = self.path_globs.parse().map_err(|e| throw(e))?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)
   }
@@ -959,15 +959,16 @@ impl WrappedNode for DownloadedFile {
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
       let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
       let expected_digest =
-        lift_file_digest(&context.core.types, py_digest).map_err(|s| throw(&s))?;
-      Ok((url_str, expected_digest))
+        lift_file_digest(&context.core.types, py_digest).map_err(|s| throw(s))?;
+      let res: NodeResult<(String, Digest)> = Ok((url_str, expected_digest));
+      res
     })?;
     let url = Url::parse(&url_str)
-      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
+      .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
       .await
-      .map_err(|err| throw(&err))?;
+      .map_err(|err| throw(err))?;
     Ok(snapshot.digest)
   }
 }
@@ -1019,7 +1020,7 @@ impl Task {
             .core
             .rule_graph
             .edges_for_inner(&entry)
-            .ok_or_else(|| throw(&format!("No edges for task {:?} exist!", entry)))?;
+            .ok_or_else(|| throw(format!("No edges for task {:?} exist!", entry)))?;
 
           // See if there is a Get: otherwise, a union (which is executed as a Query).
           // See #12934 for further cleanup of this API.
@@ -1046,7 +1047,7 @@ impl Task {
             })
             .ok_or_else(|| {
               if get.input_type.is_union() {
-                throw(&format!(
+                throw(format!(
                   "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
                   with `@union`, the third argument should be a member of that union. Did you \
                   intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
@@ -1061,7 +1062,7 @@ impl Task {
               } else {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
-                throw(&format!(
+                throw(format!(
                   "Get({}, {}, {}) was not detected in your @rule body at rule compile time. \
                   Was the `Get` constructor called in a separate function, or perhaps \
                   dynamically? If so, it must be inlined into the @rule body.",
@@ -1184,7 +1185,7 @@ impl WrappedNode for Task {
     }
 
     if result_type != self.product {
-      return Err(throw(&format!(
+      return Err(throw(format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         func, result_val
       )));
@@ -1613,7 +1614,7 @@ impl NodeError for Failure {
       gil.python(),
       "targets#dependencies-and-dependency-inference",
     );
-    throw(&format!(
+    throw(format!(
       "The dependency graph contained a cycle:\
       \n\n  \
       {}\
