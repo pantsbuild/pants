@@ -4,6 +4,7 @@
 import os
 import unittest
 from functools import partial
+from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List, Optional
 
@@ -11,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
 
 
@@ -392,53 +393,41 @@ class OptionsBootstrapperTest(unittest.TestCase):
             ),
         )
 
-    def test_setting_pants_config_in_config(self) -> None:
+    def test_setting_pants_config_in_config(self, tmp_path: Path) -> None:
         # Test that setting pants_config in the config file has no effect.
-        with temporary_dir() as tmpdir:
-            config1 = os.path.join(tmpdir, "config1")
-            config2 = os.path.join(tmpdir, "config2")
-            with open(config1, "w") as out1:
-                out1.write(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")
-            with open(config2, "w") as out2:
-                out2.write("[DEFAULT]\nlogdir = 'logdir2'\n")
+        config1 = tmp_path / "config1"
+        config2 = tmp_path / "config2"
+        config1.write_text(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")
+        config2.write_text("[DEFAULT]\nlogdir = 'logdir2'\n")
 
-            ob = OptionsBootstrapper.create(
-                env={}, args=[f"--pants-config-files=['{config1}']"], allow_pantsrc=False
-            )
-            logdir = ob.get_bootstrap_options().for_global_scope().logdir
-            self.assertEqual("logdir1", logdir)
+        ob = OptionsBootstrapper.create(
+            env={}, args=[f"--pants-config-files=['{config1.as_posix()}']"], allow_pantsrc=False
+        )
+        logdir = ob.get_bootstrap_options().for_global_scope().logdir
+        assert "logdir1" == logdir
 
-    def test_alias_pyupgrade(self) -> None:
-        with temporary_dir() as tmpdir:
-            config = os.path.join(tmpdir, "config")
-            with open(config, "w") as out:
-                out.write(
-                    dedent(
-                        """\
-                        [cli.alias]
-                        pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
-                        """
-                    )
-                )
+    def test_alias_pyupgrade(self, tmp_path: Path) -> None:
+        config = tmp_path / "config"
+        config.write_text(
+            dedent(
+                """\
+                    [cli.alias]
+                    pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+                    """
+            )
+        )
 
-            config_arg = f"--pants-config-files=['{config}']"
-            ob = OptionsBootstrapper.create(
-                env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False
-            )
+        config_arg = f"--pants-config-files=['{config.as_posix()}']"
+        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False)
 
-            self.assertEqual(
-                (
-                    config_arg,
-                    "--backend-packages=pants.backend.python.lint.pyupgrade",
-                    "fmt",
-                ),
-                ob.args,
-            )
-            self.assertEqual(
-                (
-                    "./pants",
-                    config_arg,
-                    "--backend-packages=pants.backend.python.lint.pyupgrade",
-                ),
-                ob.bootstrap_args,
-            )
+        assert (
+            config_arg,
+            "--backend-packages=pants.backend.python.lint.pyupgrade",
+            "fmt",
+        ) == ob.args
+
+        assert (
+            "./pants",
+            config_arg,
+            "--backend-packages=pants.backend.python.lint.pyupgrade",
+        ) == ob.bootstrap_args
