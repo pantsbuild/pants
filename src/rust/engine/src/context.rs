@@ -32,7 +32,6 @@ use regex::Regex;
 use rule_graph::RuleGraph;
 use store::{self, Store};
 use task_executor::Executor;
-use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
@@ -539,7 +538,7 @@ pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: Uuid,
+  run_id: u32,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -574,7 +573,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type RunId = Uuid;
+  type RunId = u32;
 
   fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
     Box::new(self.stats.lock())

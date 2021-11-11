@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::atomic::{self, AtomicU32};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -19,7 +20,6 @@ use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use uuid::Uuid;
 use workunit_store::{format_workunit_duration, UserMetadataPyValue, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
@@ -83,11 +83,7 @@ struct SessionState {
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
-  //
-  // TODO: Figure out how the `--loop` flag interplays with metrics. It's possible that for metrics
-  // purposes, each iteration of a loop should be considered to be a new Session, but for now the
-  // Session/build_id would be stable.
-  run_id: Mutex<Uuid>,
+  run_id: AtomicU32,
   workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
 }
 
@@ -161,6 +157,7 @@ impl Session {
       display,
     });
     core.sessions.add(&handle)?;
+    let run_id = core.sessions.generate_run_id();
     let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
@@ -170,7 +167,7 @@ impl Session {
         roots: Mutex::new(HashMap::new()),
         workunit_store,
         session_values: Mutex::new(session_values),
-        run_id: Mutex::new(Uuid::new_v4()),
+        run_id: AtomicU32::new(run_id),
         workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
     })
@@ -271,14 +268,15 @@ impl Session {
     &self.handle.build_id
   }
 
-  pub fn run_id(&self) -> Uuid {
-    let run_id = self.state.run_id.lock();
-    *run_id
+  pub fn run_id(&self) -> u32 {
+    self.state.run_id.load(atomic::Ordering::SeqCst)
   }
 
   pub fn new_run_id(&self) {
-    let mut run_id = self.state.run_id.lock();
-    *run_id = Uuid::new_v4();
+    self.state.run_id.store(
+      self.state.core.sessions.generate_run_id(),
+      atomic::Ordering::SeqCst,
+    );
   }
 
   pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
@@ -373,6 +371,9 @@ pub struct Sessions {
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_abort_handle: AbortHandle,
+  /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
+  /// ordering: only equality is relevant.
+  run_id_generator: AtomicU32,
 }
 
 impl Sessions {
@@ -414,6 +415,7 @@ impl Sessions {
     Ok(Sessions {
       sessions,
       signal_task_abort_handle,
+      run_id_generator: AtomicU32::new(0),
     })
   }
 
@@ -426,6 +428,10 @@ impl Sessions {
     } else {
       Err("The scheduler is shutting down: no new sessions may be created.".to_string())
     }
+  }
+
+  fn generate_run_id(&self) -> u32 {
+    self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst)
   }
 
   ///
