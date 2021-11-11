@@ -955,7 +955,7 @@ impl WrappedNode for DownloadedFile {
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
-      let py_download_file = self.0.to_value().into_ref(py);
+      let py_download_file = self.0.to_value().clone_ref(py).into_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
       let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
       let expected_digest =
