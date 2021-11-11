@@ -53,7 +53,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResultWithPlatform,
+    FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
     MultiPlatformProcess,
@@ -164,7 +164,7 @@ class Scheduler:
             download_file=DownloadFile,
             platform=Platform,
             multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
+            process_result=FallibleProcessResult,
             coroutine=CoroutineType,
             session_values=SessionValues,
             interactive_process=InteractiveProcess,

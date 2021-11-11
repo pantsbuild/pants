@@ -168,6 +168,7 @@ class ProcessResult:
     stderr: bytes
     stderr_digest: FileDigest
     output_digest: Digest
+    platform: Platform
 
 
 @dataclass(frozen=True)
@@ -176,18 +177,6 @@ class FallibleProcessResult:
 
     If the process has a non-zero exit code, this will not raise an exception, unlike ProcessResult.
     """
-
-    stdout: bytes
-    stdout_digest: FileDigest
-    stderr: bytes
-    stderr_digest: FileDigest
-    exit_code: int
-    output_digest: Digest
-
-
-@dataclass(frozen=True)
-class FallibleProcessResultWithPlatform:
-    """Result of executing a process which might fail, along with the platform it ran on."""
 
     stdout: bytes
     stdout_digest: FileDigest
@@ -269,6 +258,7 @@ def fallible_to_exec_result_or_raise(
             stderr=fallible_result.stderr,
             stderr_digest=fallible_result.stderr_digest,
             output_digest=fallible_result.output_digest,
+            platform=fallible_result.platform,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,
@@ -276,18 +266,6 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stderr,
         description.value,
         local_cleanup=global_options.options.process_execution_local_cleanup,
-    )
-
-
-@rule
-def remove_platform_information(res: FallibleProcessResultWithPlatform) -> FallibleProcessResult:
-    return FallibleProcessResult(
-        exit_code=res.exit_code,
-        stdout=res.stdout,
-        stdout_digest=res.stdout_digest,
-        stderr=res.stderr,
-        stderr_digest=res.stderr_digest,
-        output_digest=res.output_digest,
     )
 
 
