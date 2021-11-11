@@ -386,54 +386,66 @@ fn path_globs_to_paths(
   .boxed()
 }
 
+enum CreateDigestItem {
+  FileContent(RelativePath, bytes::Bytes, bool),
+  FileEntry(RelativePath, Digest, bool),
+  Dir(RelativePath),
+}
+
 fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_items = externs::collect_iterable(&args[0]).unwrap();
-  let digests: Vec<_> = file_items
+  let items: Vec<CreateDigestItem> = {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    externs::collect_iterable(&args[0])
+      .unwrap()
+      .into_iter()
+      .map(|obj| {
+        let raw_path: String = externs::getattr(&obj, "path").unwrap();
+        let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
+        if obj.hasattr(py, "content").unwrap() {
+          let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(&obj, "content").unwrap());
+          let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
+          CreateDigestItem::FileContent(path, bytes, is_executable)
+        } else if obj.hasattr(py, "file_digest").unwrap() {
+          let py_digest = externs::getattr(&obj, "file_digest").unwrap();
+          let digest = Snapshot::lift_file_digest(&py_digest).unwrap();
+          let is_executable: bool = externs::getattr(&obj, "is_executable").unwrap();
+          CreateDigestItem::FileEntry(path, digest, is_executable)
+        } else {
+          CreateDigestItem::Dir(path)
+        }
+      })
+      .collect()
+  };
+
+  let digest_futures: Vec<_> = items
     .into_iter()
-    .map(|file_item| {
-      let path: String = externs::getattr(&file_item, "path").unwrap();
+    .map(|item| {
       let store = context.core.store();
       async move {
-        let path = RelativePath::new(PathBuf::from(path))
-          .map_err(|e| format!("The `path` must be relative: {:?}", e))?;
-
-        let (is_file_content, is_file_entry) = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          (
-            file_item.hasattr(py, "content").unwrap(),
-            file_item.hasattr(py, "file_digest").unwrap(),
-          )
-        };
-
-        if is_file_content {
-          let bytes =
-            bytes::Bytes::from(externs::getattr::<Vec<u8>>(&file_item, "content").unwrap());
-          let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
-
-          let digest = store.store_file_bytes(bytes, true).await?;
-          let snapshot = store
-            .snapshot_of_one_file(path, digest, is_executable)
-            .await?;
-          let res: Result<_, String> = Ok(snapshot.digest);
-          res
-        } else if is_file_entry {
-          let digest_obj = externs::getattr(&file_item, "file_digest")?;
-          let digest = Snapshot::lift_file_digest(&digest_obj)?;
-          let is_executable: bool = externs::getattr(&file_item, "is_executable").unwrap();
-          let snapshot = store
-            .snapshot_of_one_file(path, digest, is_executable)
-            .await?;
-          let res: Result<_, String> = Ok(snapshot.digest);
-          res
-        } else {
-          store
+        match item {
+          CreateDigestItem::FileContent(path, bytes, is_executable) => {
+            let digest = store.store_file_bytes(bytes, true).await?;
+            let snapshot = store
+              .snapshot_of_one_file(path, digest, is_executable)
+              .await?;
+            let res: Result<_, String> = Ok(snapshot.digest);
+            res
+          }
+          CreateDigestItem::FileEntry(path, digest, is_executable) => {
+            let snapshot = store
+              .snapshot_of_one_file(path, digest, is_executable)
+              .await?;
+            let res: Result<_, String> = Ok(snapshot.digest);
+            res
+          }
+          CreateDigestItem::Dir(path) => store
             .create_empty_dir(path)
             .await
-            .map_err(|e| format!("{:?}", e))
+            .map_err(|e| format!("{:?}", e)),
         }
       }
     })
@@ -441,7 +453,9 @@ fn create_digest_to_digest(
 
   let store = context.core.store();
   async move {
-    let digests = future::try_join_all(digests).await.map_err(|e| throw(&e))?;
+    let digests = future::try_join_all(digest_futures)
+      .await
+      .map_err(|e| throw(&e))?;
     let digest = store
       .merge(digests)
       .await
