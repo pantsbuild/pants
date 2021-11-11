@@ -1096,7 +1096,8 @@ impl Task {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();
-      match externs::generator_send(&generator, &input)? {
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
+      match response {
         externs::GeneratorResponse::Get(get) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
@@ -1377,7 +1378,11 @@ impl Node for NodeKey {
             if key
               .type_id()
               .as_py_type(py)
-              .is_subtype_of(py, &engine_aware_param_ty)
+              // TODO: Switch to PyO3's upcoming mechanism for this:
+              // https://github.com/PyO3/pyo3/pull/1985.
+              .call_method1("__subclasscheck__", (engine_aware_param_ty,))
+              .map(|res| res.extract::<bool>().unwrap_or(false))
+              .unwrap_or(false)
             {
               Some(key.to_value())
             } else {

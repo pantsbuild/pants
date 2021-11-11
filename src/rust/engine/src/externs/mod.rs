@@ -170,13 +170,15 @@ pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyA
   func.call1(arg_handles)
 }
 
-pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
+pub fn generator_send(
+  py: Python,
+  generator: &Value,
+  arg: &Value,
+) -> Result<GeneratorResponse, Failure> {
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
   let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
   let response = native_engine_generator_send
-    .call1((generator, arg))
+    .call1((generator.to_object(py), arg.to_object(py)))
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
   if let Ok(b) = response.cast_as::<PyGeneratorResponseBreak>() {

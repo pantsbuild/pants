@@ -978,7 +978,7 @@ fn scheduler_execute<'py>(
           .map(|root_results| {
             let py_results = root_results
               .into_iter()
-              .map(|rr| py_result_from_root(py, rr).unwrap().into_object())
+              .map(|err| py_result_from_root(py, err).unwrap().into_object())
               .collect::<Vec<_>>();
             PyTuple::new(py, &py_results)
           })
@@ -1681,6 +1681,8 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 fn block_in_place_and_wait<T, E, F>(py: Python, f: impl FnOnce() -> F + Sync + Send) -> Result<T, E>
 where
   F: Future<Output = Result<T, E>>,
+  T: Send,
+  E: Send,
 {
   py.allow_threads(|| {
     let future = f();

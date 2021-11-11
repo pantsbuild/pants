@@ -13,7 +13,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use fs::RelativePath;
+use fs::{PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
@@ -164,8 +164,8 @@ fn multi_platform_process_request_to_process_result(
           "Error lifting MultiPlatformExecuteProcess: {}",
           str
         ))
-      })?
-    });
+      })
+    })?;
 
     let result = context.get(process_request).await?.0;
 
@@ -283,8 +283,9 @@ fn remove_prefix_request_to_digest(
       let py_digest = externs::getattr(py_remove_prefix, "digest").unwrap();
       let input_digest = lift_directory_digest(py_digest).map_err(|e| throw(e))?;
       let prefix: String = externs::getattr(py_remove_prefix, "prefix").unwrap();
-      (input_digest, prefix)
-    });
+      let res: NodeResult<(Digest, String)> = Ok((input_digest, prefix));
+      res
+    })?;
     let prefix = RelativePath::new(PathBuf::from(raw_prefix))
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
@@ -309,7 +310,8 @@ fn add_prefix_request_to_digest(
       let py_digest = externs::getattr(py_add_prefix, "digest").unwrap();
       let input_digest = lift_directory_digest(py_digest).map_err(|e| throw(e))?;
       let prefix: String = externs::getattr(py_add_prefix, "prefix").unwrap();
-      Ok((input_digest, prefix))
+      let res: NodeResult<(Digest, String)> = Ok((input_digest, prefix));
+      res
     })?;
     let prefix = RelativePath::new(PathBuf::from(raw_prefix))
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
@@ -345,7 +347,7 @@ fn merge_digests_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let digests: Vec<hashing::Digest, String> = Python::with_gil(|py| {
+    let digests: Result<Vec<hashing::Digest>, String> = Python::with_gil(|py| {
       let py_merge_digests = args[0].into_ref(py);
       externs::getattr::<Vec<&PyAny>>(py_merge_digests, "digests")
         .unwrap()
@@ -496,10 +498,11 @@ fn digest_subset_to_digest(
       let py_digest_subset = args[0].into_ref(py);
       let py_path_globs = externs::getattr(py_digest_subset, "globs").unwrap();
       let py_digest = externs::getattr(py_digest_subset, "digest").unwrap();
-      Ok((
+      let res: NodeResult<(PreparedPathGlobs, Digest)> = Ok((
         Snapshot::lift_prepared_path_globs(py_path_globs).map_err(|e| throw(e))?,
         lift_directory_digest(py_digest).map_err(|e| throw(e))?,
-      ))
+      ));
+      res
     })?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store
