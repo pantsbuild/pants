@@ -440,22 +440,19 @@ struct PyResult {
   #[pyo3(get)]
   result: PyObject,
   #[pyo3(get)]
-  python_traceback: Py<PyString>,
+  python_traceback: Option<String>,
   #[pyo3(get)]
-  engine_traceback: Py<PyList>,
+  engine_traceback: Vec<String>,
 }
 
 fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
   match result {
-    Ok(val) => {
-      let engine_traceback: Vec<String> = vec![];
-      PyResult {
-        is_throw: false,
-        result: val.into(),
-        python_traceback: "".into(),
-        engine_traceback: engine_traceback.into(),
-      }
-    }
+    Ok(val) => PyResult {
+      is_throw: false,
+      result: val.into(),
+      python_traceback: None,
+      engine_traceback: vec![],
+    },
     Err(f) => {
       let (val, python_traceback, engine_traceback) = match f {
         f @ Failure::Invalidated => {
@@ -472,11 +469,11 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
           engine_traceback,
         } => (val, python_traceback, engine_traceback),
       };
-      &PyResult {
+      PyResult {
         is_throw: true,
         result: val.into(),
-        python_traceback: python_traceback.into(),
-        engine_traceback: engine_traceback.into(),
+        python_traceback: Some(python_traceback.into()),
+        engine_traceback,
       }
     }
   }
@@ -974,11 +971,12 @@ fn scheduler_execute<'py>(
       with_session(session_ptr, |session| {
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
-        py.allow_threads(|| scheduler.execute(execution_request, session))
+        let execute_result = py.allow_threads(|| scheduler.execute(execution_request, session));
+        execute_result
           .map(|root_results| {
             let py_results = root_results
               .into_iter()
-              .map(|err| py_result_from_root(py, err).unwrap().into_object())
+              .map(|err| Py::new(py, py_result_from_root(py, err)).unwrap())
               .collect::<Vec<_>>();
             PyTuple::new(py, &py_results)
           })
