@@ -446,6 +446,7 @@ py_class!(class PyTypes |py| {
       process_result_metadata: PyType,
       coroutine: PyType,
       session_values: PyType,
+      run_id: PyType,
       interactive_process: PyType,
       interactive_process_result: PyType,
       engine_aware_parameter: PyType
@@ -475,6 +476,7 @@ py_class!(class PyTypes |py| {
         process_result_metadata: TypeId::new(&process_result_metadata),
         coroutine: TypeId::new(&coroutine),
         session_values: TypeId::new(&session_values),
+        run_id: TypeId::new(&run_id),
         interactive_process: TypeId::new(&interactive_process),
         interactive_process_result: TypeId::new(&interactive_process_result),
         engine_aware_parameter: TypeId::new(&engine_aware_parameter),

@@ -15,6 +15,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
@@ -204,7 +205,7 @@ class ProcessResultMetadata:
     # The run_id in which a ProcessResult was created. See the `self.source` method.
     source_run_id: int
 
-    def source(self, current_run_id: int) -> str:
+    def source(self, current_run_id: RunId) -> str:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
         If a ProcessResult is consumed in any run_id other than the one it was created in, the its

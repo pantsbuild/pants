@@ -6,7 +6,7 @@ use crate::context::Context;
 use crate::externs;
 use crate::nodes::{
   lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
-  NodeResult, Paths, SessionValues, Snapshot,
+  NodeResult, Paths, RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -123,6 +123,13 @@ impl Intrinsics {
         inputs: vec![],
       },
       Box::new(session_values),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.run_id,
+        inputs: vec![],
+      },
+      Box::new(run_id),
     );
     intrinsics.insert(
       Intrinsic {
@@ -490,6 +497,10 @@ fn digest_subset_to_digest(
 
 fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
   async move { context.get(SessionValues).await }.boxed()
+}
+
+fn run_id(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move { context.get(RunId).await }.boxed()
 }
 
 fn interactive_process(

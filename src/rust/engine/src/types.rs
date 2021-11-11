@@ -26,6 +26,7 @@ pub struct Types {
   pub process_result_metadata: TypeId,
   pub coroutine: TypeId,
   pub session_values: TypeId,
+  pub run_id: TypeId,
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
   pub engine_aware_parameter: TypeId,
