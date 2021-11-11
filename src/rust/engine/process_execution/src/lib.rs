@@ -410,17 +410,29 @@ pub struct ProcessResultMetadata {
   pub total_elapsed: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
+  /// within the same process, the source of the process implicitly becomes memoization.
+  pub source_run_id: u32,
 }
 
 impl ProcessResultMetadata {
-  pub fn new(total_elapsed: Option<Duration>, source: ProcessResultSource) -> Self {
-    ProcessResultMetadata {
+  pub fn new(
+    total_elapsed: Option<Duration>,
+    source: ProcessResultSource,
+    context: &Context,
+  ) -> Self {
+    Self {
       total_elapsed,
       source,
+      source_run_id: context.run_id,
     }
   }
 
-  pub fn new_from_metadata(metadata: ExecutedActionMetadata, source: ProcessResultSource) -> Self {
+  pub fn new_from_metadata(
+    metadata: ExecutedActionMetadata,
+    source: ProcessResultSource,
+    context: &Context,
+  ) -> Self {
     let total_elapsed = match (
       metadata.worker_start_timestamp,
       metadata.worker_completed_timestamp,
@@ -433,6 +445,7 @@ impl ProcessResultMetadata {
     Self {
       total_elapsed,
       source,
+      source_run_id: context.run_id,
     }
   }
 
@@ -499,6 +512,7 @@ pub enum ProcessResultSource {
 pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
+  run_id: u32,
 }
 
 impl Default for Context {
@@ -506,15 +520,17 @@ impl Default for Context {
     Context {
       workunit_store: WorkunitStore::new(false),
       build_id: String::default(),
+      run_id: 0,
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: u32) -> Context {
     Context {
       workunit_store,
       build_id,
+      run_id,
     }
   }
 }

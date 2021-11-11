@@ -86,7 +86,7 @@ impl crate::CommandRunner for CommandRunner {
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-        match self.lookup(&key2).await {
+        match self.lookup(&context2, &key2).await {
           Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
             let lookup_elapsed = cache_lookup_start.elapsed();
             workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
@@ -159,6 +159,7 @@ impl crate::CommandRunner for CommandRunner {
 impl CommandRunner {
   async fn lookup(
     &self,
+    context: &Context,
     action_key: &CacheKey,
   ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
     use remexec::ExecuteResponse;
@@ -181,6 +182,7 @@ impl CommandRunner {
       if let Some(ref action_result) = execute_response.result {
         crate::remote::populate_fallible_execution_result(
           self.file_store.clone(),
+          context,
           action_result,
           platform,
           true,
