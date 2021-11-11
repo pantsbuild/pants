@@ -154,8 +154,10 @@ impl From<&PyType> for TypeId {
 
 impl fmt::Debug for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let name = Python::with_gil(|py| self.as_py_type(py).name().unwrap());
-    write!(f, "{}", name)
+    Python::with_gil(|py| {
+      let name = self.as_py_type(py).name().unwrap();
+      write!(f, "{}", name)
+    })
   }
 }
 

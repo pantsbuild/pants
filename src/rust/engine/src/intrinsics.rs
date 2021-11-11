@@ -380,7 +380,7 @@ fn download_file_to_digest(
 
 fn path_globs_to_digest(
   context: Context,
-  mut args: Vec<Value>,
+  args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let path_globs = Python::with_gil(|py| Snapshot::lift_path_globs(args[0].into_ref(py)))
@@ -394,7 +394,7 @@ fn path_globs_to_digest(
 
 fn path_globs_to_paths(
   context: Context,
-  mut args: Vec<Value>,
+  args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
@@ -521,7 +521,7 @@ fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, Nod
 
 fn interactive_process(
   context: Context,
-  mut args: Vec<Value>,
+  args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let types = &context.core.types;

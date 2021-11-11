@@ -580,7 +580,6 @@ fn strongly_connected_components(
 ///
 #[pyfunction]
 fn scheduler_create(
-  py: Python,
   executor_ptr: &PyExecutor,
   tasks_ptr: &PyTasks,
   types_ptr: &PyTypes,
@@ -1584,7 +1583,7 @@ fn stdio_thread_console_clear() {
 }
 
 #[pyfunction]
-fn stdio_thread_get_destination(py: Python) -> PyStdioDestination {
+fn stdio_thread_get_destination() -> PyStdioDestination {
   let dest = stdio::get_destination();
   PyStdioDestination(dest)
 }
