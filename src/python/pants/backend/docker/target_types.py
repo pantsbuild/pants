@@ -14,6 +14,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.util.docutil import doc_url
 
 
 class DockerBuildArgsField(StringSequenceField):
@@ -40,7 +41,7 @@ class DockerImageTagsField(StringSequenceField):
         "Any tags to apply to the Docker image name (the version is usually applied as a tag).\n\n"
         "Each tag may use placeholders in curly braces to be interpolated. The placeholders are "
         "derived from various sources, such as the Dockerfile FROM instructions tags and build "
-        "args.\n\nSee {doc_url('tagging-docker-images')}."
+        f"args.\n\nSee {doc_url('tagging-docker-images')}."
     )
 
 
