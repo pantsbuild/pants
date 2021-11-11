@@ -57,6 +57,7 @@ from pants.engine.process import (
     InteractiveProcess,
     InteractiveProcessResult,
     MultiPlatformProcess,
+    ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union
@@ -165,6 +166,7 @@ class Scheduler:
             platform=Platform,
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResult,
+            process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,
             session_values=SessionValues,
             interactive_process=InteractiveProcess,

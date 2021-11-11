@@ -38,7 +38,7 @@ from pants.backend.docker.util_rules.docker_build_env import rules as build_env_
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult, ProcessResultMetadata
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
@@ -87,6 +87,7 @@ def assert_build(
             stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
             platform=Platform.current,
+            metadata=ProcessResultMetadata(0, "ran_locally", 0),
         )
 
     if options:

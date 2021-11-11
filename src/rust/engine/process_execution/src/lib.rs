@@ -508,6 +508,17 @@ pub enum ProcessResultSource {
   HitRemotely,
 }
 
+impl From<ProcessResultSource> for &'static str {
+  fn from(prs: ProcessResultSource) -> &'static str {
+    match prs {
+      ProcessResultSource::RanLocally => "ran_locally",
+      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::HitLocally => "hit_locally",
+      ProcessResultSource::HitRemotely => "hit_remotely",
+    }
+  }
+}
+
 #[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,

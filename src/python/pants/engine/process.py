@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from textwrap import dedent
 from typing import Iterable, Mapping
@@ -169,9 +169,11 @@ class ProcessResult:
     stderr_digest: FileDigest
     output_digest: Digest
     platform: Platform
+    metadata: ProcessResultMetadata = field(compare=False, hash=False)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class FallibleProcessResult:
     """Result of executing a process which might fail.
 
@@ -185,6 +187,31 @@ class FallibleProcessResult:
     exit_code: int
     output_digest: Digest
     platform: Platform
+    metadata: ProcessResultMetadata = field(compare=False, hash=False)
+
+
+@dataclass(frozen=True)
+class ProcessResultMetadata:
+    """Metadata for a ProcessResult, which is not included in its definition of equality."""
+
+    # The execution time of the process, in milliseconds, or None if it could not be captured
+    # (since remote execution does not guarantee its availability).
+    total_elapsed_ms: int | None
+    # Whether the ProcessResult (when it was created in the attached run_id) came from the local
+    # or remote cache, or ran locally or remotely. See the `self.source` method.
+    # TODO: Consider extracting an enum.
+    _source: str
+    # The run_id in which a ProcessResult was created. See the `self.source` method.
+    source_run_id: int
+
+    def source(self, current_run_id: int) -> str:
+        """Given the current run_id, return the calculated "source" of the ProcessResult.
+
+        If a ProcessResult is consumed in any run_id other than the one it was created in, the its
+        source implicitly becomes memoization, since the result was re-used in a new run without
+        being recreated.
+        """
+        return self._source if self.source_run_id == current_run_id else "memoized"
 
 
 class ProcessExecutionFailure(Exception):
@@ -259,6 +286,7 @@ def fallible_to_exec_result_or_raise(
             stderr_digest=fallible_result.stderr_digest,
             output_digest=fallible_result.output_digest,
             platform=fallible_result.platform,
+            metadata=fallible_result.metadata,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,
