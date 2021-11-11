@@ -1100,6 +1100,17 @@ def test_multiple_sources_path_globs(
             ),
             id="provided value warns on glob match error",
         ),
+        pytest.param(
+            "file",
+            "life",
+            expected_path_globs(
+                globs=("test/life",),
+                glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="test:test's `source` field",
+            ),
+            id="default glob conjunction",
+        ),
     ],
 )
 def test_single_source_path_globs(

@@ -1616,10 +1616,16 @@ class SourcesField(AsyncFieldMixin, Field):
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
         if not self.globs:
             return PathGlobs([])
+
+        # SingleSourceField has str as default type.
+        default_globs = (
+            [self.default] if self.default and isinstance(self.default, str) else self.default
+        )
+
         # Match any if we use default globs, else match all.
         conjunction = (
             GlobExpansionConjunction.all_match
-            if not self.default or (set(self.value) != set(self.default))  # type: ignore[arg-type]
+            if not default_globs or (set(self.globs) != set(default_globs))
             else GlobExpansionConjunction.any_match
         )
         # Use fields default error behavior if defined, if we use default globs else the provided
