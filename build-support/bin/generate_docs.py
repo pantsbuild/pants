@@ -203,6 +203,8 @@ def run_pants_help_all() -> dict[str, Any]:
         "internal_plugins.releases",
         "pants.backend.experimental.java",
         "pants.backend.experimental.java.debug_goals",
+        "pants.backend.experimental.scala",
+        "pants.backend.experimental.scala.debug_goals",
     ]
     activated_backends = [
         "pants.backend.codegen.protobuf.python",

@@ -6,11 +6,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.dependency_inference.artifact_mapper import (
-    FrozenTrieNode,
-    ThirdPartyJavaPackageToArtifactMapping,
-    UnversionedCoordinate,
-)
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
 from pants.backend.java.dependency_inference.java_parser_launcher import (
     rules as java_parser_launcher_rules,
@@ -33,6 +28,11 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferredDependencies,
     Targets,
+)
+from pants.jvm.dependency_inference.artifact_mapper import (
+    FrozenTrieNode,
+    ThirdPartyPackageToArtifactMapping,
+    UnversionedCoordinate,
 )
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -68,7 +68,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
             QueryRule(Targets, [UnparsedAddressInputs]),
-            QueryRule(ThirdPartyJavaPackageToArtifactMapping, []),
+            QueryRule(ThirdPartyPackageToArtifactMapping, []),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifact],
     )
@@ -568,7 +568,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    mapping = rule_runner.request(ThirdPartyJavaPackageToArtifactMapping, [])
+    mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
     root_node = mapping.mapping_root
 
     # Handy trie traversal function to placate mypy

@@ -6,11 +6,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterable, Set
 
-from pants.backend.java.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.build_graph.address import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
+from pants.jvm.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
 from pants.jvm.target_types import JvmArtifactArtifactField, JvmArtifactGroupField
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -113,7 +113,7 @@ def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
 
 
 @dataclass(frozen=True)
-class ThirdPartyJavaPackageToArtifactMapping:
+class ThirdPartyPackageToArtifactMapping:
     mapping_root: FrozenTrieNode
 
 
@@ -146,7 +146,7 @@ async def find_available_third_party_artifacts(
 @rule
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
-) -> ThirdPartyJavaPackageToArtifactMapping:
+) -> ThirdPartyPackageToArtifactMapping:
     def insert(mapping: MutableTrieNode, imp: str, coordinate: UnversionedCoordinate) -> None:
         imp_parts = imp.split(".")
         recursive = False
@@ -170,12 +170,12 @@ async def compute_java_third_party_artifact_mapping(
         value = UnversionedCoordinate.from_coord_str(imp_action)
         insert(mapping, imp_name, value)
 
-    return ThirdPartyJavaPackageToArtifactMapping(FrozenTrieNode(mapping))
+    return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
 
 
 def find_artifact_mapping(
     import_name: str,
-    mapping: ThirdPartyJavaPackageToArtifactMapping,
+    mapping: ThirdPartyPackageToArtifactMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
 ) -> FrozenOrderedSet[Address]:
     imp_parts = import_name.split(".")

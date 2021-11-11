@@ -135,7 +135,7 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_names": self.provided_names,
+            "provided_names": list(self.provided_names),
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()

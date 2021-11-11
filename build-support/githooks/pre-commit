@@ -20,7 +20,7 @@ if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
   ./build-support/bin/check_rust_pre_commit.sh
 fi
 
-echo "* Checking MyPy"
+echo "* Typechecking"
 ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive check
 
 echo "* Checking linters, formatters, and headers"
