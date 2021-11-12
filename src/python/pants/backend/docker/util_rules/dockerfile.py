@@ -13,8 +13,8 @@ from pants.engine.unions import UnionRule
 
 
 class GenerateDockerfileRequest(GenerateSourcesRequest):
-    # This will always run codegen when hydrating `docker_image`s, but is a no-op in case there are
-    # no `instructions` defined on the target.
+    # This will always run codegen when hydrating `docker_image`s, performing source validations but
+    # does not generate anything if there are no `instructions` defined on the target.
     input = DockerImageSourceField
     output = DockerImageSourceField
 

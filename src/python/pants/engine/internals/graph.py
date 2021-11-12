@@ -786,7 +786,6 @@ async def hydrate_sources(
         ),
         None,
     )
-
     if sources_type is None:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None)
 
