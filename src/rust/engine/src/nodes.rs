@@ -429,6 +429,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       let execution_context = process_execution::Context::new(
         context.session.workunit_store(),
         context.session.build_id().to_string(),
+        context.session.run_id(),
       );
 
       let res = command_runner
@@ -689,6 +690,34 @@ impl WrappedNode for SessionValues {
 impl From<SessionValues> for NodeKey {
   fn from(n: SessionValues) -> Self {
     NodeKey::SessionValues(n)
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct RunId;
+
+#[async_trait]
+impl WrappedNode for RunId {
+  type Item = Value;
+
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    _workunit: &mut RunningWorkunit,
+  ) -> NodeResult<Value> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.run_id,
+      &[externs::store_u64(py, context.session.run_id().0 as u64)],
+    ))
+  }
+}
+
+impl From<RunId> for NodeKey {
+  fn from(n: RunId) -> Self {
+    NodeKey::RunId(n)
   }
 }
 
@@ -1248,6 +1277,7 @@ pub enum NodeKey {
   Snapshot(Snapshot),
   Paths(Paths),
   SessionValues(SessionValues),
+  RunId(RunId),
   Task(Box<Task>),
 }
 
@@ -1258,6 +1288,7 @@ impl NodeKey {
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::SessionValues(_) => "SessionValues".to_string(),
+      &NodeKey::RunId(_) => "RunId".to_string(),
       &NodeKey::Task(ref s) => format!("{}", s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::Paths(..) => "Paths".to_string(),
@@ -1280,6 +1311,7 @@ impl NodeKey {
       &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::SessionValues { .. }
+      | &NodeKey::RunId { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Paths { .. }
       | &NodeKey::Task { .. }
@@ -1318,6 +1350,7 @@ impl NodeKey {
       NodeKey::Scandir(..) => "scandir".to_string(),
       NodeKey::Select(..) => "select".to_string(),
       NodeKey::SessionValues(..) => "session_values".to_string(),
+      NodeKey::RunId(..) => "run_id".to_string(),
     }
   }
 
@@ -1347,6 +1380,7 @@ impl NodeKey {
       }
       NodeKey::Select(..) => None,
       NodeKey::SessionValues(..) => None,
+      NodeKey::RunId(..) => None,
     }
   }
 }
@@ -1475,6 +1509,11 @@ impl Node for NodeKey {
               .map_ok(NodeOutput::Value)
               .await
           }
+          NodeKey::RunId(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(NodeOutput::Value)
+              .await
+          }
           NodeKey::Task(n) => {
             n.run_wrapped_node(context, workunit)
               .map_ok(NodeOutput::Value)
@@ -1539,7 +1578,7 @@ impl Node for NodeKey {
   fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
-      &NodeKey::SessionValues(_) => false,
+      &NodeKey::SessionValues(_) | &NodeKey::RunId(_) => false,
       _ => true,
     }
   }
@@ -1598,6 +1637,7 @@ impl Display for NodeKey {
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
+      &NodeKey::RunId(_) => write!(f, "RunId"),
       &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.path_globs),
     }
   }

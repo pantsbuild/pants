@@ -154,7 +154,6 @@ tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = "2.1"
-uuid = { version = "0.7", features = ["v4"] }
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 

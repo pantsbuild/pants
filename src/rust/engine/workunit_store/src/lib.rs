@@ -48,6 +48,18 @@ use tokio::task_local;
 
 mod metrics;
 
+///
+/// A unique id for a single run or `--loop` iteration of Pants within a single Scheduler.
+///
+/// RunIds are not comparable across Scheduler instances, and only equality is meaningful, not
+/// ordering.
+///
+/// NB: This type is defined here to make it easily accessible to both the `process_execution`
+/// and `engine` crates: it's not actually used by the WorkunitStore.
+///
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct RunId(pub u32);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct SpanId(u64);
 
