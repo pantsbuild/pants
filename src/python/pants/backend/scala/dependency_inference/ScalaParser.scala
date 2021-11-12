@@ -7,14 +7,14 @@ import io.circe.syntax._
 import scala.meta._
 import scala.meta.transversers.Traverser
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
 case class AnImport(name: String, isWildcard: Boolean)
 
 case class Analysis(
   providedNames: Vector[String],
   importsByScope: HashMap[String, ArrayBuffer[AnImport]],
+  consumedSymbolsByScope: HashMap[String, HashSet[String]],
 )
 
 class SourceAnalysisTraverser extends Traverser {
@@ -22,6 +22,7 @@ class SourceAnalysisTraverser extends Traverser {
 
   val providedNames = ArrayBuffer[String]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
+  val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -53,6 +54,14 @@ class SourceAnalysisTraverser extends Traverser {
       importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
     }
     importsByScope(fullPackageName).append(AnImport(name, isWildcard))
+  }
+
+  def recordConsumedSymbol(name: String): Unit = {
+    val fullPackageName = nameParts.mkString(".")
+    if (!consumedSymbolsByScope.contains(fullPackageName)) {
+      consumedSymbolsByScope(fullPackageName) = HashSet[String]()
+    }
+    consumedSymbolsByScope(fullPackageName).add(name, isWildcard)
   }
 
   override def apply(tree: Tree): Unit = tree match {

@@ -113,6 +113,7 @@ class ScalaImport:
 class ScalaSourceDependencyAnalysis:
     provided_names: FrozenOrderedSet[str]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
+    consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
 
     def all_imports(self) -> frozenset[str]:
         all_symbols: Set[str] = set()
@@ -131,6 +132,12 @@ class ScalaSourceDependencyAnalysis:
                     for key, values in d["importsByScope"].items()
                 }
             ),
+            consumed_symbols_by_scope=FrozenDict(
+                {
+                    key: FrozenOrderedSet(values)
+                    for key, values in d["consumedSymbolsByScope"].items()
+                }
+            ),
         )
 
     def to_debug_json_dict(self) -> dict[str, Any]:
@@ -140,6 +147,7 @@ class ScalaSourceDependencyAnalysis:
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()
             },
+            "consumed_symbols_by_scope": self.consumed_symbols_by_scope,
         }
 
 
