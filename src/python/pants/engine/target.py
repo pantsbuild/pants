@@ -1502,6 +1502,11 @@ class SourcesField(AsyncFieldMixin, Field):
         files. The default is no limit on the number of source files.
     - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files
         referenced by this field.
+    - `default` -- A default value for this field.
+    - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
+        glob match error behavior when using the default value. If setting this to
+        `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
+        default glob doesn't match any files if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
@@ -1509,6 +1514,7 @@ class SourcesField(AsyncFieldMixin, Field):
     uses_source_roots: ClassVar[bool] = True
 
     default: ClassVar[ImmutableValue] = None
+    default_glob_match_error_behavior: ClassVar[GlobMatchErrorBehavior | None] = None
 
     @property
     def globs(self) -> tuple[str, ...]:
@@ -1612,11 +1618,25 @@ class SourcesField(AsyncFieldMixin, Field):
     def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
         if not self.globs:
             return PathGlobs([])
-        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
+
+        # SingleSourceField has str as default type.
+        default_globs = (
+            [self.default] if self.default and isinstance(self.default, str) else self.default
+        )
+
+        # Match any if we use default globs, else match all.
         conjunction = (
             GlobExpansionConjunction.all_match
-            if not self.default or (set(self.globs) != set(self.default))
+            if not default_globs or (set(self.globs) != set(default_globs))
             else GlobExpansionConjunction.any_match
+        )
+        # Use fields default error behavior if defined, if we use default globs else the provided
+        # error behavior.
+        error_behavior = (
+            files_not_found_behavior.to_glob_match_error_behavior()
+            if conjunction == GlobExpansionConjunction.all_match
+            or self.default_glob_match_error_behavior is None
+            else self.default_glob_match_error_behavior
         )
         return PathGlobs(
             (self._prefix_glob_with_address(glob) for glob in self.globs),
