@@ -198,7 +198,7 @@ pub fn doc_url(py: Python, slug: &str) -> String {
     .unwrap()
 }
 
-pub fn create_exception(py: Python, msg: &str) -> Value {
+pub fn create_exception(py: Python, msg: String) -> Value {
   Value::from(PyErr::new::<cpython::exc::Exception, _>(py, msg).instance(py))
 }
 
