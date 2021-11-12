@@ -1,6 +1,9 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// File-specific allowances to silence internal warnings of `[pyclass]`.
+#![allow(clippy::used_underscore_binding)]
+
 /// This crate is a wrapper around the engine crate which exposes a Python module via PyO3.
 use std::any::Any;
 use std::cell::RefCell;
@@ -472,7 +475,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
       PyResult {
         is_throw: true,
         result: val.into(),
-        python_traceback: Some(python_traceback.into()),
+        python_traceback: Some(python_traceback),
         engine_traceback,
       }
     }
@@ -1427,8 +1430,8 @@ fn ensure_remote_has_recursive(
     let digests: Vec<Digest> = py_digests
       .iter()
       .map(|value| {
-        crate::nodes::lift_directory_digest(&value)
-          .or_else(|_| crate::nodes::lift_file_digest(&core.types, &value))
+        crate::nodes::lift_directory_digest(value)
+          .or_else(|_| crate::nodes::lift_file_digest(&core.types, value))
       })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(PyException::new_err)?;

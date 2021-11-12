@@ -435,7 +435,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       let res = command_runner
         .run(execution_context, workunit, request)
         .await
-        .map_err(|e| throw(e))?;
+        .map_err(throw)?;
 
       let definition = serde_json::to_string(&compatible_request)
         .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
@@ -547,7 +547,7 @@ impl WrappedNode for DigestFile {
       .core
       .store()
       .store_file(true, false, move || std::fs::File::open(&path))
-      .map_err(|e| throw(e))
+      .map_err(throw)
       .await
   }
 }
@@ -659,7 +659,7 @@ impl WrappedNode for Paths {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Arc<Vec<PathStat>>> {
-    let path_globs = self.path_globs.parse().map_err(|e| throw(e))?;
+    let path_globs = self.path_globs.parse().map_err(throw)?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
   }
@@ -875,7 +875,7 @@ impl WrappedNode for Snapshot {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
-    let path_globs = self.path_globs.parse().map_err(|e| throw(e))?;
+    let path_globs = self.path_globs.parse().map_err(throw)?;
     let snapshot = Self::create(context, path_globs).await?;
     Ok(snapshot.digest)
   }
@@ -958,8 +958,7 @@ impl WrappedNode for DownloadedFile {
       let py_download_file = self.0.to_value().clone_ref(py).into_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
       let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
-      let expected_digest =
-        lift_file_digest(&context.core.types, py_digest).map_err(|s| throw(s))?;
+      let expected_digest = lift_file_digest(&context.core.types, py_digest).map_err(throw)?;
       let res: NodeResult<(String, Digest)> = Ok((url_str, expected_digest));
       res
     })?;
@@ -968,7 +967,7 @@ impl WrappedNode for DownloadedFile {
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
       .await
-      .map_err(|err| throw(err))?;
+      .map_err(throw)?;
     Ok(snapshot.digest)
   }
 }

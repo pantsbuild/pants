@@ -418,7 +418,7 @@ impl Failure {
       py.eval(
         "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
         None,
-        Some(&locals),
+        Some(locals),
       )
       .unwrap()
       .extract::<String>()

@@ -1,6 +1,9 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// File-specific allowances to silence internal warnings of `[pyclass]`.
+#![allow(clippy::used_underscore_binding)]
+
 pub mod engine_aware;
 pub mod fs;
 mod interface;
@@ -198,7 +201,7 @@ pub fn generator_send(
       .map(|g| {
         let get = g
           .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e.into()))?;
+          .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
         Get::new(py, get)
       })
       .collect::<Result<Vec<_>, _>>()?;

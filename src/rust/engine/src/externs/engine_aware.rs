@@ -52,7 +52,7 @@ impl EngineAwareReturnType {
     if level_val.is_none() {
       return None;
     }
-    externs::val_to_log_level(&level_val).ok()
+    externs::val_to_log_level(level_val).ok()
   }
 
   fn message(obj: &PyAny) -> Option<String> {
@@ -74,7 +74,7 @@ impl EngineAwareReturnType {
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if TypeId::new(&value.get_type()) == types.file_digest {
+      let artifact_output = if TypeId::new(value.get_type()) == types.file_digest {
         lift_file_digest(types, value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
