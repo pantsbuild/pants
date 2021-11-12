@@ -28,7 +28,8 @@ async def hydrate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSou
     if instructions and request.protocol_sources.files:
         raise InvalidFieldException(
             f"The `{target.alias}` {address} provides both a Dockerfile with the `source` field, "
-            "and Dockerfile contents with the `instructions` field, which is not supported."
+            "and Dockerfile contents with the `instructions` field, which is not supported.\n\n"
+            "To fix, please either set `source=None` or `instructions=None`."
         )
 
     if not (instructions or request.protocol_sources.files):

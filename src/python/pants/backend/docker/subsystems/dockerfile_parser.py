@@ -116,7 +116,7 @@ async def setup_process_for_parse_dockerfile(
 @dataclass(frozen=True)
 class DockerfileInfo:
     digest: Digest
-    source: str = ""
+    source: str
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
 

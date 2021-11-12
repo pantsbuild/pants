@@ -33,13 +33,32 @@ class DockerBuildArgsField(StringSequenceField):
 
 class DockerImageSourceField(SingleSourceField):
     default = "Dockerfile"
+
+    # When the default glob value is in effect, we don't want the normal glob match error behavior
+    # to kick in for a missing Dockerfile, in case there are `instructions` provided, in which case
+    # we generate the Dockerfile instead. If there are no `instructions`, or there are both
+    # `instructions` and a Dockerfile hydrated from the `source` glob, we error out with a message
+    # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
+
     expected_num_files = range(0, 2)
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
-        "project source tree."
+        "project source tree.\n\n"
+        + dedent(
+            """\
+            Example:
+
+                # example/BUILD
+                # Use the "./Dockerfile" from the project source tree.
+                docker_image()
+
+                # Use another Dockerfile
+                docker_image(source="Dockerfile.example")
+            """
+        )
     )
 
 
@@ -49,7 +68,20 @@ class DockerImageInstructionsField(StringSequenceField):
     help = (
         "The `Dockerfile` content, typically one instruction per list item.\n\n"
         "Use the `source` field instead if you prefer having the Dockerfile in your project "
-        "source tree."
+        "source tree.\n\n"
+        + dedent(
+            """\
+            Example:
+
+                # example/BUILD
+                docker_image(
+                  instructions=[
+                    "FROM base/image:1.0",
+                    "RUN echo example",
+                  ],
+                )
+            """
+        )
     )
 
 
@@ -83,13 +115,9 @@ class DockerRegistriesField(StringSequenceField):
             Example:
 
                 # pants.toml
-                [docker]
-                registries = "@registries.yaml"
-
-                # registries.yaml
-                my-registry-alias:
-                    address = "myregistrydomain:port"
-                    default = False  # optional
+                [docker.registries.my-registry-alias]
+                address = "myregistrydomain:port"
+                default = false  # optional
 
                 # example/BUILD
                 docker_image(
@@ -141,5 +169,8 @@ class DockerImageTarget(Target):
     help = (
         "The `docker_image` target describes how to build and tag a Docker image.\n\n"
         "Any dependencies, as inferred or explicitly specified, will be included in the Docker "
-        "build context, after being packaged if applicable."
+        "build context, after being packaged if applicable.\n\n"
+        "By default, will use a Dockerfile from the same directory as the BUILD file this target "
+        "is defined in. Point at another file with the `source` field, or use the `instructions` "
+        "field to have the Dockerfile contents verbatim directly in the BUILD file."
     )
