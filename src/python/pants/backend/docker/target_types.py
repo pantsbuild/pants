@@ -46,19 +46,7 @@ class DockerImageSourceField(SingleSourceField):
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
-        "project source tree.\n\n"
-        + dedent(
-            """\
-            Example:
-
-                # example/BUILD
-                # Use the "./Dockerfile" from the project source tree.
-                docker_image()
-
-                # Use another Dockerfile
-                docker_image(source="Dockerfile.example")
-            """
-        )
+        "project source tree."
     )
 
 
