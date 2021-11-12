@@ -1194,7 +1194,7 @@ impl WrappedNode for Task {
     let engine_aware_return_type = if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result(py, &result_val, &context)
+      EngineAwareReturnType::from_task_result(result_val.clone_ref(py).into_ref(py), &context)
     } else {
       EngineAwareReturnType::default()
     };
@@ -1397,7 +1397,7 @@ impl Node for NodeKey {
       let py = gil.python();
       engine_aware_params
         .iter()
-        .flat_map(|val| EngineAwareParameter::metadata(py, &context, val))
+        .flat_map(|val| EngineAwareParameter::metadata(&context, val.clone_ref(py).into_ref(py)))
         .collect()
     };
 
@@ -1501,7 +1501,7 @@ impl Node for NodeKey {
             let py = gil.python();
             engine_aware_params
               .iter()
-              .filter_map(|val| EngineAwareParameter::debug_hint(py, val))
+              .filter_map(|val| EngineAwareParameter::debug_hint(val.clone_ref(py).into_ref(py)))
               .collect()
           };
           let failure_name = if displayable_param_names.is_empty() {
@@ -1560,7 +1560,8 @@ impl Node for NodeKey {
       },
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
         let gil = Python::acquire_gil();
-        EngineAwareReturnType::is_cacheable(gil.python(), v).unwrap_or(true)
+        let py = gil.python();
+        EngineAwareReturnType::is_cacheable(v.clone_ref(py).into_ref(py)).unwrap_or(true)
       }
       _ => true,
     }
@@ -1585,7 +1586,9 @@ impl Display for NodeKey {
           task
             .params
             .keys()
-            .filter_map(|k| EngineAwareParameter::debug_hint(py, &k.to_value()))
+            .filter_map(|k| {
+              EngineAwareParameter::debug_hint(k.to_value().clone_ref(py).into_ref(py))
+            })
             .collect::<Vec<_>>()
         };
         write!(

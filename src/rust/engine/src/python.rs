@@ -186,7 +186,7 @@ impl Function {
   /// The function represented as `path.to.module:lineno:func_name`.
   pub fn full_name(&self) -> String {
     let (module, name, line_no) = Python::with_gil(|py| {
-      let val = self.0.to_value().into_ref(py);
+      let val = self.0.to_value().clone_ref(py).into_ref(py);
       let module: String = externs::getattr(val, "__module__").unwrap();
       let name: String = externs::getattr(val, "__name__").unwrap();
       // NB: this is a custom dunder method that Python code should populate before sending the
@@ -290,7 +290,12 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    Python::with_gil(|py| externs::equals(self.0.into_ref(py), other.0.into_ref(py)))
+    Python::with_gil(|py| {
+      externs::equals(
+        self.0.clone_ref(py).into_ref(py),
+        other.0.clone_ref(py).into_ref(py),
+      )
+    })
   }
 }
 
@@ -313,7 +318,7 @@ impl AsRef<PyObject> for Value {
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     let repr = Python::with_gil(|py| {
-      let obj = self.into_ref(py);
+      let obj = self.clone_ref(py).into_ref(py);
       externs::val_to_str(obj)
     });
     write!(f, "{}", repr)
@@ -401,7 +406,7 @@ impl Failure {
   }
 
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
-    let maybe_ptraceback = py_err.ptraceback(py);
+    let maybe_ptraceback = py_err.ptraceback(py).map(|res| res.into_py(py));
     let val = Value::from(py_err.into_py(py));
     let python_traceback = if let Some(tb) = maybe_ptraceback {
       let locals = PyDict::new(py);
@@ -419,7 +424,7 @@ impl Failure {
       .extract::<String>()
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(val.into_ref(py)))
+      Self::native_traceback(&externs::val_to_str(val.clone_ref(py).into_ref(py)))
     };
     Failure::Throw {
       val,
@@ -442,7 +447,7 @@ impl fmt::Display for Failure {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
       Failure::Throw { val, .. } => {
         let repr = Python::with_gil(|py| {
-          let obj = val.into_ref(py);
+          let obj = val.clone_ref(py).into_ref(py);
           externs::val_to_str(obj)
         });
         write!(f, "{}", repr)
@@ -459,9 +464,10 @@ impl From<String> for Failure {
 
 pub fn throw(msg: String) -> Failure {
   let gil = Python::acquire_gil();
+  let python_traceback = Failure::native_traceback(&msg);
   Failure::Throw {
     val: externs::create_exception(gil.python(), msg),
-    python_traceback: Failure::native_traceback(&msg),
+    python_traceback,
     engine_traceback: Vec::new(),
   }
 }
