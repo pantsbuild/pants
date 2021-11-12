@@ -600,7 +600,7 @@ fn interactive_process(
         })?;
 
         let dst = destination.join(&named_cache_symlink.dst);
-        if let Some(dir) = named_cache_symlink.dst.parent() {
+        if let Some(dir) = dst.parent() {
           safe_create_dir_all_ioerror(dir).map_err(|err| {
             format!(
               "Error making {} for local execution: {:?}", dir.display(), err
