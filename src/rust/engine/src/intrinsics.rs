@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 
 use crate::context::Context;
 use crate::externs;
 use crate::nodes::{
   lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
-  NodeResult, Paths, SessionValues, Snapshot,
+  NodeResult, Paths, RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -125,6 +126,13 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        product: types.run_id,
+        inputs: vec![],
+      },
+      Box::new(run_id),
+    );
+    intrinsics.insert(
+      Intrinsic {
         product: types.interactive_process_result,
         inputs: vec![types.interactive_process],
       },
@@ -213,6 +221,19 @@ fn multi_platform_process_request_to_process_result(
           py,
           context.core.types.platform,
           &[externs::store_utf8(py, &platform_name)],
+        ),
+        externs::unsafe_call(
+          py,
+          context.core.types.process_result_metadata,
+          &[
+            result
+              .metadata
+              .total_elapsed
+              .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
+              .unwrap_or_else(|| Value::from(py.None())),
+            externs::store_utf8(py, result.metadata.source.into()),
+            externs::store_u64(py, result.metadata.source_run_id.0.into()),
+          ],
         ),
       ],
     ))
@@ -490,6 +511,10 @@ fn digest_subset_to_digest(
 
 fn session_values(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
   async move { context.get(SessionValues).await }.boxed()
+}
+
+fn run_id(context: Context, _args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move { context.get(RunId).await }.boxed()
 }
 
 fn interactive_process(

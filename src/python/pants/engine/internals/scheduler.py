@@ -50,13 +50,14 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.session import SessionValues
+from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResultWithPlatform,
+    FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
     MultiPlatformProcess,
+    ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union
@@ -164,9 +165,11 @@ class Scheduler:
             download_file=DownloadFile,
             platform=Platform,
             multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
+            process_result=FallibleProcessResult,
+            process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,
             session_values=SessionValues,
+            run_id=RunId,
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,

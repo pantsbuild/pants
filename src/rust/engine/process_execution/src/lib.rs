@@ -40,7 +40,7 @@ use hashing::{Digest, EMPTY_FINGERPRINT};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use workunit_store::{in_workunit, RunningWorkunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, WorkunitStore};
 
 pub mod cache;
 #[cfg(test)]
@@ -410,17 +410,29 @@ pub struct ProcessResultMetadata {
   pub total_elapsed: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
+  /// within the same process, the source of the process implicitly becomes memoization.
+  pub source_run_id: RunId,
 }
 
 impl ProcessResultMetadata {
-  pub fn new(total_elapsed: Option<Duration>, source: ProcessResultSource) -> Self {
-    ProcessResultMetadata {
+  pub fn new(
+    total_elapsed: Option<Duration>,
+    source: ProcessResultSource,
+    source_run_id: RunId,
+  ) -> Self {
+    Self {
       total_elapsed,
       source,
+      source_run_id,
     }
   }
 
-  pub fn new_from_metadata(metadata: ExecutedActionMetadata, source: ProcessResultSource) -> Self {
+  pub fn new_from_metadata(
+    metadata: ExecutedActionMetadata,
+    source: ProcessResultSource,
+    source_run_id: RunId,
+  ) -> Self {
     let total_elapsed = match (
       metadata.worker_start_timestamp,
       metadata.worker_completed_timestamp,
@@ -433,6 +445,7 @@ impl ProcessResultMetadata {
     Self {
       total_elapsed,
       source,
+      source_run_id,
     }
   }
 
@@ -495,10 +508,22 @@ pub enum ProcessResultSource {
   HitRemotely,
 }
 
+impl From<ProcessResultSource> for &'static str {
+  fn from(prs: ProcessResultSource) -> &'static str {
+    match prs {
+      ProcessResultSource::RanLocally => "ran_locally",
+      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::HitLocally => "hit_locally",
+      ProcessResultSource::HitRemotely => "hit_remotely",
+    }
+  }
+}
+
 #[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
+  run_id: RunId,
 }
 
 impl Default for Context {
@@ -506,15 +531,17 @@ impl Default for Context {
     Context {
       workunit_store: WorkunitStore::new(false),
       build_id: String::default(),
+      run_id: RunId(0),
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: RunId) -> Context {
     Context {
       workunit_store,
       build_id,
+      run_id,
     }
   }
 }
