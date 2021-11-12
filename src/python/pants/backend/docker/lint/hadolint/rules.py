@@ -43,7 +43,7 @@ def generate_argv(
     if hadolint.config:
         args.append(f"--config={hadolint.config}")
     args.extend(hadolint.args)
-    args.extend([info.source for info in dockerfile_infos])
+    args.extend(info.source for info in dockerfile_infos)
     return tuple(args)
 
 
@@ -68,7 +68,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
             (
                 downloaded_hadolint.digest,
                 config_files.snapshot.digest,
-                *[info.digest for info in dockerfile_infos],
+                *(info.digest for info in dockerfile_infos),
             )
         ),
     )

@@ -28,7 +28,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
         ),
     )
 
-    referenced_targets = [tgt.address for tgt in targets if PexBinaryFieldSet.is_applicable(tgt)]
+    referenced_targets = (tgt.address for tgt in targets if PexBinaryFieldSet.is_applicable(tgt))
     return InjectedDependencies(Addresses(referenced_targets))
 
 
