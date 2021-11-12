@@ -35,7 +35,7 @@ async def find_putative_targets(
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []
     dockerfiles_per_directory: DefaultDict[str, int] = defaultdict(int)
-    for dockerfile in unowned_dockerfiles:
+    for dockerfile in sorted(unowned_dockerfiles):
         dirname, filename = os.path.split(dockerfile)
         count = dockerfiles_per_directory[dirname]
         dockerfiles_per_directory[dirname] += 1
@@ -43,10 +43,10 @@ async def find_putative_targets(
         kwargs = {"name": name}
         if filename != DockerImageSourceField.default:
             kwargs["source"] = filename
-        # TODO(#13600): Include the filename in `triggering_sources` when tailor supports the
-        # SingleSourceField.
         pts.append(
-            PutativeTarget.for_target_type(DockerImageTarget, dirname, name, [], kwargs=kwargs)
+            PutativeTarget.for_target_type(
+                DockerImageTarget, dirname, name, [filename], kwargs=kwargs
+            )
         )
     return PutativeTargets(pts)
 
