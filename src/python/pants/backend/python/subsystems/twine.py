@@ -15,7 +15,7 @@ class TwineSubsystem(PythonToolBase):
     options_scope = "twine"
     help = "The utility for publishing Python distributions to PyPi and other Python repositories."
 
-    default_version = "twine==3.4.2"
+    default_version = "twine==3.6.0"
 
     default_main = ConsoleScript("twine")
     register_interpreter_constraints = True
