@@ -11,6 +11,7 @@ mod interface;
 mod interface_tests;
 mod stdio;
 
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
@@ -125,6 +126,17 @@ pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
       py_err
     )),
   }
+}
+
+/// Read a `FrozenDict[str, str]`.
+pub fn getattr_from_str_frozendict(value: &PyAny, field: &str) -> BTreeMap<String, String> {
+  let frozendict = getattr(value, field).unwrap();
+  let pydict: &PyDict = getattr(frozendict, "_data").unwrap();
+  pydict
+    .items()
+    .into_iter()
+    .map(|kv_pair| kv_pair.extract().unwrap())
+    .collect()
 }
 
 pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> Option<String> {

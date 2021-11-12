@@ -292,7 +292,7 @@ pub struct MultiPlatformExecuteProcess {
 
 impl MultiPlatformExecuteProcess {
   fn lift_process(value: &PyAny, platform_constraint: Option<Platform>) -> Result<Process, String> {
-    let env: BTreeMap<String, String> = externs::getattr(value, "env").unwrap();
+    let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
       Some(dir) => Some(RelativePath::new(dir)?),
@@ -326,11 +326,10 @@ impl MultiPlatformExecuteProcess {
     let py_level = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(py_level)?;
 
-    let append_only_caches =
-      externs::getattr::<BTreeMap<String, String>>(value, "append_only_caches")?
-        .into_iter()
-        .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
-        .collect::<Result<_, String>>()?;
+    let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
+      .into_iter()
+      .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
+      .collect::<Result<_, String>>()?;
 
     let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
 

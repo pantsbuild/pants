@@ -11,7 +11,7 @@ pub struct PyStdioRead;
 
 #[pymethods]
 impl PyStdioRead {
-  fn is_atty(&self) -> bool {
+  fn isatty(&self) -> bool {
     if let Ok(fd) = self.fileno() {
       unsafe { libc::isatty(fd) != 0 }
     } else {

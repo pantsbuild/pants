@@ -1,4 +1,6 @@
-use std::collections::BTreeMap;
+// Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -541,7 +543,7 @@ fn interactive_process(
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
       let input_digest: Digest = lift_directory_digest(py_input_digest)?;
-      let env: BTreeMap<String, String> = externs::getattr(py_interactive_process, "env").unwrap();
+      let env = externs::getattr_from_str_frozendict(py_interactive_process, "env");
       Ok((argv, run_in_workspace, restartable, input_digest, env))
     })?;
 
