@@ -50,13 +50,14 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.session import SessionValues
+from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResultWithPlatform,
+    FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
     MultiPlatformProcess,
+    ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union
@@ -164,9 +165,11 @@ class Scheduler:
             download_file=DownloadFile,
             platform=Platform,
             multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
+            process_result=FallibleProcessResult,
+            process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,
             session_values=SessionValues,
+            run_id=RunId,
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
@@ -277,10 +280,7 @@ class Scheduler:
             self.py_scheduler, root_subject_types, product_type
         )
 
-    def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
-        filenames = set(direct_filenames)
-        # TODO(#11707): Evaluate removing the invalidation of parent directories.
-        filenames.update(os.path.dirname(f) for f in direct_filenames)
+    def invalidate_files(self, filenames: Iterable[str]) -> int:
         return native_engine.graph_invalidate_paths(self.py_scheduler, tuple(filenames))
 
     def invalidate_all_files(self) -> int:

@@ -17,8 +17,8 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, FileDigest, PathGlobs
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.engine.fs import FileDigest
+from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
@@ -26,12 +26,16 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
-from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+    maybe_skip_jdk_test,
+)
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
@@ -95,26 +99,6 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 )
 
 
-def expect_single_expanded_coarsened_target(
-    rule_runner: RuleRunner, address: Address
-) -> CoarsenedTarget:
-    expanded_target = rule_runner.request(Targets, [Addresses([address])]).expect_single()
-    coarsened_targets = rule_runner.request(
-        CoarsenedTargets, [Addresses([expanded_target.address])]
-    )
-    assert len(coarsened_targets) == 1
-    return coarsened_targets[0]
-
-
-def make_resolve(
-    rule_runner: RuleRunner,
-    resolve_name: str = "test",
-    resolve_path: str = "coursier_resolve.lockfile",
-) -> CoursierResolveKey:
-    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
-    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
-
-
 @logging
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
@@ -158,10 +142,9 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-
     assert len(check_results.results) == 1
     check_result = check_results.results[0]
-    assert check_result.partition_description == str(coarsened_target)
+    assert check_result.exit_code == 0
 
 
 @logging

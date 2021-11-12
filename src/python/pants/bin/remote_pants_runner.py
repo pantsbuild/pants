@@ -71,14 +71,14 @@ class STTYSettings:
         try:
             self._tty_flags = termios.tcgetattr(sys.stdin.fileno())
         except termios.error as e:
-            logger.debug("masking tcgetattr exception: {!r}".format(e))
+            logger.debug(f"masking tcgetattr exception: {e!r}")
 
     def restore_tty_flags(self):
         if self._tty_flags:
             try:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, self._tty_flags)
             except termios.error as e:
-                logger.debug("masking tcsetattr exception: {!r}".format(e))
+                logger.debug(f"masking tcsetattr exception: {e!r}")
 
 
 class RemotePantsRunner:

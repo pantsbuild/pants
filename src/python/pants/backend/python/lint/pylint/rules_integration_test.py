@@ -323,7 +323,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement(name='pylint', requirements=['pylint>=2.6.2,<2.7'])
+                python_requirement(name='pylint', requirements=['pylint>=2.11.0,<2.12'])
                 python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),

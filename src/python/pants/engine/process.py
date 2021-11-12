@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from textwrap import dedent
 from typing import Iterable, Mapping
@@ -15,6 +15,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
@@ -168,9 +169,12 @@ class ProcessResult:
     stderr: bytes
     stderr_digest: FileDigest
     output_digest: Digest
+    platform: Platform
+    metadata: ProcessResultMetadata = field(compare=False, hash=False)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class FallibleProcessResult:
     """Result of executing a process which might fail.
 
@@ -183,19 +187,32 @@ class FallibleProcessResult:
     stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
+    platform: Platform
+    metadata: ProcessResultMetadata = field(compare=False, hash=False)
 
 
 @dataclass(frozen=True)
-class FallibleProcessResultWithPlatform:
-    """Result of executing a process which might fail, along with the platform it ran on."""
+class ProcessResultMetadata:
+    """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
-    stdout: bytes
-    stdout_digest: FileDigest
-    stderr: bytes
-    stderr_digest: FileDigest
-    exit_code: int
-    output_digest: Digest
-    platform: Platform
+    # The execution time of the process, in milliseconds, or None if it could not be captured
+    # (since remote execution does not guarantee its availability).
+    total_elapsed_ms: int | None
+    # Whether the ProcessResult (when it was created in the attached run_id) came from the local
+    # or remote cache, or ran locally or remotely. See the `self.source` method.
+    # TODO: Consider extracting an enum.
+    _source: str
+    # The run_id in which a ProcessResult was created. See the `self.source` method.
+    source_run_id: int
+
+    def source(self, current_run_id: RunId) -> str:
+        """Given the current run_id, return the calculated "source" of the ProcessResult.
+
+        If a ProcessResult is consumed in any run_id other than the one it was created in, the its
+        source implicitly becomes memoization, since the result was re-used in a new run without
+        being recreated.
+        """
+        return self._source if self.source_run_id == current_run_id else "memoized"
 
 
 class ProcessExecutionFailure(Exception):
@@ -269,6 +286,8 @@ def fallible_to_exec_result_or_raise(
             stderr=fallible_result.stderr,
             stderr_digest=fallible_result.stderr_digest,
             output_digest=fallible_result.output_digest,
+            platform=fallible_result.platform,
+            metadata=fallible_result.metadata,
         )
     raise ProcessExecutionFailure(
         fallible_result.exit_code,
@@ -276,18 +295,6 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stderr,
         description.value,
         local_cleanup=global_options.options.process_execution_local_cleanup,
-    )
-
-
-@rule
-def remove_platform_information(res: FallibleProcessResultWithPlatform) -> FallibleProcessResult:
-    return FallibleProcessResult(
-        exit_code=res.exit_code,
-        stdout=res.stdout,
-        stdout_digest=res.stdout_digest,
-        stderr=res.stderr,
-        stderr_digest=res.stderr_digest,
-        output_digest=res.output_digest,
     )
 
 
@@ -604,7 +611,9 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                # NB: Since a failure is a valid result for this script, we always cache it for
+                # `pantsd`'s lifetime, regardless of success or failure.
+                cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
             ),
         )
         for path in found_paths

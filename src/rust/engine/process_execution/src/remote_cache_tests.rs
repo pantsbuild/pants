@@ -16,7 +16,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use tokio::time::sleep;
-use workunit_store::{RunningWorkunit, WorkunitStore};
+use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
@@ -46,7 +46,7 @@ impl MockLocalCommandRunner {
         exit_code,
         output_directory: EMPTY_DIGEST,
         platform: Platform::current().unwrap(),
-        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
+        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
       }),
       call_counter,
       delay: Duration::from_millis(delay_ms),
@@ -616,7 +616,7 @@ async fn make_action_result_basic() {
     output_directory: directory_digest,
     exit_code: 102,
     platform: Platform::Linux_x86_64,
-    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
+    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
   };
 
   let (action_result, digests) = runner

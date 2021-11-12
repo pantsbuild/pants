@@ -38,7 +38,8 @@ use tonic::{Code, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunningWorkunit, SpanId, WorkunitMetadata, WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
+  WorkunitStore,
 };
 
 use crate::{
@@ -442,6 +443,7 @@ impl CommandRunner {
   // pub(crate) for testing
   pub(crate) async fn extract_execute_response(
     &self,
+    run_id: RunId,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -490,6 +492,7 @@ impl CommandRunner {
 
           return populate_fallible_execution_result(
             self.store.clone(),
+            run_id,
             action_result,
             self.platform,
             false,
@@ -674,7 +677,10 @@ impl CommandRunner {
         }
       };
 
-      match self.extract_execute_response(actionable_result).await {
+      match self
+        .extract_execute_response(context.run_id, actionable_result)
+        .await
+      {
         Ok(result) => return Ok(result),
         Err(err) => match err {
           ExecutionError::Fatal(e) => {
@@ -712,6 +718,7 @@ impl CommandRunner {
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             return populate_fallible_execution_result_for_timeout(
               &self.store,
+              context,
               &process.description,
               process.timeout,
               start_time.elapsed(),
@@ -1053,6 +1060,7 @@ pub fn make_execute_request(
 
 pub async fn populate_fallible_execution_result_for_timeout(
   store: &Store,
+  context: &Context,
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
@@ -1072,7 +1080,11 @@ pub async fn populate_fallible_execution_result_for_timeout(
     exit_code: -libc::SIGTERM,
     output_directory: hashing::EMPTY_DIGEST,
     platform,
-    metadata: ProcessResultMetadata::new(Some(elapsed.into()), ProcessResultSource::RanRemotely),
+    metadata: ProcessResultMetadata::new(
+      Some(elapsed.into()),
+      ProcessResultSource::RanRemotely,
+      context.run_id,
+    ),
   })
 }
 
@@ -1085,6 +1097,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
 /// will be extracted from the tree_digest of the single output directory.
 pub fn populate_fallible_execution_result(
   store: Store,
+  run_id: RunId,
   action_result: &remexec::ActionResult,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
@@ -1107,12 +1120,10 @@ pub fn populate_fallible_execution_result(
         exit_code: action_result.exit_code,
         output_directory,
         platform,
-        metadata: action_result
-          .execution_metadata
-          .clone()
-          .map_or(ProcessResultMetadata::new(None, source), |metadata| {
-            ProcessResultMetadata::new_from_metadata(metadata, source)
-          }),
+        metadata: action_result.execution_metadata.clone().map_or(
+          ProcessResultMetadata::new(None, source, run_id),
+          |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, run_id),
+        ),
       })
     },
   )
@@ -1381,6 +1392,7 @@ pub async fn check_action_cache(
           let action_result = action_result.into_inner();
           let response = populate_fallible_execution_result(
             store.clone(),
+            context.run_id,
             &action_result,
             platform,
             false,

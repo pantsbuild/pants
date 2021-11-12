@@ -67,7 +67,7 @@ class DaemonPantsRunner:
         acquired = self._run_lock.acquire(blocking=False)
         if not acquired:
             # If we don't acquire immediately, send an explanation.
-            length = "forever" if should_poll_forever else "up to {} seconds".format(timeout)
+            length = "forever" if should_poll_forever else f"up to {timeout} seconds"
             self._send_stderr(
                 stderr_fileno,
                 f"Another pants invocation is running. Will wait {length} for it to finish before giving up.\n"

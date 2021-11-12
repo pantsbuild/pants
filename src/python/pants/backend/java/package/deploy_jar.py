@@ -77,7 +77,7 @@ async def package_deploy_jar(
 
     manifest_content = FileContent(
         _JAVA_MANIFEST_FILENAME,
-        # NB: we're joining strings with newlines, becuase the JAR manfiest format
+        # NB: we're joining strings with newlines, because the JAR manifest format
         # needs precise indentation, and _cannot_ start with a blank line. `dedent` seriously
         # messes up those requirements.
         "\n".join(

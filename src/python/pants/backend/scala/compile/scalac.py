@@ -4,47 +4,38 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
-from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
+from pants.engine.target import SourcesField
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    CompileResult,
+    FallibleClasspathEntry,
+)
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
-    Coordinates,
-    CoursierResolvedLockfile,
-    CoursierResolveKey,
-    FilterDependenciesRequest,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ScalacFieldSet(FieldSet):
-    required_fields = (ScalaSourceField,)
-
-    sources: ScalaSourceField
-
-
-@dataclass(frozen=True)
-class CompileScalaSourceRequest:
-    component: CoarsenedTarget
-    resolve: CoursierResolveKey
+class CompileScalaSourceRequest(ClasspathEntryRequest):
+    field_sets = (ScalaFieldSet, ScalaGeneratorFieldSet)
 
 
 @rule(desc="Compile with scalac")
@@ -53,8 +44,30 @@ async def compile_scala_source(
     coursier: Coursier,
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
+    union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
+    # Request classpath entries for our direct dependencies.
+    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
+        await MultiGet(
+            Get(
+                FallibleClasspathEntry,
+                ClasspathEntryRequest,
+                ClasspathEntryRequest.for_targets(
+                    union_membership, component=coarsened_dep, resolve=request.resolve
+                ),
+            )
+            for coarsened_dep in request.component.dependencies
+        )
+    )
+    if direct_dependency_classpath_entries is None:
+        return FallibleClasspathEntry(
+            description=str(request.component),
+            result=CompileResult.DEPENDENCY_FAILED,
+            output=None,
+            exit_code=1,
+        )
+
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
     )
@@ -80,50 +93,19 @@ async def compile_scala_source(
     ]
 
     if not component_members_and_scala_source_files:
+        # Is a generator, and so exports all of its direct deps.
+        exported_digest = await Get(
+            Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
+        )
+        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=ClasspathEntry(digest=EMPTY_DIGEST),
+            output=classpath_entry,
             exit_code=0,
         )
 
-    filter_coords = Coordinates(
-        (
-            Coordinate.from_jvm_artifact_target(dep)
-            for item in CoarsenedTargets(request.component.dependencies).closure()
-            for dep in item.members
-            if JvmArtifactFieldSet.is_applicable(dep)
-        )
-    )
-
-    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
-    lockfile = await Get(
-        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
-    )
-
-    transitive_dependency_classfiles_fallible = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            CompileScalaSourceRequest(component=component, resolve=request.resolve),
-        )
-        for component in CoarsenedTargets(request.component.dependencies).closure()
-    )
-    transitive_dependency_classfiles = [
-        fcc.output for fcc in transitive_dependency_classfiles_fallible if fcc.output
-    ]
-    if len(transitive_dependency_classfiles) != len(transitive_dependency_classfiles_fallible):
-        return FallibleClasspathEntry(
-            description=str(request.component),
-            result=CompileResult.DEPENDENCY_FAILED,
-            output=None,
-            exit_code=1,
-        )
-
-    (
-        tool_classpath,
-        materialized_classpath,
-        merged_transitive_dependency_classfiles_digest,
-    ) = await MultiGet(
+    (tool_classpath, merged_transitive_dependency_classpath_entries_digest,) = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
@@ -147,30 +129,26 @@ async def compile_scala_source(
             ),
         ),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__thirdpartycp",
-                lockfiles=(lockfile,),
-            ),
-        ),
-        Get(
             Digest,
-            MergeDigests(classfiles.digest for classfiles in transitive_dependency_classfiles),
+            # Flatten the entire transitive classpath.
+            MergeDigests(
+                classfiles.digest
+                for classfiles in ClasspathEntry.closure(direct_dependency_classpath_entries)
+            ),
         ),
     )
 
-    usercp_relpath = "__usercp"
-    prefixed_transitive_dependency_classpath = await Get(
-        Snapshot, AddPrefix(merged_transitive_dependency_classfiles_digest, usercp_relpath)
+    usercp = "__cp"
+    prefixed_transitive_dependency_classpath_digest = await Get(
+        Digest, AddPrefix(merged_transitive_dependency_classpath_entries_digest, usercp)
     )
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_transitive_dependency_classpath.digest,
+                prefixed_transitive_dependency_classpath_digest,
                 tool_classpath.digest,
-                materialized_classpath.digest,
                 jdk_setup.digest,
                 *(
                     sources.snapshot.digest
@@ -180,11 +158,8 @@ async def compile_scala_source(
         ),
     )
 
-    classpath_arg = ":".join(
-        [
-            *prefixed_transitive_dependency_classpath.files,
-            *materialized_classpath.classpath_entries(),
-        ]
+    classpath_arg = ClasspathEntry.arg(
+        ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
     )
 
     output_file = f"{request.component.representative.address.path_safe_spec}.jar"
@@ -217,7 +192,9 @@ async def compile_scala_source(
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
-        output = ClasspathEntry(process_result.output_digest)
+        output = ClasspathEntry(
+            process_result.output_digest, (output_file,), direct_dependency_classpath_entries
+        )
 
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
@@ -230,4 +207,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
     ]

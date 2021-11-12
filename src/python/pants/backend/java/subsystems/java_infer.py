@@ -34,6 +34,7 @@ class JavaInferSubsystem(Subsystem):
         _default_package_mapping_url = git_url(
             "src/python/pants/backend/java/dependency_inference/jvm_artifact_mappings.py"
         )
+        # TODO: Move to `coursier` or a generic `jvm` subsystem.
         register(
             "--third-party-import-mapping",
             type=dict,

@@ -147,16 +147,16 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
         # This is copied from humbug code, to ensure that future changes to humbug
         # don't add tags that inadvertently violate our anonymity promise.
         system_tags = [
-            "source:{}".format(reporter.name),
-            "os:{}".format(reporter.system_information.os),
-            "arch:{}".format(reporter.system_information.machine),
-            "python:{}".format(reporter.system_information.python_version_major),
+            f"source:{reporter.name}",
+            f"os:{reporter.system_information.os}",
+            f"arch:{reporter.system_information.machine}",
+            f"python:{reporter.system_information.python_version_major}",
             "python:{}.{}".format(
                 reporter.system_information.python_version_major,
                 reporter.system_information.python_version_minor,
             ),
-            "python:{}".format(reporter.system_information.python_version),
-            "session:{}".format(reporter.session_id),
+            f"python:{reporter.system_information.python_version}",
+            f"session:{reporter.session_id}",
         ]
         tags = (
             system_tags

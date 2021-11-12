@@ -315,12 +315,12 @@ async def validate(
         if detail_level == DetailLevel.all or (
             detail_level == DetailLevel.nonmatching and nonmatched_msg
         ):
-            console.print_stdout("{} {}:{}{}".format(icon, rmr.path, matched_msg, nonmatched_msg))
+            console.print_stdout(f"{icon} {rmr.path}:{matched_msg}{nonmatched_msg}")
 
     if detail_level not in (DetailLevel.none, DetailLevel.names):
-        console.print_stdout("\n{} files matched all required patterns.".format(num_matched_all))
+        console.print_stdout(f"\n{num_matched_all} files matched all required patterns.")
         console.print_stdout(
-            "{} files failed to match at least one required pattern.".format(num_nonmatched_some)
+            f"{num_nonmatched_some} files failed to match at least one required pattern."
         )
 
     if num_nonmatched_some:

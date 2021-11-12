@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash;
 use std::sync::atomic;
 
-use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
+use cpython::{ObjectProtocol, PyErr, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
 
 use crate::externs;
@@ -105,22 +105,6 @@ impl PartialEq for InternKey {
 }
 
 impl hash::Hash for InternKey {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
-  }
-}
-
-struct InternType(isize, PyType);
-
-impl Eq for InternType {}
-
-impl PartialEq for InternType {
-  fn eq(&self, other: &InternType) -> bool {
-    self.1 == other.1
-  }
-}
-
-impl hash::Hash for InternType {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
     self.0.hash(state);
   }

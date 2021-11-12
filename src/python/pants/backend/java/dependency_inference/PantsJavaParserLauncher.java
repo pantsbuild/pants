@@ -1,6 +1,8 @@
 package org.pantsbuild.javaparser;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
@@ -52,21 +54,21 @@ class Import {
 
 class CompilationUnitAnalysis {
     CompilationUnitAnalysis(
-        String declaredPackage,
+        Optional<String> declaredPackage,
         ArrayList<Import> imports,
         ArrayList<String> topLevelTypes,
-        ArrayList<String> consumedUnqualifiedTypes
+        ArrayList<String> consumedTypes
     ) {
         this.declaredPackage = declaredPackage;
         this.imports = imports;
         this.topLevelTypes = topLevelTypes;
-        this.consumedUnqualifiedTypes = consumedUnqualifiedTypes;
+        this.consumedTypes = consumedTypes;
     }
 
-    public final String declaredPackage;
+    public final Optional<String> declaredPackage;
     public final ArrayList<Import> imports;
     public final ArrayList<String> topLevelTypes;
-    public final ArrayList<String> consumedUnqualifiedTypes;
+    public final ArrayList<String> consumedTypes;
 }
 
 
@@ -118,10 +120,9 @@ public class PantsJavaParserLauncher {
         CompilationUnit cu = StaticJavaParser.parse(new File(sourceToAnalyze));
 
         // Get the source's declare package.
-        String declaredPackage = cu.getPackageDeclaration()
+        Optional<String> declaredPackage = cu.getPackageDeclaration()
             .map(PackageDeclaration::getName)
-            .map(Name::toString)
-            .orElse("");
+            .map(Name::toString);
 
         // Get the source's imports.
         ArrayList<Import> imports = new ArrayList<Import>(
@@ -198,10 +199,11 @@ public class PantsJavaParserLauncher {
             identifiers.addAll(identifiersForType);
         }
 
-        ArrayList<String> consumedUnqualifiedTypes = new ArrayList<>(identifiers);
+        ArrayList<String> consumedTypes = new ArrayList<>(identifiers);
 
-        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedUnqualifiedTypes);
+        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedTypes);
         ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new Jdk8Module());
         mapper.writeValue(new File(analysisOutputPath), analysis);
     }
 }
