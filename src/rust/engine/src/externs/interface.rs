@@ -732,9 +732,10 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> CPyResult<
       let (val, python_traceback, engine_traceback) = match f {
         f @ Failure::Invalidated => {
           let msg = format!("{}", f);
+          let python_traceback = Failure::native_traceback(&msg);
           (
-            externs::create_exception(py, &msg),
-            Failure::native_traceback(&msg),
+            externs::create_exception(py, msg),
+            python_traceback,
             Vec::new(),
           )
         }
