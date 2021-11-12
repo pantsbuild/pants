@@ -143,6 +143,10 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     #logger.warning("%s", exports)
 
+    # Files do not export themselves. Don't be silly.
+    if address in exports:
+        exports.remove(address)
+
     return JavaInferredDependencies(dependencies, exports)
 
 
