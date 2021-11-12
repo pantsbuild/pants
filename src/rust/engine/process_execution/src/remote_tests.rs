@@ -19,7 +19,7 @@ use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::WorkunitStore;
+use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
@@ -898,6 +898,7 @@ async fn sends_headers() {
   let context = Context {
     workunit_store: WorkunitStore::new(false),
     build_id: String::from("marmosets"),
+    run_id: RunId(0),
   };
   command_runner
     .run(context, &mut workunit, execute_request)
@@ -1755,7 +1756,7 @@ async fn remote_workunits_are_stored() {
     create_command_runner(action_cache.address(), &cas, Platform::Linux_x86_64);
 
   command_runner
-    .extract_execute_response(OperationOrStatus::Operation(operation))
+    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
     .await
     .unwrap();
 
@@ -2291,7 +2292,7 @@ async fn extract_execute_response(
     create_command_runner(action_cache.address(), &cas, remote_platform);
 
   let original = command_runner
-    .extract_execute_response(OperationOrStatus::Operation(operation))
+    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
     .await?;
 
   let stdout_bytes: Vec<u8> = store

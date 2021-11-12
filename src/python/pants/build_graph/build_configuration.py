@@ -132,7 +132,7 @@ class BuildConfiguration:
             :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
             """
             if not isinstance(aliases, BuildFileAliases):
-                raise TypeError("The aliases must be a BuildFileAliases, given {}".format(aliases))
+                raise TypeError(f"The aliases must be a BuildFileAliases, given {aliases}")
 
             for alias, obj in aliases.objects.items():
                 self._register_exposed_object(alias, obj)
@@ -147,9 +147,7 @@ class BuildConfiguration:
 
         def _register_exposed_object(self, alias, obj):
             if alias in self._exposed_object_by_alias:
-                logger.debug(
-                    "Object alias {} has already been registered. Overwriting!".format(alias)
-                )
+                logger.debug(f"Object alias {alias} has already been registered. Overwriting!")
 
             self._exposed_object_by_alias[alias] = obj
 
@@ -171,7 +169,7 @@ class BuildConfiguration:
         ):
             """Registers the given subsystem types."""
             if not isinstance(subsystems, Iterable):
-                raise TypeError("The subsystems must be an iterable, given {}".format(subsystems))
+                raise TypeError(f"The subsystems must be an iterable, given {subsystems}")
             subsystems = tuple(subsystems)
             if not subsystems:
                 return
@@ -191,7 +189,7 @@ class BuildConfiguration:
         def register_rules(self, plugin_or_backend: str, rules: Iterable[Rule | UnionRule]):
             """Registers the given rules."""
             if not isinstance(rules, Iterable):
-                raise TypeError("The rules must be an iterable, given {!r}".format(rules))
+                raise TypeError(f"The rules must be an iterable, given {rules!r}")
 
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)

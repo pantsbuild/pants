@@ -10,7 +10,7 @@ use nails::execution::{self, child_channel, ChildInput, Command};
 use store::Store;
 use task_executor::Executor;
 use tokio::net::TcpStream;
-use workunit_store::RunningWorkunit;
+use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::local::{CapturedWorkdir, ChildOutput};
 use crate::{
@@ -130,44 +130,60 @@ impl super::CommandRunner for CommandRunner {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;
     }
-    debug!("Running request under nailgun:\n {:#?}", &original_request);
+    debug!("Running request under nailgun:\n {:?}", &original_request);
 
-    // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
-    let ParsedJVMCommandLines {
-      nailgun_args,
-      client_main_class,
-      ..
-    } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
-    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
+    in_workunit!(
+      context.workunit_store.clone(),
+      "run_nailgun_process".to_owned(),
+      WorkunitMetadata {
+        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+        // renders at the Process's level.
+        level: original_request.level,
+        desc: Some(original_request.description.clone()),
+        ..WorkunitMetadata::default()
+      },
+      |workunit| async move {
+        workunit.increment_counter(Metric::LocalExecutionRequests, 1);
 
-    let nailgun_req =
-      construct_nailgun_server_request(&nailgun_name, nailgun_args, original_request.clone());
-    trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
+        // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
+        let ParsedJVMCommandLines {
+          nailgun_args,
+          client_main_class,
+          ..
+        } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
+        let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
 
-    // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
-    let mut nailgun_process = self
-      .nailgun_pool
-      .acquire(nailgun_req, context.clone())
-      .await
-      .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
+        let nailgun_req =
+          construct_nailgun_server_request(&nailgun_name, nailgun_args, original_request.clone());
+        trace!("Running request under nailgun:\n {:#?}", &nailgun_req);
 
-    let res = self
-      .run_and_capture_workdir(
-        original_request,
-        context,
-        self.inner.store.clone(),
-        self.executor.clone(),
-        nailgun_process.workdir_path().to_owned(),
-        (nailgun_process.name().to_owned(), nailgun_process.address()),
-        Platform::current().unwrap(),
-      )
-      .await;
+        // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
+        let mut nailgun_process = self
+          .nailgun_pool
+          .acquire(nailgun_req, context.clone())
+          .await
+          .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
 
-    // NB: We explicitly release the BorrowedNailgunProcess, because when it is Dropped without
-    // release, it assumes that it has been canceled and kills the server.
-    nailgun_process.release().await?;
+        let res = self
+          .run_and_capture_workdir(
+            original_request,
+            context,
+            self.inner.store.clone(),
+            self.executor.clone(),
+            nailgun_process.workdir_path().to_owned(),
+            (nailgun_process.name().to_owned(), nailgun_process.address()),
+            Platform::current().unwrap(),
+          )
+          .await;
 
-    res
+        // NB: We explicitly release the BorrowedNailgunProcess, because when it is Dropped without
+        // release, it assumes that it has been canceled and kills the server.
+        nailgun_process.release().await?;
+
+        res
+      }
+    )
+    .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
@@ -189,7 +205,6 @@ impl CapturedWorkdir for CommandRunner {
     workdir_path: &'b Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
-    _context: Context,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     let client_workdir = if let Some(working_directory) = &req.working_directory {

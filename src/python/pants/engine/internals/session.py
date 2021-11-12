@@ -8,6 +8,14 @@ from pants.util.frozendict import FrozenDict
 _T = TypeVar("_T")
 
 
+class RunId(int):
+    """A unique id for a single run or `--loop` iteration of Pants within a single Scheduler.
+
+    RunIds are not comparable across Scheduler instances, and only equality is meaningful, not
+    ordering.
+    """
+
+
 class SessionValues(FrozenDict[Type, Any]):
     """Values set for the Session, and exposed to @rules.
 

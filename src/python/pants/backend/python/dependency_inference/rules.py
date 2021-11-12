@@ -3,9 +3,13 @@
 
 import itertools
 import logging
+from enum import Enum
 from typing import cast
 
 from pants.backend.python.dependency_inference import import_parser, module_mapper
+from pants.backend.python.dependency_inference.default_unowned_dependencies import (
+    DEFAULT_UNOWNED_DEPENDENCIES,
+)
 from pants.backend.python.dependency_inference.import_parser import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
@@ -33,8 +37,22 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
+
+
+class UnownedDependencyError(Exception):
+    """The inferred dependency does not have any owner."""
+
+
+class UnownedDependencyUsage(Enum):
+    """What action to take when an inferred dependency is unowned."""
+
+    RaiseError = "error"
+    LogWarning = "warning"
+    DoNothing = "ignore"
 
 
 class PythonInferSubsystem(Subsystem):
@@ -106,6 +124,12 @@ class PythonInferSubsystem(Subsystem):
                 "`python_distribution`'s `entry_points` field."
             ),
         )
+        register(
+            "--unowned-dependency-behavior",
+            type=UnownedDependencyUsage,
+            default=UnownedDependencyUsage.DoNothing,
+            help=("How to handle inferred dependencies that don't have any owner."),
+        )
 
     @property
     def imports(self) -> bool:
@@ -130,6 +154,10 @@ class PythonInferSubsystem(Subsystem):
     @property
     def entry_points(self) -> bool:
         return cast(bool, self.options.entry_points)
+
+    @property
+    def unowned_dependency_behavior(self) -> UnownedDependencyUsage:
+        return cast(UnownedDependencyUsage, self.options.unowned_dependency_behavior)
 
 
 class InferPythonImportDependencies(InferDependenciesRequest):
@@ -163,10 +191,12 @@ async def infer_python_dependencies_via_imports(
         Get(PythonModuleOwners, PythonModule(imported_module))
         for imported_module in detected_imports
     )
+
     merged_result: set[Address] = set()
+    unowned_imports: set[str] = set()
+    address = wrapped_tgt.target.address
     for owners, imp in zip(owners_per_import, detected_imports):
         merged_result.update(owners.unambiguous)
-        address = wrapped_tgt.target.address
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
@@ -176,6 +206,26 @@ async def infer_python_dependencies_via_imports(
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
+
+        if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES:
+            unowned_imports.add(imp)
+
+    unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
+    if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
+        raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
+        log = logger.error if raise_error else logger.warning
+        log(
+            f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports)}\n\n"
+            "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
+            "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
+            "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred.\n"
+            f"See {doc_url('python-third-party-dependencies')}"
+        )
+
+        if raise_error:
+            raise UnownedDependencyError(
+                "One or more unowned dependencies detected. Check logs for more details."
+            )
 
     return InferredDependencies(sorted(merged_result))
 

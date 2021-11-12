@@ -9,8 +9,4 @@ deploy_jar(
 
 scala_sources(
     compatible_resolves=["exampleapp"],
-    dependencies=[
-        # TODO: Remove via https://github.com/pantsbuild/pants/issues/13365.
-        "testprojects/src/jvm/org/pantsbuild/example/lib/ExampleLib.java",
-    ],
 )

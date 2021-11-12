@@ -347,7 +347,6 @@ impl CapturedWorkdir for CommandRunner {
     workdir_path: &'b Path,
     _workdir_token: (),
     req: Process,
-    _context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     let cwd = if let Some(ref working_directory) = req.working_directory {
@@ -488,13 +487,7 @@ pub trait CapturedWorkdir {
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
-          .run_in_workdir(
-            &workdir_path,
-            workdir_token,
-            req.clone(),
-            context,
-            exclusive_spawn,
-          )
+          .run_in_workdir(&workdir_path, workdir_token, req.clone(), exclusive_spawn)
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
@@ -537,8 +530,11 @@ pub trait CapturedWorkdir {
     };
 
     let elapsed = start_time.elapsed();
-    let result_metadata =
-      ProcessResultMetadata::new(Some(elapsed.into()), ProcessResultSource::RanLocally);
+    let result_metadata = ProcessResultMetadata::new(
+      Some(elapsed.into()),
+      ProcessResultSource::RanLocally,
+      context.run_id,
+    );
 
     match child_results_result {
       Ok(child_results) => {
@@ -603,7 +599,6 @@ pub trait CapturedWorkdir {
     workdir_path: &'b Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
-    context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }

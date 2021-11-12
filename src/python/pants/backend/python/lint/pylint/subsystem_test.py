@@ -49,7 +49,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement(name='pylint', requirements=['pylint==2.6.2'])
+                python_requirement(name='pylint', requirements=['pylint==2.11.1'])
                 python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
@@ -83,7 +83,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     )
     first_party_plugins = rule_runner.request(PylintFirstPartyPlugins, [])
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
-        ["ansicolors", "pylint==2.6.2"]
+        ["ansicolors", "pylint==2.11.1"]
     )
     assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
         [

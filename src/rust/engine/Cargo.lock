@@ -689,7 +689,6 @@ dependencies = [
  "tryfuture",
  "ui",
  "url",
- "uuid",
  "watch",
  "workunit_store",
 ]

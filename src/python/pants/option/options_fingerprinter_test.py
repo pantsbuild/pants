@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+from pathlib import Path
 
 import pytest
 
@@ -15,7 +15,6 @@ from pants.option.custom_types import (
 )
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.testutil.rule_runner import RuleRunner
-from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture
@@ -61,11 +60,10 @@ def test_fingerprint_file(rule_runner: RuleRunner) -> None:
     assert fp2 != fp3
 
 
-def test_fingerprint_file_outside_buildroot(rule_runner: RuleRunner) -> None:
-    with temporary_dir() as tmp:
-        outside_buildroot = rule_runner.create_file(os.path.join(tmp, "foobar"), contents="foobar")
-        with pytest.raises(ValueError):
-            OptionsFingerprinter().fingerprint(file_option, outside_buildroot)
+def test_fingerprint_file_outside_buildroot(tmp_path: Path, rule_runner: RuleRunner) -> None:
+    outside_buildroot = rule_runner.create_file((tmp_path / "foobar").as_posix(), contents="foobar")
+    with pytest.raises(ValueError):
+        OptionsFingerprinter().fingerprint(file_option, outside_buildroot)
 
 
 def test_fingerprint_file_list(rule_runner: RuleRunner) -> None:

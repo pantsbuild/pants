@@ -107,7 +107,7 @@ class BuildFileAliases:
         :API: public
         """
         if not isinstance(other, BuildFileAliases):
-            raise TypeError("Can only merge other BuildFileAliases, given {}".format(other))
+            raise TypeError(f"Can only merge other BuildFileAliases, given {other}")
 
         def merge(*items):
             merged: dict = {}

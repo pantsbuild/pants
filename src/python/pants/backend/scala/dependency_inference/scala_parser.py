@@ -7,7 +7,7 @@ import logging
 import os
 import pkgutil
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Set
 
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
@@ -114,6 +114,13 @@ class ScalaSourceDependencyAnalysis:
     provided_names: FrozenOrderedSet[str]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
 
+    def all_imports(self) -> frozenset[str]:
+        all_symbols: Set[str] = set()
+        for imports in self.imports_by_scope.values():
+            for imp in imports:
+                all_symbols.add(imp.name)
+        return frozenset(all_symbols)
+
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
@@ -128,7 +135,7 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_names": self.provided_names,
+            "provided_names": list(self.provided_names),
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()

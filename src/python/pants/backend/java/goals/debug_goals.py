@@ -4,7 +4,6 @@
 import json
 
 from pants.backend.experimental.java.register import rules as java_rules
-from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaFieldSet
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -13,6 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 
 
 class DumpFirstPartyDepMapSubsystem(GoalSubsystem):
@@ -26,11 +26,9 @@ class DumpFirstPartyDepMap(Goal):
 
 @goal_rule
 async def dump_dep_inference_data(
-    console: Console, first_party_dep_map: FirstPartyJavaPackageMapping
+    console: Console, first_party_dep_map: FirstPartySymbolMapping
 ) -> DumpFirstPartyDepMap:
-    console.write_stdout(
-        json.dumps(first_party_dep_map.package_rooted_dependency_map.to_json_dict())
-    )
+    console.write_stdout(json.dumps(first_party_dep_map.symbols.to_json_dict()))
     return DumpFirstPartyDepMap(exit_code=0)
 
 
