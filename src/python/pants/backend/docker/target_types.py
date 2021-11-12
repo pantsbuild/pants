@@ -48,7 +48,8 @@ class DockerImageInstructionsField(StringSequenceField):
     required = False
     help = (
         "The `Dockerfile` content, typically one instruction per list item.\n\n"
-        "Mutually exclusive with the `source` field."
+        "Use the `source` field instead if you prefer having the Dockerfile in your project "
+        "source tree."
     )
 
 

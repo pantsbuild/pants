@@ -38,29 +38,15 @@ async def hydrate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSou
             "`source` field value, or the Dockerfile content to the `instructions` field."
         )
 
+    def dockerfile_path():
+        name_parts = ["Dockerfile", address.target_name, address.generated_name]
+        return os.path.join(address.spec_path, ".".join(filter(bool, name_parts)))
+
     output = (
         await Get(
             Snapshot,
             CreateDigest(
-                (
-                    FileContent(
-                        os.path.join(
-                            address.spec_path,
-                            ".".join(
-                                [
-                                    s
-                                    for s in [
-                                        "Dockerfile",
-                                        address.target_name,
-                                        address.generated_name,
-                                    ]
-                                    if s
-                                ]
-                            ),
-                        ),
-                        "\n".join([*instructions, ""]).encode(),
-                    ),
-                )
+                (FileContent(dockerfile_path(), "\n".join([*instructions, ""]).encode()),)
             ),
         )
         if instructions
