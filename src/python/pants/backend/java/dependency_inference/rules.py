@@ -20,6 +20,7 @@ from pants.backend.java.dependency_inference.package_mapper import FirstPartyJav
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
+from pants.core.goals.export import export
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -34,6 +35,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules, JavaSourceDependencyAnalysisRequest
 
@@ -79,7 +81,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     address = request.address
     if not address.is_file_target:
-        raise Exception("Can only analyse file targets, Java ones at that")
+        raise Exception(f"Can only analyse file targets, Java ones at that. Address was: {address}")
     a = await Get(Digest, PathGlobs([address.filename]))
     s = await Get(Snapshot, Digest, a)
 
@@ -140,8 +142,10 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
             dependencies.add(maybe_disambiguated)
             if typ in export_types:
                 exports.add(maybe_disambiguated)
-
-    #logger.warning("%s", exports)
+        else:
+            # Exports from explicitly provided dependencies:
+            explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
+            exports |= explicitly_provided_exports
 
     # Files do not export themselves. Don't be silly.
     if address in exports:
