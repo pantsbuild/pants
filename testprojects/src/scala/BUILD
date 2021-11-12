@@ -2,6 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_sources(
-  compatible_resolves=["scala_testprojects"],
+    compatible_resolves=["scala_testprojects"],
 )
-
