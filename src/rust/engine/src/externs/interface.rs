@@ -48,7 +48,7 @@ use crate::{
 };
 
 #[pymodule]
-fn native_engine_new(py: Python, m: &PyModule) -> PyO3Result<()> {
+fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
   m.add_class::<PyExecutionRequest>()?;

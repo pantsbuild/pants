@@ -413,17 +413,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
 
 [[package]]
-name = "cpython"
-version = "0.5.2"
-source = "git+https://github.com/pantsbuild/rust-cpython?rev=46d7eff26a705384e41eb6f7b870cd3f5f14b3bc#46d7eff26a705384e41eb6f7b870cd3f5f14b3bc"
-dependencies = [
- "libc",
- "num-traits",
- "paste 1.0.5",
- "python3-sys",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -646,7 +635,6 @@ dependencies = [
  "bytes",
  "cache",
  "concrete_time",
- "cpython",
  "crossbeam-channel 0.4.4",
  "derivative",
  "double-checked-cell-async",
@@ -673,6 +661,7 @@ dependencies = [
  "process_execution",
  "protos",
  "pyo3",
+ "pyo3-build-config",
  "rand 0.8.2",
  "regex",
  "reqwest",
@@ -2004,12 +1993,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
-
-[[package]]
 name = "paste-impl"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2370,7 +2353,7 @@ dependencies = [
  "indoc",
  "libc",
  "parking_lot",
- "paste 0.1.18",
+ "paste",
  "pyo3-build-config",
  "pyo3-macros",
  "unindent",
@@ -2406,15 +2389,6 @@ dependencies = [
  "pyo3-build-config",
  "quote 1.0.10",
  "syn 1.0.81",
-]
-
-[[package]]
-name = "python3-sys"
-version = "0.5.2"
-source = "git+https://github.com/pantsbuild/rust-cpython?rev=46d7eff26a705384e41eb6f7b870cd3f5f14b3bc#46d7eff26a705384e41eb6f7b870cd3f5f14b3bc"
-dependencies = [
- "libc",
- "regex",
 ]
 
 [[package]]
