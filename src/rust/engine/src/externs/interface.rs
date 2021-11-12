@@ -496,9 +496,8 @@ fn nailgun_server_create(
         let py = gil.python();
         let result = runner.as_ref(py).call1((
           exe.cmd.command,
-          exe.cmd.args,
-          exe.cmd.env,
-          exe.cmd.working_dir,
+          PyTuple::new(py, exe.cmd.args),
+          exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
           PySessionCancellationLatch(exe.cancelled),
           exe.stdin_fd as i64,
           exe.stdout_fd as i64,
@@ -510,7 +509,10 @@ fn nailgun_server_create(
             nailgun::ExitCode(code)
           }
           Err(e) => {
-            error!("Uncaught exception in nailgun handler: {:#?}", e);
+            error!(
+              "Uncaught exception in nailgun handler: {:#?}",
+              Failure::from_py_err_with_gil(py, e)
+            );
             nailgun::ExitCode(1)
           }
         }
