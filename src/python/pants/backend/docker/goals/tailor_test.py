@@ -22,13 +22,7 @@ def test_find_putative_targets() -> None:
         ],
         target_types=[DockerImageTarget],
     )
-    rule_runner.write_files(
-        {
-            "src/docker_ok/Dockerfile": "",
-            "src/docker_orphan/Dockerfile": "",
-            "src/docker_orphan/Dockerfile.two": "",
-        }
-    )
+    rule_runner.write_files({"src/docker_ok/Dockerfile": "", "src/docker_orphan/Dockerfile": ""})
     pts = rule_runner.request(
         PutativeTargets,
         [
@@ -45,13 +39,6 @@ def test_find_putative_targets() -> None:
                     "docker",
                     ["Dockerfile"],
                     kwargs={"name": "docker"},
-                ),
-                PutativeTarget.for_target_type(
-                    DockerImageTarget,
-                    "src/docker_orphan",
-                    "docker_2",
-                    ["Dockerfile.two"],
-                    kwargs={"name": "docker_2", "source": "Dockerfile.two"},
                 ),
             ]
         )
