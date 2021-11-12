@@ -71,7 +71,7 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
         "PEX_PATH": repl.in_chroot(local_dists.pex.name),
     }
 
-    return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
+    return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env, run_in_workspace=False)
 
 
 class IPythonRepl(ReplImplementation):
@@ -148,7 +148,7 @@ async def create_ipython_repl_request(
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),
     }
 
-    return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
+    return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env, run_in_workspace=False)
 
 
 def rules():

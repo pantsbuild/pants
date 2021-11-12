@@ -1,5 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import os
 from abc import ABC
 from dataclasses import dataclass
@@ -79,6 +81,8 @@ class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    append_only_caches: FrozenDict[str, str]
+    run_in_workspace: bool
 
     def __init__(
         self,
@@ -86,10 +90,14 @@ class ReplRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        run_in_workspace: bool = True,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
+        self.append_only_caches = FrozenDict(append_only_caches or {})
+        self.run_in_workspace = run_in_workspace
 
 
 @goal_rule
@@ -139,8 +147,10 @@ async def run_repl(
             InteractiveProcess(
                 argv=request.args,
                 env=env,
-                run_in_workspace=True,
+                input_digest=request.digest,
+                run_in_workspace=request.run_in_workspace,
                 restartable=repl_subsystem.restartable,
+                append_only_caches=request.append_only_caches,
             ),
         )
     return Repl(result.exit_code)
