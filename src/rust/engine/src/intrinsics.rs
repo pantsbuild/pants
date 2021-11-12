@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -14,10 +16,11 @@ use crate::types::Types;
 use crate::Failure;
 
 use cpython::{ObjectProtocol, Python};
-use fs::RelativePath;
+use fs::{safe_create_dir_all_ioerror, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
+use process_execution::{CacheDest, CacheName, NamedCaches};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -537,7 +540,15 @@ fn interactive_process(
     let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
     let input_digest: Digest = lift_directory_digest(&input_digest_value)?;
     let env = externs::getattr_from_str_frozendict(&value, "env");
+    let append_only_caches = externs::getattr_from_str_frozendict(&value, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
     let session = context.session;
+
+    if !append_only_caches.is_empty() && run_in_workspace {
+      return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned().into());
+    }
 
     if !restartable {
         task_side_effected()?;
@@ -566,6 +577,37 @@ fn interactive_process(
         .store()
         .materialize_directory(destination, input_digest)
         .await?;
+    }
+
+    if !append_only_caches.is_empty() {
+      let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
+      let named_cache_symlinks = named_caches
+          .local_paths(&append_only_caches)
+          .collect::<Vec<_>>();
+
+      let destination = match maybe_tempdir {
+        Some(ref dir) => dir.path().to_path_buf(),
+        None => unreachable!(),
+      };
+
+      for named_cache_symlink in named_cache_symlinks {
+        safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+          format!(
+            "Error making {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            err
+          )
+        })?;
+        let dst = destination.join(&named_cache_symlink.dst);
+        symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+          format!(
+            "Error linking {} -> {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            dst.display(),
+            err
+          )
+        })?;
+      }
     }
 
     let p = Path::new(&argv[0]);

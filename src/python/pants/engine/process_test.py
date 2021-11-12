@@ -261,6 +261,11 @@ def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 
 
+def test_interactive_process_cannot_have_append_only_caches_and_workspace() -> None:
+    with pytest.raises(ValueError):
+        InteractiveProcess(argv=["/bin/echo"], append_only_caches={"foo": "bar"}, run_in_workspace=True)
+
+
 def test_find_binary_non_existent(rule_runner: RuleRunner, tmp_path: Path) -> None:
     binary_paths = rule_runner.request(
         BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=[str(tmp_path)])]
