@@ -182,7 +182,7 @@ impl CommandRunner {
       if let Some(ref action_result) = execute_response.result {
         crate::remote::populate_fallible_execution_result(
           self.file_store.clone(),
-          context,
+          context.run_id,
           action_result,
           platform,
           true,

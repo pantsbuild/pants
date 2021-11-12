@@ -38,7 +38,8 @@ use tonic::{Code, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunningWorkunit, SpanId, WorkunitMetadata, WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
+  WorkunitStore,
 };
 
 use crate::{
@@ -442,7 +443,7 @@ impl CommandRunner {
   // pub(crate) for testing
   pub(crate) async fn extract_execute_response(
     &self,
-    context: &Context,
+    run_id: RunId,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -491,7 +492,7 @@ impl CommandRunner {
 
           return populate_fallible_execution_result(
             self.store.clone(),
-            context,
+            run_id,
             action_result,
             self.platform,
             false,
@@ -677,7 +678,7 @@ impl CommandRunner {
       };
 
       match self
-        .extract_execute_response(context, actionable_result)
+        .extract_execute_response(context.run_id, actionable_result)
         .await
       {
         Ok(result) => return Ok(result),
@@ -1082,7 +1083,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
     metadata: ProcessResultMetadata::new(
       Some(elapsed.into()),
       ProcessResultSource::RanRemotely,
-      context,
+      context.run_id,
     ),
   })
 }
@@ -1094,14 +1095,14 @@ pub async fn populate_fallible_execution_result_for_timeout(
 /// of the ActionResult/ExecuteResponse stored in the local cache. When
 /// `treat_tree_digest_as_final_directory_hack` is true, then that final merged directory
 /// will be extracted from the tree_digest of the single output directory.
-pub fn populate_fallible_execution_result<'a>(
+pub fn populate_fallible_execution_result(
   store: Store,
-  context: &'a Context,
-  action_result: &'a remexec::ActionResult,
+  run_id: RunId,
+  action_result: &remexec::ActionResult,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
   source: ProcessResultSource,
-) -> BoxFuture<'a, Result<FallibleProcessResultWithPlatform, String>> {
+) -> BoxFuture<Result<FallibleProcessResultWithPlatform, String>> {
   future::try_join3(
     extract_stdout(&store, action_result),
     extract_stderr(&store, action_result),
@@ -1120,8 +1121,8 @@ pub fn populate_fallible_execution_result<'a>(
         output_directory,
         platform,
         metadata: action_result.execution_metadata.clone().map_or(
-          ProcessResultMetadata::new(None, source, context),
-          |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, context),
+          ProcessResultMetadata::new(None, source, run_id),
+          |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, run_id),
         ),
       })
     },
@@ -1391,7 +1392,7 @@ pub async fn check_action_cache(
           let action_result = action_result.into_inner();
           let response = populate_fallible_execution_result(
             store.clone(),
-            context,
+            context.run_id,
             &action_result,
             platform,
             false,

@@ -232,7 +232,7 @@ fn multi_platform_process_request_to_process_result(
               .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
               .unwrap_or_else(|| Value::from(py.None())),
             externs::store_utf8(py, result.metadata.source.into()),
-            externs::store_u64(py, result.metadata.source_run_id.into()),
+            externs::store_u64(py, result.metadata.source_run_id.0.into()),
           ],
         ),
       ],

@@ -713,7 +713,7 @@ impl WrappedNode for RunId {
     Ok(externs::unsafe_call(
       py,
       context.core.types.run_id,
-      &[externs::store_u64(py, context.session.run_id() as u64)],
+      &[externs::store_u64(py, context.session.run_id().0 as u64)],
     ))
   }
 }

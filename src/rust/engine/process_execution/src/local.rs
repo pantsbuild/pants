@@ -533,7 +533,7 @@ pub trait CapturedWorkdir {
     let result_metadata = ProcessResultMetadata::new(
       Some(elapsed.into()),
       ProcessResultSource::RanLocally,
-      &context,
+      context.run_id,
     );
 
     match child_results_result {

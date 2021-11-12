@@ -20,7 +20,7 @@ use parking_lot::{Mutex, RwLock};
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration, RunId, UserMetadataPyValue, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -167,7 +167,7 @@ impl Session {
         roots: Mutex::new(HashMap::new()),
         workunit_store,
         session_values: Mutex::new(session_values),
-        run_id: AtomicU32::new(run_id),
+        run_id: AtomicU32::new(run_id.0),
         workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
     })
@@ -268,13 +268,13 @@ impl Session {
     &self.handle.build_id
   }
 
-  pub fn run_id(&self) -> u32 {
-    self.state.run_id.load(atomic::Ordering::SeqCst)
+  pub fn run_id(&self) -> RunId {
+    RunId(self.state.run_id.load(atomic::Ordering::SeqCst))
   }
 
   pub fn new_run_id(&self) {
     self.state.run_id.store(
-      self.state.core.sessions.generate_run_id(),
+      self.state.core.sessions.generate_run_id().0,
       atomic::Ordering::SeqCst,
     );
   }
@@ -430,8 +430,8 @@ impl Sessions {
     }
   }
 
-  fn generate_run_id(&self) -> u32 {
-    self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst)
+  fn generate_run_id(&self) -> RunId {
+    RunId(self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst))
   }
 
   ///

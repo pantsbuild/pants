@@ -33,6 +33,7 @@ use rule_graph::RuleGraph;
 use store::{self, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
+use workunit_store::RunId;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -538,7 +539,7 @@ pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: u32,
+  run_id: RunId,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -573,7 +574,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type RunId = u32;
+  type RunId = RunId;
 
   fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
     Box::new(self.stats.lock())
