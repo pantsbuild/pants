@@ -1503,10 +1503,10 @@ class SourcesField(AsyncFieldMixin, Field):
     - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files
         referenced by this field.
     - `default` -- A default value for this field.
-    - `default_glob_match_error_behavior` -- Override glob match error behavior when using the
-        default value. If setting this to `GlobMatchErrorBehavior.ignore`, make sure you have other
-        validation in place in case the default glob doesn't match any files if required, to alert
-        the user appropriately.
+    - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
+        glob match error behavior when using the default value. If setting this to
+        `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
+        default glob doesn't match any files if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
