@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.fs import CreateDigest, FileContent
 from pants.option.custom_types import file_option, shell_str
 
 
@@ -60,6 +63,17 @@ class TwineSubsystem(PythonToolBase):
                 "non-standard location."
             ),
         )
+        register(
+            "--ca-certs-path",
+            advanced=True,
+            type=str,
+            default="<inherit>",
+            help=(
+                "Path to a file containing PEM-format CA certificates used for verifying secure "
+                "connections when publishing python distributions.\n\n"
+                "Uses the value from `[GLOBAL].ca_certs_path` by default."
+            ),
+        )
 
     @property
     def skip(self) -> bool:
@@ -82,3 +96,16 @@ class TwineSubsystem(PythonToolBase):
             discovery=cast(bool, self.options.config_discovery),
             check_existence=[".pypirc"],
         )
+
+    def ca_certs_digest_request(self, default_ca_certs_path: str | None) -> CreateDigest | None:
+        ca_certs_path: str | None = self.options.ca_certs_path
+        if ca_certs_path == "<inherit>":
+            ca_certs_path = default_ca_certs_path
+        if not ca_certs_path:
+            return None
+
+        # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
+        # Instead we manually create a FileContent for it.
+        ca_certs_content = Path(ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(ca_certs_path)
+        return CreateDigest((FileContent(chrooted_ca_certs_path, ca_certs_content),))
