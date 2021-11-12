@@ -6,16 +6,11 @@ from dataclasses import dataclass
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
-from pants.backend.docker.subsystems.dockerfile_parser import (
-    DockerfileAddress,
-    DockerfileInfo,
-    DockerfileInfoRequest,
-)
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
@@ -62,13 +57,9 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
     )
 
-    dockerfile_addresses = await MultiGet(
-        Get(DockerfileAddress, Address, field_set.address) for field_set in request.field_sets
-    )
-
     dockerfile_infos = await MultiGet(
-        Get(DockerfileInfo, DockerfileInfoRequest(dockerfile_address.address))
-        for dockerfile_address in dockerfile_addresses
+        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address))
+        for field_set in request.field_sets
     )
 
     input_digest = await Get(

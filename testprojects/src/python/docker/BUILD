@@ -4,12 +4,12 @@
 docker_image(
     name="test-example",
     image_tags=["1.2.5"],
-    source="Dockerfile",
-    # dependencies=[":example-dockerfile"],
+    source="Dockerfile.example",
 )
 
-dockerfile(
-    name="example-dockerfile",
+docker_image(
+    name="test-example-synth",
+    image_tags=["1.2.5"],
     instructions=[
         "FROM python:3.7",
         'ENTRYPOINT ["/hello"]',

@@ -7,11 +7,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.subsystems.dockerfile_parser import (
-    DockerfileAddress,
-    DockerfileInfo,
-    DockerfileInfoRequest,
-)
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
@@ -36,7 +32,6 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    WrappedTarget,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -129,9 +124,6 @@ async def create_docker_build_context(
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
     docker_image = transitive_targets.roots[0]
 
-    # Get address for our dockerfile target.
-    dockerfile_address = await Get(DockerfileAddress, WrappedTarget(docker_image))
-
     # Get all dependencies for the root target.
     root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
 
@@ -153,7 +145,7 @@ async def create_docker_build_context(
     file_sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
         file_sources_request,
         embedded_pkgs_per_target_request,
-        Get(DockerfileInfo, DockerfileInfoRequest(dockerfile_address.address)),
+        Get(DockerfileInfo, DockerfileInfoRequest(docker_image.address)),
     )
 
     # Package binary dependencies for build context.

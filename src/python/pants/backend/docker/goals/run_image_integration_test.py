@@ -21,7 +21,7 @@ def run_pants_with_sources(sources: dict[str, str], *args: str) -> PantsResult:
 
 def test_docker_run() -> None:
     sources = {
-        "BUILD": """docker_image(name="run-image", source="Dockerfile")""",
+        "BUILD": "docker_image(name='run-image')",
         "Dockerfile": dedent(
             """\
             FROM alpine

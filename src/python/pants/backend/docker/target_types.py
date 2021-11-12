@@ -7,6 +7,7 @@ from textwrap import dedent
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.core.goals.run import RestartableField
+from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -31,11 +32,23 @@ class DockerBuildArgsField(StringSequenceField):
 
 
 class DockerImageSourceField(SingleSourceField):
+    default = "Dockerfile"
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
     expected_num_files = range(0, 2)
     required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
-        "Leave this undefined when using a dependency to a `dockerfile` target."
+        "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
+        "project source tree."
+    )
+
+
+class DockerImageInstructionsField(StringSequenceField):
+    alias = "instructions"
+    required = False
+    help = (
+        "The `Dockerfile` content, typically one instruction per list item.\n\n"
+        "Mutually exclusive with the `source` field."
     )
 
 
@@ -117,6 +130,7 @@ class DockerImageTarget(Target):
         DockerBuildArgsField,
         DockerDependenciesField,
         DockerImageSourceField,
+        DockerImageInstructionsField,
         DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
@@ -127,31 +141,4 @@ class DockerImageTarget(Target):
         "The `docker_image` target describes how to build and tag a Docker image.\n\n"
         "Any dependencies, as inferred or explicitly specified, will be included in the Docker "
         "build context, after being packaged if applicable."
-    )
-
-
-class DockerfileInstructionsField(StringSequenceField):
-    alias = "instructions"
-    required = True
-    help = "The `Dockerfile` content, typically one instruction per list item."
-
-
-class DockerfileSourceField(SingleSourceField):
-    # We solely register this field for codegen to work.
-    alias = "_source"
-    required = False
-    expected_num_files = 0
-
-
-class DockerfileTarget(Target):
-    alias = "dockerfile"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        DockerfileInstructionsField,
-        DockerfileSourceField,
-    )
-    help = (
-        "The `dockerfile` target substitutes for a `Dockerfile` in your project workspace.\n\n"
-        "Any `docker_image` may add a dependency to a `dockerfile` target rather than referencing "
-        "a `Dockerfile` on disk."
     )
