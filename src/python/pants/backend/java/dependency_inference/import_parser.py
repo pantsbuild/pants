@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
 
+from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import DeduplicatedCollection
@@ -25,7 +25,10 @@ class ParseJavaImportsRequest:
 @rule
 async def parse_java_imports(request: ParseJavaImportsRequest) -> ParsedJavaImports:
     source_files = await Get(SourceFiles, SourceFilesRequest([request.sources]))
-    analysis = await Get(JavaSourceDependencyAnalysis, JavaSourceDependencyAnalysisRequest(snapshot=source_files.snapshot))
+    analysis = await Get(
+        JavaSourceDependencyAnalysis,
+        JavaSourceDependencyAnalysisRequest(snapshot=source_files.snapshot),
+    )
     return ParsedJavaImports(imp.name for imp in analysis.imports)
 
 

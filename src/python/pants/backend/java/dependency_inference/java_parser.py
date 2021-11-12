@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class JavaSourceDependencyAnalysisRequest:
     snapshot: Snapshot
 
+
 @dataclass(frozen=True)
 class FallibleJavaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
@@ -59,7 +60,7 @@ async def resolve_fallible_result_to_analysis(
 
 @rule(level=LogLevel.DEBUG)
 async def make_analysis_request_from_source_files(
-    source_files: SourceFiles
+    source_files: SourceFiles,
 ) -> JavaSourceDependencyAnalysisRequest:
     return JavaSourceDependencyAnalysisRequest(snapshot=source_files.snapshot)
 

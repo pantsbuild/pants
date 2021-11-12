@@ -1,27 +1,23 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
-from dataclasses import dataclass
 
 import logging
+from dataclasses import dataclass
 from itertools import groupby
 
-from pants.backend.java.dependency_inference import (
-    artifact_mapper,
-    import_parser,
-    package_mapper,
-)
+from pants.backend.java.dependency_inference import artifact_mapper, import_parser, package_mapper
 from pants.backend.java.dependency_inference.artifact_mapper import (
     AvailableThirdPartyArtifacts,
     ThirdPartyJavaPackageToArtifactMapping,
     find_artifact_mapping,
 )
+from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
+from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
 from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
-from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
+from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.export import export
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, PathGlobs, Snapshot
@@ -35,9 +31,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules, JavaSourceDependencyAnalysisRequest
 
 logger = logging.getLogger(__name__)
 
@@ -51,16 +45,21 @@ class JavaInferredDependencies:
     dependencies: FrozenOrderedSet[Address]
     exports: FrozenOrderedSet[Address]
 
+
 @dataclass(frozen=True)
 class JavaInferredDependenciesAndExportsRequest:
     address: Address
+
 
 @rule(desc="Inferring Java dependencies by source analysis")
 async def infer_java_dependencies_via_source_analysis(
     request: InferJavaSourceDependencies,
 ) -> InferredDependencies:
 
-    jids = await Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(request.sources_field.address))
+    jids = await Get(
+        JavaInferredDependencies,
+        JavaInferredDependenciesAndExportsRequest(request.sources_field.address),
+    )
     return InferredDependencies(dependencies=jids.dependencies)
 
 
@@ -77,7 +76,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
         and not java_infer_subsystem.consumed_types
         and not java_infer_subsystem.third_party_imports
     ):
-        return JavaInferredDependencies([], [])
+        return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))
 
     address = request.address
     if not address.is_file_target:
@@ -93,7 +92,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     types: OrderedSet[str] = OrderedSet()
     if java_infer_subsystem.imports:
-        types.update(dependency_name(imp.name, imp.is_static) for imp in analysis.imports)
+        types.update(dependency_name(imp) for imp in analysis.imports)
     if java_infer_subsystem.consumed_types:
         package = analysis.declared_package
 
@@ -145,20 +144,20 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
         else:
             # Exports from explicitly provided dependencies:
             explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
-            exports |= explicitly_provided_exports
+            exports.update(explicitly_provided_exports)
 
     # Files do not export themselves. Don't be silly.
     if address in exports:
         exports.remove(address)
 
-    return JavaInferredDependencies(dependencies, exports)
+    return JavaInferredDependencies(FrozenOrderedSet(dependencies), FrozenOrderedSet(exports))
 
 
-def dependency_name(name: str, static: bool):
-    if not static:
-        return name
+def dependency_name(imp: JavaImport):
+    if imp.is_static and not imp.is_asterisk:
+        return imp.name.rsplit(".", maxsplit=1)[0]
     else:
-        return name.rsplit(".", maxsplit=1)[0]
+        return imp.name
 
 
 def rules():

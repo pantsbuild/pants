@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import logging
 from itertools import chain
-from pants.backend.java.dependency_inference.rules import JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest
 
-from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField, JavaSourceTarget
-from pants.build_graph.address import Address
-from pants.core.goals.export import export
+from pants.backend.java.dependency_inference.rules import (
+    JavaInferredDependencies,
+    JavaInferredDependenciesAndExportsRequest,
+)
+from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -24,7 +25,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, SourcesField, WrappedTarget
+from pants.engine.target import CoarsenedTargets, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -66,12 +67,15 @@ async def compile_java_source(
     )
 
     # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
-    deps_to_classpath_entries = dict(zip(request.component.dependencies, direct_dependency_classpath_entries))
-    # Re-request inferred dependencies to get a list of export dependency addresses    
+    actual_direct_dependency_classpath_entries = direct_dependency_classpath_entries or ()
+    deps_to_classpath_entries = dict(
+        zip(request.component.dependencies, actual_direct_dependency_classpath_entries)
+    )
+    # Re-request inferred dependencies to get a list of export dependency addresses
     inferred_dependencies = await MultiGet(
-        Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(tgt.address)) 
+        Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(tgt.address))
         for tgt in request.component.members
-        if isinstance(tgt, JavaSourceTarget)
+        if JavaFieldSet.is_applicable(tgt)
     )
     exports = (export for i in inferred_dependencies for export in i.exports)
     export_targets = await Get(CoarsenedTargets, Addresses(exports))
@@ -217,11 +221,18 @@ async def compile_java_source(
         # a `package-info.java` in a single partition.
         jar_output_digest = EMPTY_DIGEST
 
-    output_classpath = ClasspathEntry(jar_output_digest, (output_file,), direct_dependency_classpath_entries)
+    output_classpath = ClasspathEntry(
+        jar_output_digest, (output_file,), direct_dependency_classpath_entries
+    )
 
     if export_classpath_entries:
-        merged_export_digest = await Get(Digest, MergeDigests((output_classpath.digest, *[i.digest for i in export_classpath_entries])))
-        merged_classpath = ClasspathEntry.merge(merged_export_digest, (output_classpath, *export_classpath_entries))
+        merged_export_digest = await Get(
+            Digest,
+            MergeDigests((output_classpath.digest, *[i.digest for i in export_classpath_entries])),
+        )
+        merged_classpath = ClasspathEntry.merge(
+            merged_export_digest, (output_classpath, *export_classpath_entries)
+        )
         output_classpath = merged_classpath
 
     return FallibleClasspathEntry.from_fallible_process_result(
