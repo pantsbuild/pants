@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
-
 from pants.engine.fs import PathGlobs
 
 # TODO: black and flake8 disagree about the content of this file:

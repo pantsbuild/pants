@@ -1114,7 +1114,7 @@ def test_digest_equality() -> None:
     assert digest != Digest("a" * 64, 1000)
     assert digest != Digest("0" * 64, 1)
     with pytest.raises(TypeError):
-        digest < digest
+        digest < digest  # type: ignore[operator]
 
 
 def test_snapshot_properties() -> None:
@@ -1149,18 +1149,14 @@ def test_snapshot_hash() -> None:
 
 def test_snapshot_equality() -> None:
     # Only the digest is used for equality.
-    snapshot = Snapshot._create_for_testing(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
+    snapshot = Snapshot._create_for_testing(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot == Snapshot._create_for_testing(
         Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     assert snapshot == Snapshot._create_for_testing(
         Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
     )
-    assert snapshot == Snapshot._create_for_testing(
-        Digest("a" * 64, 1000), ["f.ext"], ["dir"]
-    )
+    assert snapshot == Snapshot._create_for_testing(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
     assert snapshot != Snapshot._create_for_testing(
         Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"]
     )
@@ -1168,4 +1164,4 @@ def test_snapshot_equality() -> None:
         Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     with pytest.raises(TypeError):
-        snapshot < snapshot
+        snapshot < snapshot  # type: ignore[operator]
