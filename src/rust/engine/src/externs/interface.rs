@@ -1117,8 +1117,8 @@ async fn workunit_to_py_value(
   externs::store_dict(py, dict_entries)
 }
 
-async fn workunits_to_py_tuple_value<'py>(
-  py: Python<'py>,
+async fn workunits_to_py_tuple_value(
+  py: Python<'_>,
   workunits: Vec<Workunit>,
   core: &Arc<Core>,
   session: &Session,
