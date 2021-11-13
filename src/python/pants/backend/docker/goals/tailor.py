@@ -4,9 +4,7 @@
 from __future__ import annotations
 
 import os
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict
 
 from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.core.goals.tailor import (
@@ -34,18 +32,14 @@ async def find_putative_targets(
     all_dockerfiles = await Get(Paths, PathGlobs, req.search_paths.path_globs("*Dockerfile*"))
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []
-    dockerfiles_per_directory: DefaultDict[str, int] = defaultdict(int)
     for dockerfile in sorted(unowned_dockerfiles):
         dirname, filename = os.path.split(dockerfile)
-        count = dockerfiles_per_directory[dirname]
-        dockerfiles_per_directory[dirname] += 1
-        name = "docker" if not count else f"docker_{count+1}"
-        kwargs = {"name": name}
+        kwargs = {}
         if filename != DockerImageSourceField.default:
             kwargs["source"] = filename
         pts.append(
             PutativeTarget.for_target_type(
-                DockerImageTarget, dirname, name, [filename], kwargs=kwargs
+                DockerImageTarget, dirname, "docker", [filename], kwargs=kwargs
             )
         )
     return PutativeTargets(pts)
