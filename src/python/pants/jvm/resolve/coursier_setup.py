@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable
@@ -17,6 +18,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.python.binaries import PythonBinary
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -38,24 +40,8 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """
 )
 
-COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
-    """\
-    set -eux
 
-    coursier_exe="$1"
-    shift
-    json_output_file="$1"
-    shift
-
-    "$coursier_exe" fetch --json-output-file="$json_output_file" "$@"
-
-    /bin/mkdir -p classpath
-    /usr/bin/python3 coursier_post_processing_script.py "$json_output_file"
-    """
-)
-
-
-class CoursierBinary(TemplatedExternalTool):
+class CoursierSubsystem(TemplatedExternalTool):
     options_scope = "coursier"
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem."
@@ -77,6 +63,20 @@ class CoursierBinary(TemplatedExternalTool):
         "linux_x86_64": "x86_64-pc-linux",
     }
 
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--repos",
+            type=list,
+            member_type=str,
+            default=[
+                "https://maven-central.storage-download.googleapis.com/maven2",
+                "https://repo1.maven.org/maven2",
+            ],
+            help=("Maven style repositories to resolve artifacts from."),
+        )
+
     def generate_exe(self, plat: Platform) -> str:
         archive_filename = os.path.basename(self.generate_url(plat))
         filename = os.path.splitext(archive_filename)[0]
@@ -85,7 +85,7 @@ class CoursierBinary(TemplatedExternalTool):
 
 @dataclass(frozen=True)
 class Coursier:
-    """The Coursier tool and various utilities, materialzed to a `Digest` and ready to use."""
+    """The Coursier tool and various utilities, materialized to a `Digest` and ready to use."""
 
     coursier: DownloadedExternalTool
     digest: Digest
@@ -114,9 +114,31 @@ class Coursier:
 
 
 @rule
-async def setup_coursier(coursier_binary: CoursierBinary) -> Coursier:
+async def setup_coursier(
+    coursier_subsystem: CoursierSubsystem,
+    python: PythonBinary,
+) -> Coursier:
+    repos_args = " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
+    coursier_wrapper_script = textwrap.dedent(
+        f"""\
+        set -eux
+
+        coursier_exe="$1"
+        shift
+        json_output_file="$1"
+        shift
+
+        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" "$@"
+
+        /bin/mkdir -p classpath
+        {python.path} coursier_post_processing_script.py "$json_output_file"
+        """
+    )
+
     downloaded_coursier_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, coursier_binary.get_request(Platform.current)
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        coursier_subsystem.get_request(Platform.current),
     )
     wrapper_scripts_digest_get = Get(
         Digest,
@@ -124,7 +146,7 @@ async def setup_coursier(coursier_binary: CoursierBinary) -> Coursier:
             [
                 FileContent(
                     Coursier.wrapper_script,
-                    COURSIER_WRAPPER_SCRIPT.encode("utf-8"),
+                    coursier_wrapper_script.encode("utf-8"),
                     is_executable=True,
                 ),
                 FileContent(
