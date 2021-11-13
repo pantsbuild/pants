@@ -134,6 +134,8 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(strongly_connected_components, m)?)?;
 
+  m.add_function(wrap_pyfunction!(debug_hang, m)?)?;
+
   Ok(())
 }
 
@@ -1630,6 +1632,11 @@ fn write_log(py: Python, msg: String, level: u64, target: String) {
 #[pyfunction]
 fn task_side_effected() -> PyO3Result<()> {
   nodes::task_side_effected().map_err(PyException::new_err)
+}
+
+#[pyfunction]
+fn debug_hang(scheduler_ptr: &PyScheduler) {
+  let _scheduler = scheduler_ptr.0.clone();
 }
 
 #[pyfunction]
