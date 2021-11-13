@@ -24,19 +24,33 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
     import json
     import sys
+    import os
     from pathlib import PurePath
     from shutil import copyfile
 
     report = json.load(open(sys.argv[1]))
 
-    classpath = set()
+    # Mapping from dest path to source path. It is ok to capture the same output filename multiple
+    # times if the source is the same as well.
+    classpath = dict()
     for dep in report['dependencies']:
-        file_path = PurePath(dep['file'])
-        classpath_dest = f"classpath/{file_path.name}"
-        if classpath_dest in classpath:
-            raise Exception(f"Found duplicate jar name {file_path.name}, which isn't currently supported")
-        classpath.add(classpath_dest)
-        copyfile(file_path, classpath_dest)
+        source = PurePath(dep['file'])
+        dest_name = dep['coord'].replace(":", "_")
+        _, ext = os.path.splitext(source)
+        classpath_dest = f"classpath/{dest_name}{ext}"
+
+        existing_source = classpath.get(classpath_dest)
+        if existing_source:
+            if existing_source == source:
+                # We've already captured this file.
+                continue
+            raise Exception(
+                f"Duplicate jar name {classpath_dest} with incompatible source:\\n"
+                f"  {source}\\n"
+                f"  {existing_source}\\n"
+            )
+        classpath[classpath_dest] = source
+        copyfile(source, classpath_dest)
     """
 )
 

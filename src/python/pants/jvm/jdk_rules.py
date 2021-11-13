@@ -51,7 +51,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         ClasspathEntry,
         CoursierLockfileEntry(
             coord=Coordinate.from_coord_str("com.martiansoftware:nailgun-server:0.9.1"),
-            file_name="nailgun-server-0.9.1.jar",
+            file_name="com.martiansoftware_nailgun-server_0.9.1.jar",
             direct_dependencies=Coordinates(),
             dependencies=Coordinates(),
             file_digest=FileDigest(
