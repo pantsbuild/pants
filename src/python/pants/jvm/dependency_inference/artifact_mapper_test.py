@@ -16,7 +16,6 @@ from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
     ThirdPartyPackageToArtifactMapping,
-    UnversionedCoordinate,
 )
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -24,7 +23,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
 DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
@@ -55,6 +54,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@logging
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
@@ -63,6 +63,43 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "junit_junit",
+                    group = "junit",
+                    artifact = "junit",
+                    version = "0.0.1",
+                )
+
+                jvm_artifact(
+                    name = "github-frenchtoast_savory",
+                    group = "github-frenchtoast",
+                    artifact = "savory",
+                    version = "0.0.1",
+                )
+
+                jvm_artifact(
+                    name = "does.not_exist",
+                    group = "does.not",
+                    artifact = "exist",
+                    version = "0.0.1",
+                    packages = ["but.let.us.pretend.**"],
+                )
+
+                jvm_artifact(
+                    name = "is.a.total_mystery",
+                    group = "is.a.total",
+                    artifact = "mystery",
+                    version = "0.0.1",
+                )
+                """
+            ),
+        }
+    )
+
     mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
     root_node = mapping.mapping_root
 
@@ -77,17 +114,24 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             node = new_node
         return node
 
-    # Verify some provided by `JVM_ARTFACT_MAPPINGS`
-    assert set(traverse("org", "junit").coordinates) == {
-        UnversionedCoordinate(group="junit", artifact="junit")
-    }
-    assert set(traverse("org", "aopalliance").coordinates) == {
-        UnversionedCoordinate(group="aopalliance", artifact="aopalliance")
+    # Provided by `JVM_ARTFACT_MAPPINGS.`
+    assert set(traverse("org", "junit").addresses) == {
+        Address("", target_name="junit_junit"),
     }
 
-    # Verify the one that we provided in the options is there too.
-    assert set(traverse("io", "github", "frenchtoast", "savory").coordinates) == {
-        UnversionedCoordinate(group="github-frenchtoast", artifact="savory")
+    # Provided by options.
+    assert set(traverse("io", "github", "frenchtoast", "savory").addresses) == {
+        Address("", target_name="github-frenchtoast_savory"),
+    }
+
+    # Provided on the `jvm_artifact`.
+    assert set(traverse("but", "let", "us", "pretend").addresses) == {
+        Address("", target_name="does.not_exist"),
+    }
+
+    # Defaulting to the `group`.
+    assert set(traverse("is", "a", "total").addresses) == {
+        Address("", target_name="is.a.total_mystery"),
     }
 
 
