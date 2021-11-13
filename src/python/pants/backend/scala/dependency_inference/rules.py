@@ -23,7 +23,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
-    AvailableThirdPartyArtifacts,
     ThirdPartyPackageToArtifactMapping,
     find_artifact_mapping,
 )
@@ -43,7 +42,6 @@ async def infer_scala_dependencies_via_source_analysis(
     scala_infer_subsystem: ScalaInferSubsystem,
     first_party_symbol_map: FirstPartySymbolMapping,
     third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
-    available_artifacts: AvailableThirdPartyArtifacts,
 ) -> InferredDependencies:
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])
@@ -62,9 +60,7 @@ async def infer_scala_dependencies_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
         first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(symbol)
-        third_party_matches = find_artifact_mapping(
-            symbol, third_party_artifact_mapping, available_artifacts
-        )
+        third_party_matches = find_artifact_mapping(symbol, third_party_artifact_mapping)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue

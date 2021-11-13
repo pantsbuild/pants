@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -14,10 +16,11 @@ use crate::types::Types;
 use crate::Failure;
 
 use cpython::{ObjectProtocol, Python};
-use fs::RelativePath;
+use fs::{safe_create_dir_all_ioerror, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
+use process_execution::{CacheDest, CacheName, NamedCaches};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -169,7 +172,7 @@ fn multi_platform_process_request_to_process_result(
     let _platform_val = &args[1];
 
     let process_request = MultiPlatformExecuteProcess::lift(process_val).map_err(|str| {
-      throw(&format!(
+      throw(format!(
         "Error lifting MultiPlatformExecuteProcess: {}",
         str
       ))
@@ -181,24 +184,24 @@ fn multi_platform_process_request_to_process_result(
       .store()
       .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
       .await
-      .map_err(|s| throw(&s))?;
+      .map_err(throw)?;
 
     let maybe_stderr = context
       .core
       .store()
       .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
       .await
-      .map_err(|s| throw(&s))?;
+      .map_err(throw)?;
 
     let stdout_bytes = maybe_stdout.ok_or_else(|| {
-      throw(&format!(
+      throw(format!(
         "Bytes from stdout Digest {:?} not found in store",
         result.stdout_digest
       ))
     })?;
 
     let stderr_bytes = maybe_stderr.ok_or_else(|| {
-      throw(&format!(
+      throw(format!(
         "Bytes from stderr Digest {:?} not found in store",
         result.stderr_digest
       ))
@@ -216,7 +219,7 @@ fn multi_platform_process_request_to_process_result(
         externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
         externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(py, &result.output_directory).map_err(|s| throw(&s))?,
+        Snapshot::store_directory_digest(py, &result.output_directory).map_err(throw)?,
         externs::unsafe_call(
           py,
           context.core.types.platform,
@@ -246,7 +249,7 @@ fn directory_digest_to_digest_contents(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
+    let digest = lift_directory_digest(&args[0]).map_err(throw)?;
     let snapshot = context
       .core
       .store()
@@ -256,7 +259,7 @@ fn directory_digest_to_digest_contents(
         let gil = Python::acquire_gil();
         Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
       })
-      .map_err(|s| throw(&s))?;
+      .map_err(throw)?;
     Ok(snapshot)
   }
   .boxed()
@@ -267,7 +270,7 @@ fn directory_digest_to_digest_entries(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let digest = lift_directory_digest(&args[0]).map_err(|s| throw(&s))?;
+    let digest = lift_directory_digest(&args[0]).map_err(throw)?;
     let snapshot = context
       .core
       .store()
@@ -277,7 +280,7 @@ fn directory_digest_to_digest_entries(
         let gil = Python::acquire_gil();
         Snapshot::store_digest_entries(gil.python(), &context, &digest_entries)
       })
-      .map_err(|s| throw(&s))?;
+      .map_err(throw)?;
     Ok(snapshot)
   }
   .boxed()
@@ -291,17 +294,17 @@ fn remove_prefix_request_to_digest(
   let store = core.store();
 
   async move {
-    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
+    let input_digest =
+      lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap()).map_err(throw)?;
     let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
-      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
+      .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
       .strip_prefix(input_digest, prefix)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
+      .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -313,17 +316,17 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
+    let input_digest =
+      lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap()).map_err(throw)?;
     let prefix: String = externs::getattr(&args[0], "prefix").unwrap();
     let prefix = RelativePath::new(PathBuf::from(prefix))
-      .map_err(|e| throw(&format!("The `prefix` must be relative: {:?}", e)))?;
+      .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = store
       .add_prefix(input_digest, prefix)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
+      .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -336,7 +339,7 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
     let gil = Python::acquire_gil();
     Snapshot::store_snapshot(gil.python(), snapshot)
   }
-  .map_err(|e: String| throw(&e))
+  .map_err(throw)
   .boxed()
 }
 
@@ -354,11 +357,11 @@ fn merge_digests_request_to_digest(
       .collect();
   async move {
     let digest = store
-      .merge(digests.map_err(|e| throw(&e))?)
+      .merge(digests.map_err(throw)?)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
+      .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -371,7 +374,7 @@ fn download_file_to_digest(
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
     let digest = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -383,10 +386,10 @@ fn path_globs_to_digest(
   async move {
     let val = args.pop().unwrap();
     let path_globs = Snapshot::lift_path_globs(&val)
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+      .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
     let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -399,10 +402,10 @@ fn path_globs_to_paths(
   async move {
     let val = args.pop().unwrap();
     let path_globs = Snapshot::lift_path_globs(&val)
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+      .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
-    Paths::store_paths(gil.python(), &core, &paths).map_err(|e: String| throw(&e))
+    Paths::store_paths(gil.python(), &core, &paths).map_err(throw)
   }
   .boxed()
 }
@@ -474,15 +477,13 @@ fn create_digest_to_digest(
 
   let store = context.core.store();
   async move {
-    let digests = future::try_join_all(digest_futures)
-      .await
-      .map_err(|e| throw(&e))?;
+    let digests = future::try_join_all(digest_futures).await.map_err(throw)?;
     let digest = store
       .merge(digests)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
+      .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -495,16 +496,16 @@ fn digest_subset_to_digest(
   let store = context.core.store();
 
   async move {
-    let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(|e| throw(&e))?;
-    let original_digest = lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap())
-      .map_err(|e| throw(&e))?;
+    let path_globs = Snapshot::lift_prepared_path_globs(&globs).map_err(throw)?;
+    let original_digest =
+      lift_directory_digest(&externs::getattr(&args[0], "digest").unwrap()).map_err(throw)?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store
       .subset(original_digest, subset_params)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
+      .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), &digest).map_err(|s| throw(&s))
+    Snapshot::store_directory_digest(gil.python(), &digest).map_err(throw)
   }
   .boxed()
 }
@@ -537,7 +538,15 @@ fn interactive_process(
     let input_digest_value: Value = externs::getattr(&value, "input_digest").unwrap();
     let input_digest: Digest = lift_directory_digest(&input_digest_value)?;
     let env = externs::getattr_from_str_frozendict(&value, "env");
+    let append_only_caches = externs::getattr_from_str_frozendict(&value, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
     let session = context.session;
+
+    if !append_only_caches.is_empty() && run_in_workspace {
+      return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned().into());
+    }
 
     if !restartable {
         task_side_effected()?;
@@ -566,6 +575,45 @@ fn interactive_process(
         .store()
         .materialize_directory(destination, input_digest)
         .await?;
+    }
+
+    if !append_only_caches.is_empty() {
+      let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
+      let named_cache_symlinks = named_caches
+          .local_paths(&append_only_caches)
+          .collect::<Vec<_>>();
+
+      let destination = match maybe_tempdir {
+        Some(ref dir) => dir.path().to_path_buf(),
+        None => unreachable!(),
+      };
+
+      for named_cache_symlink in named_cache_symlinks {
+        safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+          format!(
+            "Error making {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            err
+          )
+        })?;
+
+        let dst = destination.join(&named_cache_symlink.dst);
+        if let Some(dir) = dst.parent() {
+          safe_create_dir_all_ioerror(dir).map_err(|err| {
+            format!(
+              "Error making {} for local execution: {:?}", dir.display(), err
+            )
+          })?;
+        }
+        symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+          format!(
+            "Error linking {} -> {} for local execution: {:?}",
+            named_cache_symlink.src.display(),
+            dst.display(),
+            err
+          )
+        })?;
+      }
     }
 
     let p = Path::new(&argv[0]);

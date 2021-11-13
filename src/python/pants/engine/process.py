@@ -312,6 +312,7 @@ class InteractiveProcess(SideEffecting):
     run_in_workspace: bool
     forward_signals_to_process: bool
     restartable: bool
+    append_only_caches: FrozenDict[str, str]
 
     def __init__(
         self,
@@ -322,6 +323,7 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -340,14 +342,21 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
+        self.append_only_caches = FrozenDict(append_only_caches or {})
 
         self.__post_init__()
 
     def __post_init__(self):
         if self.input_digest != EMPTY_DIGEST and self.run_in_workspace:
             raise ValueError(
-                "InteractiveProcessRequest should use the Workspace API to materialize any needed "
+                "InteractiveProcess should use the Workspace API to materialize any needed "
                 "files when it runs in the workspace"
+            )
+        if self.append_only_caches and self.run_in_workspace:
+            raise ValueError(
+                "InteractiveProcess requested setup of append-only caches and also requested to run in "
+                "the workspace. These options are incompatible since setting up append-only caches would "
+                "modify the workspace."
             )
 
     @classmethod
@@ -364,6 +373,7 @@ class InteractiveProcess(SideEffecting):
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
+            append_only_caches=process.append_only_caches,
         )
 
 

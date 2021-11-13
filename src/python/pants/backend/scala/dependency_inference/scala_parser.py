@@ -223,7 +223,7 @@ async def analyze_scala_source_dependencies(
             use_nailgun=tool_digest,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
-            description="Analyze Scala source for dependencies",
+            description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,
         ),
     )

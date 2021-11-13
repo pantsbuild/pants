@@ -9,7 +9,6 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from pathlib import PurePath
 from typing import Any, Iterable, Iterator
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -283,6 +282,16 @@ class CoursierResolvedLockfile:
         )
 
 
+def classpath_dest_filename(coord: str, src_filename: str) -> str:
+    """Calculates the destination filename on the classpath for the given source filename and coord.
+
+    TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
+    """
+    dest_name = coord.replace(":", "_")
+    _, ext = os.path.splitext(src_filename)
+    return f"{dest_name}{ext}"
+
+
 @rule(level=LogLevel.DEBUG)
 async def coursier_resolve_lockfile(
     bash: BashBinary,
@@ -354,7 +363,9 @@ async def coursier_resolve_lockfile(
     report_contents = await Get(DigestContents, Digest, report_digest)
     report = json.loads(report_contents[0].content)
 
-    artifact_file_names = tuple(PurePath(dep["file"]).name for dep in report["dependencies"])
+    artifact_file_names = tuple(
+        classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
+    )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
     artifact_digests = await MultiGet(
         Get(Digest, DigestSubset(process_result.output_digest, PathGlobs([output_path])))
@@ -483,8 +494,8 @@ async def coursier_fetch_one_coord(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
-    file_path = PurePath(dep["file"])
-    classpath_dest = f"classpath/{file_path.name}"
+    classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
+    classpath_dest = f"classpath/{classpath_dest_name}"
 
     resolved_file_digest = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
@@ -492,13 +503,13 @@ async def coursier_fetch_one_coord(
     stripped_digest = await Get(Digest, RemovePrefix(resolved_file_digest, "classpath"))
     file_digest = await Get(
         FileDigest,
-        ExtractFileDigest(stripped_digest, file_path.name),
+        ExtractFileDigest(stripped_digest, classpath_dest_name),
     )
     if file_digest != request.file_digest:
         raise CoursierError(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
-    return ClasspathEntry(digest=stripped_digest, filenames=(file_path.name,))
+    return ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,))
 
 
 @rule(level=LogLevel.DEBUG)

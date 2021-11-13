@@ -177,17 +177,23 @@ class PexFromTargetsRequest:
 
 
 @dataclass(frozen=True)
-class _ConstraintsRepositoryPex:
+class _RepositoryPex:
     maybe_pex: Pex | None
 
 
 @dataclass(frozen=True)
-class _ConstraintsRepositoryPexRequest:
+class _RepositoryPexRequest:
     requirements: PexRequirements
     platforms: PexPlatforms
     interpreter_constraints: InterpreterConstraints
     internal_only: bool
+    resolve_and_lockfile: tuple[str, str] | None
     additional_lockfile_args: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ConstraintsRepositoryPexRequest:
+    repository_pex_request: _RepositoryPexRequest
 
 
 @rule(level=LogLevel.DEBUG)
@@ -271,74 +277,18 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     description = request.description
 
     if requirements:
-        repository_pex: Pex | None = None
-        if python_setup.requirement_constraints:
-            maybe_constraints_repository_pex = await Get(
-                _ConstraintsRepositoryPex,
-                _ConstraintsRepositoryPexRequest(
-                    requirements,
-                    request.platforms,
-                    interpreter_constraints,
-                    request.internal_only,
-                    request.additional_lockfile_args,
-                ),
-            )
-            if maybe_constraints_repository_pex.maybe_pex:
-                repository_pex = maybe_constraints_repository_pex.maybe_pex
-        elif (
-            python_setup.resolve_all_constraints
-            and python_setup.resolve_all_constraints_was_set_explicitly()
-        ):
-            raise ValueError(
-                "`[python].resolve_all_constraints` is enabled, so "
-                "`[python].requirement_constraints` must also be set."
-            )
-        elif request.resolve_and_lockfile:
-            resolve, lockfile = request.resolve_and_lockfile
-            repository_pex = await Get(
-                Pex,
-                PexRequest(
-                    description=f"Installing {lockfile} for the resolve `{resolve}`",
-                    output_filename=f"{path_safe(resolve)}_lockfile.pex",
-                    internal_only=request.internal_only,
-                    requirements=Lockfile(
-                        file_path=lockfile,
-                        file_path_description_of_origin=(
-                            f"the resolve `{resolve}` (from "
-                            "`[python].experimental_resolves_to_lockfiles`)"
-                        ),
-                        # TODO(#12314): Hook up lockfile staleness check.
-                        lockfile_hex_digest=None,
-                        req_strings=None,
-                    ),
-                    interpreter_constraints=interpreter_constraints,
-                    platforms=request.platforms,
-                    additional_args=request.additional_lockfile_args,
-                ),
-            )
-        elif python_setup.lockfile:
-            repository_pex = await Get(
-                Pex,
-                PexRequest(
-                    description=f"Installing {python_setup.lockfile}",
-                    output_filename="lockfile.pex",
-                    internal_only=request.internal_only,
-                    requirements=Lockfile(
-                        file_path=python_setup.lockfile,
-                        file_path_description_of_origin=(
-                            "the option `[python].experimental_lockfile`"
-                        ),
-                        # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
-                        # are supported.
-                        lockfile_hex_digest=None,
-                        req_strings=None,
-                    ),
-                    interpreter_constraints=interpreter_constraints,
-                    platforms=request.platforms,
-                    additional_args=request.additional_lockfile_args,
-                ),
-            )
-        requirements = dataclasses.replace(requirements, repository_pex=repository_pex)
+        repository_pex = await Get(
+            _RepositoryPex,
+            _RepositoryPexRequest(
+                requirements,
+                request.platforms,
+                interpreter_constraints,
+                request.internal_only,
+                request.resolve_and_lockfile,
+                request.additional_lockfile_args,
+            ),
+        )
+        requirements = dataclasses.replace(requirements, repository_pex=repository_pex.maybe_pex)
 
     return PexRequest(
         output_filename=request.output_filename,
@@ -355,13 +305,80 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
 
 @rule
+async def get_repository_pex(
+    request: _RepositoryPexRequest, python_setup: PythonSetup
+) -> _RepositoryPex:
+    repository_pex: Pex | None = None
+    if python_setup.requirement_constraints:
+        maybe_constraints_repository_pex = await Get(
+            _RepositoryPex,
+            _ConstraintsRepositoryPexRequest(request),
+        )
+        if maybe_constraints_repository_pex.maybe_pex:
+            repository_pex = maybe_constraints_repository_pex.maybe_pex
+    elif (
+        python_setup.resolve_all_constraints
+        and python_setup.resolve_all_constraints_was_set_explicitly()
+    ):
+        raise ValueError(
+            "`[python].resolve_all_constraints` is enabled, so "
+            "`[python].requirement_constraints` must also be set."
+        )
+    elif request.resolve_and_lockfile:
+        resolve, lockfile = request.resolve_and_lockfile
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                description=f"Installing {lockfile} for the resolve `{resolve}`",
+                output_filename=f"{path_safe(resolve)}_lockfile.pex",
+                internal_only=request.internal_only,
+                requirements=Lockfile(
+                    file_path=lockfile,
+                    file_path_description_of_origin=(
+                        f"the resolve `{resolve}` (from "
+                        "`[python].experimental_resolves_to_lockfiles`)"
+                    ),
+                    # TODO(#12314): Hook up lockfile staleness check.
+                    lockfile_hex_digest=None,
+                    req_strings=None,
+                ),
+                interpreter_constraints=request.interpreter_constraints,
+                platforms=request.platforms,
+                additional_args=request.additional_lockfile_args,
+            ),
+        )
+    elif python_setup.lockfile:
+        repository_pex = await Get(
+            Pex,
+            PexRequest(
+                description=f"Installing {python_setup.lockfile}",
+                output_filename="lockfile.pex",
+                internal_only=request.internal_only,
+                requirements=Lockfile(
+                    file_path=python_setup.lockfile,
+                    file_path_description_of_origin=("the option `[python].experimental_lockfile`"),
+                    # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
+                    # are supported.
+                    lockfile_hex_digest=None,
+                    req_strings=None,
+                ),
+                interpreter_constraints=request.interpreter_constraints,
+                platforms=request.platforms,
+                additional_args=request.additional_lockfile_args,
+            ),
+        )
+    return _RepositoryPex(repository_pex)
+
+
+@rule
 async def _setup_constraints_repository_pex(
-    request: _ConstraintsRepositoryPexRequest, python_setup: PythonSetup
-) -> _ConstraintsRepositoryPex:
+    constraints_request: _ConstraintsRepositoryPexRequest, python_setup: PythonSetup
+) -> _RepositoryPex:
+    request = constraints_request.repository_pex_request
     # NB: it isn't safe to resolve against the whole constraints file if
     # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
     if not python_setup.resolve_all_constraints or request.platforms:
-        return _ConstraintsRepositoryPex(None)
+        return _RepositoryPex(None)
 
     constraints_path = python_setup.requirement_constraints
     assert constraints_path is not None
@@ -407,7 +424,7 @@ async def _setup_constraints_repository_pex(
             f"entries for the following requirements: {', '.join(unconstrained_projects)}.\n\n"
             f"Ignoring `[python_setup].resolve_all_constraints` option."
         )
-        return _ConstraintsRepositoryPex(None)
+        return _RepositoryPex(None)
 
     # To get a full set of requirements we must add the URL requirements to the
     # constraints file, since the latter cannot contain URL requirements.
@@ -435,7 +452,7 @@ async def _setup_constraints_repository_pex(
             additional_args=request.additional_lockfile_args,
         ),
     )
-    return _ConstraintsRepositoryPex(repository_pex)
+    return _RepositoryPex(repository_pex)
 
 
 def rules():

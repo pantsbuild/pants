@@ -10,6 +10,7 @@ from pants.backend.docker.util_rules.docker_binary import rules as binary_rules
 from pants.backend.docker.util_rules.docker_build_args import rules as build_args_rules
 from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
+from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 
 
 def rules():
@@ -19,6 +20,7 @@ def rules():
         *build_env_rules(),
         *context_rules(),
         *dependencies_rules(),
+        *dockerfile_rules(),
         *package_rules(),
         *parser_rules(),
         *publish_rules(),
