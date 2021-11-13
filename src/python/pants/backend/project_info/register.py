@@ -6,7 +6,6 @@
 from pants.backend.project_info import (
     count_loc,
     dependees,
-    debug_engine,
     dependencies,
     filedeps,
     filter_targets,
@@ -28,5 +27,4 @@ def rules():
         *list_targets.rules(),
         *peek.rules(),
         *source_file_validator.rules(),
-        *debug_engine.rules(),
     ]

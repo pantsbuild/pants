@@ -134,8 +134,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(strongly_connected_components, m)?)?;
 
-  m.add_function(wrap_pyfunction!(debug_hang, m)?)?;
-
   Ok(())
 }
 
@@ -1635,11 +1633,6 @@ fn task_side_effected() -> PyO3Result<()> {
 }
 
 #[pyfunction]
-fn debug_hang(scheduler_ptr: &PyScheduler) {
-  let _scheduler = scheduler_ptr.0.clone();
-}
-
-#[pyfunction]
 fn teardown_dynamic_ui(py: Python, scheduler_ptr: &PyScheduler, session_ptr: &PySession) {
   with_scheduler(scheduler_ptr, |_scheduler| {
     with_session(session_ptr, |session| {
@@ -1693,30 +1686,27 @@ where
 /// them. In particular: methods that use the `Graph` should be called outside the GIL. We should
 /// make this less error prone: see https://github.com/pantsbuild/pants/issues/11722.
 ///
-fn with_scheduler<F, T>(scheduler_ptr: &PyScheduler, f: F) -> T
+fn with_scheduler<F, T>(py_scheduler: &PyScheduler, f: F) -> T
 where
   F: FnOnce(&Scheduler) -> T,
 {
-  let scheduler = &scheduler_ptr.0.clone();
-  scheduler.core.executor.enter(|| f(scheduler))
+  py_scheduler.0.core.executor.enter(|| f(&py_scheduler.0))
 }
 
 /// See `with_scheduler`.
-fn with_executor<F, T>(executor_ptr: &PyExecutor, f: F) -> T
+fn with_executor<F, T>(py_executor: &PyExecutor, f: F) -> T
 where
   F: FnOnce(&Executor) -> T,
 {
-  let executor = &executor_ptr.0.clone();
-  f(executor)
+  f(&py_executor.0)
 }
 
 /// See `with_scheduler`.
-fn with_session<F, T>(session_ptr: &PySession, f: F) -> T
+fn with_session<F, T>(py_session: &PySession, f: F) -> T
 where
   F: FnOnce(&Session) -> T,
 {
-  let session = &session_ptr.0.clone();
-  f(session)
+  f(&py_session.0)
 }
 
 /// See `with_scheduler`.
