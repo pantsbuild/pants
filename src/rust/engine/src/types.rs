@@ -3,7 +3,6 @@
 
 use crate::python::TypeId;
 
-#[derive(Debug)]
 pub struct Types {
   pub directory_digest: TypeId,
   pub file_digest: TypeId,

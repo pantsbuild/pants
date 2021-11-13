@@ -246,7 +246,6 @@ lazy_static! {
 }
 
 #[pyclass]
-#[derive(Debug)]
 pub struct PyGeneratorResponseBreak(PyObject);
 
 #[pymethods]
@@ -258,7 +257,6 @@ impl PyGeneratorResponseBreak {
 }
 
 #[pyclass]
-#[derive(Debug)]
 pub struct PyGeneratorResponseGet {
   product: Py<PyType>,
   declared_subject: Py<PyType>,
@@ -278,7 +276,6 @@ impl PyGeneratorResponseGet {
 }
 
 #[pyclass]
-#[derive(Debug)]
 pub struct PyGeneratorResponseGetMulti(Py<PyTuple>);
 
 #[pymethods]

@@ -140,7 +140,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 create_exception!(native_engine, PollTimeout, PyException);
 
 #[pyclass]
-#[derive(Debug)]
 struct PyTasks(RefCell<Tasks>);
 
 #[pymethods]
@@ -152,7 +151,6 @@ impl PyTasks {
 }
 
 #[pyclass]
-#[derive(Debug)]
 struct PyTypes(RefCell<Option<Types>>);
 
 #[pymethods]
@@ -218,7 +216,6 @@ impl PyTypes {
 }
 
 #[pyclass]
-#[derive(Debug)]
 struct PyExecutor(task_executor::Executor);
 
 #[pymethods]
@@ -234,7 +231,6 @@ impl PyExecutor {
 struct PyScheduler(Scheduler);
 
 #[pyclass]
-#[derive(Debug)]
 struct PyStdioDestination(Arc<stdio::Destination>);
 
 /// Represents configuration related to process execution strategies.
@@ -243,7 +239,6 @@ struct PyStdioDestination(Arc<stdio::Destination>);
 /// scheduler_create but has been broken out separately because the large number of options
 /// became unwieldy.
 #[pyclass]
-#[derive(Debug)]
 struct PyExecutionStrategyOptions(ExecutionStrategyOptions);
 
 #[pymethods]
@@ -272,7 +267,6 @@ impl PyExecutionStrategyOptions {
 
 /// Represents configuration related to remote execution and caching.
 #[pyclass]
-#[derive(Debug)]
 struct PyRemotingOptions(RemotingOptions);
 
 #[pymethods]
@@ -325,7 +319,6 @@ impl PyRemotingOptions {
 }
 
 #[pyclass]
-#[derive(Debug)]
 struct PyLocalStoreOptions(LocalStoreOptions);
 
 #[pymethods]
@@ -430,7 +423,6 @@ impl PyNailgunServer {
 }
 
 #[pyclass]
-#[derive(Debug)]
 struct PyExecutionRequest(RefCell<ExecutionRequest>);
 
 #[pymethods]
@@ -448,7 +440,6 @@ impl PyExecutionRequest {
 }
 
 #[pyclass]
-#[derive(Debug)]
 struct PyResult {
   #[pyo3(get)]
   is_throw: bool,

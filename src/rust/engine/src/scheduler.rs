@@ -29,7 +29,7 @@ pub enum ExecutionTermination {
   Fatal(String),
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,

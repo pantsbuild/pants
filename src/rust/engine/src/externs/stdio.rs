@@ -7,7 +7,6 @@ use pyo3::prelude::*;
 
 /// A Python file-like that proxies to the `stdio` module, which implements thread-local input.
 #[pyclass]
-#[derive(Debug)]
 pub struct PyStdioRead;
 
 #[pymethods]
@@ -54,7 +53,6 @@ impl PyStdioRead {
 
 /// A Python file-like that proxies to the `stdio` module, which implements thread-local output.
 #[pyclass]
-#[derive(Debug)]
 pub struct PyStdioWrite {
   pub(crate) is_stdout: bool,
 }
