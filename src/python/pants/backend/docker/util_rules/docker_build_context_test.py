@@ -17,6 +17,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
 from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
+from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -36,12 +37,13 @@ def rule_runner() -> RuleRunner:
         rules=[
             *context_rules(),
             *core_target_types_rules(),
-            docker_build_args,
-            docker_build_environment_vars,
+            *dockerfile_rules(),
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
+            docker_build_args,
+            docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
@@ -193,7 +195,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
 def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/docker/BUILD": """docker_image()""",
+            "src/docker/BUILD": "docker_image()",
             "src/docker/Dockerfile": dedent(
                 """\
                 FROM python:3.8
@@ -209,6 +211,38 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile"],
+        expected_version_context={
+            "baseimage": {"tag": "3.8"},
+            "stage0": {"tag": "3.8"},
+            "interim": {"tag": "latest"},
+            "stage2": {"tag": "latest"},
+            "output": {"tag": "1-1"},
+        },
+    )
+
+
+def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  instructions=[
+                    "FROM python:3.8",
+                    "FROM alpine as interim",
+                    "FROM interim",
+                    "FROM scratch:1-1 as output",
+                  ]
+                )
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile.docker"],
         expected_version_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},

@@ -67,6 +67,7 @@ pub struct Core {
   pub build_root: PathBuf,
   pub local_parallelism: usize,
   pub sessions: Sessions,
+  pub named_caches_dir: PathBuf,
 }
 
 #[derive(Clone, Debug)]
@@ -476,6 +477,7 @@ impl Core {
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
       sessions,
+      named_caches_dir,
     })
   }
 

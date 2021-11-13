@@ -1,6 +1,8 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::BTreeMap;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -16,10 +18,11 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use fs::{PreparedPathGlobs, RelativePath};
+use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
+use process_execution::{CacheDest, CacheName, NamedCaches};
 use pyo3::{PyAny, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -558,7 +561,7 @@ fn interactive_process(
     let types = &context.core.types;
     let interactive_process_result = types.interactive_process_result;
 
-    let (argv, run_in_workspace, restartable, input_digest, env) = Python::with_gil(|py| {
+    let (argv, run_in_workspace, restartable, input_digest, env, append_only_caches) = Python::with_gil(|py| {
       let py_interactive_process = args[0].clone_ref(py).into_ref(py);
       let argv: Vec<String> = externs::getattr(py_interactive_process, "argv").unwrap();
       if argv.is_empty() {
@@ -569,7 +572,16 @@ fn interactive_process(
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
       let input_digest: Digest = lift_directory_digest(py_input_digest)?;
       let env = externs::getattr_from_str_frozendict(py_interactive_process, "env");
-      Ok((argv, run_in_workspace, restartable, input_digest, env))
+
+      let append_only_caches = externs::getattr_from_str_frozendict(py_interactive_process, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
+      if !append_only_caches.is_empty() && run_in_workspace {
+        return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned().into());
+      }
+
+      Ok((argv, run_in_workspace, restartable, input_digest, env, append_only_caches))
     })?;
 
     let session = context.session;
@@ -602,6 +614,45 @@ fn interactive_process(
         .materialize_directory(destination, input_digest)
         .await?;
     }
+
+    if !append_only_caches.is_empty() {
+       let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
+       let named_cache_symlinks = named_caches
+           .local_paths(&append_only_caches)
+           .collect::<Vec<_>>();
+
+       let destination = match maybe_tempdir {
+         Some(ref dir) => dir.path().to_path_buf(),
+         None => unreachable!(),
+       };
+
+       for named_cache_symlink in named_cache_symlinks {
+         safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+           format!(
+             "Error making {} for local execution: {:?}",
+             named_cache_symlink.src.display(),
+             err
+           )
+         })?;
+
+         let dst = destination.join(&named_cache_symlink.dst);
+         if let Some(dir) = dst.parent() {
+           safe_create_dir_all_ioerror(dir).map_err(|err| {
+             format!(
+               "Error making {} for local execution: {:?}", dir.display(), err
+             )
+           })?;
+         }
+         symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+           format!(
+             "Error linking {} -> {} for local execution: {:?}",
+             named_cache_symlink.src.display(),
+             dst.display(),
+             err
+           )
+         })?;
+       }
+     }
 
     let p = Path::new(&argv[0]);
     let program_name = match maybe_tempdir {
