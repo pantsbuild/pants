@@ -578,7 +578,7 @@ fn interactive_process(
         .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
         .collect::<Result<BTreeMap<_, _>, String>>()?;
       if !append_only_caches.is_empty() && run_in_workspace {
-        return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned().into());
+        return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned());
       }
 
       Ok((argv, run_in_workspace, restartable, input_digest, env, append_only_caches))
