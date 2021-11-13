@@ -5,21 +5,30 @@ from __future__ import annotations
 
 from typing import cast
 
+from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
+from pants.util.docutil import git_url
 
 
-class TwineSubsystem(PythonToolBase):
+class Twine(PythonToolBase):
     options_scope = "twine"
     help = "The utility for publishing Python distributions to PyPi and other Python repositories."
 
     default_version = "twine==3.6.0"
-
     default_main = ConsoleScript("twine")
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.subsystems", "twine_lockfile.txt")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine_lockfile.txt"
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
@@ -82,3 +91,16 @@ class TwineSubsystem(PythonToolBase):
             discovery=cast(bool, self.options.config_discovery),
             check_existence=[".pypirc"],
         )
+
+
+class TwineLockfileSentinel(PythonToolLockfileSentinel):
+    options_scope = Twine.options_scope
+
+
+@rule
+def setup_twine_lockfile(_: TwineLockfileSentinel, twine: Twine) -> PythonLockfileRequest:
+    return PythonLockfileRequest.from_tool(twine)
+
+
+def rules():
+    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, TwineLockfileSentinel))
