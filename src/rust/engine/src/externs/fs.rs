@@ -17,7 +17,7 @@ use store::Snapshot;
 // -----------------------------------------------------------------------------
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PyDigest(pub Digest);
 
 #[pymethods]
@@ -61,6 +61,7 @@ impl PyDigest {
 // -----------------------------------------------------------------------------
 
 #[pyclass]
+#[derive(Debug)]
 pub struct PySnapshot(pub Snapshot);
 
 #[pymethods]
