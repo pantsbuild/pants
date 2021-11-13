@@ -15,15 +15,15 @@ python_tests(
     timeout=180,
 )
 
-python_sources(
+python_source(
     name="native",
-    sources=["native_engine.pyi", "native_engine_pyo3.pyi"],
+    source="native_engine.pyi",
     dependencies=[":native_engine"],
 )
 
 resources(
     name="native_engine",
-    sources=["native_engine.so", "native_engine_pyo3.so", "native_engine.so.metadata"],
+    sources=["native_engine.so" "native_engine.so.metadata"],
 )
 
 resources(name="fs_test_data", sources=["fs_test_data/fs_test.tar", "fs_test_data/tls/rsa/*"])
