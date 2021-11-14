@@ -30,11 +30,11 @@ use petgraph::graph::{DiGraph, Graph};
 use process_execution::RemoteCacheWarningsBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
-  pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, Py, PyModule, PyObject,
+  pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
   PyResult as PyO3Result, Python,
 };
-use pyo3::types::{PyBytes, PyDict, PyList, PyString, PyTuple, PyType};
-use pyo3::{create_exception, IntoPy, PyAny};
+use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
+use pyo3::{create_exception, PyAny};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
@@ -884,25 +884,16 @@ fn session_run_interactive_process(
 }
 
 #[pyfunction]
-fn scheduler_metrics(
-  py: Python,
-  py_scheduler: &PyScheduler,
-  py_session: &PySession,
-) -> PyO3Result<PyObject> {
-  py_scheduler.0.core.executor.enter(|| {
-    let values = py_scheduler
-      .0
-      .metrics(&py_session.0)
-      .into_iter()
-      .map(|(metric, value)| {
-        (
-          externs::store_utf8(py, metric),
-          externs::store_i64(py, value),
-        )
-      })
-      .collect::<Vec<_>>();
-    externs::store_dict(py, values).map(|d| d.consume_into_py_object(py))
-  })
+fn scheduler_metrics<'py>(
+  py: Python<'py>,
+  py_scheduler: &'py PyScheduler,
+  py_session: &'py PySession,
+) -> HashMap<&'py str, i64> {
+  py_scheduler
+    .0
+    .core
+    .executor
+    .enter(|| py.allow_threads(|| py_scheduler.0.metrics(&py_session.0)))
 }
 
 #[pyfunction]
@@ -918,30 +909,32 @@ fn scheduler_shutdown(py: Python, py_scheduler: &PyScheduler, timeout_secs: u64)
 }
 
 #[pyfunction]
-fn scheduler_execute<'py>(
-  py: Python<'py>,
+fn scheduler_execute(
+  py: Python,
   py_scheduler: &PyScheduler,
   py_session: &PySession,
   py_execution_request: &PyExecutionRequest,
-) -> PyO3Result<&'py PyTuple> {
+) -> PyO3Result<Vec<PyResult>> {
   py_scheduler.0.core.executor.enter(|| {
     // TODO: A parent_id should be an explicit argument.
     py_session.0.workunit_store().init_thread_state(None);
 
     let execution_request: &mut ExecutionRequest = &mut py_execution_request.0.borrow_mut();
-    py.allow_threads(|| py_scheduler.0.execute(execution_request, &py_session.0))
-      .map(|root_results| {
-        let py_results = root_results
-          .into_iter()
-          .map(|err| Py::new(py, py_result_from_root(py, err)).unwrap())
-          .collect::<Vec<_>>();
-        PyTuple::new(py, &py_results)
-      })
-      .map_err(|e| match e {
-        ExecutionTermination::KeyboardInterrupt => PyKeyboardInterrupt::new_err(()),
-        ExecutionTermination::PollTimeout => PollTimeout::new_err(()),
-        ExecutionTermination::Fatal(msg) => PyException::new_err(msg),
-      })
+    Ok(
+      py.allow_threads(|| {
+        py_scheduler
+          .0
+          .execute(execution_request, &py_session.0)
+          .map_err(|e| match e {
+            ExecutionTermination::KeyboardInterrupt => PyKeyboardInterrupt::new_err(()),
+            ExecutionTermination::PollTimeout => PollTimeout::new_err(()),
+            ExecutionTermination::Fatal(msg) => PyException::new_err(msg),
+          })
+      })?
+      .into_iter()
+      .map(|root_result| py_result_from_root(py, root_result))
+      .collect(),
+    )
   })
 }
 
@@ -1116,23 +1109,22 @@ fn session_get_observation_histograms<'py>(
   const OBSERVATIONS_VERSION: u64 = 0;
 
   py_scheduler.0.core.executor.enter(|| {
-    let observations = py_session
-      .0
-      .workunit_store()
-      .encode_observations()
-      .map_err(PyException::new_err)?;
+    let observations = py.allow_threads(|| {
+      py_session
+        .0
+        .workunit_store()
+        .encode_observations()
+        .map_err(PyException::new_err)
+    })?;
 
     let encoded_observations = PyDict::new(py);
     for (metric, encoded_histogram) in &observations {
-      encoded_observations.set_item(
-        PyString::new(py, metric.as_str()),
-        PyBytes::new(py, &encoded_histogram[..]),
-      )?;
+      encoded_observations.set_item(metric, PyBytes::new(py, &encoded_histogram[..]))?;
     }
 
     let result = PyDict::new(py);
-    result.set_item(PyString::new(py, "version"), OBSERVATIONS_VERSION)?;
-    result.set_item(PyString::new(py, "histograms"), encoded_observations)?;
+    result.set_item("version", OBSERVATIONS_VERSION)?;
+    result.set_item("histograms", encoded_observations)?;
     Ok(result)
   })
 }
@@ -1313,7 +1305,7 @@ fn capture_snapshots(
   py_scheduler: &PyScheduler,
   py_session: &PySession,
   path_globs_and_root_tuple_wrapper: &PyAny,
-) -> PyO3Result<PyObject> {
+) -> PyO3Result<Vec<externs::fs::PySnapshot>> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
     // TODO: A parent_id should be an explicit argument.
@@ -1339,28 +1331,30 @@ fn capture_snapshots(
       .collect::<Result<Vec<_>, _>>()
       .map_err(PyValueError::new_err)?;
 
-    let snapshot_futures = path_globs_and_roots
-      .into_iter()
-      .map(|(path_globs, root, digest_hint)| async move {
-        let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
-          core.store(),
-          core.executor.clone(),
-          root,
-          path_globs,
-          digest_hint,
-        )
-        .await?;
-        let gil = Python::acquire_gil();
-        nodes::Snapshot::store_snapshot(gil.python(), snapshot)
-      })
-      .collect::<Vec<_>>();
     py.allow_threads(|| {
-      core
-        .executor
-        .block_on(future::try_join_all(snapshot_futures))
+      let snapshot_futures = path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root, digest_hint)| {
+          store::Snapshot::capture_snapshot_from_arbitrary_root(
+            core.store(),
+            core.executor.clone(),
+            root,
+            path_globs,
+            digest_hint,
+          )
+        })
+        .collect::<Vec<_>>();
+
+      Ok(
+        core
+          .executor
+          .block_on(future::try_join_all(snapshot_futures))
+          .map_err(PyException::new_err)?
+          .into_iter()
+          .map(externs::fs::PySnapshot)
+          .collect(),
+      )
     })
-    .map(|values| Python::with_gil(|py| externs::store_tuple(py, values)).into())
-    .map_err(PyException::new_err)
   })
 }
 
@@ -1465,7 +1459,6 @@ fn write_digest(
 
 #[pyfunction]
 fn stdio_initialize(
-  py: Python,
   level: u64,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
@@ -1473,7 +1466,11 @@ fn stdio_initialize(
   literal_filters: Vec<String>,
   regex_filters: Vec<String>,
   log_file_path: PathBuf,
-) -> PyO3Result<&PyTuple> {
+) -> PyO3Result<(
+  externs::stdio::PyStdioRead,
+  externs::stdio::PyStdioWrite,
+  externs::stdio::PyStdioWrite,
+)> {
   let regex_filters = regex_filters
     .iter()
     .map(|re| {
@@ -1499,13 +1496,10 @@ fn stdio_initialize(
   )
   .map_err(|s| PyException::new_err(format!("Could not initialize logging: {}", s)))?;
 
-  Ok(PyTuple::new(
-    py,
-    &[
-      Py::new(py, externs::stdio::PyStdioRead)?.into_py(py),
-      Py::new(py, externs::stdio::PyStdioWrite { is_stdout: true })?.into_py(py),
-      Py::new(py, externs::stdio::PyStdioWrite { is_stdout: false })?.into_py(py),
-    ],
+  Ok((
+    externs::stdio::PyStdioRead,
+    externs::stdio::PyStdioWrite { is_stdout: true },
+    externs::stdio::PyStdioWrite { is_stdout: false },
   ))
 }
 
