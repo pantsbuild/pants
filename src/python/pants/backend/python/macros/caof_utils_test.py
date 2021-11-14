@@ -76,7 +76,7 @@ def test_flatten_overrides_same_key() -> None:
 
 
 def test_flatten_overrides_only_dependencies_field() -> None:
-    with pytest.raises(InvalidFieldException, match="Can only specify the `dependencies` field"):
+    with pytest.raises(InvalidFieldException, match="Can only specify the `dependencies` key"):
         flatten_overrides_to_dependency_field(
             {"d": {"tags": []}}, macro_name="macro", build_file_dir="dir"
         )

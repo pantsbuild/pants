@@ -46,7 +46,7 @@ def flatten_overrides_to_dependency_field(
         for field, value in override_values.items():
             if field != "dependencies":
                 raise InvalidFieldException(
-                    "Can only specify the `dependencies` field (for now) in the `overrides` "
+                    "Can only specify the `dependencies` key (for now) in the `overrides` "
                     f"field of the `{macro_name}` macro in the BUILD file in {build_file_dir} "
                     f"for the key `{key}`, but you specified `{field}`."
                 )
@@ -54,7 +54,7 @@ def flatten_overrides_to_dependency_field(
                 normalized_value = ensure_str_list(value)
             except ValueError:
                 raise InvalidFieldException(
-                    f"The `{field}` field in the `overrides` field of the `{macro_name}` "
+                    f"The `{field}` key in the `overrides` field of the `{macro_name}` "
                     f"macro in the BUILD file in {build_file_dir} must be `list[str]`, "
                     f"but was `{repr(value)}` with type `{type(value).__name__}`."
                 )
