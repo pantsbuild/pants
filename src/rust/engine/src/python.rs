@@ -267,10 +267,8 @@ impl Key {
   }
 }
 
-/// We wrap PyObject (aka Py<PyAny>) in an Arc in order to cheaply clone without needing to
-/// access the GIL. It's already cheap to clone `&PyAny` as it simply increases Python's ref
-/// count, but that type only works when we are holding the GIL. While we could clone the
-/// `PyObject` without the GIL, that would be an expensive deep clone.
+// TODO: simplify to use `PyObject` (aka `Py<PyAny>`) directly. There is no benefit to wrapping
+// this in an `Arc`, given that it's already GIL-independent.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
 
