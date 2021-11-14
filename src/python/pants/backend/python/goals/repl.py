@@ -3,10 +3,14 @@
 import os
 
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    InterpreterConstraintsRequest,
+    RequirementsPexRequest,
+)
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -26,23 +30,18 @@ class PythonRepl(ReplImplementation):
 @rule(level=LogLevel.DEBUG)
 async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
 
-    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex) so
-    # that we can get the interpreter constraints for use in local_dists_request.
-    requirements_pex_request = await Get(
-        PexRequest,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
-            (tgt.address for tgt in repl.targets), internal_only=True
-        ),
+    addresses = tuple(tgt.address for tgt in repl.targets)
+    interpreter_constraints = await Get(
+        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
     )
-    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+    requirements_request = Get(Pex, RequirementsPexRequest(addresses, internal_only=True))
 
     local_dists_request = Get(
         LocalDistsPex,
         LocalDistsPexRequest(
             Addresses(tgt.address for tgt in repl.targets),
             internal_only=True,
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
         ),
     )
 
@@ -83,17 +82,11 @@ class IPythonRepl(ReplImplementation):
 async def create_ipython_repl_request(
     repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
 ) -> ReplRequest:
-    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex) so
-    # that we can get the interpreter constraints for use in ipython_request/local_dists_request.
-    requirements_pex_request = await Get(
-        PexRequest,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
-            (tgt.address for tgt in repl.targets), internal_only=True
-        ),
+    addresses = tuple(tgt.address for tgt in repl.targets)
+    interpreter_constraints = await Get(
+        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
     )
-
-    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+    requirements_request = Get(Pex, RequirementsPexRequest(addresses, internal_only=True))
 
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
@@ -105,7 +98,7 @@ async def create_ipython_repl_request(
             output_filename="ipython.pex",
             main=ipython.main,
             requirements=ipython.pex_requirements(),
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             internal_only=True,
         ),
     )
@@ -119,7 +112,7 @@ async def create_ipython_repl_request(
         LocalDistsPexRequest(
             [tgt.address for tgt in repl.targets],
             internal_only=True,
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             sources=sources,
         ),
     )
@@ -148,7 +141,7 @@ async def create_ipython_repl_request(
         **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
         "PEX_PATH": os.pathsep.join(
             [
-                repl.in_chroot(requirements_pex_request.output_filename),
+                repl.in_chroot(requirements_pex.name),
                 repl.in_chroot(local_dists.pex.name),
             ]
         ),

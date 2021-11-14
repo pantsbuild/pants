@@ -10,10 +10,14 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    InterpreterConstraintsRequest,
+    PexFromTargetsRequest,
+)
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -41,10 +45,13 @@ async def create_pex_binary_run_request(
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
-    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
-    # so that we can get the interpreter constraints for use in local_dists_get.
-    requirements_pex_request = await Get(
-        PexRequest,
+    addresses = [field_set.address]
+    interpreter_constraints = await Get(
+        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
+    )
+
+    pex_get = Get(
+        Pex,
         PexFromTargetsRequest(
             [field_set.address],
             output_filename=f"{field_set.address.target_name}.pex",
@@ -63,7 +70,6 @@ async def create_pex_binary_run_request(
             ),
         ),
     )
-    pex_get = Get(Pex, PexRequest, requirements_pex_request)
     sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
@@ -74,7 +80,7 @@ async def create_pex_binary_run_request(
         LocalDistsPexRequest(
             [field_set.address],
             internal_only=True,
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             sources=sources,
         ),
     )

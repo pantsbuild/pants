@@ -23,7 +23,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -130,8 +130,7 @@ async def mypy_typecheck_partition(
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
     requirements_pex_get = Get(
         Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             (tgt.address for tgt in partition.root_targets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,

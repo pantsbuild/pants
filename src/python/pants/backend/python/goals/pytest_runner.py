@@ -16,7 +16,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -170,8 +170,7 @@ async def setup_pytest_for_target(
 
     requirements_pex_get = Get(
         Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             [request.field_set.address],
             internal_only=True,
             resolve_and_lockfile=request.field_set.resolve.resolve_and_lockfile(python_setup),
