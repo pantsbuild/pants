@@ -186,12 +186,13 @@ impl Function {
   /// The function represented as `path.to.module:lineno:func_name`.
   pub fn full_name(&self) -> String {
     let (module, name, line_no) = Python::with_gil(|py| {
-      let val = self.0.to_value().clone_ref(py).into_ref(py);
-      let module: String = externs::getattr(val, "__module__").unwrap();
-      let name: String = externs::getattr(val, "__name__").unwrap();
+      let val = self.0.to_value();
+      let obj = (*val).as_ref(py);
+      let module: String = externs::getattr(obj, "__module__").unwrap();
+      let name: String = externs::getattr(obj, "__name__").unwrap();
       // NB: this is a custom dunder method that Python code should populate before sending the
       // function (e.g. an `@rule`) through FFI.
-      let line_no: u64 = externs::getattr(val, "__line_number__").unwrap();
+      let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
       (module, name, line_no)
     });
     format!("{}:{}:{}", module, line_no, name)
@@ -288,12 +289,7 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    Python::with_gil(|py| {
-      externs::equals(
-        self.0.clone_ref(py).into_ref(py),
-        other.0.clone_ref(py).into_ref(py),
-      )
-    })
+    Python::with_gil(|py| externs::equals((*self.0).as_ref(py), (*other.0).as_ref(py)))
   }
 }
 
@@ -316,7 +312,7 @@ impl AsRef<PyObject> for Value {
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     let repr = Python::with_gil(|py| {
-      let obj = self.clone_ref(py).into_ref(py);
+      let obj = (*self.0).as_ref(py);
       externs::val_to_str(obj)
     });
     write!(f, "{}", repr)
@@ -422,7 +418,7 @@ impl Failure {
       .extract::<String>()
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(val.clone_ref(py).into_ref(py)))
+      Self::native_traceback(&externs::val_to_str((*val).as_ref(py)))
     };
     Failure::Throw {
       val,
@@ -445,7 +441,7 @@ impl fmt::Display for Failure {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
       Failure::Throw { val, .. } => {
         let repr = Python::with_gil(|py| {
-          let obj = val.clone_ref(py).into_ref(py);
+          let obj = (*val.0).as_ref(py);
           externs::val_to_str(obj)
         });
         write!(f, "{}", repr)

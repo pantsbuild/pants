@@ -53,7 +53,7 @@ impl Interns {
 
   pub fn key_insert(&self, py: Python, v: Value) -> PyResult<Key> {
     let (intern_key, type_id) = {
-      let obj = v.clone_ref(py).into_ref(py);
+      let obj = (*v).as_ref(py);
       (InternKey(obj.hash()?, v.clone()), obj.get_type().into())
     };
 
@@ -99,12 +99,7 @@ impl Eq for InternKey {}
 
 impl PartialEq for InternKey {
   fn eq(&self, other: &InternKey) -> bool {
-    Python::with_gil(|py| {
-      externs::equals(
-        self.1.clone_ref(py).into_ref(py),
-        other.1.clone_ref(py).into_ref(py),
-      )
-    })
+    Python::with_gil(|py| externs::equals((*self.1).as_ref(py), (*other.1).as_ref(py)))
   }
 }
 

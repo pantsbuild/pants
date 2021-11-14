@@ -983,7 +983,8 @@ impl WrappedNode for DownloadedFile {
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
-      let py_download_file = self.0.to_value().clone_ref(py).into_ref(py);
+      let py_download_file_val = self.0.to_value();
+      let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
       let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
       let expected_digest = lift_file_digest(&context.core.types, py_digest).map_err(throw)?;
@@ -1188,7 +1189,8 @@ impl WrappedNode for Task {
     let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
         Python::with_gil(|py| {
-          let func = func.0.to_value().clone_ref(py).into_ref(py);
+          let func_val = func.0.to_value();
+          let func = (*func_val).as_ref(py);
           externs::call_function(func, &deps)
             .map(|res| {
               let type_id = TypeId::new(res.get_type());
@@ -1221,7 +1223,7 @@ impl WrappedNode for Task {
     let engine_aware_return_type = if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result(result_val.clone_ref(py).into_ref(py), &context)
+      EngineAwareReturnType::from_task_result((*result_val).as_ref(py), &context)
     } else {
       EngineAwareReturnType::default()
     };
@@ -1535,8 +1537,8 @@ impl Node for NodeKey {
             let gil = Python::acquire_gil();
             let py = gil.python();
             engine_aware_params
-              .iter()
-              .filter_map(|val| EngineAwareParameter::debug_hint(val.clone_ref(py).into_ref(py)))
+              .into_iter()
+              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
               .collect()
           };
           let failure_name = if displayable_param_names.is_empty() {
