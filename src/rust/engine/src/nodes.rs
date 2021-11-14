@@ -1429,7 +1429,7 @@ impl Node for NodeKey {
       let py = gil.python();
       engine_aware_params
         .iter()
-        .flat_map(|val| EngineAwareParameter::metadata(&context, val.clone_ref(py).into_ref(py)))
+        .flat_map(|val| EngineAwareParameter::metadata(&context, (**val).as_ref(py)))
         .collect()
     };
 
@@ -1598,7 +1598,7 @@ impl Node for NodeKey {
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        EngineAwareReturnType::is_cacheable(v.clone_ref(py).into_ref(py)).unwrap_or(true)
+        EngineAwareReturnType::is_cacheable((**v).as_ref(py)).unwrap_or(true)
       }
       _ => true,
     }
