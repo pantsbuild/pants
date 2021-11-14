@@ -189,13 +189,16 @@ async def find_putative_targets(
                     path=dirname,
                     name="pex_binaries_from_sources",
                     type_alias="pex_binaries_from_sources",
-                    triggering_sources=tuple(
+                    triggering_sources=tuple(),
+                    owned_sources=[],
+                    addressable=False,
+                    kwargs={
+                        "sources": tuple(sorted(
                             os.path.split(module_to_entry_point[entry_point_module])[1]
                             for entry_point_module in
                             unowned_entry_point_modules
-                        ),
-                    owned_sources=[],
-                    addressable=False,
+                        ))
+                    }
                 )
             )
 

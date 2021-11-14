@@ -213,9 +213,12 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     path="src/python/foo",
                     name="pex_binaries_from_sources",
                     type_alias="pex_binaries_from_sources",
-                    triggering_sources=("main3.py", "main4.py"),
+                    triggering_sources=tuple(),
                     owned_sources=[],
                     addressable=False,
+                    kwargs={
+                        "sources": ("main3.py", "main4.py"),
+                    }
                 )
             ]
         )
