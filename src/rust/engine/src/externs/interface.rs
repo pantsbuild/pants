@@ -18,8 +18,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_latch::AsyncLatch;
+use futures::future;
 use futures::future::FutureExt;
-use futures::future::{self, TryFutureExt};
 use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
@@ -1339,7 +1339,6 @@ fn lease_files_in_graph(
 ) -> PyO3Result<()> {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      // NB: See the note on with_scheduler re: allow_threads.
       py.allow_threads(|| {
         let digests = scheduler.all_digests(session);
         scheduler
@@ -1405,12 +1404,11 @@ fn capture_snapshots(
         })
         .collect::<Vec<_>>();
       py.allow_threads(|| {
-        let gil = Python::acquire_gil();
-        core.executor.block_on(
-          future::try_join_all(snapshot_futures)
-            .map_ok(|values| externs::store_tuple(gil.python(), values).into()),
-        )
+        core
+          .executor
+          .block_on(future::try_join_all(snapshot_futures))
       })
+      .map(|values| Python::with_gil(|py| externs::store_tuple(py, values)).into())
       .map_err(PyException::new_err)
     })
   })
@@ -1480,12 +1478,8 @@ fn single_file_digests_to_bytes<'py>(
     });
 
     let bytes_values: Vec<PyObject> = py
-      .allow_threads(|| {
-        core.executor.block_on(
-          future::try_join_all(digest_futures)
-            .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
-        )
-      })
+      .allow_threads(|| core.executor.block_on(future::try_join_all(digest_futures)))
+      .map(|values| values.into_iter().map(|val| val.into()).collect())
       .map_err(PyException::new_err)?;
 
     let output_list = PyList::new(py, &bytes_values);
