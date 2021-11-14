@@ -228,9 +228,6 @@ class PyExecutionRequest:
 class PyExecutionStrategyOptions:
     def __init__(self, **kwargs: Any) -> None: ...
 
-class PyExecutor:
-    def __init__(self, *, core_threads: int, max_threads: int) -> None: ...
-
 class PyGeneratorResponseBreak:
     def __init__(self, val: Any) -> None: ...
 
