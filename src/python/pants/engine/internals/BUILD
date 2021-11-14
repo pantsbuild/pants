@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources(sources=["*.py", "!*_test.py"])
+python_sources(
+    overrides={"native_engine.pyi": {"dependencies": [":native_engine"]}},
+)
 
 python_tests(name="tests", sources=["*_test.py", "!scheduler_integration_test.py"], timeout=90)
 
@@ -13,12 +15,6 @@ python_tests(
         "testprojects/src/python:hello_directory",
     ],
     timeout=180,
-)
-
-python_source(
-    name="native",
-    source="native_engine.pyi",
-    dependencies=[":native_engine"],
 )
 
 resources(
