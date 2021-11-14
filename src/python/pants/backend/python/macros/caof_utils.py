@@ -24,8 +24,7 @@ def flatten_overrides(
             if key in result:
                 raise InvalidFieldException(
                     f"Conflicting overrides in the `overrides` field of the `{macro_name}` macro "
-                    f"in the BUILD file in {build_file_dir} for the key `{key}`. You cannot specify "
-                    "the same field name multiple times for the same key.\n\n"
+                    f"in the BUILD file in {build_file_dir} for the key `{key}`. "
                     f"(One override sets the field to `{repr(result[key])}` "
                     f"but another sets to `{repr(overrides[key_or_keys])}`.)"
                 )
