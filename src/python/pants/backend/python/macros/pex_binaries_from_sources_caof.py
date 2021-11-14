@@ -4,7 +4,7 @@
 import os.path
 from typing import Iterable
 
-from pants.backend.python.macros.caof_utils import OVERRIDES_TYPE
+from pants.backend.python.macros.caof_utils import OVERRIDES_TYPE, flatten_overrides
 from pants.engine.target import InvalidFieldException
 
 
@@ -21,15 +21,19 @@ class PexBinariesFromSourcesCAOF:
         sources: Iterable[str],
         overrides: OVERRIDES_TYPE = None,
     ) -> None:
-        overrides = (overrides or {}).copy()
+        flattened_overrides = flatten_overrides(
+            overrides,
+            macro_name="pex_binaries_from_sources",
+            build_file_dir=self._parse_context.rel_path,
+        )
         for source in sources:
-            values = overrides.pop(source, {})
+            values = flattened_overrides.pop(source, {})
             values.setdefault("name", os.path.splitext(source)[0])
             values.setdefault("entry_point", source)
             self._parse_context.create_object("pex_binary", **values)
 
-        if overrides:
+        if flattened_overrides:
             raise InvalidFieldException(
                 "overrides field contained one or more keys that aren't in `sources`. "
-                f" Invalid keys were: '{', '.join(sorted(overrides.keys()))}'"
+                f" Invalid keys were: '{', '.join(sorted(flattened_overrides.keys()))}'"
             )
