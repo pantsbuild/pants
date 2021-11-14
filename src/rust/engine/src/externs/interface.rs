@@ -8,6 +8,7 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
@@ -268,8 +269,8 @@ impl PyRemotingOptions {
     execution_address: Option<String>,
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
-    root_ca_certs_path: Option<String>,
-    store_headers: Vec<(String, String)>,
+    root_ca_certs_path: Option<PathBuf>,
+    store_headers: BTreeMap<String, String>,
     store_chunk_bytes: usize,
     store_chunk_upload_timeout: u64,
     store_rpc_retries: usize,
@@ -279,7 +280,7 @@ impl PyRemotingOptions {
     cache_eager_fetch: bool,
     cache_rpc_concurrency: usize,
     execution_extra_platform_properties: Vec<(String, String)>,
-    execution_headers: Vec<(String, String)>,
+    execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
   ) -> Self {
@@ -289,8 +290,8 @@ impl PyRemotingOptions {
       execution_address,
       execution_process_cache_namespace,
       instance_name,
-      root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
-      store_headers: store_headers.into_iter().collect(),
+      root_ca_certs_path,
+      store_headers,
       store_chunk_bytes,
       store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
       store_rpc_retries,
@@ -301,7 +302,7 @@ impl PyRemotingOptions {
       cache_eager_fetch,
       cache_rpc_concurrency,
       execution_extra_platform_properties,
-      execution_headers: execution_headers.into_iter().collect(),
+      execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
     })
@@ -315,7 +316,7 @@ struct PyLocalStoreOptions(LocalStoreOptions);
 impl PyLocalStoreOptions {
   #[new]
   fn __new__(
-    store_dir: String,
+    store_dir: PathBuf,
     process_cache_max_size_bytes: usize,
     files_max_size_bytes: usize,
     directories_max_size_bytes: usize,
@@ -329,7 +330,7 @@ impl PyLocalStoreOptions {
       )));
     }
     Ok(Self(LocalStoreOptions {
-      store_dir: PathBuf::from(store_dir),
+      store_dir,
       process_cache_max_size_bytes,
       files_max_size_bytes,
       directories_max_size_bytes,
@@ -582,10 +583,10 @@ fn scheduler_create(
   py_executor: &externs::scheduler::PyExecutor,
   py_tasks: &PyTasks,
   types_ptr: &PyTypes,
-  build_root_buf: String,
-  local_execution_root_dir_buf: String,
-  named_caches_dir_buf: String,
-  ca_certs_path_buf: Option<String>,
+  build_root: PathBuf,
+  local_execution_root_dir: PathBuf,
+  named_caches_dir: PathBuf,
+  ca_certs_path: Option<PathBuf>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   watch_filesystem: bool,
@@ -617,13 +618,13 @@ fn scheduler_create(
         tasks,
         types,
         intrinsics,
-        PathBuf::from(build_root_buf),
+        build_root,
         ignore_patterns,
         use_gitignore,
         watch_filesystem,
-        PathBuf::from(local_execution_root_dir_buf),
-        PathBuf::from(named_caches_dir_buf),
-        ca_certs_path_buf.map(PathBuf::from),
+        local_execution_root_dir,
+        named_caches_dir,
+        ca_certs_path,
         local_store_options.0.clone(),
         remoting_options.0.clone(),
         exec_strategy_opts.0.clone(),
@@ -1037,11 +1038,12 @@ fn tasks_add_query(py_tasks: &PyTasks, output_type: &PyType, input_types: Vec<&P
 }
 
 #[pyfunction]
-fn graph_invalidate_paths(py: Python, py_scheduler: &PyScheduler, paths: Vec<String>) -> u64 {
-  py_scheduler.0.core.executor.enter(|| {
-    let paths = paths.into_iter().map(PathBuf::from).collect();
-    py.allow_threads(|| py_scheduler.0.invalidate_paths(&paths) as u64)
-  })
+fn graph_invalidate_paths(py: Python, py_scheduler: &PyScheduler, paths: HashSet<PathBuf>) -> u64 {
+  py_scheduler
+    .0
+    .core
+    .executor
+    .enter(|| py.allow_threads(|| py_scheduler.0.invalidate_paths(&paths) as u64))
 }
 
 #[pyfunction]
@@ -1084,10 +1086,9 @@ fn graph_visualize(
   py: Python,
   py_scheduler: &PyScheduler,
   py_session: &PySession,
-  path: String,
+  path: PathBuf,
 ) -> PyO3Result<()> {
   py_scheduler.0.core.executor.enter(|| {
-    let path = PathBuf::from(path);
     py.allow_threads(|| py_scheduler.0.visualize(&py_session.0, path.as_path()))
       .map_err(|e| {
         PyException::new_err(format!(
@@ -1195,11 +1196,9 @@ fn rule_graph_consumed_types<'py>(
 }
 
 #[pyfunction]
-fn rule_graph_visualize(py_scheduler: &PyScheduler, path: String) -> PyO3Result<()> {
+fn rule_graph_visualize(py_scheduler: &PyScheduler, path: PathBuf) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
-    let path = PathBuf::from(path);
-
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     write_to_file(path.as_path(), &core.rule_graph).map_err(|e| {
       PyIOError::new_err(format!(
@@ -1216,12 +1215,11 @@ fn rule_subgraph_visualize(
   py_scheduler: &PyScheduler,
   param_types: Vec<&PyType>,
   product_type: &PyType,
-  path: String,
+  path: PathBuf,
 ) -> PyO3Result<()> {
   py_scheduler.0.core.executor.enter(|| {
     let param_types = param_types.into_iter().map(TypeId::new).collect::<Vec<_>>();
     let product_type = TypeId::new(product_type);
-    let path = PathBuf::from(path);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     let subgraph = py_scheduler
@@ -1325,7 +1323,7 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root = PathBuf::from(externs::getattr::<String>(value, "root").unwrap());
+        let root: PathBuf = externs::getattr(value, "root").unwrap();
         let path_globs =
           nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
         let digest_hint = {
@@ -1474,7 +1472,7 @@ fn stdio_initialize(
   log_levels_by_target: HashMap<String, u64>,
   literal_filters: Vec<String>,
   regex_filters: Vec<String>,
-  log_file: String,
+  log_file_path: PathBuf,
 ) -> PyO3Result<&PyTuple> {
   let regex_filters = regex_filters
     .iter()
@@ -1497,7 +1495,7 @@ fn stdio_initialize(
     log_levels_by_target,
     literal_filters,
     regex_filters,
-    PathBuf::from(log_file),
+    log_file_path,
   )
   .map_err(|s| PyException::new_err(format!("Could not initialize logging: {}", s)))?;
 
@@ -1540,9 +1538,9 @@ fn stdio_thread_set_destination(stdio_destination: &PyStdioDestination) {
 
 // TODO: Needs to be thread-local / associated with the Console.
 #[pyfunction]
-fn set_per_run_log_path(py: Python, log_path: Option<String>) {
+fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
   py.allow_threads(|| {
-    PANTS_LOGGER.set_per_run_logs(log_path.map(PathBuf::from));
+    PANTS_LOGGER.set_per_run_logs(log_path);
   })
 }
 
