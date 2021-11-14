@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipIsortField(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipIsortField),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipIsortField),
-        PythonTestTarget.register_plugin_field(SkipIsortField),
+        PythonSourceTarget.register_plugin_field(SkipIsortField),
         PythonTestsGeneratorTarget.register_plugin_field(SkipIsortField),
+        PythonTestTarget.register_plugin_field(SkipIsortField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipIsortField),
     ]

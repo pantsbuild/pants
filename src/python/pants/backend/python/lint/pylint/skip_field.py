@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipPylintField(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipPylintField),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipPylintField),
-        PythonTestTarget.register_plugin_field(SkipPylintField),
+        PythonSourceTarget.register_plugin_field(SkipPylintField),
         PythonTestsGeneratorTarget.register_plugin_field(SkipPylintField),
+        PythonTestTarget.register_plugin_field(SkipPylintField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipPylintField),
     ]
