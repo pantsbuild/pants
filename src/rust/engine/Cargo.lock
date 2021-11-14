@@ -684,20 +684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "engine_pyo3"
-version = "0.0.1"
-dependencies = [
- "fs",
- "mock",
- "nailgun",
- "parking_lot",
- "pyo3",
- "pyo3-build-config 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "task_executor",
- "workunit_store",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"

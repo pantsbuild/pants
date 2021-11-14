@@ -4,14 +4,14 @@
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyExecutor>()?;
   Ok(())
 }
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub(crate) struct PyExecutor(pub task_executor::Executor);
+pub struct PyExecutor(pub task_executor::Executor);
 
 #[pymethods]
 impl PyExecutor {

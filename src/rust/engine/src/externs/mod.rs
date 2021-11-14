@@ -4,19 +4,9 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
-pub mod engine_aware;
-pub mod fs;
-mod interface;
-#[cfg(test)]
-mod interface_tests;
-mod stdio;
-
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
-
-use crate::interning::Interns;
-use crate::python::{Failure, Key, TypeId, Value};
 
 use lazy_static::lazy_static;
 use pyo3::basic::CompareOp;
@@ -26,6 +16,20 @@ use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{FromPyObject, ToPyObject};
 
 use logging::PythonLogLevel;
+
+use crate::interning::Interns;
+use crate::python::{Failure, Key, TypeId, Value};
+
+pub mod engine_aware;
+pub mod fs;
+mod interface;
+#[cfg(test)]
+mod interface_tests;
+pub mod nailgun;
+pub mod scheduler;
+mod stdio;
+pub mod testutil;
+pub mod workunits;
 
 pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   // NB: Although it does not precisely align with Python's definition of equality, we ban matches
