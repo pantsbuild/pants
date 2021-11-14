@@ -12,15 +12,20 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.util.docutil import git_url
+
+_DEFAULT_PACKAGE_MAPPING_URL = git_url(
+    "src/python/pants/jvm/dependency_inference/jvm_artifact_mappings.py"
+)
 
 
 class JvmArtifactGroupField(StringField):
     alias = "group"
+    required = True
     help = (
         "The 'group' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
         "com.google.guava:guava:30.1.1-jre, the group is 'com.google.guava'."
     )
-    required = True
 
 
 class JvmArtifactArtifactField(StringField):
@@ -41,16 +46,36 @@ class JvmArtifactVersionField(StringField):
     )
 
 
+class JvmArtifactPackagesField(StringSequenceField):
+    alias = "packages"
+    help = (
+        "The JVM packages this artifact provides for the purposes of dependency inference.\n\n"
+        'For example, the JVM artifact `junit:junit` might provide `["org.junit.**"]`.\n\n'
+        "Usually you can leave this field off. If unspecified, Pants will fall back to the "
+        "`[java-infer].third_party_import_mapping`, then to a built in mapping "
+        f"({_DEFAULT_PACKAGE_MAPPING_URL}), and then finally it will default to "
+        "the normalized `group` of the artifact. For example, in the absence of any other mapping "
+        "the artifact `io.confluent:common-config` would default to providing "
+        '`["io.confluent.**"]`.\n\n'
+        "The package path may be made recursive to match symbols in subpackages "
+        'by adding `.**` to the end of the package path. For example, specify `["org.junit.**"]` '
+        "to infer a dependency on the artifact for any file importing a symbol from `org.junit` or "
+        "its subpackages."
+    )
+
+
 class JvmArtifactFieldSet(FieldSet):
 
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
+    packages: JvmArtifactPackagesField
 
     required_fields = (
         JvmArtifactGroupField,
         JvmArtifactArtifactField,
         JvmArtifactVersionField,
+        JvmArtifactPackagesField,
     )
 
 
