@@ -142,7 +142,6 @@ class DaemonPantsRunner:
         command: str,
         args: Tuple[str, ...],
         env: Dict[str, str],
-        working_directory: bytes,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,
