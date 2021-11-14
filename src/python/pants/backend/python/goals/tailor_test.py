@@ -182,7 +182,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
 
 
 def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None:
-    mains = ("main1.py", "main2.py", "main3.py")
+    mains = ("main1.py", "main2.py", "main3.py",  "main4.py")
     rule_runner.write_files(
         {
             f"src/python/foo/{name}": textwrap.dedent(
@@ -209,13 +209,14 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
     assert (
         PutativeTargets(
             [
-                PutativeTarget.for_target_type(
-                    PexBinary,
-                    "src/python/foo",
-                    "main3",
-                    [],
-                    kwargs={"name": "main3", "entry_point": "main3.py"},
-                ),
+                PutativeTarget(
+                    path="src/python/foo",
+                    name="pex_binaries_from_sources",
+                    type_alias="pex_binaries_from_sources",
+                    triggering_sources=("main3.py", "main4.py"),
+                    owned_sources=[],
+                    addressable=False,
+                )
             ]
         )
         == pts

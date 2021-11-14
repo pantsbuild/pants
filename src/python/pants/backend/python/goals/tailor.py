@@ -12,7 +12,6 @@ from typing import Iterable
 from pants.backend.python.dependency_inference.module_mapper import PythonModule
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PexBinary,
     PexEntryPointField,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratingSourcesField,
@@ -180,19 +179,23 @@ async def find_putative_targets(
         unowned_entry_point_modules = (
             module_to_entry_point.keys() - possible_existing_entry_point_modules
         )
+        unowned_entry_point_module_paths = (
+            module_to_entry_point[mod] for mod in unowned_entry_point_modules
+        )
 
-        # Generate new targets for entry points that don't already have one.
-        for entry_point_module in unowned_entry_point_modules:
-            entry_point = module_to_entry_point[entry_point_module]
-            path, fname = os.path.split(entry_point)
-            name = os.path.splitext(fname)[0]
+        for dirname, filenames in group_by_dir(unowned_entry_point_module_paths).items():
             pts.append(
-                PutativeTarget.for_target_type(
-                    target_type=PexBinary,
-                    path=path,
-                    name=name,
-                    triggering_sources=tuple(),
-                    kwargs={"name": name, "entry_point": fname},
+                PutativeTarget(
+                    path=dirname,
+                    name="pex_binaries_from_sources",
+                    type_alias="pex_binaries_from_sources",
+                    triggering_sources=tuple(
+                            os.path.split(module_to_entry_point[entry_point_module])[1]
+                            for entry_point_module in
+                            unowned_entry_point_modules
+                        ),
+                    owned_sources=[],
+                    addressable=False,
                 )
             )
 
