@@ -1760,13 +1760,12 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let got_workunit_items: HashSet<String> =
-    workunit_store.with_latest_workunits(log::Level::Trace, |_, completed| {
-      completed
-        .iter()
-        .map(|workunit| workunit.name.clone())
-        .collect()
-    });
+  let got_workunit_items: HashSet<String> = workunit_store
+    .latest_workunits(log::Level::Trace)
+    .1
+    .into_iter()
+    .map(|workunit| workunit.name)
+    .collect();
 
   let wanted_workunit_items = hashset! {
     String::from("remote execution action scheduling"),
