@@ -1117,19 +1117,19 @@ async fn workunit_to_py_value(
   externs::store_dict(py, dict_entries)
 }
 
-async fn workunits_to_py_tuple_value<'a>(
-  workunits: impl Iterator<Item = &'a Workunit>,
+async fn workunits_to_py_tuple_value(
+  py: Python<'_>,
+  workunits: Vec<Workunit>,
   core: &Arc<Core>,
   session: &Session,
 ) -> CPyResult<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit, core, session).await?;
+    let py_value = workunit_to_py_value(&workunit, core, session).await?;
     workunit_values.push(py_value);
   }
 
-  let gil = Python::acquire_gil();
-  Ok(externs::store_tuple(gil.python(), workunit_values))
+  Ok(externs::store_tuple(py, workunit_values))
 }
 
 fn session_poll_workunits(
@@ -1144,28 +1144,22 @@ fn session_poll_workunits(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       let core = scheduler.core.clone();
-      py.allow_threads(|| {
-        session
-          .workunit_store()
-          .with_latest_workunits(py_level.into(), |started, completed| {
-            let mut started_iter = started.iter();
-            let started = core.executor.block_on(workunits_to_py_tuple_value(
-              &mut started_iter,
-              &scheduler.core,
-              session,
-            ))?;
+      let (started, completed) =
+        py.allow_threads(|| session.workunit_store().latest_workunits(py_level.into()));
 
-            let mut completed_iter = completed.iter();
-            let completed = core.executor.block_on(workunits_to_py_tuple_value(
-              &mut completed_iter,
-              &scheduler.core,
-              session,
-            ))?;
-
-            let gil = Python::acquire_gil();
-            Ok(externs::store_tuple(gil.python(), vec![started, completed]).into())
-          })
-      })
+      let started_val = core.executor.block_on(workunits_to_py_tuple_value(
+        py,
+        started,
+        &scheduler.core,
+        session,
+      ))?;
+      let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
+        py,
+        completed,
+        &scheduler.core,
+        session,
+      ))?;
+      Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
     })
   })
 }
