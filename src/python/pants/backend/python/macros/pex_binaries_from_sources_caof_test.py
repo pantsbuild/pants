@@ -6,11 +6,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.macros.pex_binaries_from_sources_caof import PexBinariesFromSourcesCAOF
-from pants.backend.python.target_types import PexBinary, PythonRequirementsFile, PythonRequirementTarget
+from pants.backend.python.target_types import PexBinary
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import AllTargets, InvalidFieldException
+from pants.engine.target import AllTargets
 from pants.testutil.rule_runner import RuleRunner
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -18,6 +19,7 @@ def rule_runner() -> RuleRunner:
         target_types=[PexBinary],
         context_aware_object_factories={"pex_binaries_from_sources": PexBinariesFromSourcesCAOF},
     )
+
 
 def test_pex_binaries_from_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -51,10 +53,11 @@ def test_pex_binaries_from_sources(rule_runner: RuleRunner) -> None:
                 "entry_point": "_main2.py",
                 "tags": ["overridden"],
             },
-            Address("", target_name="ThePexBinaryFormerlyKnownAsMain2")
+            Address("", target_name="ThePexBinaryFormerlyKnownAsMain2"),
         ),
         PexBinary({"entry_point": "main3.py"}, Address("", target_name="main3")),
     }
+
 
 def test_invalid_overrides(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(

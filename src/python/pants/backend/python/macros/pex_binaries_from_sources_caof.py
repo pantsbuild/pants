@@ -2,16 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-
 from typing import Iterable
 
+from pants.backend.python.macros.caof_utils import OVERRIDES_TYPE
 from pants.engine.target import InvalidFieldException
-from pants.backend.python.macros.caof_utils import (
-    OVERRIDES_TYPE,
-)
+
 
 class PexBinariesFromSourcesCAOF:
-    """Translates N sources to equivalent `pex_binary` targets with entry_point set to the source."""
+    """Translates N sources to equivalent `pex_binary` targets with entry_point set to the
+    source."""
 
     def __init__(self, parse_context):
         self._parse_context = parse_context
@@ -19,10 +18,10 @@ class PexBinariesFromSourcesCAOF:
     def __call__(
         self,
         *,
-        sources: str = Iterable[str],
+        sources: Iterable[str],
         overrides: OVERRIDES_TYPE = None,
     ) -> None:
-        overrides = overrides.copy() or {}
+        overrides = (overrides or {}).copy()
         for source in sources:
             values = overrides.pop(source, {})
             values.setdefault("name", os.path.splitext(source)[0])
@@ -32,5 +31,5 @@ class PexBinariesFromSourcesCAOF:
         if overrides:
             raise InvalidFieldException(
                 "overrides field contained one or more keys that aren't in `sources`. "
-                f" Invalid keys were: '{', '.join(sorted(overrides))}'"
+                f" Invalid keys were: '{', '.join(sorted(overrides.keys()))}'"
             )
