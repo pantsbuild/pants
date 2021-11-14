@@ -60,13 +60,11 @@ def default_cache_path() -> str: ...
 #  cast to `tuple()` when not necessary.
 def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
 
-
 # ------------------------------------------------------------------------------
 # Workunits
 # ------------------------------------------------------------------------------
 
 def all_counter_names() -> list[str]: ...
-
 
 # ------------------------------------------------------------------------------
 # Nailgun
@@ -95,7 +93,6 @@ class PyStubCAS:
     def builder(cls) -> PyStubCASBuilder: ...
     @property
     def address(self) -> str: ...
-
 
 class RawFdRunner(Protocol):
     def __call__(

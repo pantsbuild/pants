@@ -23,7 +23,7 @@ python_source(
 
 resources(
     name="native_engine",
-    sources=["native_engine.so" "native_engine.so.metadata"],
+    sources=["native_engine.so", "native_engine.so.metadata"],
 )
 
 resources(name="fs_test_data", sources=["fs_test_data/fs_test.tar", "fs_test_data/tls/rsa/*"])
