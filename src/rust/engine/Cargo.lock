@@ -661,7 +661,7 @@ dependencies = [
  "process_execution",
  "protos",
  "pyo3",
- "pyo3-build-config",
+ "pyo3-build-config 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.8.2",
  "regex",
  "reqwest",
@@ -692,7 +692,7 @@ dependencies = [
  "nailgun",
  "parking_lot",
  "pyo3",
- "pyo3-build-config",
+ "pyo3-build-config 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "task_executor",
  "workunit_store",
 ]
@@ -2345,15 +2345,14 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64664505ce285a59b8b7e940fbe54ad65b1758a0810eddc5bc26df6f6ec8c557"
+source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
 dependencies = [
  "cfg-if 1.0.0",
  "indoc",
  "libc",
  "parking_lot",
  "paste",
- "pyo3-build-config",
+ "pyo3-build-config 0.15.0 (git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5)",
  "pyo3-macros",
  "unindent",
 ]
@@ -2368,10 +2367,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyo3-build-config"
+version = "0.15.0"
+source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
+dependencies = [
+ "once_cell",
+]
+
+[[package]]
 name = "pyo3-macros"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "244f21d0a3887a9c02018b94e3b78d693dc7eca5c56839b7796a499cc364deb4"
+source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
 dependencies = [
  "pyo3-macros-backend",
  "quote 1.0.10",
@@ -2381,11 +2387,10 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3d3d18ac41d05199bb82645d56e39f8c8b4909a0137c6f2640f03685b29f672"
+source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
 dependencies = [
  "proc-macro2 1.0.32",
- "pyo3-build-config",
+ "pyo3-build-config 0.15.0 (git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5)",
  "quote 1.0.10",
  "syn 1.0.81",
 ]

@@ -136,7 +136,8 @@ num_enum = "0.4"
 parking_lot = "0.11"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
-pyo3 = "0.15"
+# TODO: Switch back to official PyO3 once https://github.com/PyO3/pyo3/pull/1990 is released.
+pyo3 = { git = "https://github.com/davidhewitt/pyo3.git", rev = "51b6b947b82e61adad61524f9c58e3b1c89247a5" }
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
