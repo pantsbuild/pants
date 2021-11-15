@@ -1386,8 +1386,6 @@ fn ensure_remote_has_recursive(
   })
 }
 
-/// This functions assumes that the Digest in question represents the contents of a single File rather than a Directory,
-/// and will fail on Digests representing a Directory.
 #[pyfunction]
 fn single_file_digests_to_bytes<'py>(
   py: Python<'py>,
