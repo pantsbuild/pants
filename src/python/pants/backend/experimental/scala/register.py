@@ -11,7 +11,12 @@ from pants.backend.java.test import junit  # TODO: Should move to the JVM packag
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, tailor
-from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
+from pants.backend.scala.target_types import (
+    ScalaJunitTestsGeneratorTarget,
+    ScalaJunitTestTarget,
+    ScalaSourcesGeneratorTarget,
+    ScalaSourceTarget,
+)
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.jvm import classpath, jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
@@ -23,12 +28,14 @@ from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
 def target_types():
     return [
         DeployJar,
-        ScalaSourceTarget,
-        ScalaSourcesGeneratorTarget,
         JunitTestTarget,
         JunitTestsGeneratorTarget,
         JvmArtifact,
         JvmDependencyLockfile,
+        ScalaJunitTestTarget,
+        ScalaJunitTestsGeneratorTarget,
+        ScalaSourceTarget,
+        ScalaSourcesGeneratorTarget,
     ]
 
 
