@@ -133,6 +133,16 @@ class FirstPartyPythonModuleMapping:
         ambiguous = self.ambiguous_modules.get(parent_module, ())
         return unambiguous, ambiguous
 
+    def has_type_stub(self, module: str) -> bool:
+        if module in self.modules_with_type_stub:
+            return True
+
+        # Also check for the parent module if relevant. See self.addresses_for_module.
+        if "." not in module:
+            return False
+        parent_module = module.rsplit(".", maxsplit=1)[0]
+        return parent_module in self.modules_with_type_stub
+
 
 @rule(level=LogLevel.DEBUG)
 async def merge_first_party_module_mappings(
@@ -414,11 +424,11 @@ async def map_module_to_address(
     # otherwise, we have ambiguous implementations.
     if third_party_addresses and not first_party_addresses:
         return PythonModuleOwners(third_party_addresses)
-    first_party_is_type_stub = (
-        len(first_party_addresses) == 1
-        and module.module in first_party_mapping.modules_with_type_stub
-    )
-    if first_party_is_type_stub and len(third_party_addresses) == 1:
+    if (
+        len(third_party_addresses) == 1
+        and len(first_party_addresses) == 1
+        and first_party_mapping.has_type_stub(module.module)
+    ):
         return PythonModuleOwners((*third_party_addresses, *first_party_addresses))
     # Else, we have ambiguity between the third-party and first-party addresses.
     if third_party_addresses and first_party_addresses:

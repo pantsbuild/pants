@@ -401,6 +401,12 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
+        from_import_owners = rule_runner.request(
+            PythonModuleOwners, [PythonModule(f"{module}.Class")]
+        )
+        assert list(from_import_owners.unambiguous) == expected
+        assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])
+
     rule_runner.set_options(["--source-root-patterns=['root', '/']"])
     rule_runner.write_files(
         {
@@ -491,7 +497,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         "dep_w_stub",
         [Address("", target_name="dep_w_stub"), Address("", target_name="dep_w_stub-types")],
     )
-    assert_owners("script.Demo", [Address("", target_name="script")])
+    assert_owners("script", [Address("", target_name="script")])
     assert_owners("no_stub.app", expected=[Address("root/no_stub", relative_file_path="app.py")])
     assert_owners(
         "stub.app",
