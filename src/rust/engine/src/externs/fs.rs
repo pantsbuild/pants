@@ -16,9 +16,11 @@ use store::Snapshot;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
+  m.add_class::<PyFileDigest>()?;
   m.add_class::<PySnapshot>()?;
 
   m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIGEST))?;
+  m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
   m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
@@ -27,7 +29,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 }
 
 // -----------------------------------------------------------------------------
-// Digest
+// PyDigest & PyFileDigest
 // -----------------------------------------------------------------------------
 
 #[pyclass]
@@ -70,8 +72,52 @@ impl PyDigest {
   }
 }
 
+#[pyclass]
+#[derive(Clone)]
+pub struct PyFileDigest(pub Digest);
+
+#[pymethods]
+impl PyFileDigest {
+  #[new]
+  fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
+    let fingerprint = Fingerprint::from_hex_string(fingerprint)
+      .map_err(|e| PyValueError::new_err(format!("Invalid file digest hex: {}", e)))?;
+    Ok(Self(Digest::new(fingerprint, serialized_bytes_length)))
+  }
+
+  fn __hash__(&self) -> u64 {
+    self.0.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> String {
+    format!(
+      "FileDigest('{}', {})",
+      self.0.hash.to_hex(),
+      self.0.size_bytes
+    )
+  }
+
+  fn __richcmp__(&self, other: &PyFileDigest, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0 == other.0).into_py(py),
+      CompareOp::Ne => (self.0 != other.0).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  #[getter]
+  fn fingerprint(&self) -> String {
+    self.0.hash.to_hex()
+  }
+
+  #[getter]
+  fn serialized_bytes_length(&self) -> usize {
+    self.0.size_bytes
+  }
+}
+
 // -----------------------------------------------------------------------------
-// Snapshot
+// PySnapshot
 // -----------------------------------------------------------------------------
 
 #[pyclass]

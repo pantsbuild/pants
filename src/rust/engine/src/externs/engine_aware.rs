@@ -4,9 +4,9 @@
 use crate::context::Context;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
-use crate::python::{TypeId, Value};
-use crate::Types;
+use crate::python::Value;
 
+use crate::externs::fs::PyFileDigest;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use workunit_store::{
@@ -30,7 +30,7 @@ impl EngineAwareReturnType {
     Self {
       level: Self::level(task_result),
       message: Self::message(task_result),
-      artifacts: Self::artifacts(&context.core.types, task_result).unwrap_or_else(Vec::new),
+      artifacts: Self::artifacts(task_result).unwrap_or_else(Vec::new),
       metadata: metadata(context, task_result).unwrap_or_else(Vec::new),
     }
   }
@@ -63,7 +63,7 @@ impl EngineAwareReturnType {
     msg_val.extract().ok()
   }
 
-  fn artifacts(types: &Types, obj: &PyAny) -> Option<Vec<(String, ArtifactOutput)>> {
+  fn artifacts(obj: &PyAny) -> Option<Vec<(String, ArtifactOutput)>> {
     let artifacts_val = obj.call_method0("artifacts").ok()?;
     if artifacts_val.is_none() {
       return None;
@@ -74,8 +74,8 @@ impl EngineAwareReturnType {
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if TypeId::new(value.get_type()) == types.file_digest {
-        lift_file_digest(types, value).map(ArtifactOutput::FileDigest)
+      let artifact_output = if value.is_instance::<PyFileDigest>().unwrap_or(false) {
+        lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
         lift_directory_digest(digest_value).map(ArtifactOutput::Snapshot)

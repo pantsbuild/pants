@@ -25,7 +25,6 @@ use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::selectors;
 use crate::tasks::{self, Rule};
-use crate::Types;
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -37,8 +36,9 @@ use process_execution::{
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
+use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
-use hashing::{Digest, Fingerprint};
+use hashing::Digest;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -270,16 +270,9 @@ pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> 
   Ok(py_digest.0)
 }
 
-pub fn lift_file_digest(types: &Types, digest: &PyAny) -> Result<hashing::Digest, String> {
-  if TypeId::new(digest.get_type()) != types.file_digest {
-    return Err(format!("{} is not of type {}.", digest, types.file_digest));
-  }
-  let fingerprint: String = externs::getattr(digest, "fingerprint").unwrap();
-  let digest_length: usize = externs::getattr(digest, "serialized_bytes_length").unwrap();
-  Ok(hashing::Digest::new(
-    hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length,
-  ))
+pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+  let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  Ok(py_file_digest.0)
 }
 
 /// A Node that represents a set of processes to execute on specific platforms.
@@ -773,28 +766,10 @@ impl Snapshot {
     Ok(Value::new(py_digest.into_py(py)))
   }
 
-  pub fn lift_file_digest(item: &PyAny) -> Result<hashing::Digest, String> {
-    let fingerprint: String = externs::getattr(item, "fingerprint").unwrap();
-    let serialized_bytes_length: usize = externs::getattr(item, "serialized_bytes_length")?;
-    Ok(hashing::Digest::new(
-      Fingerprint::from_hex_string(&fingerprint)?,
-      serialized_bytes_length,
-    ))
-  }
-
-  pub fn store_file_digest(
-    py: Python,
-    types: &crate::types::Types,
-    item: &hashing::Digest,
-  ) -> Value {
-    externs::unsafe_call(
-      py,
-      types.file_digest,
-      &[
-        externs::store_utf8(py, &item.hash.to_hex()),
-        externs::store_i64(py, item.size_bytes as i64),
-      ],
-    )
+  pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+    let py_file_digest =
+      Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_file_digest.into_py(py)))
   }
 
   pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
@@ -836,7 +811,7 @@ impl Snapshot {
       types.file_entry,
       &[
         Self::store_path(py, &item.path)?,
-        Self::store_file_digest(py, types, &item.digest),
+        Self::store_file_digest(py, item.digest)?,
         externs::store_bool(py, item.is_executable),
       ],
     ))
@@ -986,9 +961,9 @@ impl WrappedNode for DownloadedFile {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
-      let py_digest = externs::getattr(py_download_file, "expected_digest").unwrap();
-      let expected_digest = lift_file_digest(&context.core.types, py_digest).map_err(throw)?;
-      let res: NodeResult<(String, Digest)> = Ok((url_str, expected_digest));
+      let py_file_digest: PyFileDigest =
+        externs::getattr(py_download_file, "expected_digest").unwrap();
+      let res: NodeResult<(String, Digest)> = Ok((url_str, py_file_digest.0));
       res
     })?;
     let url = Url::parse(&url_str)

@@ -12,8 +12,12 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobM
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
+from pants.engine.internals.native_engine import (  # noqa: F401
+    EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
+)
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
 from pants.engine.internals.native_engine import PyDigest as Digest
+from pants.engine.internals.native_engine import PyFileDigest as FileDigest
 from pants.engine.internals.native_engine import PySnapshot as Snapshot
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
@@ -32,14 +36,6 @@ class Paths:
 
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class FileDigest:
-    """A FileDigest is a digest that refers to a file's content, without its name."""
-
-    fingerprint: str
-    serialized_bytes_length: int
 
 
 @dataclass(frozen=True)
@@ -287,10 +283,6 @@ class Workspace(SideEffecting):
         if side_effecting:
             self.side_effected()
         self._scheduler.write_digest(digest, path_prefix=path_prefix)
-
-
-_EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 
 
 @dataclass(frozen=True)
