@@ -601,7 +601,7 @@ class SchedulerSession:
             self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
         )
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:

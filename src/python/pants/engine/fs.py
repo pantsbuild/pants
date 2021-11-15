@@ -16,14 +16,19 @@ from pants.engine.internals.native_engine import (  # noqa: F401
     EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
 )
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
-from pants.engine.internals.native_engine import PyDigest as Digest
-from pants.engine.internals.native_engine import PyFileDigest as FileDigest
-from pants.engine.internals.native_engine import PySnapshot as Snapshot
+from pants.engine.internals.native_engine import PyDigest, PyFileDigest, PySnapshot
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
+
+
+# Re-export. Note that because we rename the symbol, MyPy requires defining an alias like this,
+# rather than simply using `from mod import Bar as Baz`.
+Digest = PyDigest
+FileDigest = PyFileDigest
+Snapshot = PySnapshot
 
 
 @dataclass(frozen=True)
