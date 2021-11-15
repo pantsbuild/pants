@@ -1,9 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources(
-    overrides={"native_engine.pyi": {"dependencies": [":native_engine"]}},
-)
+python_sources(sources=["*.py", "!*_test.py"])
 
 python_tests(name="tests", sources=["*_test.py", "!scheduler_integration_test.py"], timeout=90)
 
@@ -17,9 +15,15 @@ python_tests(
     timeout=180,
 )
 
+python_sources(
+    name="native",
+    sources=["native_engine.pyi", "native_engine_pyo3.pyi"],
+    dependencies=[":native_engine"],
+)
+
 resources(
     name="native_engine",
-    sources=["native_engine.so", "native_engine.so.metadata"],
+    sources=["native_engine.so", "native_engine_pyo3.so", "native_engine.so.metadata"],
 )
 
 resources(name="fs_test_data", sources=["fs_test_data/fs_test.tar", "fs_test_data/tls/rsa/*"])

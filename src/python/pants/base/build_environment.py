@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
-from pants.engine.internals import native_engine
+from pants.engine.internals import native_engine_pyo3
 from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
@@ -29,7 +29,7 @@ def get_buildroot() -> str:
 
 def get_pants_cachedir() -> str:
     """Return the Pants global cache directory."""
-    return native_engine.default_cache_path()
+    return native_engine_pyo3.default_cache_path()
 
 
 def get_default_pants_config_file() -> str:

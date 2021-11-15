@@ -100,6 +100,8 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so
 
+          src/python/pants/engine/internals/native_engine_pyo3.so
+
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
@@ -139,6 +141,8 @@ jobs:
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: '!contains(env.COMMIT_MESSAGE, ''[ci skip-rust]'')'
@@ -250,6 +254,8 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so
 
+          src/python/pants/engine/internals/native_engine_pyo3.so
+
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
@@ -267,6 +273,8 @@ jobs:
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine_pyo3.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - env:

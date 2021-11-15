@@ -49,16 +49,11 @@ use crate::{
 
 #[pymodule]
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
-  externs::fs::register(m)?;
-  externs::nailgun::register(py, m)?;
-  externs::scheduler::register(m)?;
-  externs::testutil::register(m)?;
-  externs::workunits::register(m)?;
-
   m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
   m.add_class::<PyExecutionRequest>()?;
   m.add_class::<PyExecutionStrategyOptions>()?;
+  m.add_class::<PyExecutor>()?;
   m.add_class::<PyNailgunServer>()?;
   m.add_class::<PyRemotingOptions>()?;
   m.add_class::<PyLocalStoreOptions>()?;
@@ -73,6 +68,9 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
   m.add_class::<externs::PyGeneratorResponseGet>()?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
+
+  m.add_class::<externs::fs::PyDigest>()?;
+  m.add_class::<externs::fs::PySnapshot>()?;
 
   m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;
@@ -214,6 +212,18 @@ impl PyTypes {
       interactive_process_result: TypeId::new(interactive_process_result),
       engine_aware_parameter: TypeId::new(engine_aware_parameter),
     })))
+  }
+}
+
+#[pyclass]
+struct PyExecutor(task_executor::Executor);
+
+#[pymethods]
+impl PyExecutor {
+  #[new]
+  fn __new__(core_threads: usize, max_threads: usize) -> PyO3Result<Self> {
+    let executor = Executor::global(core_threads, max_threads).map_err(PyException::new_err)?;
+    Ok(Self(executor))
   }
 }
 
@@ -478,7 +488,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
 
 #[pyfunction]
 fn nailgun_server_create(
-  executor_ptr: &externs::scheduler::PyExecutor,
+  executor_ptr: &PyExecutor,
   port: u16,
   runner: PyObject,
 ) -> PyO3Result<PyNailgunServer> {
@@ -580,7 +590,7 @@ fn strongly_connected_components(
 ///
 #[pyfunction]
 fn scheduler_create(
-  executor_ptr: &externs::scheduler::PyExecutor,
+  executor_ptr: &PyExecutor,
   tasks_ptr: &PyTasks,
   types_ptr: &PyTypes,
   build_root_buf: String,
@@ -1663,7 +1673,7 @@ where
 }
 
 /// See `with_scheduler`.
-fn with_executor<F, T>(py_executor: &externs::scheduler::PyExecutor, f: F) -> T
+fn with_executor<F, T>(py_executor: &PyExecutor, f: F) -> T
 where
   F: FnOnce(&Executor) -> T,
 {

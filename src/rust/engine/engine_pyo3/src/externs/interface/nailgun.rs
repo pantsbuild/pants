@@ -6,10 +6,10 @@ use pyo3::exceptions::{PyBrokenPipeError, PyException, PyKeyboardInterrupt};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::externs::scheduler::PyExecutor;
+use crate::externs::interface::scheduler::PyExecutor;
 use task_executor::Executor;
 
-pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
+pub(crate) fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add(
     "PantsdConnectionException",
     py.get_type::<PantsdConnectionException>(),
@@ -22,8 +22,8 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   Ok(())
 }
 
-create_exception!(native_engine, PantsdConnectionException, PyException);
-create_exception!(native_engine, PantsdClientException, PyException);
+create_exception!(native_engine_pyo3, PantsdConnectionException, PyException);
+create_exception!(native_engine_pyo3, PantsdClientException, PyException);
 
 #[pyclass]
 struct PyNailgunClient {
