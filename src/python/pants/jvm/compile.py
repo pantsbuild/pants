@@ -44,10 +44,20 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
 
     component: CoarsenedTarget
     resolve: CoursierResolveKey
+    # If this request contains some FieldSets which do _not_ match this request class's
+    # FieldSets a prerequisite request will be set. When set, the provider of the
+    # ClasspathEntry should recurse with this request first, and include it as a dependency.
+    prerequisite: ClasspathEntryRequest | None = None
 
-    # The FieldSets types that this request subclass is compatible with. A request will only be
-    # constructed if it is compatible with _all_ of the members of the CoarsenedTarget.
+    # The FieldSet types that this request subclass can produce a ClasspathEntry for. A request
+    # will only be constructed if it is compatible with all of the members of the CoarsenedTarget,
+    # or if a `prerequisite` request will provide an entry for the rest of the members.
     field_sets: ClassVar[tuple[type[FieldSet], ...]]
+
+    # Additional FieldSet types that this request subclass may consume (but not produce a
+    # ClasspathEntry for) iff they are contained in a component with FieldSets matching
+    # `cls.field_sets`.
+    field_sets_consume_only: ClassVar[tuple[type[FieldSet], ...]] = ()
 
     @staticmethod
     def for_targets(
@@ -55,13 +65,29 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
     ) -> ClasspathEntryRequest:
         """Constructs a subclass compatible with the members of the CoarsenedTarget."""
         compatible = []
+        partial = []
+        consume_only = []
         impls = union_membership.get(ClasspathEntryRequest)
         for impl in impls:
-            if all(any(fs.is_applicable(t) for fs in impl.field_sets) for t in component.members):
+            classification = ClasspathEntryRequest.classify_impl(impl, component)
+            if not classification:
+                continue
+            if "compatible" == classification:
                 compatible.append(impl)
+            elif "partial" == classification:
+                partial.append(impl)
+            elif "consume_only" == classification:
+                consume_only.append(impl)
 
         if len(compatible) == 1:
-            return compatible[0](component, resolve)
+            return compatible[0](component, resolve, None)
+
+        # No single request can handle the entire component: see whether there are exactly one
+        # partial and consume_only impl to handle it together.
+        if not compatible and len(partial) == 1 and len(consume_only) == 1:
+            # TODO: Precompute which requests might be partial for others?
+            if set(partial[0].field_sets).issubset(set(consume_only[0].field_sets_consume_only)):
+                return partial[0](component, resolve, consume_only[0](component, resolve, None))
 
         impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
         targets_str = "\n  ".join(
@@ -69,14 +95,36 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         )
         if compatible:
             raise ClasspathSourceAmbiguity(
-                f"More than one JVM compiler instance ({impls_str}) was compatible with "
+                f"More than one JVM classpath provider ({impls_str}) was compatible with "
                 f"the inputs:\n  {targets_str}"
             )
         else:
+            # TODO: There is more subtlety of error messages possible here if there are multiple
+            # partial providers, but can cross that bridge when we have them (multiple Scala or Java
+            # compiler implementations, for example).
             raise ClasspathSourceMissing(
-                f"No single JVM compiler instance (from: {impls_str}) was compatible with all of the "
-                f"the inputs:\n  {targets_str}"
+                f"No JVM classpath providers (from: {impls_str}) were compatible with the "
+                f"combination of inputs:\n  {targets_str}"
             )
+
+    @staticmethod
+    def classify_impl(impl: type[ClasspathEntryRequest], component: CoarsenedTarget) -> str | None:
+        """Return `compatible`, `partial`, `consume_only`, or None.
+
+        TODO: Make the return value an enum.
+        """
+        targets = component.members
+        compatible = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        if not compatible:
+            return None
+        if compatible == len(targets):
+            return "compatible"
+        consume_only = sum(
+            1 for t in targets for fs in impl.field_sets_consume_only if fs.is_applicable(t)
+        )
+        if compatible + consume_only == len(targets):
+            return "consume_only"
+        return "partial"
 
 
 @frozen_after_init
