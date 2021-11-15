@@ -24,11 +24,16 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ThirdPartyPythonModuleMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 def test_default_module_mapping_is_normalized() -> None:
@@ -175,6 +180,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(PythonModuleOwners, [PythonModule]),
         ],
         target_types=[
+            PythonSourceTarget,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             ProtobufSourcesGeneratorTarget,
@@ -210,14 +216,14 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             "src/python/stubs/stub.pyi": "",
             "src/python/stubs/BUILD": "python_sources()",
             # Check that plugin mappings work. Note that we duplicate one of the files with a normal
-            # python_sources(), which means neither the Protobuf nor Python targets should be used.
+            # python_source, which means neither the Protobuf nor Python targets should be used.
             "src/python/protos/f1.proto": "",
             "src/python/protos/f2.proto": "",
             "src/python/protos/f2_pb2.py": "",
             "src/python/protos/BUILD": dedent(
                 """\
                 protobuf_sources(name='protos')
-                python_sources(name='py')
+                python_source(name='py', source="f2_pb2.py")
                 """
             ),
             # If a module is ambiguous within a particular implementation, which means that it's
@@ -231,74 +237,63 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 """\
                 protobuf_sources(name='protos1')
                 protobuf_sources(name='protos2')
-                python_sources(name='py')
+                python_source(name='py', source="f_pb2.py")
                 """
             ),
         }
     )
 
     result = rule_runner.request(FirstPartyPythonModuleMapping, [])
-    assert result == FirstPartyPythonModuleMapping(
-        mapping=FrozenDict(
-            {
-                "project.util.dirutil": (
-                    Address("src/python/project/util", relative_file_path="dirutil.py"),
-                ),
-                "project.util.tarutil": (
-                    Address("src/python/project/util", relative_file_path="tarutil.py"),
-                ),
-                "project_test.demo_test": (
-                    Address(
-                        "tests/python/project_test/demo_test", relative_file_path="__init__.py"
-                    ),
-                ),
-                "protos.f1_pb2": (
-                    Address(
-                        "src/python/protos", relative_file_path="f1.proto", target_name="protos"
-                    ),
-                ),
-                "stubs.stub": (
-                    Address("src/python/stubs", relative_file_path="stub.py"),
-                    Address("src/python/stubs", relative_file_path="stub.pyi"),
-                ),
-            }
-        ),
-        ambiguous_modules=FrozenDict(
-            {
-                "protos.f2_pb2": (
-                    Address(
-                        "src/python/protos", relative_file_path="f2.proto", target_name="protos"
-                    ),
-                    Address("src/python/protos", relative_file_path="f2_pb2.py", target_name="py"),
-                ),
-                "protos_ambiguous.f_pb2": (
-                    Address(
-                        "src/python/protos_ambiguous",
-                        relative_file_path="f.proto",
-                        target_name="protos1",
-                    ),
-                    Address(
-                        "src/python/protos_ambiguous",
-                        relative_file_path="f.proto",
-                        target_name="protos2",
-                    ),
-                    Address(
-                        "src/python/protos_ambiguous",
-                        relative_file_path="f_pb2.py",
-                        target_name="py",
-                    ),
-                ),
-                "stub_ambiguity.f": (
-                    Address("build-support/stub_ambiguity", relative_file_path="f.pyi"),
-                    Address("src/python/stub_ambiguity", relative_file_path="f.pyi"),
-                ),
-                "two_owners": (
-                    Address("build-support", relative_file_path="two_owners.py"),
-                    Address("src/python", relative_file_path="two_owners.py"),
-                ),
-            }
-        ),
+    assert result.mapping == FrozenDict(
+        {
+            "project.util.dirutil": (
+                Address("src/python/project/util", relative_file_path="dirutil.py"),
+            ),
+            "project.util.tarutil": (
+                Address("src/python/project/util", relative_file_path="tarutil.py"),
+            ),
+            "project_test.demo_test": (
+                Address("tests/python/project_test/demo_test", relative_file_path="__init__.py"),
+            ),
+            "protos.f1_pb2": (
+                Address("src/python/protos", relative_file_path="f1.proto", target_name="protos"),
+            ),
+            "stubs.stub": (
+                Address("src/python/stubs", relative_file_path="stub.py"),
+                Address("src/python/stubs", relative_file_path="stub.pyi"),
+            ),
+        }
     )
+    assert result.ambiguous_modules == FrozenDict(
+        {
+            "protos.f2_pb2": (
+                Address("src/python/protos", target_name="py"),
+                Address("src/python/protos", relative_file_path="f2.proto", target_name="protos"),
+            ),
+            "protos_ambiguous.f_pb2": (
+                Address("src/python/protos_ambiguous", target_name="py"),
+                Address(
+                    "src/python/protos_ambiguous",
+                    relative_file_path="f.proto",
+                    target_name="protos1",
+                ),
+                Address(
+                    "src/python/protos_ambiguous",
+                    relative_file_path="f.proto",
+                    target_name="protos2",
+                ),
+            ),
+            "stub_ambiguity.f": (
+                Address("build-support/stub_ambiguity", relative_file_path="f.pyi"),
+                Address("src/python/stub_ambiguity", relative_file_path="f.pyi"),
+            ),
+            "two_owners": (
+                Address("build-support", relative_file_path="two_owners.py"),
+                Address("src/python", relative_file_path="two_owners.py"),
+            ),
+        }
+    )
+    assert result.modules_with_type_stub == FrozenOrderedSet(["stubs.stub"])
 
 
 def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
@@ -413,7 +408,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             "script.py": "",
             "BUILD": dedent(
                 """\
-                python_sources(name="script", sources=["script.py"])
+                python_source(name="script", source="script.py")
                 python_requirement(name="valid_dep", requirements=["valid_dep"])
                 # Dependency with a type stub.
                 python_requirement(name="dep_w_stub", requirements=["dep_w_stub"])
@@ -450,8 +445,8 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_requirement(name='thirdparty2', requirements=['ambiguous_3rdparty'])
 
                 # Ambiguity purely within first-party deps.
-                python_sources(name="firstparty1", sources=["f1.py"])
-                python_sources(name="firstparty2", sources=["f1.py"])
+                python_source(name="firstparty1", source="f1.py")
+                python_source(name="firstparty2", source="f1.py")
 
                 # Ambiguity within third-party, which should result in ambiguity for first-party
                 # too. These all share the module `ambiguous.f2`.
@@ -461,12 +456,12 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                 python_requirement(
                     name='thirdparty4', requirements=['bar'], modules=['ambiguous.f2']
                 )
-                python_sources(name="firstparty3", sources=["f2.py"])
+                python_source(name="firstparty3", source="f2.py")
 
                 # Ambiguity within first-party, which should result in ambiguity for third-party
                 # too. These all share the module `ambiguous.f3`.
-                python_sources(name="firstparty4", sources=["f3.py"])
-                python_sources(name="firstparty5", sources=["f3.py"])
+                python_source(name="firstparty4", source="f3.py")
+                python_source(name="firstparty5", source="f3.py")
                 python_requirement(
                     name='thirdparty5', requirements=['baz'], modules=['ambiguous.f3']
                 )
@@ -483,7 +478,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
                     requirements=['ambiguous-stub-types'],
                     type_stub_modules=["ambiguous.f4"],
                 )
-                python_sources(name='ambiguous-stub-1stparty', sources=['f4.pyi'])
+                python_source(name='ambiguous-stub-1stparty', source='f4.pyi')
                 """
             ),
         }
@@ -496,9 +491,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         "dep_w_stub",
         [Address("", target_name="dep_w_stub"), Address("", target_name="dep_w_stub-types")],
     )
-    assert_owners(
-        "script.Demo", [Address("", target_name="script", relative_file_path="script.py")]
-    )
+    assert_owners("script.Demo", [Address("", target_name="script")])
     assert_owners("no_stub.app", expected=[Address("root/no_stub", relative_file_path="app.py")])
     assert_owners(
         "stub.app",
@@ -530,26 +523,26 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         "ambiguous.f1",
         [],
         expected_ambiguous=[
-            Address("root/ambiguous", relative_file_path="f1.py", target_name="firstparty1"),
-            Address("root/ambiguous", relative_file_path="f1.py", target_name="firstparty2"),
+            Address("root/ambiguous", target_name="firstparty1"),
+            Address("root/ambiguous", target_name="firstparty2"),
         ],
     )
     assert_owners(
         "ambiguous.f2",
         [],
         expected_ambiguous=[
+            Address("root/ambiguous", target_name="firstparty3"),
             Address("root/ambiguous", target_name="thirdparty3"),
             Address("root/ambiguous", target_name="thirdparty4"),
-            Address("root/ambiguous", relative_file_path="f2.py", target_name="firstparty3"),
         ],
     )
     assert_owners(
         "ambiguous.f3",
         [],
         expected_ambiguous=[
+            Address("root/ambiguous", target_name="firstparty4"),
+            Address("root/ambiguous", target_name="firstparty5"),
             Address("root/ambiguous", target_name="thirdparty5"),
-            Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty4"),
-            Address("root/ambiguous", relative_file_path="f3.py", target_name="firstparty5"),
         ],
     )
     assert_owners(
@@ -557,11 +550,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         [],
         expected_ambiguous=[
             Address("root/ambiguous", target_name="ambiguous-stub"),
+            Address("root/ambiguous", target_name="ambiguous-stub-1stparty"),
             Address("root/ambiguous", target_name="ambiguous-stub-types"),
-            Address(
-                "root/ambiguous",
-                relative_file_path="f4.pyi",
-                target_name="ambiguous-stub-1stparty",
-            ),
         ],
     )
