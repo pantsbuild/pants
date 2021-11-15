@@ -2331,14 +2331,14 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.15.0"
-source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
+source = "git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327#45059cbdb81fd3ab72a5ce530e3b99cc90383327"
 dependencies = [
  "cfg-if 1.0.0",
  "indoc",
  "libc",
  "parking_lot",
  "paste",
- "pyo3-build-config 0.15.0 (git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5)",
+ "pyo3-build-config 0.15.0 (git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327)",
  "pyo3-macros",
  "unindent",
 ]
@@ -2355,7 +2355,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.15.0"
-source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
+source = "git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327#45059cbdb81fd3ab72a5ce530e3b99cc90383327"
 dependencies = [
  "once_cell",
 ]
@@ -2363,7 +2363,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.15.0"
-source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
+source = "git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327#45059cbdb81fd3ab72a5ce530e3b99cc90383327"
 dependencies = [
  "pyo3-macros-backend",
  "quote 1.0.10",
@@ -2373,10 +2373,10 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.15.0"
-source = "git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5#51b6b947b82e61adad61524f9c58e3b1c89247a5"
+source = "git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327#45059cbdb81fd3ab72a5ce530e3b99cc90383327"
 dependencies = [
  "proc-macro2 1.0.32",
- "pyo3-build-config 0.15.0 (git+https://github.com/davidhewitt/pyo3.git?rev=51b6b947b82e61adad61524f9c58e3b1c89247a5)",
+ "pyo3-build-config 0.15.0 (git+https://github.com/PyO3/pyo3.git?rev=45059cbdb81fd3ab72a5ce530e3b99cc90383327)",
  "quote 1.0.10",
  "syn 1.0.81",
 ]
