@@ -29,6 +29,11 @@ class PyExecutor:
 # ------------------------------------------------------------------------------
 
 class PyDigest:
+    """A Digest is a lightweight reference to a set of files known about by the engine.
+
+    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
+    Get(DigestContents, Digest)` to see the actual file content.
+    """
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
     def fingerprint(self) -> str: ...
@@ -39,6 +44,11 @@ class PyDigest:
     def __repr__(self) -> str: ...
 
 class PySnapshot:
+    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
+    names/content.
+
+    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+    """
     def __init__(self) -> None: ...
     @classmethod
     def _create_for_testing(

@@ -11,28 +11,13 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.internals.native_engine import PyDigest, PySnapshot
+from pants.engine.internals.native_engine import PyDigest as Digest
+from pants.engine.internals.native_engine import PySnapshot as Snapshot
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
-
-
-"""A Digest is a lightweight reference to a set of files known about by the engine.
-
-You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
-Get(DigestContents, Digest)` to see the actual file content.
-"""
-Digest = PyDigest
-
-
-"""A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
-names/content.
-
-You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-"""
-Snapshot = PySnapshot
 
 
 @dataclass(frozen=True)
