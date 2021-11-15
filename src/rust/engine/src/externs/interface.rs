@@ -42,6 +42,7 @@ use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
 };
 
+use crate::externs::fs::PyFileDigest;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -160,8 +161,6 @@ struct PyTypes(RefCell<Option<Types>>);
 impl PyTypes {
   #[new]
   fn __new__(
-    file_digest: &PyType,
-    snapshot: &PyType,
     paths: &PyType,
     file_content: &PyType,
     file_entry: &PyType,
@@ -189,8 +188,8 @@ impl PyTypes {
   ) -> Self {
     Self(RefCell::new(Some(Types {
       directory_digest: TypeId::new(py.get_type::<externs::fs::PyDigest>()),
-      file_digest: TypeId::new(file_digest),
-      snapshot: TypeId::new(snapshot),
+      file_digest: TypeId::new(py.get_type::<externs::fs::PyFileDigest>()),
+      snapshot: TypeId::new(py.get_type::<externs::fs::PySnapshot>()),
       paths: TypeId::new(paths),
       file_content: TypeId::new(file_content),
       file_entry: TypeId::new(file_entry),
@@ -718,7 +717,8 @@ async fn workunit_to_py_value(
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
         let gil = Python::acquire_gil();
-        crate::nodes::Snapshot::store_file_digest(gil.python(), &core.types, digest)
+        crate::nodes::Snapshot::store_file_digest(gil.python(), *digest)
+          .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest) => {
         let snapshot = store::Snapshot::from_digest(store, *digest)
@@ -766,17 +766,17 @@ async fn workunit_to_py_value(
     externs::store_dict(py, user_metadata_entries)?,
   ));
 
-  if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
+  if let Some(stdout_digest) = workunit.metadata.stdout {
     artifact_entries.push((
       externs::store_utf8(py, "stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, &core.types, stdout_digest),
+      crate::nodes::Snapshot::store_file_digest(py, stdout_digest).map_err(PyException::new_err)?,
     ));
   }
 
-  if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
+  if let Some(stderr_digest) = workunit.metadata.stderr {
     artifact_entries.push((
       externs::store_utf8(py, "stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, &core.types, stderr_digest),
+      crate::nodes::Snapshot::store_file_digest(py, stderr_digest).map_err(PyException::new_err)?,
     ));
   }
 
@@ -1366,12 +1366,12 @@ fn ensure_remote_has_recursive(
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
-    // NB: Supports either a FileDigest or Digest as input.
+    // NB: Supports either a PyFileDigest or PyDigest as input.
     let digests: Vec<Digest> = py_digests
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
-          .or_else(|_| crate::nodes::lift_file_digest(&core.types, value))
+          .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(PyException::new_err)?;
@@ -1386,34 +1386,27 @@ fn ensure_remote_has_recursive(
   })
 }
 
-/// This functions assumes that the Digest in question represents the contents of a single File rather than a Directory,
-/// and will fail on Digests representing a Directory.
 #[pyfunction]
 fn single_file_digests_to_bytes<'py>(
   py: Python<'py>,
   py_scheduler: &PyScheduler,
-  py_file_digests: &PyList,
+  py_file_digests: Vec<PyFileDigest>,
 ) -> PyO3Result<&'py PyList> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
-    let digests: Vec<Digest> = py_file_digests
-      .iter()
-      .map(|item| crate::nodes::lift_file_digest(&core.types, item))
-      .collect::<Result<Vec<Digest>, _>>()
-      .map_err(PyException::new_err)?;
-
-    let digest_futures = digests.into_iter().map(|digest| {
+    let digest_futures = py_file_digests.into_iter().map(|py_file_digest| {
       let store = core.store();
       async move {
         store
-          .load_file_bytes_with(digest, |bytes| {
+          .load_file_bytes_with(py_file_digest.0, |bytes| {
             let gil = Python::acquire_gil();
             let py = gil.python();
             externs::store_bytes(py, bytes)
           })
           .await
           .and_then(|maybe_bytes| {
-            maybe_bytes.ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
+            maybe_bytes
+              .ok_or_else(|| format!("Error loading bytes from digest: {:?}", py_file_digest.0))
           })
       }
     });

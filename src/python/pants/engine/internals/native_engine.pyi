@@ -29,6 +29,12 @@ class PyExecutor:
 # ------------------------------------------------------------------------------
 
 class PyDigest:
+    """A Digest is a lightweight reference to a set of files known about by the engine.
+
+    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
+    Get(DigestContents, Digest)` to see the actual file content.
+    """
+
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
     def fingerprint(self) -> str: ...
@@ -38,10 +44,27 @@ class PyDigest:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
+class PyFileDigest:
+    """A FileDigest is a digest that refers to a file's content, without its name."""
+
+    def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
+    @property
+    def fingerprint(self) -> str: ...
+    @property
+    def serialized_bytes_length(self) -> int: ...
+    def __eq__(self, other: PyFileDigest | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
 class PySnapshot:
-    def __init__(self) -> None: ...
+    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
+    names/content.
+
+    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+    """
+
     @classmethod
-    def _create_for_testing(
+    def _unsafe_create(
         cls, digest: PyDigest, files: Sequence[str], dirs: Sequence[str]
     ) -> PySnapshot: ...
     @property
@@ -53,6 +76,10 @@ class PySnapshot:
     def __eq__(self, other: PySnapshot | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
+
+EMPTY_DIGEST: PyDigest
+EMPTY_FILE_DIGEST: PyFileDigest
+EMPTY_SNAPSHOT: PySnapshot
 
 def default_cache_path() -> str: ...
 
@@ -111,11 +138,11 @@ def capture_snapshots(
     session: PySession,
     path_globs_and_root_tuple_wrapper: _PathGlobsAndRootCollection,
 ) -> list[PySnapshot]: ...
-def ensure_remote_has_recursive(scheduler: PyScheduler, digests: list[PyDigest]) -> None: ...
-
-# TODO: Should this be a proper FileDigest? Maybe create PyFileDigest.
+def ensure_remote_has_recursive(
+    scheduler: PyScheduler, digests: list[PyDigest | PyFileDigest]
+) -> None: ...
 def single_file_digests_to_bytes(
-    scheduler: PyScheduler, digests: list[PyDigest]
+    scheduler: PyScheduler, digests: list[PyFileDigest]
 ) -> list[bytes]: ...
 def write_digest(
     scheduler: PyScheduler, session: PySession, digest: PyDigest, path_prefix: str

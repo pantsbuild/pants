@@ -18,6 +18,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
+use crate::externs::fs::PyFileDigest;
 use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -218,9 +219,9 @@ fn multi_platform_process_request_to_process_result(
       context.core.types.process_result,
       &[
         externs::store_bytes(py, &stdout_bytes),
-        Snapshot::store_file_digest(py, &context.core.types, &result.stdout_digest),
+        Snapshot::store_file_digest(py, result.stdout_digest).map_err(throw)?,
         externs::store_bytes(py, &stderr_bytes),
-        Snapshot::store_file_digest(py, &context.core.types, &result.stderr_digest),
+        Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?,
         externs::store_i64(py, result.exit_code.into()),
         Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?,
         externs::unsafe_call(
@@ -464,10 +465,9 @@ fn create_digest_to_digest(
           let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
           CreateDigestItem::FileContent(path, bytes, is_executable)
         } else if obj.hasattr("file_digest").unwrap() {
-          let py_digest = externs::getattr(obj, "file_digest").unwrap();
-          let digest = Snapshot::lift_file_digest(py_digest).unwrap();
+          let py_file_digest: PyFileDigest = externs::getattr(obj, "file_digest").unwrap();
           let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
-          CreateDigestItem::FileEntry(path, digest, is_executable)
+          CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
         } else {
           CreateDigestItem::Dir(path)
         }

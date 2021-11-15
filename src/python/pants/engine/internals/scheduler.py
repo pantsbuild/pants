@@ -148,8 +148,6 @@ class Scheduler:
 
         # Create the native Scheduler and Session.
         types = PyTypes(
-            file_digest=FileDigest,
-            snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,
             file_entry=FileEntry,
@@ -587,8 +585,8 @@ class SchedulerSession:
             _PathGlobsAndRootCollection(path_globs_and_roots),
         )
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
-        return tuple(native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests)))
+    def single_file_digests_to_bytes(self, digests: Sequence[FileDigest]) -> list[bytes]:
+        return native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests))
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
@@ -603,7 +601,7 @@ class SchedulerSession:
             self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
         )
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
