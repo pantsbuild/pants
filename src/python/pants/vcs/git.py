@@ -57,22 +57,22 @@ class Git:
         cmd = [str(binary), "rev-parse", "--show-toplevel"]
         if subdir:
             with pushd(str(subdir)):
-                process, out = cls._invoke(cmd)
+                process, out, err = cls._invoke(cmd)
         else:
-            process, out = cls._invoke(cmd)
-        cls._check_result(cmd, process.returncode)
+            process, out, err = cls._invoke(cmd)
+        cls._check_result(cmd, process.returncode, err.decode())
         return cls(worktree=PurePath(cls._cleanse(out)))
 
     @staticmethod
-    def _invoke(cmd: list[str]) -> tuple[subprocess.Popen, bytes]:
+    def _invoke(cmd: list[str]) -> tuple[subprocess.Popen, bytes, bytes]:
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             # Binary DNE or is not executable
             cmd_str = " ".join(cmd)
             raise GitException(f"Failed to execute command {cmd_str}: {e!r}")
-        out, _ = process.communicate()
-        return process, out
+        out, err = process.communicate()
+        return process, out, err
 
     @classmethod
     def _cleanse(cls, output: bytes) -> str:
@@ -149,13 +149,13 @@ class Git:
         result = subprocess.call(cmd)
         self._check_result(cmd, result)
 
-    def _check_output(self, args: Iterable[str], failure_msg: str | None = None) -> str:
+    def _check_output(self, args: Iterable[str]) -> str:
         cmd = self._create_git_cmdline(args)
         self._log_call(cmd)
 
-        process, out = self._invoke(cmd)
+        process, out, err = self._invoke(cmd)
 
-        self._check_result(cmd, process.returncode, failure_msg)
+        self._check_result(cmd, process.returncode, err.decode())
         return self._cleanse(out)
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:

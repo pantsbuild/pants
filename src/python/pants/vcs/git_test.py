@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path, PurePath
 from textwrap import dedent
@@ -216,6 +217,20 @@ def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: Git) -> N
     git.commit("API Changes.")
 
     assert set() == git.changed_files(include_untracked=True)
+
+
+def test_bad_ref_stderr_issues_13396(git: Git) -> None:
+    with pytest.raises(GitException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")):
+        git.changed_files(from_commit="remote/dne")
+
+    with pytest.raises(
+        GitException,
+        match=re.escape(
+            "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working "
+            "tree.\n"
+        ),
+    ):
+        git.changes_in(diffspec="HEAD~1000")
 
 
 @pytest.fixture
