@@ -161,7 +161,6 @@ impl PyTypes {
   #[new]
   fn __new__(
     file_digest: &PyType,
-    snapshot: &PyType,
     paths: &PyType,
     file_content: &PyType,
     file_entry: &PyType,
@@ -190,7 +189,7 @@ impl PyTypes {
     Self(RefCell::new(Some(Types {
       directory_digest: TypeId::new(py.get_type::<externs::fs::PyDigest>()),
       file_digest: TypeId::new(file_digest),
-      snapshot: TypeId::new(snapshot),
+      snapshot: TypeId::new(py.get_type::<externs::fs::PySnapshot>()),
       paths: TypeId::new(paths),
       file_content: TypeId::new(file_content),
       file_entry: TypeId::new(file_entry),

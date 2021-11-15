@@ -149,7 +149,6 @@ class Scheduler:
         # Create the native Scheduler and Session.
         types = PyTypes(
             file_digest=FileDigest,
-            snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,
             file_entry=FileEntry,
