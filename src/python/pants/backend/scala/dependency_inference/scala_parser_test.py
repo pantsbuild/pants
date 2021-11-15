@@ -78,6 +78,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 }
                 type NestedType = Foo
                 object NestedObject {
+                  val valWithType: String = "foo"
                 }
             }
 
@@ -104,6 +105,16 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 object NestedObject {
                 }
             }
+
+            object Functions {
+              def func1(a: Integer): Unit = {
+                val a = foo + 5
+                val b = bar(5, "hello") + OuterObject.NestedVal
+              }
+            }
+
+            class ASubClass extends ABaseClass with ATrait1 with ATrait2.Nested { }
+            trait ASubTrait extends ATrait1 with ATrait2.Nested { }
             """
             ),
         }
@@ -136,6 +147,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterClass.NestedClass",
             "org.pantsbuild.example.OuterClass.NestedType",
             "org.pantsbuild.example.OuterClass.NestedObject",
+            "org.pantsbuild.example.OuterClass.NestedObject.valWithType",
             "org.pantsbuild.example.OuterTrait",
             "org.pantsbuild.example.OuterTrait.NestedVal",
             "org.pantsbuild.example.OuterTrait.NestedVar",
@@ -150,6 +162,10 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterObject.NestedClass",
             "org.pantsbuild.example.OuterObject.NestedType",
             "org.pantsbuild.example.OuterObject.NestedObject",
+            "org.pantsbuild.example.Functions",
+            "org.pantsbuild.example.Functions.func1",
+            "org.pantsbuild.example.ASubClass",
+            "org.pantsbuild.example.ASubTrait",
         ]
     )
 
@@ -163,5 +179,15 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 ScalaImport(name="scala.collection.mutable.HashMap", is_wildcard=False),
                 ScalaImport(name="java.io", is_wildcard=True),
             ),
+        }
+    )
+
+    assert analysis.consumed_symbols_by_scope == FrozenDict(
+        {
+            "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
+            "org.pantsbuild.example.Functions": FrozenOrderedSet(
+                ["bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
+            ),
+            "org.pantsbuild.example": FrozenOrderedSet(["ABaseClass", "ATrait1", "ATrait2.Nested"]),
         }
     )

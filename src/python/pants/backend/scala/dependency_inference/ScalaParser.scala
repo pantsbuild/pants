@@ -7,26 +7,29 @@ import io.circe.syntax._
 import scala.meta._
 import scala.meta.transversers.Traverser
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
 case class AnImport(name: String, isWildcard: Boolean)
 
 case class Analysis(
   providedNames: Vector[String],
   importsByScope: HashMap[String, ArrayBuffer[AnImport]],
+  consumedSymbolsByScope: HashMap[String, HashSet[String]],
 )
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
+  var skipProvidedNames = false
 
   val providedNames = ArrayBuffer[String]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
+  val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
     tree match {
       case Term.Select(qual, name) => s"${extractName(qual)}.${extractName(name)}"
+      case Type.Select(qual, name) => s"${extractName(qual)}.${extractName(name)}"
       case Term.Name(name) => name
       case Type.Name(name) => name
       case Pat.Var(node) => extractName(node)
@@ -36,8 +39,10 @@ class SourceAnalysisTraverser extends Traverser {
   }
 
   def recordProvidedName(name: String): Unit = {
-    val fullPackageName = nameParts.mkString(".")
-    providedNames.append(s"${fullPackageName}.${name}")
+    if (!skipProvidedNames) {
+      val fullPackageName = nameParts.mkString(".")
+      providedNames.append(s"${fullPackageName}.${name}")
+    }
   }
 
   def withNamePart[T](namePart: String, f: () => T): T = {
@@ -55,6 +60,22 @@ class SourceAnalysisTraverser extends Traverser {
     importsByScope(fullPackageName).append(AnImport(name, isWildcard))
   }
 
+  def recordConsumedSymbol(name: String): Unit = {
+    val fullPackageName = nameParts.mkString(".")
+    if (!consumedSymbolsByScope.contains(fullPackageName)) {
+      consumedSymbolsByScope(fullPackageName) = HashSet[String]()
+    }
+    consumedSymbolsByScope(fullPackageName).add(name)
+  }
+
+  def visitTemplate(templ: Template, name: String): Unit = {
+    templ.inits.foreach(init => apply(init))
+    withNamePart(name, () => {
+      apply(templ.early)
+      apply(templ.stats)
+    })
+  }
+
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
       withNamePart(extractName(ref), () => super.apply(stats))
@@ -63,19 +84,19 @@ class SourceAnalysisTraverser extends Traverser {
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
       recordProvidedName(name)
-      withNamePart(name, () => super.apply(templ))
+      visitTemplate(templ, name)
     }
 
     case Defn.Trait(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
       recordProvidedName(name)
-      withNamePart(name, () => super.apply(templ))
+      visitTemplate(templ, name)
     }
 
     case Defn.Object(_mods, nameNode, templ) => {
       val name = extractName(nameNode)
       recordProvidedName(name)
-      withNamePart(name, () => super.apply(templ))
+      visitTemplate(templ, name)
     }
 
     case Defn.Type(_mods, nameNode, _tparams, _body) => {
@@ -83,18 +104,40 @@ class SourceAnalysisTraverser extends Traverser {
       recordProvidedName(name)
     }
 
-    case Defn.Val(_mods, pats, _decltpe, _rhs) => {
+    case Defn.Val(_mods, pats, decltpe, rhs) => {
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
         recordProvidedName(name)
       })
+      decltpe.foreach(tpe => {
+        recordConsumedSymbol(extractName(tpe))
+      })
+      super.apply(rhs)
     }
 
-    case Defn.Var(_mods, pats, _decltpe, _rhs) => {
+    case Defn.Var(_mods, pats, decltpe, rhs) => {
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
         recordProvidedName(name)
       })
+      decltpe.foreach(tpe => {
+        recordConsumedSymbol(extractName(tpe))
+      })
+      super.apply(rhs)
+    }
+
+    case Defn.Def(_mods, nameNode, _tparams, _paramss, decltpe, body) => {
+      val name = extractName(nameNode)
+      recordProvidedName(name)
+
+      decltpe.foreach(tpe => {
+        recordConsumedSymbol(extractName(tpe))
+      })
+
+      val oldSkipProvidedNames = skipProvidedNames
+      skipProvidedNames = true
+      apply(body)
+      skipProvidedNames = oldSkipProvidedNames
     }
 
     case Import(importers) => {
@@ -109,6 +152,21 @@ class SourceAnalysisTraverser extends Traverser {
           }
         })
       })
+    }
+
+    case Init(tpe, _name, _argss) => {
+      val name = extractName(tpe)
+      recordConsumedSymbol(name)
+    }
+
+    case node @ Term.Select(_, _) => {
+      val name = extractName(node)
+      recordConsumedSymbol(name)
+    }
+
+    case node @ Term.Name(_) => {
+      val name = extractName(node)
+      recordConsumedSymbol(name)
     }
 
     case node => super.apply(node)
@@ -130,6 +188,7 @@ object ScalaParser {
     Analysis(
       providedNames = analysisTraverser.providedNames.toVector,
       importsByScope = analysisTraverser.importsByScope,
+      consumedSymbolsByScope = analysisTraverser.consumedSymbolsByScope,
     )
   }
 
