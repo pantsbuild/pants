@@ -49,7 +49,7 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
         subprocess.run(["git", "config", "user.name", "Your Name"], check=True)
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-am", "Add project files."], check=True)
-        yield Git(gitdir=git_dir, worktree=worktree)
+        yield Git.mount(subdir=worktree)
 
 
 def lines_to_set(str_or_list):
