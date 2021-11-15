@@ -1091,30 +1091,38 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def test_digest_properties() -> None:
-    digest = Digest("a" * 64, 1000)
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_properties(digest_cls: type) -> None:
+    digest = digest_cls("a" * 64, 1000)
     assert digest.fingerprint == "a" * 64
     assert digest.serialized_bytes_length == 1000
 
 
-def test_digest_repr() -> None:
-    assert str(Digest("a" * 64, 1)) == f"Digest({repr('a' * 64)}, 1)"
+@pytest.mark.parametrize("digest_cls,cls_name", ((Digest, "Digest"), (FileDigest, "FileDigest")))
+def test_digest_repr(digest_cls: type, cls_name: str) -> None:
+    assert str(digest_cls("a" * 64, 1)) == f"{cls_name}({repr('a' * 64)}, 1)"
 
 
-def test_digest_hash() -> None:
-    assert hash(Digest("a" * 64, 1)) == -6148914691236517206
-    assert hash(Digest("b" * 64, 1)) == -4919131752989213765
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_hash(digest_cls: type) -> None:
+    assert hash(digest_cls("a" * 64, 1)) == -6148914691236517206
+    assert hash(digest_cls("b" * 64, 1)) == -4919131752989213765
     # Note that the size bytes is not considered in the hash.
-    assert hash(Digest("a" * 64, 1000)) == -6148914691236517206
+    assert hash(digest_cls("a" * 64, 1000)) == -6148914691236517206
 
 
-def test_digest_equality() -> None:
-    digest = Digest("a" * 64, 1)
-    assert digest == Digest("a" * 64, 1)
-    assert digest != Digest("a" * 64, 1000)
-    assert digest != Digest("0" * 64, 1)
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_equality(digest_cls) -> None:
+    digest = digest_cls("a" * 64, 1)
+    assert digest == digest_cls("a" * 64, 1)
+    assert digest != digest_cls("a" * 64, 1000)
+    assert digest != digest_cls("0" * 64, 1)
     with pytest.raises(TypeError):
-        digest < digest  # type: ignore[operator]
+        digest < digest
+
+
+def test_digest_is_not_file_digest() -> None:
+    assert Digest("a" * 64, 1) != FileDigest("a" * 64, 1)
 
 
 def test_snapshot_properties() -> None:
