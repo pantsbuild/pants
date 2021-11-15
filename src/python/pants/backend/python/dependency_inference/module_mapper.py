@@ -207,11 +207,12 @@ async def map_first_party_python_targets_to_modules(
         # `PythonSourceFile` validates that each target has exactly one file.
         assert len(stripped_sources) == 1
         stripped_f = PurePath(stripped_sources[0])
+        is_type_stub = stripped_f.suffix == ".pyi"
 
         module = PythonModule.create_from_stripped_path(stripped_f).module
         if module not in modules_to_addresses:
             modules_to_addresses[module].append(tgt.address)
-            if stripped_f.suffix == ".pyi":
+            if is_type_stub:
                 modules_with_type_stub.add(module)
             continue
 
@@ -221,10 +222,9 @@ async def map_first_party_python_targets_to_modules(
         prior_is_type_stub = (
             len(modules_to_addresses[module]) == 1 and module in modules_with_type_stub
         )
-        current_is_type_stub = stripped_f.suffix == ".pyi"
-        if prior_is_type_stub ^ current_is_type_stub:
+        if is_type_stub ^ prior_is_type_stub:
             modules_to_addresses[module].append(tgt.address)
-            if current_is_type_stub:
+            if is_type_stub:
                 modules_with_type_stub.add(module)
         else:
             modules_with_multiple_implementations[module].update(
