@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipYapfField(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipYapfField),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipYapfField),
-        PythonTestTarget.register_plugin_field(SkipYapfField),
+        PythonSourceTarget.register_plugin_field(SkipYapfField),
         PythonTestsGeneratorTarget.register_plugin_field(SkipYapfField),
+        PythonTestTarget.register_plugin_field(SkipYapfField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipYapfField),
     ]
