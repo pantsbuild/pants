@@ -181,7 +181,7 @@ class Scheduler:
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
-            store_headers=execution_options.remote_store_headers,
+            store_headers=tuple(execution_options.remote_store_headers.items()),
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
@@ -194,7 +194,7 @@ class Scheduler:
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=execution_options.remote_execution_headers,
+            execution_headers=tuple(execution_options.remote_execution_headers.items()),
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
         )
@@ -281,7 +281,7 @@ class Scheduler:
         )
 
     def invalidate_files(self, filenames: Iterable[str]) -> int:
-        return native_engine.graph_invalidate_paths(self.py_scheduler, filenames)
+        return native_engine.graph_invalidate_paths(self.py_scheduler, tuple(filenames))
 
     def invalidate_all_files(self) -> int:
         return native_engine.graph_invalidate_all_paths(self.py_scheduler)
@@ -575,7 +575,9 @@ class SchedulerSession:
         # order in output lists.
         return [ret.value for _, ret in returns]
 
-    def capture_snapshots(self, path_globs_and_roots: Iterable[PathGlobsAndRoot]) -> list[Snapshot]:
+    def capture_snapshots(
+        self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
+    ) -> tuple[Snapshot, ...]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
