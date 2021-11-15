@@ -147,7 +147,9 @@ class ScalaSourceDependencyAnalysis:
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()
             },
-            "consumed_symbols_by_scope": self.consumed_symbols_by_scope,
+            "consumed_symbols_by_scope": {
+                k: sorted(list(v)) for k, v in self.consumed_symbols_by_scope.items()
+            },
         }
 
 
