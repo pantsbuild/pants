@@ -7,10 +7,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
-# Re-export GlobMatchErrorBehavior here as part of the public Plugin API.
+# Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
+from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
 from pants.engine.internals.native_engine import PyDigest as Digest
 from pants.engine.internals.native_engine import PySnapshot as Snapshot
 from pants.engine.rules import QueryRule
@@ -288,9 +290,7 @@ class Workspace(SideEffecting):
 
 
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EMPTY_DIGEST: Digest = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_SNAPSHOT = Snapshot()
 
 
 @dataclass(frozen=True)

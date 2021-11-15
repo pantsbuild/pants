@@ -34,6 +34,7 @@ class PyDigest:
     You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
     Get(DigestContents, Digest)` to see the actual file content.
     """
+
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
     def fingerprint(self) -> str: ...
@@ -49,9 +50,9 @@ class PySnapshot:
 
     You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
     """
-    def __init__(self) -> None: ...
+
     @classmethod
-    def _create_for_testing(
+    def _unsafe_create(
         cls, digest: PyDigest, files: Sequence[str], dirs: Sequence[str]
     ) -> PySnapshot: ...
     @property
@@ -63,6 +64,9 @@ class PySnapshot:
     def __eq__(self, other: PySnapshot | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
+
+EMPTY_DIGEST: PyDigest
+EMPTY_SNAPSHOT: PySnapshot
 
 def default_cache_path() -> str: ...
 

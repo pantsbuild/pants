@@ -11,12 +11,15 @@ use pyo3::prelude::*;
 use pyo3::types::{PyString, PyTuple, PyType};
 
 use fs::{GlobExpansionConjunction, PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching};
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
   m.add_class::<PySnapshot>()?;
+
+  m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIGEST))?;
+  m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
   m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
@@ -76,13 +79,8 @@ pub struct PySnapshot(pub Snapshot);
 
 #[pymethods]
 impl PySnapshot {
-  #[new]
-  fn __new__() -> Self {
-    Self(Snapshot::empty())
-  }
-
   #[classmethod]
-  fn _create_for_testing(
+  fn _unsafe_create(
     _cls: &PyType,
     py_digest: PyDigest,
     files: Vec<String>,

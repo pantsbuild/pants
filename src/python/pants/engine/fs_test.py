@@ -1119,7 +1119,7 @@ def test_digest_equality() -> None:
 
 def test_snapshot_properties() -> None:
     digest = Digest("a" * 64, 1000)
-    snapshot = Snapshot._create_for_testing(digest, ["f.ext", "dir/f.ext"], ["dir"])
+    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
     assert snapshot.files == ("f.ext", "dir/f.ext")
     assert snapshot.dirs == ("dir",)
@@ -1134,9 +1134,7 @@ def test_snapshot_hash() -> None:
         dirs: Optional[List[str]] = None,
     ) -> None:
         digest = Digest(digest_char * 64, 1000)
-        snapshot = Snapshot._create_for_testing(
-            digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"]
-        )
+        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
         assert hash(snapshot) == expected
 
     # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
@@ -1149,18 +1147,16 @@ def test_snapshot_hash() -> None:
 
 def test_snapshot_equality() -> None:
     # Only the digest is used for equality.
-    snapshot = Snapshot._create_for_testing(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot == Snapshot._create_for_testing(
+    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot == Snapshot._unsafe_create(
         Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
-    assert snapshot == Snapshot._create_for_testing(
+    assert snapshot == Snapshot._unsafe_create(
         Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
     )
-    assert snapshot == Snapshot._create_for_testing(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
-    assert snapshot != Snapshot._create_for_testing(
-        Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    assert snapshot != Snapshot._create_for_testing(
+    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
+    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot != Snapshot._unsafe_create(
         Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     with pytest.raises(TypeError):
