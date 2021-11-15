@@ -575,9 +575,7 @@ class SchedulerSession:
         # order in output lists.
         return [ret.value for _, ret in returns]
 
-    def capture_snapshots(
-        self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
-    ) -> list[Snapshot]:
+    def capture_snapshots(self, path_globs_and_roots: Iterable[PathGlobsAndRoot]) -> list[Snapshot]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
