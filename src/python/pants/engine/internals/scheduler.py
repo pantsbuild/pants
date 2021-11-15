@@ -469,12 +469,12 @@ class SchedulerSession:
 
         states = [
             Throw(
-                raw_root.result,
-                python_traceback=raw_root.python_traceback,
-                engine_traceback=raw_root.engine_traceback,
+                raw_root.result(),
+                python_traceback=raw_root.python_traceback(),
+                engine_traceback=raw_root.engine_traceback(),
             )
-            if raw_root.is_throw
-            else Return(raw_root.result)
+            if raw_root.is_throw()
+            else Return(raw_root.result())
             for raw_root in raw_roots
         ]
 

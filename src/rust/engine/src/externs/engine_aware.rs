@@ -7,8 +7,7 @@ use crate::nodes::{lift_directory_digest, lift_file_digest};
 use crate::python::{TypeId, Value};
 use crate::Types;
 
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use cpython::{ObjectProtocol, PyDict, PyString, Python};
 use workunit_store::{
   ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
 };
@@ -26,12 +25,12 @@ pub(crate) struct EngineAwareReturnType {
 }
 
 impl EngineAwareReturnType {
-  pub(crate) fn from_task_result(task_result: &PyAny, context: &Context) -> Self {
+  pub(crate) fn from_task_result(py: Python, task_result: &Value, context: &Context) -> Self {
     Self {
-      level: Self::level(task_result),
-      message: Self::message(task_result),
-      artifacts: Self::artifacts(&context.core.types, task_result).unwrap_or_else(Vec::new),
-      metadata: metadata(context, task_result).unwrap_or_else(Vec::new),
+      level: Self::level(py, task_result),
+      message: Self::message(py, task_result),
+      artifacts: Self::artifacts(py, &context.core.types, task_result).unwrap_or_else(Vec::new),
+      metadata: metadata(py, context, task_result).unwrap_or_else(Vec::new),
     }
   }
 
@@ -47,83 +46,91 @@ impl EngineAwareReturnType {
     });
   }
 
-  fn level(obj: &PyAny) -> Option<Level> {
-    let level_val = obj.call_method0("level").ok()?;
-    if level_val.is_none() {
+  fn level(py: Python, value: &Value) -> Option<Level> {
+    let level_val = externs::call_method0(py, value, "level").ok()?;
+    if level_val.is_none(py) {
       return None;
     }
-    externs::val_to_log_level(level_val).ok()
+    externs::val_to_log_level(&level_val).ok()
   }
 
-  fn message(obj: &PyAny) -> Option<String> {
-    let msg_val = obj.call_method0("message").ok()?;
-    if msg_val.is_none() {
+  fn message(py: Python, value: &Value) -> Option<String> {
+    let msg_val = externs::call_method0(py, value, "message").ok()?;
+    if msg_val.is_none(py) {
       return None;
     }
-    msg_val.extract().ok()
+    msg_val.extract(py).ok()
   }
 
-  fn artifacts(types: &Types, obj: &PyAny) -> Option<Vec<(String, ArtifactOutput)>> {
-    let artifacts_val = obj.call_method0("artifacts").ok()?;
-    if artifacts_val.is_none() {
+  fn artifacts(py: Python, types: &Types, value: &Value) -> Option<Vec<(String, ArtifactOutput)>> {
+    let artifacts_val = externs::call_method0(py, value, "artifacts").ok()?;
+    if artifacts_val.is_none(py) {
       return None;
     }
 
-    let artifacts_dict = artifacts_val.cast_as::<PyDict>().ok()?;
+    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
     let mut output = Vec::new();
 
-    for kv_pair in artifacts_dict.items().into_iter() {
-      let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if TypeId::new(value.get_type()) == types.file_digest {
-        lift_file_digest(types, value).map(ArtifactOutput::FileDigest)
+    for (key, value) in artifacts_dict.items(py).into_iter() {
+      let key_name: String = key.cast_as::<PyString>(py).ok()?.to_string_lossy(py).into();
+
+      let artifact_output = if TypeId::new(&value.get_type(py)) == types.file_digest {
+        lift_file_digest(types, &value).map(ArtifactOutput::FileDigest)
       } else {
-        let digest_value = value.getattr("digest").ok()?;
-        lift_directory_digest(digest_value).map(ArtifactOutput::Snapshot)
+        let digest_value = value.getattr(py, "digest").ok()?;
+        lift_directory_digest(&digest_value).map(ArtifactOutput::Snapshot)
       }
       .ok()?;
-      output.push((key, artifact_output));
+      output.push((key_name, artifact_output));
     }
     Some(output)
   }
 
-  pub(crate) fn is_cacheable(obj: &PyAny) -> Option<bool> {
-    obj.call_method0("cacheable").ok()?.extract().ok()
+  pub(crate) fn is_cacheable(py: Python, value: &Value) -> Option<bool> {
+    externs::call_method0(py, value, "cacheable")
+      .ok()?
+      .extract(py)
+      .ok()
   }
 }
 
 pub struct EngineAwareParameter;
 
 impl EngineAwareParameter {
-  pub fn debug_hint(obj: &PyAny) -> Option<String> {
-    let hint = obj.call_method0("debug_hint").ok()?;
-    if hint.is_none() {
+  pub fn debug_hint(py: Python, value: &Value) -> Option<String> {
+    let hint = externs::call_method0(py, value, "debug_hint").ok()?;
+    if hint.is_none(py) {
       return None;
     }
-    hint.extract().ok()
+    hint.extract(py).ok()
   }
 
-  pub fn metadata(context: &Context, obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
-    metadata(context, obj).unwrap_or_else(Vec::new)
+  pub fn metadata(py: Python, context: &Context, value: &Value) -> Vec<(String, UserMetadataItem)> {
+    metadata(py, context, value).unwrap_or_else(Vec::new)
   }
 }
 
-fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
-  let metadata_val = obj.call_method0("metadata").ok()?;
-  if metadata_val.is_none() {
+fn metadata(
+  py: Python,
+  context: &Context,
+  value: &Value,
+) -> Option<Vec<(String, UserMetadataItem)>> {
+  let metadata_val = externs::call_method0(py, value, "metadata").ok()?;
+  if metadata_val.is_none(py) {
     return None;
   }
 
   let mut output = Vec::new();
-  let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
+  let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
 
-  for kv_pair in metadata_dict.items().into_iter() {
-    let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
+  for (key, value) in metadata_dict.items(py).into_iter() {
+    let key_name: String = key.extract(py).ok()?;
     let py_value_handle = UserMetadataPyValue::new();
     let umi = UserMetadataItem::PyValue(py_value_handle.clone());
     context.session.with_metadata_map(|map| {
-      map.insert(py_value_handle.clone(), Value::new(value.into_py(obj.py())));
+      map.insert(py_value_handle.clone(), value.into());
     });
-    output.push((key, umi));
+    output.push((key_name, umi));
   }
   Some(output)
 }

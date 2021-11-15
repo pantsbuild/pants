@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::hash;
 use std::sync::atomic;
 
+use cpython::{ObjectProtocol, PyErr, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
-use pyo3::prelude::{PyResult, Python};
 
 use crate::externs;
 use crate::python::{Fnv, Key, Value};
@@ -51,10 +51,10 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn key_insert(&self, py: Python, v: Value) -> PyResult<Key> {
+  pub fn key_insert(&self, py: Python, v: Value) -> Result<Key, PyErr> {
     let (intern_key, type_id) = {
-      let obj = (*v).as_ref(py);
-      (InternKey(obj.hash()?, v.clone()), obj.get_type().into())
+      let obj = v.to_py_object(py).into();
+      (InternKey(v.hash(py)?, obj), (&v.get_type(py)).into())
     };
 
     py.allow_threads(|| {
@@ -99,7 +99,8 @@ impl Eq for InternKey {}
 
 impl PartialEq for InternKey {
   fn eq(&self, other: &InternKey) -> bool {
-    Python::with_gil(|py| externs::equals((*self.1).as_ref(py), (*other.1).as_ref(py)))
+    let gil = Python::acquire_gil();
+    externs::equals(gil.python(), &self.1, &other.1)
   }
 }
 

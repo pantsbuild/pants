@@ -18,11 +18,14 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+either = "1.6"
 fs = { path = "../fs" }
+hashing = { path = "../hashing" }
+itertools = "0.10"
 nailgun = { path = "../nailgun" }
 parking_lot = "0.11"
-# TODO: Switch back to official PyO3 once https://github.com/PyO3/pyo3/pull/1990 is released.
-pyo3 = { git = "https://github.com/davidhewitt/pyo3.git", rev = "51b6b947b82e61adad61524f9c58e3b1c89247a5" }
+pyo3 = "0.15"
+store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 testutil_mock = { package = "mock", path = "../testutil/mock" }
 workunit_store = { path = "../workunit_store" }
