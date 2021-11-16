@@ -107,7 +107,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             }
 
             object Functions {
-              def func1(a: Integer): Unit = {
+              def func1(a: Integer, b: AParameterType): Unit = {
                 val a = foo + 5
                 val b = bar(5, "hello") + OuterObject.NestedVal
               }
@@ -115,6 +115,12 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
             class ASubClass extends ABaseClass with ATrait1 with ATrait2.Nested { }
             trait ASubTrait extends ATrait1 with ATrait2.Nested { }
+
+            class HasPrimaryConstructor(foo: SomeTypeInPrimaryConstructor) extends BaseWithConstructor(foo) {
+               def this(bar: SomeTypeInSecondaryConstructor) {
+                 this(bar)
+               }
+            }
             """
             ),
         }
@@ -166,6 +172,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.Functions.func1",
             "org.pantsbuild.example.ASubClass",
             "org.pantsbuild.example.ASubTrait",
+            "org.pantsbuild.example.HasPrimaryConstructor",
         ]
     )
 
@@ -186,8 +193,13 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
-                ["bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
+                ["Integer", "AParameterType", "bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
             ),
-            "org.pantsbuild.example": FrozenOrderedSet(["ABaseClass", "ATrait1", "ATrait2.Nested"]),
+            "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
+                ["bar", "SomeTypeInSecondaryConstructor"]
+            ),
+            "org.pantsbuild.example": FrozenOrderedSet(
+                ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
+            ),
         }
     )
