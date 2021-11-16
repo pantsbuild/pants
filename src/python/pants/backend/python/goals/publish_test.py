@@ -23,6 +23,7 @@ from pants.util.frozendict import FrozenDict
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
+        preserve_tmpdirs=True,
         rules=[
             *config_files_rules(),
             *pex_from_targets.rules(),
