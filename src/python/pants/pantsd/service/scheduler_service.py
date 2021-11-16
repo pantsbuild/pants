@@ -114,9 +114,9 @@ class SchedulerService(PantsService):
 
     def _check_pidfile(self):
         try:
-            with open(self._pidfile, "r") as f:
+            with open(self._pidfile) as f:
                 pid_from_file = f.read()
-        except IOError:
+        except OSError:
             raise Exception(f"Could not read pants pidfile at {self._pidfile}.")
         if int(pid_from_file) != self._pid:
             raise Exception(f"Another instance of pantsd is running at {pid_from_file}")
@@ -140,7 +140,7 @@ class SchedulerService(PantsService):
         # that exist at startup are the only ones that can affect the running daemon.
         globs, _ = self._invalidation_globs_and_snapshot
         self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
-        self._logger.debug("watching invalidation patterns: {}".format(globs))
+        self._logger.debug(f"watching invalidation patterns: {globs}")
         pidfile_deadline = time.time() + self.PIDFILE_GRACE_PERIOD
 
         while not self._state.is_terminating:
