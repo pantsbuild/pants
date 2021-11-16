@@ -6,7 +6,6 @@ import pstats
 import shutil
 import subprocess
 import sys
-import unittest.mock
 import zipfile
 from contextlib import contextmanager
 from typing import Iterator
