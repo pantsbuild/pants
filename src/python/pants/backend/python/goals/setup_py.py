@@ -363,8 +363,6 @@ def validate_commands(commands: tuple[str, ...]):
     # happens in dependency order).  Note that `upload` and `register` were removed in
     # setuptools 42.0.0, in favor of Twine, but we still check for them in case the user modified
     # the default version used by our Setuptools subsystem.
-    # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
-    #  See https://github.com/pantsbuild/pants/issues/8935.
     if "upload" in commands or "register" in commands:
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands.")
 
