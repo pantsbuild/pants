@@ -15,7 +15,7 @@ from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -82,8 +82,7 @@ async def pylint_lint_partition(
 ) -> LintResult:
     requirements_pex_get = Get(
         Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             (field_set.address for field_set in partition.field_sets),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result

@@ -28,6 +28,7 @@ from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
+from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 
@@ -155,6 +156,11 @@ def main() -> None:
             f"--dockerfile-parser-extra-requirements={repr(DockerfileParser.default_extra_requirements)}",
             f"--dockerfile-parser-interpreter-constraints={repr(DockerfileParser.default_interpreter_constraints)}",
             f"--dockerfile-parser-lockfile={DockerfileParser.default_lockfile_path}",
+            # Twine.
+            f"--twine-version={TwineSubsystem.default_version}",
+            f"--twine-extra-requirements={repr(TwineSubsystem.default_extra_requirements)}",
+            f"--twine-interpreter-constraints={repr(TwineSubsystem.default_interpreter_constraints)}",
+            f"--twine-lockfile={TwineSubsystem.default_lockfile_path}",
             # Run the goal.
             "generate-lockfiles",
         ],

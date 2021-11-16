@@ -10,7 +10,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import ExportableData, ExportableDataRequest, ExportError, Symlink
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -45,8 +45,7 @@ async def export_venv(
 
     venv_pex = await Get(
         VenvPex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             (tgt.address for tgt in request.targets),
             internal_only=True,
             hardcoded_interpreter_constraints=min_interpreter,
