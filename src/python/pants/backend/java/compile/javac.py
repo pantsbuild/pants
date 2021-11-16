@@ -10,6 +10,7 @@ from pants.backend.java.dependency_inference.rules import (
     JavaInferredDependencies,
     JavaInferredDependenciesAndExportsRequest,
 )
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -244,6 +245,7 @@ async def compile_java_source(
 def rules():
     return [
         *collect_rules(),
+        *java_dep_inference_rules(),
         *jvm_compile_rules(),
         UnionRule(ClasspathEntryRequest, CompileJavaSourceRequest),
     ]

@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.java.dependency_inference import import_parser, symbol_mapper
+from pants.backend.java.dependency_inference import symbol_mapper
 from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
@@ -174,7 +174,6 @@ def rules():
         *collect_rules(),
         *artifact_mapper.rules(),
         *java_parser_rules(),
-        *import_parser.rules(),
         *symbol_mapper.rules(),
         *source_files_rules(),
         UnionRule(InferDependenciesRequest, InferJavaSourceDependencies),
