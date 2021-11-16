@@ -27,7 +27,7 @@ async def parse_java_imports(request: ParseJavaImportsRequest) -> ParsedJavaImpo
     analysis = await Get(
         JavaSourceDependencyAnalysis,
         SourceFiles,
-        source_files.snapshot,
+        source_files,
     )
     return ParsedJavaImports(imp.name for imp in analysis.imports)
 
