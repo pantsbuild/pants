@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipBlackField(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipBlackField),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipBlackField),
-        PythonTestTarget.register_plugin_field(SkipBlackField),
+        PythonSourceTarget.register_plugin_field(SkipBlackField),
         PythonTestsGeneratorTarget.register_plugin_field(SkipBlackField),
+        PythonTestTarget.register_plugin_field(SkipBlackField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipBlackField),
     ]

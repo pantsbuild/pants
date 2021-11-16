@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -29,14 +29,17 @@ class PutativeDockerTargetsRequest(PutativeTargetsRequest):
 async def find_putative_targets(
     req: PutativeDockerTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_dockerfiles = await Get(Paths, PathGlobs, req.search_paths.path_globs("Dockerfile"))
+    all_dockerfiles = await Get(Paths, PathGlobs, req.search_paths.path_globs("*Dockerfile*"))
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []
-    for dockerfile in unowned_dockerfiles:
+    for dockerfile in sorted(unowned_dockerfiles):
         dirname, filename = os.path.split(dockerfile)
+        kwargs = {}
+        if filename != DockerImageSourceField.default:
+            kwargs["source"] = filename
         pts.append(
             PutativeTarget.for_target_type(
-                DockerImageTarget, dirname, "docker", [filename], kwargs={"name": "docker"}
+                DockerImageTarget, dirname, "docker", [filename], kwargs=kwargs
             )
         )
     return PutativeTargets(pts)

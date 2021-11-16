@@ -257,84 +257,76 @@ impl StreamingWorkunitData {
     }
   }
 
-  pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
-  where
-    F: FnOnce(&[Workunit], &[Workunit]) -> T,
-  {
+  pub fn latest_workunits(&mut self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
     let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+    let mut started_messages = vec![];
+    let mut completed_messages = vec![];
 
-    let (started_workunits, completed_workunits) = {
-      let mut started_messages = vec![];
-      let mut completed_messages = vec![];
+    {
+      let receiver = self.msg_rx.lock();
+      while let Ok(msg) = receiver.try_recv() {
+        match msg {
+          StoreMsg::Started(started) => started_messages.push(started),
+          StoreMsg::Completed(span, metadata, time, new_counters) => {
+            completed_messages.push((span, metadata, time, new_counters))
+          }
+          StoreMsg::Canceled(..) => (),
+        }
+      }
+    }
 
-      {
-        let receiver = self.msg_rx.lock();
-        while let Ok(msg) = receiver.try_recv() {
-          match msg {
-            StoreMsg::Started(started) => started_messages.push(started),
-            StoreMsg::Completed(span, metadata, time, new_counters) => {
-              completed_messages.push((span, metadata, time, new_counters))
+    let mut workunit_records = self.workunit_records.lock();
+    let mut started_workunits: Vec<Workunit> = vec![];
+    for mut started in started_messages.into_iter() {
+      let span_id = started.span_id;
+      workunit_records.insert(span_id, started.clone());
+
+      if should_emit(&started) {
+        started.parent_id =
+          first_matched_parent(&workunit_records, started.parent_id, |_| false, should_emit);
+        started_workunits.push(started);
+      }
+    }
+
+    let mut completed_workunits: Vec<Workunit> = vec![];
+    for (span_id, new_metadata, end_time, new_counters) in completed_messages.into_iter() {
+      match workunit_records.entry(span_id) {
+        Entry::Vacant(_) => {
+          log::warn!("No previously-started workunit found for id: {}", span_id);
+          continue;
+        }
+        Entry::Occupied(o) => {
+          let (span_id, mut workunit) = o.remove_entry();
+          let time_span = match workunit.state {
+            WorkunitState::Completed { .. } => {
+              log::warn!("Workunit {} was already completed", span_id);
+              continue;
             }
-            StoreMsg::Canceled(..) => (),
+            WorkunitState::Started { start_time, .. } => {
+              TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
+            }
+          };
+          let new_state = WorkunitState::Completed { time_span };
+          workunit.state = new_state;
+          if let Some(metadata) = new_metadata {
+            workunit.metadata = metadata;
+          }
+          workunit.counters = new_counters;
+          workunit_records.insert(span_id, workunit.clone());
+
+          if should_emit(&workunit) {
+            workunit.parent_id = first_matched_parent(
+              &workunit_records,
+              workunit.parent_id,
+              |_| false,
+              should_emit,
+            );
+            completed_workunits.push(workunit);
           }
         }
       }
-
-      let mut workunit_records = self.workunit_records.lock();
-      let mut started_workunits: Vec<Workunit> = vec![];
-      for mut started in started_messages.into_iter() {
-        let span_id = started.span_id;
-        workunit_records.insert(span_id, started.clone());
-
-        if should_emit(&started) {
-          started.parent_id =
-            first_matched_parent(&workunit_records, started.parent_id, |_| false, should_emit);
-          started_workunits.push(started);
-        }
-      }
-
-      let mut completed_workunits: Vec<Workunit> = vec![];
-      for (span_id, new_metadata, end_time, new_counters) in completed_messages.into_iter() {
-        match workunit_records.entry(span_id) {
-          Entry::Vacant(_) => {
-            log::warn!("No previously-started workunit found for id: {}", span_id);
-            continue;
-          }
-          Entry::Occupied(o) => {
-            let (span_id, mut workunit) = o.remove_entry();
-            let time_span = match workunit.state {
-              WorkunitState::Completed { .. } => {
-                log::warn!("Workunit {} was already completed", span_id);
-                continue;
-              }
-              WorkunitState::Started { start_time, .. } => {
-                TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
-              }
-            };
-            let new_state = WorkunitState::Completed { time_span };
-            workunit.state = new_state;
-            if let Some(metadata) = new_metadata {
-              workunit.metadata = metadata;
-            }
-            workunit.counters = new_counters;
-            workunit_records.insert(span_id, workunit.clone());
-
-            if should_emit(&workunit) {
-              workunit.parent_id = first_matched_parent(
-                &workunit_records,
-                workunit.parent_id,
-                |_| false,
-                should_emit,
-              );
-              completed_workunits.push(workunit);
-            }
-          }
-        }
-      }
-      (started_workunits, completed_workunits)
-    };
-
-    f(&started_workunits, &completed_workunits)
+    }
+    (started_workunits, completed_workunits)
   }
 }
 
@@ -729,13 +721,8 @@ impl WorkunitStore {
     self.complete_workunit_impl(workunit, end_time);
   }
 
-  pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
-  where
-    F: FnOnce(&[Workunit], &[Workunit]) -> T,
-  {
-    self
-      .streaming_workunit_data
-      .with_latest_workunits(max_verbosity, f)
+  pub fn latest_workunits(&mut self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
+    self.streaming_workunit_data.latest_workunits(max_verbosity)
   }
 
   ///

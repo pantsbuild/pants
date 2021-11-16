@@ -23,7 +23,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
-    AvailableThirdPartyArtifacts,
     ThirdPartyPackageToArtifactMapping,
     find_artifact_mapping,
 )
@@ -43,7 +42,6 @@ async def infer_java_dependencies_via_imports(
     java_infer_subsystem: JavaInferSubsystem,
     first_party_dep_map: FirstPartySymbolMapping,
     third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
-    available_artifacts: AvailableThirdPartyArtifacts,
 ) -> InferredDependencies:
     if (
         not java_infer_subsystem.imports
@@ -83,9 +81,7 @@ async def infer_java_dependencies_via_imports(
         first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
         if java_infer_subsystem.third_party_imports:
-            third_party_matches = find_artifact_mapping(
-                typ, third_party_artifact_mapping, available_artifacts
-            )
+            third_party_matches = find_artifact_mapping(typ, third_party_artifact_mapping)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue

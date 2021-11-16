@@ -78,6 +78,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 }
                 type NestedType = Foo
                 object NestedObject {
+                  val valWithType: String = "foo"
                 }
             }
 
@@ -103,6 +104,22 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 type NestedType = Foo
                 object NestedObject {
                 }
+            }
+
+            object Functions {
+              def func1(a: Integer, b: AParameterType): Unit = {
+                val a = foo + 5
+                val b = bar(5, "hello") + OuterObject.NestedVal
+              }
+            }
+
+            class ASubClass extends ABaseClass with ATrait1 with ATrait2.Nested { }
+            trait ASubTrait extends ATrait1 with ATrait2.Nested { }
+
+            class HasPrimaryConstructor(foo: SomeTypeInPrimaryConstructor) extends BaseWithConstructor(foo) {
+               def this(bar: SomeTypeInSecondaryConstructor) {
+                 this(bar)
+               }
             }
             """
             ),
@@ -136,6 +153,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterClass.NestedClass",
             "org.pantsbuild.example.OuterClass.NestedType",
             "org.pantsbuild.example.OuterClass.NestedObject",
+            "org.pantsbuild.example.OuterClass.NestedObject.valWithType",
             "org.pantsbuild.example.OuterTrait",
             "org.pantsbuild.example.OuterTrait.NestedVal",
             "org.pantsbuild.example.OuterTrait.NestedVar",
@@ -150,6 +168,11 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.OuterObject.NestedClass",
             "org.pantsbuild.example.OuterObject.NestedType",
             "org.pantsbuild.example.OuterObject.NestedObject",
+            "org.pantsbuild.example.Functions",
+            "org.pantsbuild.example.Functions.func1",
+            "org.pantsbuild.example.ASubClass",
+            "org.pantsbuild.example.ASubTrait",
+            "org.pantsbuild.example.HasPrimaryConstructor",
         ]
     )
 
@@ -165,3 +188,52 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+    assert analysis.consumed_symbols_by_scope == FrozenDict(
+        {
+            "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
+            "org.pantsbuild.example.Functions": FrozenOrderedSet(
+                ["Integer", "AParameterType", "bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
+            ),
+            "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
+                ["bar", "SomeTypeInSecondaryConstructor"]
+            ),
+            "org.pantsbuild.example": FrozenOrderedSet(
+                ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
+            ),
+        }
+    )
+
+    assert set(analysis.fully_qualified_consumed_symbols()) == {
+        # Because they contain dots, and thus might be fully qualified. See #13545.
+        "ATrait2.Nested",
+        "OuterObject.NestedVal",
+        # Because of the wildcard import.
+        "java.io.+",
+        "java.io.ABaseClass",
+        "java.io.AParameterType",
+        "java.io.ATrait1",
+        "java.io.ATrait2.Nested",
+        "java.io.BaseWithConstructor",
+        "java.io.OuterObject.NestedVal",
+        "java.io.String",
+        "java.io.Unit",
+        "java.io.Integer",
+        "java.io.SomeTypeInSecondaryConstructor",
+        "java.io.bar",
+        "java.io.foo",
+        # Because it's the top-most scope in the file.
+        "org.pantsbuild.example.+",
+        "org.pantsbuild.example.ABaseClass",
+        "org.pantsbuild.example.AParameterType",
+        "org.pantsbuild.example.BaseWithConstructor",
+        "org.pantsbuild.example.Integer",
+        "org.pantsbuild.example.SomeTypeInSecondaryConstructor",
+        "org.pantsbuild.example.ATrait1",
+        "org.pantsbuild.example.ATrait2.Nested",
+        "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.String",
+        "org.pantsbuild.example.Unit",
+        "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.foo",
+    }
