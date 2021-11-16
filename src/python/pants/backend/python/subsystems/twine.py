@@ -71,7 +71,8 @@ class TwineSubsystem(PythonToolBase):
             help=(
                 "Path to a file containing PEM-format CA certificates used for verifying secure "
                 "connections when publishing python distributions.\n\n"
-                "Uses the value from `[GLOBAL].ca_certs_path` by default."
+                'Uses the value from `[GLOBAL].ca_certs_path` by default. Set to `"<none>"` to '
+                "not use the default CA certificate."
             ),
         )
 
@@ -101,7 +102,7 @@ class TwineSubsystem(PythonToolBase):
         ca_certs_path: str | None = self.options.ca_certs_path
         if ca_certs_path == "<inherit>":
             ca_certs_path = default_ca_certs_path
-        if not ca_certs_path:
+        if not ca_certs_path or ca_certs_path == "<none>":
             return None
 
         # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
