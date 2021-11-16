@@ -20,21 +20,21 @@ class TestCollections(unittest.TestCase):
         d1 = {"a": 1, "b": {"c": 2, "o": "z"}, "z": {"y": 0}}
         d2 = {"e": 3, "b": {"f": 4, "o": 9}, "g": {"h": 5}, "z": 7}
         recursively_update(d1, d2)
-        self.assertEqual(d1, {"a": 1, "b": {"c": 2, "f": 4, "o": 9}, "e": 3, "g": {"h": 5}, "z": 7})
+        assert d1 == {"a": 1, "b": {"c": 2, "f": 4, "o": 9}, "e": 3, "g": {"h": 5}, "z": 7}
 
     def test_assert_single_element(self) -> None:
         single_element = [1]
-        self.assertEqual(1, assert_single_element(single_element))
+        assert 1 == assert_single_element(single_element)
 
         no_elements: List[int] = []
-        with self.assertRaises(StopIteration):
+        with pytest.raises(StopIteration):
             assert_single_element(no_elements)
 
         too_many_elements = [1, 2]
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as cm:
             assert_single_element(too_many_elements)
         expected_msg = "iterable [1, 2] has more than one element."
-        self.assertEqual(expected_msg, str(cm.exception))
+        assert expected_msg == str(cm.exception)
 
     def test_ensure_list(self) -> None:
         # Reject single values by default, even if they're the expected type.

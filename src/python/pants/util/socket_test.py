@@ -21,9 +21,9 @@ class TestSocketUtils(unittest.TestCase):
         # cares that _some_ event happened so we choose a simpler mock here. See
         # https://docs.python.org/3/library/selectors.html#selectors.BaseSelector.select.
         mock_selector.select = unittest.mock.Mock(return_value=[(1, "")])
-        self.assertTrue(is_readable(mock_fileobj, timeout=0.1))
+        assert is_readable(mock_fileobj, timeout=0.1)
         mock_selector.select = unittest.mock.Mock(return_value=[])
-        self.assertFalse(is_readable(mock_fileobj, timeout=0.1))
+        assert not is_readable(mock_fileobj, timeout=0.1)
 
 
 class TestRecvBufferedSocket(unittest.TestCase):
@@ -39,20 +39,20 @@ class TestRecvBufferedSocket(unittest.TestCase):
         self.server_sock.close()
 
     def test_getattr(self):
-        self.assertTrue(inspect.ismethod(self.buf_sock.recv))
-        self.assertFalse(inspect.isbuiltin(self.buf_sock.recv))
-        self.assertTrue(inspect.isbuiltin(self.buf_sock.connect))
+        assert inspect.ismethod(self.buf_sock.recv)
+        assert not inspect.isbuiltin(self.buf_sock.recv)
+        assert inspect.isbuiltin(self.buf_sock.connect)
 
     def test_recv(self):
         self.server_sock.sendall(b"A" * 300)
-        self.assertEqual(self.buf_sock.recv(1), b"A")
-        self.assertEqual(self.buf_sock.recv(200), b"A" * 200)
-        self.assertEqual(self.buf_sock.recv(99), b"A" * 99)
+        assert self.buf_sock.recv(1) == b"A"
+        assert self.buf_sock.recv(200) == b"A" * 200
+        assert self.buf_sock.recv(99) == b"A" * 99
 
     def test_recv_max_larger_than_buf(self):
         double_chunk = self.chunk_size * 2
         self.server_sock.sendall(b"A" * double_chunk)
-        self.assertEqual(self.buf_sock.recv(double_chunk), b"A" * double_chunk)
+        assert self.buf_sock.recv(double_chunk) == b"A" * double_chunk
 
     @unittest.mock.patch("selectors.DefaultSelector", **PATCH_OPTS)
     def test_recv_check_calls(self, mock_selector):
@@ -65,12 +65,12 @@ class TestRecvBufferedSocket(unittest.TestCase):
 
         self.mock_socket.recv.side_effect = [b"A" * self.chunk_size, b"B" * self.chunk_size]
 
-        self.assertEqual(self.mocked_buf_sock.recv(128), b"A" * 128)
+        assert self.mocked_buf_sock.recv(128) == b"A" * 128
         self.mock_socket.recv.assert_called_once_with(self.chunk_size)
-        self.assertEqual(self.mocked_buf_sock.recv(128), b"A" * 128)
-        self.assertEqual(self.mocked_buf_sock.recv(128), b"A" * 128)
-        self.assertEqual(self.mocked_buf_sock.recv(128), b"A" * 128)
-        self.assertEqual(self.mock_socket.recv.call_count, 1)
+        assert self.mocked_buf_sock.recv(128) == b"A" * 128
+        assert self.mocked_buf_sock.recv(128) == b"A" * 128
+        assert self.mocked_buf_sock.recv(128) == b"A" * 128
+        assert self.mock_socket.recv.call_count == 1
 
-        self.assertEqual(self.mocked_buf_sock.recv(self.chunk_size), b"B" * self.chunk_size)
-        self.assertEqual(self.mock_socket.recv.call_count, 2)
+        assert self.mocked_buf_sock.recv(self.chunk_size) == b"B" * self.chunk_size
+        assert self.mock_socket.recv.call_count == 2

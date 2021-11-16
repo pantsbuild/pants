@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import unittest
 from functools import partial
 from textwrap import dedent
 from typing import Dict, List, Optional
@@ -15,7 +14,7 @@ from pants.util.contextutil import temporary_dir, temporary_file, temporary_file
 from pants.util.logging import LogLevel
 
 
-class OptionsBootstrapperTest(unittest.TestCase):
+class TestOptionsBootstrapper:
     @staticmethod
     def _config_path(path: Optional[str]) -> List[str]:
         if path is None:
