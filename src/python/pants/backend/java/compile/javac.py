@@ -66,22 +66,6 @@ async def compile_java_source(
         )
     )
 
-    # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
-    actual_direct_dependency_classpath_entries = direct_dependency_classpath_entries or ()
-    deps_to_classpath_entries = dict(
-        zip(request.component.dependencies, actual_direct_dependency_classpath_entries)
-    )
-    # Re-request inferred dependencies to get a list of export dependency addresses
-    inferred_dependencies = await MultiGet(
-        Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(tgt.address))
-        for tgt in request.component.members
-        if JavaFieldSet.is_applicable(tgt)
-    )
-    exports = (export for i in inferred_dependencies for export in i.exports)
-    export_targets = await Get(CoarsenedTargets, Addresses(exports))
-    export_classpath_entries_ = (deps_to_classpath_entries.get(export) for export in export_targets)
-    export_classpath_entries = [i for i in export_classpath_entries_ if i is not None]
-
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
@@ -89,6 +73,21 @@ async def compile_java_source(
             output=None,
             exit_code=1,
         )
+
+    # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
+    deps_to_classpath_entries = dict(
+        zip(request.component.dependencies, direct_dependency_classpath_entries or ())
+    )
+    # Re-request inferred dependencies to get a list of export dependency addresses
+    inferred_dependencies = await MultiGet(
+        Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(tgt.address))
+        for tgt in request.component.members
+        if JavaFieldSet.is_applicable(tgt)
+    )
+    flat_exports = (export for i in inferred_dependencies for export in i.exports)
+    export_targets = await Get(CoarsenedTargets, Addresses(flat_exports))
+    export_classpath_entries_ = (deps_to_classpath_entries.get(export) for export in export_targets)
+    export_classpath_entries = [i for i in export_classpath_entries_ if i is not None]
 
     # Then collect the component's sources.
     component_members_with_sources = tuple(
