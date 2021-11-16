@@ -34,7 +34,7 @@ class TestCollections(unittest.TestCase):
         with pytest.raises(ValueError) as cm:
             assert_single_element(too_many_elements)
         expected_msg = "iterable [1, 2] has more than one element."
-        assert expected_msg == str(cm.exception)
+        assert expected_msg == str(cm.value)
 
     def test_ensure_list(self) -> None:
         # Reject single values by default, even if they're the expected type.

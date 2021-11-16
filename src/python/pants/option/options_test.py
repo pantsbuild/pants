@@ -693,10 +693,10 @@ class OptionsTest(unittest.TestCase):
     def test_arg_scoping(self) -> None:
         # Some basic smoke tests.
         options = self._parse(flags="--verbose")
-        assert True == options.for_global_scope().verbose
+        assert options.for_global_scope().verbose is True
         options = self._parse(flags="-z compile path/to/tgt")
         assert ["path/to/tgt"] == options.specs
-        assert True == options.for_global_scope().verbose
+        assert options.for_global_scope().verbose is True
 
         with pytest.raises(ParseError):
             self._parse(flags="--unregistered-option compile").for_global_scope()

@@ -49,14 +49,14 @@ class TestDirutilTest:
         assert longest_dir_prefix("hello/world/pants", prefixes) == "hello/world"
         assert longest_dir_prefix("hello/", prefixes) == "hello"
         assert longest_dir_prefix("hello", prefixes) == "hello"
-        assert longest_dir_prefix("scoobydoobydoo", prefixes) == None
+        assert longest_dir_prefix("scoobydoobydoo", prefixes) is None
 
     def test_longest_dir_prefix_special(self) -> None:
         # Ensure that something that is a longest prefix, but not a longest dir
         # prefix, is not tagged.
         prefixes = ["helloworldhowareyou", "helloworld"]
-        assert longest_dir_prefix("helloworldhowareyoufine/", prefixes) == None
-        assert longest_dir_prefix("helloworldhowareyoufine", prefixes) == None
+        assert longest_dir_prefix("helloworldhowareyoufine/", prefixes) is None
+        assert longest_dir_prefix("helloworldhowareyoufine", prefixes) is None
 
     def test_fast_relpath(self) -> None:
         def assert_relpath(expected: str, path: str, start: str) -> None:
@@ -158,11 +158,11 @@ class TestDirutilTest:
         contents: str
 
         @classmethod
-        def empty(cls, path: str) -> DirutilTest.File:
+        def empty(cls, path: str) -> TestDirutilTest.File:
             return cls(path, contents="")
 
         @classmethod
-        def read(cls, root: str, relpath: str) -> DirutilTest.File:
+        def read(cls, root: str, relpath: str) -> TestDirutilTest.File:
             with open(os.path.join(root, relpath)) as fp:
                 return cls(relpath, fp.read())
 
@@ -171,7 +171,9 @@ class TestDirutilTest:
         path: str
 
     def assert_tree(self, root: str, *expected: Dir | File | Symlink):
-        def collect_tree() -> Iterator[DirutilTest.Dir | DirutilTest.File | DirutilTest.Symlink]:
+        def collect_tree() -> Iterator[
+            TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink
+        ]:
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:
