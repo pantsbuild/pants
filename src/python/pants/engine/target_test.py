@@ -1008,6 +1008,16 @@ def test_targets_with_sources_types() -> None:
     assert set(result) == {tgt2}
 
 
+def test_single_source_field_bans_globs() -> None:
+    class TestSingleSourceField(SingleSourceField):
+        pass
+
+    with pytest.raises(InvalidFieldException):
+        TestSingleSourceField("*.ext", Address("project"))
+    with pytest.raises(InvalidFieldException):
+        TestSingleSourceField("!f.ext", Address("project"))
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `ExplicitlyProvidedDependencies` helper functions
 # -----------------------------------------------------------------------------------------------
