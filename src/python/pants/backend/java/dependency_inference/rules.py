@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
-from itertools import groupby
 
 from pants.backend.java.dependency_inference import import_parser, symbol_mapper
 from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
@@ -109,10 +109,19 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
         types.update(maybe_qualify_types)
 
     # Resolve the export types into (probable) types:
-    consumed_type_mapping_ = sorted(((typ.rpartition(".")[2], typ) for typ in types))
-    consumed_type_mapping__ = groupby(consumed_type_mapping_, lambda i: i[0])
-    consumed_type_mapping = {i: {k[1] for k in j} for (i, j) in consumed_type_mapping__}
-    export_types = {i for typ in analysis.export_types for i in consumed_type_mapping.get(typ, [])}
+    # First produce a map of known consumed unqualified types to possible qualified names
+    consumed_type_mapping: dict[str, set[str]] = defaultdict(set)
+    for typ in types:
+        unqualified = typ.rpartition(".")[2]  # `"org.foo.Java"` -> `("org.foo", ".", "Java")`
+        consumed_type_mapping[unqualified].add(typ)
+
+    # Now take the list of unqualified export types and convert them to possible
+    # qualified names based on the guesses we made for consumed types
+    export_types = {
+        i for typ in analysis.export_types for i in consumed_type_mapping.get(typ, set())
+    }
+    # Finally, if there's a `.` in the name, it's probably fully qualified,
+    # so just add it unaltered
     export_types.update(typ for typ in analysis.export_types if "." in typ)
 
     dep_map = first_party_dep_map.symbols
