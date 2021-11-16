@@ -79,7 +79,10 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     address = request.address
     if not address.is_file_target:
-        raise Exception(f"Can only analyse file targets, Java ones at that. Address was: {address}")
+        raise Exception(
+            "Java source analysis requires a snapshot with a "
+            f"single Java source file, but was provided with address `{address}`."
+        )
     a = await Get(Digest, PathGlobs([address.filename]))
     s = await Get(Snapshot, Digest, a)
 
