@@ -9,6 +9,7 @@
 #     "CPython>=3.6"
 #   ],
 #   "generated_with_requirements": [
+#     "colorama>=0.4.3",
 #     "twine==3.6.0"
 #   ]
 # }
@@ -74,7 +75,7 @@ cffi==1.15.0; sys_platform == "linux" and python_version >= "3.6" \
 charset-normalizer==2.0.7; python_full_version >= "3.6.0" and python_version >= "3.6" \
     --hash=sha256:e019de665e2bcf9c2b64e2e5aa025fa991da8720daa3c1138cadd2fd1856aed0 \
     --hash=sha256:f7af805c321bfa1ce6714c51f254e0d5bb5e5834039bc17db7ebe3a4cec9492b
-colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and platform_system == "Windows" or python_full_version >= "3.5.0" and python_version >= "3.6" and platform_system == "Windows" \
+colorama==0.4.4; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0") \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
 cryptography==35.0.0; sys_platform == "linux" and python_version >= "3.6" \
@@ -155,10 +156,9 @@ tqdm==4.62.3; python_version >= "3.6" and python_full_version < "3.0.0" or pytho
 twine==3.6.0; python_version >= "3.6" \
     --hash=sha256:916070f8ecbd1985ebed5dbb02b9bda9a092882a96d7069d542d4fc0bb5c673c \
     --hash=sha256:4caad5ef4722e127b3749052fcbffaaf71719b19d4fd4973b29c469957adeba2
-typing-extensions==3.10.0.2; python_version < "3.8" and python_version >= "3.6" \
-    --hash=sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7 \
-    --hash=sha256:f1d25edafde516b146ecd0613dabcc61409817af4766fbbcfb8d1ad4ec441a34 \
-    --hash=sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e
+typing-extensions==4.0.0; python_version < "3.8" and python_version >= "3.6" \
+    --hash=sha256:829704698b22e13ec9eaf959122315eabb370b0884400e9818334d8b677023d9 \
+    --hash=sha256:2cdf80e4e04866a9b3689a51869016d36db0814d84b8d8a568d22781d45d27ed
 urllib3==1.22; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6" \
     --hash=sha256:06330f386d6e4b195fbfc736b297f58c5a892e4440e54d294d7004e3a9bbea1b \
     --hash=sha256:cc44da8e1145637334317feebd728bd869a35285b93cbb4cca2577da7e62db4f

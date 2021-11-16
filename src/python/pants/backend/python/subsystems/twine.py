@@ -22,6 +22,12 @@ class Twine(PythonToolBase):
     default_version = "twine==3.6.0"
     default_main = ConsoleScript("twine")
 
+    # This explicit dependency resolves a weird behavior in poetry, where it would include a sys
+    # platform constraint on "Windows" when this was included transitively from the twine
+    # requirements.
+    # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
+    default_extra_requirements = ["colorama>=0.4.3"]
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
 
