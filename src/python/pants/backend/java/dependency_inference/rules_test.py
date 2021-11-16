@@ -6,7 +6,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.dependency_inference.rules import InferJavaSourceDependencies
+from pants.backend.java.dependency_inference.rules import (
+    InferJavaSourceDependencies,
+    JavaInferredDependencies,
+    JavaInferredDependenciesAndExportsRequest,
+)
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
     JavaSourceField,
@@ -56,6 +60,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(InferredDependencies, [InferJavaSourceDependencies]),
+            QueryRule(JavaInferredDependencies, [JavaInferredDependenciesAndExportsRequest]),
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifact],
@@ -546,3 +551,86 @@ def test_junit_test_dep(rule_runner: RuleRunner) -> None:
     # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
     # inferred dependencies.
     assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses()
+
+
+@maybe_skip_jdk_test
+def test_exports(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 't',
+
+                )
+                """
+            ),
+            "A.java": dedent(
+                """\
+                package org.pantsbuild.a;
+
+                import org.pantsbuild.b.B;
+
+                public class A {}
+                """
+            ),
+            "B.java": dedent(
+                """\
+                package org.pantsbuild.b;
+
+                import org.pantsbuild.c.C;
+                import org.pantsbuild.d.D;
+
+                public class B extends C {}
+                """
+            ),
+            "C.java": dedent(
+                """\
+                package org.pantsbuild.c;
+
+                public class C {}
+                """
+            ),
+            "D.java": dedent(
+                """\
+                package org.pantsbuild.d;
+
+                public class D {}
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.java"))
+    target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
+
+    # B should depend on C and D, but only export C
+    assert rule_runner.request(
+        JavaInferredDependencies,
+        [JavaInferredDependenciesAndExportsRequest(target_b[JavaSourceField].address)],
+    ) == JavaInferredDependencies(
+        dependencies=FrozenOrderedSet(
+            [
+                Address("", target_name="t", relative_file_path="C.java"),
+                Address("", target_name="t", relative_file_path="D.java"),
+            ]
+        ),
+        exports=FrozenOrderedSet(
+            [
+                Address("", target_name="t", relative_file_path="C.java"),
+            ]
+        ),
+    )
+
+    # A should depend on B, but not B's dependencies or export types
+    assert rule_runner.request(
+        JavaInferredDependencies,
+        [JavaInferredDependenciesAndExportsRequest(target_a[JavaSourceField].address)],
+    ) == JavaInferredDependencies(
+        dependencies=FrozenOrderedSet(
+            [
+                Address("", target_name="t", relative_file_path="B.java"),
+            ]
+        ),
+        exports=FrozenOrderedSet([]),
+    )
