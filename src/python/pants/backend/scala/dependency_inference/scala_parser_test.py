@@ -203,3 +203,37 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+    assert set(analysis.fully_qualified_consumed_symbols()) == {
+        # Because they contain dots, and thus might be fully qualified. See #13545.
+        "ATrait2.Nested",
+        "OuterObject.NestedVal",
+        # Because of the wildcard import.
+        "java.io.+",
+        "java.io.ABaseClass",
+        "java.io.AParameterType",
+        "java.io.ATrait1",
+        "java.io.ATrait2.Nested",
+        "java.io.BaseWithConstructor",
+        "java.io.OuterObject.NestedVal",
+        "java.io.String",
+        "java.io.Unit",
+        "java.io.Integer",
+        "java.io.SomeTypeInSecondaryConstructor",
+        "java.io.bar",
+        "java.io.foo",
+        # Because it's the top-most scope in the file.
+        "org.pantsbuild.example.+",
+        "org.pantsbuild.example.ABaseClass",
+        "org.pantsbuild.example.AParameterType",
+        "org.pantsbuild.example.BaseWithConstructor",
+        "org.pantsbuild.example.Integer",
+        "org.pantsbuild.example.SomeTypeInSecondaryConstructor",
+        "org.pantsbuild.example.ATrait1",
+        "org.pantsbuild.example.ATrait2.Nested",
+        "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.String",
+        "org.pantsbuild.example.Unit",
+        "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.foo",
+    }

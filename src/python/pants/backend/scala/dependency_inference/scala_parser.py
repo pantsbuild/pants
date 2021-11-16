@@ -7,7 +7,7 @@ import logging
 import os
 import pkgutil
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
@@ -115,12 +115,52 @@ class ScalaSourceDependencyAnalysis:
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
 
-    def all_imports(self) -> frozenset[str]:
-        all_symbols: set[str] = set()
+    def all_imports(self) -> Iterator[str]:
+        # TODO: This might also be an import relative to its scope.
         for imports in self.imports_by_scope.values():
             for imp in imports:
-                all_symbols.add(imp.name)
-        return frozenset(all_symbols)
+                yield imp.name
+
+    def fully_qualified_consumed_symbols(self) -> Iterator[str]:
+        """Consumed symbols qualified in various ways.
+
+        This method _will_ introduce false-positives, because we will assume that the symbol could
+        have been provided by any wildcard import in scope, as well as being declared in the current
+        package.
+        """
+        # TODO: We compute "the package" as the "shortest scope in the file" to handle the most
+        # common case of consuming a type from within your package. But this doesn't account
+        # for the fact that any of the intermediate scopes might be relevant as well. Solving that
+        # would require resolving the type recursively upward.
+        package = min(
+            (*self.imports_by_scope.keys(), *self.consumed_symbols_by_scope.keys()),
+            key=len,
+            default="",
+        )
+
+        # Collect all wildcard imports.
+        wildcard_imports_by_scope = {}
+        for scope, imports in self.imports_by_scope.items():
+            wildcard_imports = tuple(imp for imp in imports if imp.is_wildcard)
+            if wildcard_imports:
+                wildcard_imports_by_scope[scope] = wildcard_imports
+
+        for scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+            parent_scope_wildcards = {
+                wi
+                for s, wildcard_imports in wildcard_imports_by_scope.items()
+                for wi in wildcard_imports
+                if scope.startswith(s)
+            }
+            for symbol in consumed_symbols:
+                if package:
+                    yield f"{package}.{symbol}"
+                if not package or "." in symbol:
+                    # TODO: Similar to #13545: we assume that a symbol containing a dot might already
+                    # be fully qualified.
+                    yield symbol
+                for wildcard_scope in parent_scope_wildcards:
+                    yield f"{wildcard_scope.name}.{symbol}"
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
