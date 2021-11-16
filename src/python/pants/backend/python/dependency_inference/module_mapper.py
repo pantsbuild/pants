@@ -30,6 +30,7 @@ from pants.engine.target import AllTargets, SourcesPathsRequest, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ class FirstPartyPythonMappingImpl:
 
     mapping: FrozenDict[str, tuple[Address, ...]]
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
+    modules_with_type_stub: FrozenOrderedSet[str] = FrozenOrderedSet()
 
 
 @union
@@ -106,6 +108,7 @@ class FirstPartyPythonModuleMapping:
 
     mapping: FrozenDict[str, tuple[Address, ...]]
     ambiguous_modules: FrozenDict[str, tuple[Address, ...]]
+    modules_with_type_stub: FrozenOrderedSet[str] = FrozenOrderedSet()
 
     def addresses_for_module(self, module: str) -> tuple[tuple[Address, ...], tuple[Address, ...]]:
         """Return all unambiguous and ambiguous addresses.
@@ -132,6 +135,16 @@ class FirstPartyPythonModuleMapping:
         ambiguous = self.ambiguous_modules.get(parent_module, ())
         return unambiguous, ambiguous
 
+    def has_type_stub(self, module: str) -> bool:
+        if module in self.modules_with_type_stub:
+            return True
+
+        # Also check for the parent module if relevant. See self.addresses_for_module.
+        if "." not in module:
+            return False
+        parent_module = module.rsplit(".", maxsplit=1)[0]
+        return parent_module in self.modules_with_type_stub
+
 
 @rule(level=LogLevel.DEBUG)
 async def merge_first_party_module_mappings(
@@ -146,8 +159,7 @@ async def merge_first_party_module_mappings(
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
 
-    # First, record all known ambiguous modules. We will need to check that an implementation's
-    # module is not ambiguous within another implementation.
+    # First, record all known ambiguous modules.
     modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
     for mapping_impl in all_mappings:
         for module, addresses in mapping_impl.ambiguous_modules.items():
@@ -156,6 +168,7 @@ async def merge_first_party_module_mappings(
     # Then, merge the unambiguous modules within each MappingImpls while checking for ambiguity
     # across the other implementations.
     modules_to_addresses: dict[str, tuple[Address, ...]] = {}
+    modules_with_type_stub: set[str] = set()
     for mapping_impl in all_mappings:
         for module, addresses in mapping_impl.mapping.items():
             if module in modules_with_multiple_implementations:
@@ -166,17 +179,21 @@ async def merge_first_party_module_mappings(
                 )
             else:
                 modules_to_addresses[module] = addresses
+                if module in mapping_impl.modules_with_type_stub:
+                    modules_with_type_stub.add(module)
 
     # Finally, remove any newly ambiguous modules from the previous step.
     for module in modules_with_multiple_implementations:
         if module in modules_to_addresses:
             modules_to_addresses.pop(module)
+            modules_with_type_stub.discard(module)
 
     return FirstPartyPythonModuleMapping(
         mapping=FrozenDict(sorted(modules_to_addresses.items())),
         ambiguous_modules=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_implementations.items())
         ),
+        modules_with_type_stub=FrozenOrderedSet(modules_with_type_stub),
     )
 
 
@@ -196,26 +213,31 @@ async def map_first_party_python_targets_to_modules(
     )
 
     modules_to_addresses: DefaultDict[str, list[Address]] = defaultdict(list)
+    modules_with_type_stub: set[str] = set()
     modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, stripped_sources in zip(all_python_targets.first_party, stripped_sources_per_target):
         # `PythonSourceFile` validates that each target has exactly one file.
         assert len(stripped_sources) == 1
-        stripped_f = stripped_sources[0]
+        stripped_f = PurePath(stripped_sources[0])
+        is_type_stub = stripped_f.suffix == ".pyi"
 
-        module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
+        module = PythonModule.create_from_stripped_path(stripped_f).module
         if module not in modules_to_addresses:
             modules_to_addresses[module].append(tgt.address)
+            if is_type_stub:
+                modules_with_type_stub.add(module)
             continue
 
         # Else, possible ambiguity. Check if one of the targets is an implementation
         # (.py file) and the other is a type stub (.pyi file), which we allow. Otherwise, it's
         # ambiguous.
-        prior_is_type_stub = len(modules_to_addresses[module]) == 1 and modules_to_addresses[
-            module
-        ][0].filename.endswith(".pyi")
-        current_is_type_stub = tgt.address.filename.endswith(".pyi")
-        if prior_is_type_stub ^ current_is_type_stub:
+        prior_is_type_stub = (
+            len(modules_to_addresses[module]) == 1 and module in modules_with_type_stub
+        )
+        if is_type_stub ^ prior_is_type_stub:
             modules_to_addresses[module].append(tgt.address)
+            if is_type_stub:
+                modules_with_type_stub.add(module)
         else:
             modules_with_multiple_implementations[module].update(
                 {*modules_to_addresses[module], tgt.address}
@@ -224,12 +246,14 @@ async def map_first_party_python_targets_to_modules(
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_implementations:
         modules_to_addresses.pop(module)
+        modules_with_type_stub.discard(module)
 
     return FirstPartyPythonMappingImpl(
         mapping=FrozenDict((k, tuple(sorted(v))) for k, v in sorted(modules_to_addresses.items())),
         ambiguous_modules=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_implementations.items())
         ),
+        modules_with_type_stub=FrozenOrderedSet(modules_with_type_stub),
     )
 
 
@@ -407,10 +431,11 @@ async def map_module_to_address(
     # otherwise, we have ambiguous implementations.
     if third_party_addresses and not first_party_addresses:
         return PythonModuleOwners(third_party_addresses)
-    first_party_is_type_stub = len(first_party_addresses) == 1 and first_party_addresses[
-        0
-    ].filename.endswith(".pyi")
-    if len(third_party_addresses) == 1 and first_party_is_type_stub:
+    if (
+        len(third_party_addresses) == 1
+        and len(first_party_addresses) == 1
+        and first_party_mapping.has_type_stub(module.module)
+    ):
         return PythonModuleOwners((*third_party_addresses, *first_party_addresses))
     # Else, we have ambiguity between the third-party and first-party addresses.
     if third_party_addresses and first_party_addresses:
