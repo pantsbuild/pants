@@ -1729,20 +1729,6 @@ class SingleSourceField(SourcesField, StringField):
         return value_or_default
 
     @property
-    def file_path(self) -> str | None:
-        """The path to the file, relative to the build root.
-
-        This works without hydration because we validate that `*` globs and `!` ignores are not
-        used. However, consider still hydrating so that you verify the source file actually exists.
-
-        The return type is optional because it's possible to have 0-1 files. Most subclasses
-        will have 1 file, though.
-        """
-        if self.value is None:
-            return None
-        return os.path.join(self.address.spec_path, self.value)
-
-    @property
     def globs(self) -> tuple[str, ...]:
         # Subclasses might override `required = False`, so `self.value` could be `None`.
         if self.value is None:

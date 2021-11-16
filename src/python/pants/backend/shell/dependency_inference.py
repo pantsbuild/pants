@@ -61,7 +61,6 @@ class ShellMapping:
 
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
 async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
-    # We could simply look at `ShellSourceField.file_path`, but we want to validate the file exists.
     sources_per_target = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourceField])) for tgt in tgts
     )
