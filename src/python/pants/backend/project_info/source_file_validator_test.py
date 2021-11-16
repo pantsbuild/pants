@@ -19,19 +19,19 @@ from pants.backend.project_info.source_file_validator import (
 class TestMatcher:
     def test_match(self):
         m = Matcher(r"Here is a two-digit number: \d\d")
-        self.assertTrue(m.matches("Here is a two-digit number: 42"))
-        self.assertFalse(m.matches("Here is a two-digit number: 4"))
+        assert m.matches("Here is a two-digit number: 42")
+        assert not m.matches("Here is a two-digit number: 4")
 
     def test_inverse_match(self):
         m = Matcher(r"Here is a two-digit number: \d\d", inverted=True)
-        self.assertFalse(m.matches("Here is a two-digit number: 42"))
-        self.assertTrue(m.matches("Here is a two-digit number: 4"))
+        assert not m.matches("Here is a two-digit number: 42")
+        assert m.matches("Here is a two-digit number: 4")
 
     def test_multiline_match(self):
         m = Matcher("^bar$")
-        self.assertFalse(m.matches("foo\nbar\nbaz\n"))
+        assert not m.matches("foo\nbar\nbaz\n")
         m = Matcher("(?m)^bar$")
-        self.assertTrue(m.matches("foo\nbar\nbaz\n"))
+        assert m.matches("foo\nbar\nbaz\n")
 
 
 class TestMultiMatcherTest:
