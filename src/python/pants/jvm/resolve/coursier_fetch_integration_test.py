@@ -253,9 +253,9 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
     expected_exception_msg = (
         r".*?CoursierError:.*?Coursier fetch for .*?hamcrest.*? succeeded.*?"
         r"66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9.*?"
-        r"serialized_bytes_length=45024.*?"
+        r", 45024.*?"
         r"did not match.*?66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9.*?"
-        r"serialized_bytes_length=1\).*?"
+        r", 1\).*?"
     )
     lockfile_entry = CoursierLockfileEntry(
         coord=HAMCREST_COORD,

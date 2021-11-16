@@ -1,13 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
+from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 from pants.base.build_root import BuildRoot
-from pants.engine.internals import native_engine_pyo3
+from pants.engine.internals import native_engine
 from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
@@ -29,7 +31,7 @@ def get_buildroot() -> str:
 
 def get_pants_cachedir() -> str:
     """Return the Pants global cache directory."""
-    return native_engine_pyo3.default_cache_path()
+    return native_engine.default_cache_path()
 
 
 def get_default_pants_config_file() -> str:
@@ -48,22 +50,23 @@ def is_in_container() -> bool:
     )
 
 
-_Git: Optional[Git] = None
+class _GitIinitialized(Enum):
+    NO = 0
 
 
-def get_git() -> Optional[Git]:
+_Git: _GitIinitialized | Git | None = _GitIinitialized.NO
+
+
+def get_git() -> Git | None:
     """Returns Git, if available."""
     global _Git
-    if _Git:
-        return _Git
-
-    # We know about Git, so attempt an auto-configure
-    worktree = Git.detect_worktree()
-    if worktree and os.path.isdir(worktree):
-        git = Git(worktree=worktree)
+    if _Git is _GitIinitialized.NO:
+        # We know about Git, so attempt an auto-configure
         try:
-            logger.debug(f"Detected git repository at {worktree} on branch {git.branch_name}")
+            git = Git.mount()
+            logger.debug(f"Detected git repository at {git.worktree} on branch {git.branch_name}")
             _Git = git
         except GitException as e:
-            logger.info(f"Failed to load git repository at {worktree}: {e!r}")
+            logger.info(f"No git repository at {os.getcwd()}: {e!r}")
+            _Git = None
     return _Git

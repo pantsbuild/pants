@@ -8,10 +8,10 @@ use pyo3::exceptions::PyAssertionError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use crate::externs::interface::scheduler::PyExecutor;
+use crate::externs::scheduler::PyExecutor;
 use testutil_mock::{StubCAS, StubCASBuilder};
 
-pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+pub fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyStubCAS>()?;
   m.add_class::<PyStubCASBuilder>()?;
   Ok(())

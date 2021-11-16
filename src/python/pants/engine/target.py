@@ -1709,6 +1709,25 @@ class SingleSourceField(SourcesField, StringField):
     required = True
     expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
 
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        if "*" in value_or_default:
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} should not include `*` globs, "
+                f"but was set to {value_or_default}. Instead, use a literal file path (relative "
+                "to the BUILD file)."
+            )
+        if value_or_default.startswith("!"):
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} should not start with `!`, which "
+                f"is usually used in the `sources` field to exclude certain files. Instead, use a "
+                "literal file path (relative to the BUILD file)."
+            )
+        return value_or_default
+
     @property
     def globs(self) -> tuple[str, ...]:
         # Subclasses might override `required = False`, so `self.value` could be `None`.

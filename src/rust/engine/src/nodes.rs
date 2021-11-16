@@ -15,6 +15,8 @@ use bytes::Bytes;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
+use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::IntoPy;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -23,8 +25,6 @@ use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::selectors;
 use crate::tasks::{self, Rule};
-use crate::Types;
-use cpython::{PyObject, Python, PythonObject};
 use fs::{
   self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
@@ -36,8 +36,9 @@ use process_execution::{
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
+use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
-use hashing::{Digest, Fingerprint};
+use hashing::Digest;
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -264,22 +265,14 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &PyObject) -> Result<hashing::Digest, String> {
-  externs::fs::from_py_digest(digest).map_err(|e| format!("{:?}", e))
+pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+  let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  Ok(py_digest.0)
 }
 
-pub fn lift_file_digest(types: &Types, digest: &PyObject) -> Result<hashing::Digest, String> {
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-  if TypeId::new(&digest.get_type(py)) != types.file_digest {
-    return Err(format!("{} is not of type {}.", digest, types.file_digest));
-  }
-  let fingerprint: String = externs::getattr(digest, "fingerprint").unwrap();
-  let digest_length: usize = externs::getattr(digest, "serialized_bytes_length").unwrap();
-  Ok(hashing::Digest::new(
-    hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length,
-  ))
+pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+  let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  Ok(py_file_digest.0)
 }
 
 /// A Node that represents a set of processes to execute on specific platforms.
@@ -291,18 +284,15 @@ pub struct MultiPlatformExecuteProcess {
 }
 
 impl MultiPlatformExecuteProcess {
-  fn lift_process(value: &Value, platform_constraint: Option<Platform>) -> Result<Process, String> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
+  fn lift_process(value: &PyAny, platform_constraint: Option<Platform>) -> Result<Process, String> {
     let env = externs::getattr_from_str_frozendict(value, "env");
-    let working_directory =
-      match externs::getattr_as_optional_string(py, value, "working_directory") {
-        None => None,
-        Some(dir) => Some(RelativePath::new(dir)?),
-      };
+    let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
+      None => None,
+      Some(dir) => Some(RelativePath::new(dir)?),
+    };
 
-    let py_digest: Value = externs::getattr(value, "input_digest").unwrap();
-    let digest = lift_directory_digest(&py_digest)
+    let py_digest = externs::getattr(value, "input_digest").unwrap();
+    let digest = lift_directory_digest(py_digest)
       .map_err(|err| format!("Error parsing input_digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
@@ -326,26 +316,26 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description: String = externs::getattr(value, "description").unwrap();
-    let py_level: PyObject = externs::getattr(value, "level").unwrap();
-    let level = externs::val_to_log_level(&py_level)?;
+    let py_level = externs::getattr(value, "level").unwrap();
+    let level = externs::val_to_log_level(py_level)?;
 
     let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
       .into_iter()
       .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
-    let jdk_home = externs::getattr_as_optional_string(py, value, "jdk_home").map(PathBuf::from);
+    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
 
-    let py_use_nailgun: Value = externs::getattr(value, "use_nailgun").unwrap();
-    let use_nailgun = lift_directory_digest(&py_use_nailgun)
+    let py_use_nailgun = externs::getattr(value, "use_nailgun").unwrap();
+    let use_nailgun = lift_directory_digest(py_use_nailgun)
       .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
 
     let execution_slot_variable =
-      externs::getattr_as_optional_string(py, value, "execution_slot_variable");
+      externs::getattr_as_optional_string(value, "execution_slot_variable");
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum: PyObject = externs::getattr(value, "cache_scope").unwrap();
-      externs::getattr::<String>(&cache_scope_enum, "name")
+      let cache_scope_enum = externs::getattr(value, "cache_scope").unwrap();
+      externs::getattr::<String>(cache_scope_enum, "name")
         .unwrap()
         .try_into()?
     };
@@ -369,7 +359,7 @@ impl MultiPlatformExecuteProcess {
     })
   }
 
-  pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+  pub fn lift(value: &PyAny) -> Result<MultiPlatformExecuteProcess, String> {
     let raw_constraints = externs::getattr::<Vec<Option<String>>>(value, "platform_constraints")?;
     let constraints = raw_constraints
       .into_iter()
@@ -378,7 +368,7 @@ impl MultiPlatformExecuteProcess {
         None => Ok(None),
       })
       .collect::<Result<Vec<_>, _>>()?;
-    let processes = externs::getattr::<Vec<Value>>(value, "processes")?;
+    let processes = externs::getattr::<Vec<&PyAny>>(value, "processes")?;
     if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
@@ -388,7 +378,7 @@ impl MultiPlatformExecuteProcess {
     }
 
     let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
-    for (constraint, execute_process) in constraints.iter().zip(processes.iter()) {
+    for (constraint, execute_process) in constraints.iter().zip(processes.into_iter()) {
       let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
       request_by_constraint.insert(*constraint, underlying_req.clone());
     }
@@ -749,66 +739,42 @@ impl Snapshot {
       .await
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
+  pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
-    let description_of_origin =
-      externs::getattr_as_optional_string(py, item, "description_of_origin");
+    let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin");
 
-    let glob_match_error_behavior: PyObject =
-      externs::getattr(item, "glob_match_error_behavior").unwrap();
-    let failure_behavior: String = externs::getattr(&glob_match_error_behavior, "value").unwrap();
+    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
+    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj: PyObject = externs::getattr(item, "conjunction").unwrap();
-    let conjunction_string: String = externs::getattr(&conjunction_obj, "value").unwrap();
+    let conjunction_obj = externs::getattr(item, "conjunction").unwrap();
+    let conjunction_string: String = externs::getattr(conjunction_obj, "value").unwrap();
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
 
-  pub fn lift_prepared_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
+  pub fn lift_prepared_path_globs(item: &PyAny) -> Result<PreparedPathGlobs, String> {
     let path_globs = Snapshot::lift_path_globs(item)?;
     path_globs
       .parse()
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(py: Python, item: &hashing::Digest) -> Result<Value, String> {
-    externs::fs::to_py_digest(py, *item)
-      .map(|d| d.into_object().into())
-      .map_err(|e| format!("{:?}", e))
+  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+    let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_digest.into_py(py)))
   }
 
-  pub fn lift_file_digest(item: &PyObject) -> Result<hashing::Digest, String> {
-    let fingerprint: String = externs::getattr(item, "fingerprint").unwrap();
-    let serialized_bytes_length: usize = externs::getattr(item, "serialized_bytes_length")?;
-    Ok(hashing::Digest::new(
-      Fingerprint::from_hex_string(&fingerprint)?,
-      serialized_bytes_length,
-    ))
-  }
-
-  pub fn store_file_digest(
-    py: Python,
-    types: &crate::types::Types,
-    item: &hashing::Digest,
-  ) -> Value {
-    externs::unsafe_call(
-      py,
-      types.file_digest,
-      &[
-        externs::store_utf8(py, &item.hash.to_hex()),
-        externs::store_i64(py, item.size_bytes as i64),
-      ],
-    )
+  pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+    let py_file_digest =
+      Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_file_digest.into_py(py)))
   }
 
   pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
-    externs::fs::to_py_snapshot(py, item)
-      .map(|d| d.into_object().into())
-      .map_err(|e| format!("{:?}", e))
+    let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{}", e))?;
+    Ok(Value::new(py_snapshot.into_py(py)))
   }
 
   fn store_path(py: Python, item: &Path) -> Result<Value, String> {
@@ -845,7 +811,7 @@ impl Snapshot {
       types.file_entry,
       &[
         Self::store_path(py, &item.path)?,
-        Self::store_file_digest(py, types, &item.digest),
+        Self::store_file_digest(py, item.digest)?,
         externs::store_bool(py, item.is_executable),
       ],
     ))
@@ -991,15 +957,17 @@ impl WrappedNode for DownloadedFile {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Digest> {
-    let value = self.0.to_value();
-    let url_str: String = externs::getattr(&value, "url").unwrap();
-
+    let (url_str, expected_digest) = Python::with_gil(|py| {
+      let py_download_file_val = self.0.to_value();
+      let py_download_file = (*py_download_file_val).as_ref(py);
+      let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let py_file_digest: PyFileDigest =
+        externs::getattr(py_download_file, "expected_digest").unwrap();
+      let res: NodeResult<(String, Digest)> = Ok((url_str, py_file_digest.0));
+      res
+    })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
-
-    let py_digest: Value = externs::getattr(&value, "expected_digest").unwrap();
-    let expected_digest = lift_file_digest(&context.core.types, &py_digest).map_err(throw)?;
-
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
       .await
@@ -1122,7 +1090,7 @@ impl Task {
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-  ) -> NodeResult<Value> {
+  ) -> NodeResult<(Value, TypeId)> {
     let mut input = {
       let gil = Python::acquire_gil();
       Value::from(gil.python().None())
@@ -1131,7 +1099,8 @@ impl Task {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();
-      match externs::generator_send(&generator, &input)? {
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
+      match response {
         externs::GeneratorResponse::Get(get) => {
           let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
@@ -1141,8 +1110,8 @@ impl Task {
           let gil = Python::acquire_gil();
           input = externs::store_tuple(gil.python(), values);
         }
-        externs::GeneratorResponse::Break(val) => {
-          break Ok(val);
+        externs::GeneratorResponse::Break(val, type_id) => {
+          break Ok((val, type_id));
         }
       }
     }
@@ -1192,28 +1161,31 @@ impl WrappedNode for Task {
 
     let func = self.task.func;
 
-    let mut result_val: Value =
+    let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
-        externs::call_function(&func.0.to_value(), &deps).map_err(Failure::from_py_err)
+        Python::with_gil(|py| {
+          let func_val = func.0.to_value();
+          let func = (*func_val).as_ref(py);
+          externs::call_function(func, &deps)
+            .map(|res| {
+              let type_id = TypeId::new(res.get_type());
+              let val = Value::new(res.into_py(py));
+              (val, type_id)
+            })
+            .map_err(Failure::from_py_err)
+        })
       })
-      .await?
-      .into();
-    let mut result_type = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      TypeId::new(&result_val.get_type(py))
-    };
+      .await?;
 
     if result_type == context.core.types.coroutine {
-      result_val = maybe_side_effecting(
+      let (new_val, new_type) = maybe_side_effecting(
         self.task.side_effecting,
         &self.side_effected,
         Self::generate(&context, workunit, params, self.entry, result_val),
       )
       .await?;
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      result_type = TypeId::new(&result_val.get_type(py));
+      result_val = new_val;
+      result_type = new_type;
     }
 
     if result_type != self.product {
@@ -1226,7 +1198,7 @@ impl WrappedNode for Task {
     let engine_aware_return_type = if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result(py, &result_val, &context)
+      EngineAwareReturnType::from_task_result((*result_val).as_ref(py), &context)
     } else {
       EngineAwareReturnType::default()
     };
@@ -1411,10 +1383,12 @@ impl Node for NodeKey {
           .params
           .keys()
           .filter_map(|key| {
-            if key
-              .type_id()
-              .as_py_type(py)
-              .is_subtype_of(py, &engine_aware_param_ty)
+            // TODO: Switch to PyO3's upcoming mechanism for this:
+            // https://github.com/PyO3/pyo3/pull/1985.
+            if engine_aware_param_ty
+              .call_method1("__subclasscheck__", (key.type_id().as_py_type(py),))
+              .map(|res| res.extract::<bool>().unwrap_or(false))
+              .unwrap_or(false)
             {
               Some(key.to_value())
             } else {
@@ -1430,7 +1404,7 @@ impl Node for NodeKey {
       let py = gil.python();
       engine_aware_params
         .iter()
-        .flat_map(|val| EngineAwareParameter::metadata(py, &context, val))
+        .flat_map(|val| EngineAwareParameter::metadata(&context, (**val).as_ref(py)))
         .collect()
     };
 
@@ -1538,8 +1512,8 @@ impl Node for NodeKey {
             let gil = Python::acquire_gil();
             let py = gil.python();
             engine_aware_params
-              .iter()
-              .filter_map(|val| EngineAwareParameter::debug_hint(py, val))
+              .into_iter()
+              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
               .collect()
           };
           let failure_name = if displayable_param_names.is_empty() {
@@ -1599,7 +1573,7 @@ impl Node for NodeKey {
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        EngineAwareReturnType::is_cacheable(py, v).unwrap_or(true)
+        EngineAwareReturnType::is_cacheable((**v).as_ref(py)).unwrap_or(true)
       }
       _ => true,
     }
@@ -1624,7 +1598,9 @@ impl Display for NodeKey {
           task
             .params
             .keys()
-            .filter_map(|k| EngineAwareParameter::debug_hint(py, &k.to_value()))
+            .filter_map(|k| {
+              EngineAwareParameter::debug_hint(k.to_value().clone_ref(py).into_ref(py))
+            })
             .collect::<Vec<_>>()
         };
         write!(

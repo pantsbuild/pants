@@ -850,7 +850,7 @@ def test_context_object_on_streaming_workunits(
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
                     output = context.single_file_digests_to_bytes([digest])
-                    assert output == (b"stdout output\n",)
+                    assert output == [b"stdout output\n"]
 
     handler = StreamingWorkunitHandler(
         scheduler,

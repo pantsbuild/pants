@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipFlake8Field(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipFlake8Field),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipFlake8Field),
-        PythonTestTarget.register_plugin_field(SkipFlake8Field),
+        PythonSourceTarget.register_plugin_field(SkipFlake8Field),
         PythonTestsGeneratorTarget.register_plugin_field(SkipFlake8Field),
+        PythonTestTarget.register_plugin_field(SkipFlake8Field),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipFlake8Field),
     ]

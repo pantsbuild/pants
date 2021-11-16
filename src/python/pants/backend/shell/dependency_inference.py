@@ -16,7 +16,7 @@ from pants.backend.shell.target_types import ShellSourceField
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -68,11 +68,12 @@ async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     files_to_addresses: dict[str, Address] = {}
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt, sources in zip(tgts, sources_per_target):
-        for f in sources.files:
-            if f in files_to_addresses:
-                files_with_multiple_owners[f].update({files_to_addresses[f], tgt.address})
-            else:
-                files_to_addresses[f] = tgt.address
+        assert len(sources.files) == 1
+        fp = sources.files[0]
+        if fp in files_to_addresses:
+            files_with_multiple_owners[fp].update({files_to_addresses[fp], tgt.address})
+        else:
+            files_to_addresses[fp] = tgt.address
 
     # Remove files with ambiguous owners.
     for ambiguous_f in files_with_multiple_owners:
@@ -92,9 +93,6 @@ class ParsedShellImports(DeduplicatedCollection):
 
 @dataclass(frozen=True)
 class ParseShellImportsRequest:
-    # NB: We parse per-file, rather than per-target. This is necessary so that we can have each
-    # file in complete isolation without its sibling files present so that Shellcheck errors when
-    # trying to source a sibling file, which then allows us to extract that path.
     digest: Digest
     fp: str
 
@@ -176,32 +174,30 @@ async def infer_shell_dependencies(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
         Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
     )
-    per_file_digests = await MultiGet(
-        Get(Digest, DigestSubset(hydrated_sources.snapshot.digest, PathGlobs([f])))
-        for f in hydrated_sources.snapshot.files
-    )
-    all_detected_imports = await MultiGet(
-        Get(ParsedShellImports, ParseShellImportsRequest(digest, f))
-        for digest, f in zip(per_file_digests, hydrated_sources.snapshot.files)
-    )
+    assert len(hydrated_sources.snapshot.files) == 1
 
+    detected_imports = await Get(
+        ParsedShellImports,
+        ParseShellImportsRequest(
+            hydrated_sources.snapshot.digest, hydrated_sources.snapshot.files[0]
+        ),
+    )
     result: OrderedSet[Address] = OrderedSet()
-    for detected_imports in all_detected_imports:
-        for import_path in detected_imports:
-            unambiguous = shell_mapping.mapping.get(import_path)
-            ambiguous = shell_mapping.ambiguous_modules.get(import_path)
-            if unambiguous:
-                result.add(unambiguous)
-            elif ambiguous:
-                explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-                    ambiguous,
-                    address,
-                    import_reference="file",
-                    context=f"The target {address} sources `{import_path}`",
-                )
-                maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
-                if maybe_disambiguated:
-                    result.add(maybe_disambiguated)
+    for import_path in detected_imports:
+        unambiguous = shell_mapping.mapping.get(import_path)
+        ambiguous = shell_mapping.ambiguous_modules.get(import_path)
+        if unambiguous:
+            result.add(unambiguous)
+        elif ambiguous:
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                ambiguous,
+                address,
+                import_reference="file",
+                context=f"The target {address} sources `{import_path}`",
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
+            if maybe_disambiguated:
+                result.add(maybe_disambiguated)
     return InferredDependencies(sorted(result))
 
 

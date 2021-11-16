@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
-from pants.engine.internals.native_engine_pyo3 import PantsdConnectionException, PyNailgunClient
+from pants.engine.internals.native_engine import PantsdConnectionException, PyNailgunClient
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
@@ -119,7 +119,7 @@ class RemotePantsRunner:
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
-        executor = GlobalOptions.create_py_executor_pyo3(global_options)
+        executor = GlobalOptions.create_py_executor(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
