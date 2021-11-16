@@ -236,7 +236,7 @@ class RunTracker:
 
         output = []
         try:
-            with open(self.run_logs_file, "r") as f:
+            with open(self.run_logs_file) as f:
                 output = f.readlines()
         except OSError as e:
             logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
