@@ -33,8 +33,12 @@ def rule_runner() -> RuleRunner:
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
     )
+    return set_options(rule_runner)
+
+
+def set_options(rule_runner: RuleRunner, options: list | None = None) -> RuleRunner:
     rule_runner.set_options(
-        [],
+        options or [],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         env={"TWINE_PASSWORD_PYPI": "secret"},
     )
@@ -54,7 +58,9 @@ def packages():
     )
 
 
-def project_files(skip_twine: bool) -> dict[str, str]:
+def project_files(
+    skip_twine: bool = False, repositories: list[str] = ["@pypi", "@private"]
+) -> dict[str, str]:
     return {
         "src/BUILD": dedent(
             f"""\
@@ -65,7 +71,7 @@ def project_files(skip_twine: bool) -> dict[str, str]:
                 name="my-package",
                 version="0.1.0",
               ),
-              pypi_repositories=["@pypi", "@private"],
+              pypi_repositories={repositories!r},
               skip_twine={skip_twine},
             )
             """
@@ -73,6 +79,12 @@ def project_files(skip_twine: bool) -> dict[str, str]:
         "src/hello.py": """print("hello")""",
         ".pypirc": "",
     }
+
+
+def request_publish_processes(rule_runner: RuleRunner, packages) -> PublishProcesses:
+    tgt = rule_runner.get_target(Address("src", target_name="dist"))
+    fs = PublishToPyPiFieldSet.create(tgt)
+    return rule_runner.request(PublishProcesses, [fs._request(packages)])
 
 
 def assert_package(
@@ -99,10 +111,7 @@ def process_assertion(**assertions):
 
 def test_twine_upload(rule_runner, packages) -> None:
     rule_runner.write_files(project_files(skip_twine=False))
-
-    tgt = rule_runner.get_target(Address("src", target_name="dist"))
-    fs = PublishToPyPiFieldSet.create(tgt)
-    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
+    result = request_publish_processes(rule_runner, packages)
 
     assert len(result) == 2
     assert_package(
@@ -149,10 +158,7 @@ def test_twine_upload(rule_runner, packages) -> None:
 
 def test_skip_twine(rule_runner, packages) -> None:
     rule_runner.write_files(project_files(skip_twine=True))
-
-    tgt = rule_runner.get_target(Address("src", target_name="dist"))
-    fs = PublishToPyPiFieldSet.create(tgt)
-    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
+    result = request_publish_processes(rule_runner, packages)
 
     assert len(result) == 1
     assert_package(
@@ -167,5 +173,40 @@ def test_skip_twine(rule_runner, packages) -> None:
 
     # Skip twine globally from config option.
     rule_runner.set_options(["--twine-skip"])
-    result = rule_runner.request(PublishProcesses, [fs._request(packages)])
+    result = request_publish_processes(rule_runner, packages)
     assert len(result) == 0
+
+
+@pytest.mark.parametrize(
+    "options, cert_arg",
+    [
+        pytest.param(
+            [],
+            None,
+            id="No ca cert",
+        ),
+        pytest.param(
+            ["--twine-ca-certs-path={}"],
+            "--cert=ca_certs.pem",
+            id="[twine].ca_certs_path",
+        ),
+        # This test needs a working ca bundle to work. Verified manually for now.
+        # pytest.param(
+        #     ["--ca-certs-path={}"],
+        #     "--cert=ca_certs.pem",
+        #     id="[GLOBAL].ca_certs_path",
+        # ),
+    ],
+)
+def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
+    ca_cert_path = rule_runner.create_file("conf/ca_certs.pem", "")
+    rule_runner.write_files(project_files(repositories=["@private"]))
+    set_options(rule_runner, [opt.format(ca_cert_path) for opt in options])
+    result = request_publish_processes(rule_runner, packages)
+    assert len(result) == 1
+    process = result[0].process
+    assert process
+    if cert_arg:
+        assert cert_arg in process.argv
+    else:
+        assert not any(arg.startswith("--cert") for arg in process.argv)
