@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.python.subsystems.twine import TwineSubsystem
+from pants.backend.python.subsystems.twine import Twine
 from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.publish import (
@@ -69,7 +69,7 @@ class PublishToPyPiFieldSet(PublishFieldSet):
 
 
 def twine_upload_args(
-    twine_subsystem: TwineSubsystem, config_files: ConfigFiles, repo: str, dists: tuple[str, ...]
+    twine_subsystem: Twine, config_files: ConfigFiles, repo: str, dists: tuple[str, ...]
 ) -> tuple[str, ...]:
     args = ["upload", "--non-interactive"]
 
@@ -117,9 +117,7 @@ def twine_env(env: Environment, repo: str) -> Environment:
 
 
 @rule
-async def twine_upload(
-    request: PublishToPyPiRequest, twine_subsystem: TwineSubsystem
-) -> PublishProcesses:
+async def twine_upload(request: PublishToPyPiRequest, twine_subsystem: Twine) -> PublishProcesses:
     dists = tuple(
         artifact.relpath
         for pkg in request.packages
