@@ -6,15 +6,9 @@ import logging
 from dataclasses import dataclass
 from itertools import groupby
 
-from pants.backend.java.dependency_inference import artifact_mapper, import_parser, package_mapper
-from pants.backend.java.dependency_inference.artifact_mapper import (
-    AvailableThirdPartyArtifacts,
-    ThirdPartyJavaPackageToArtifactMapping,
-    find_artifact_mapping,
-)
+from pants.backend.java.dependency_inference import import_parser, symbol_mapper
 from pants.backend.java.dependency_inference.java_parser import JavaSourceDependencyAnalysisRequest
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
-from pants.backend.java.dependency_inference.package_mapper import FirstPartyJavaPackageMapping
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
@@ -31,6 +25,12 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.dependency_inference.artifact_mapper import (
+    ThirdPartyPackageToArtifactMapping,
+    find_artifact_mapping,
+)
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,8 @@ async def infer_java_dependencies_via_source_analysis(
 async def infer_java_dependencies_and_exports_via_source_analysis(
     request: JavaInferredDependenciesAndExportsRequest,
     java_infer_subsystem: JavaInferSubsystem,
-    first_party_dep_map: FirstPartyJavaPackageMapping,
-    third_party_artifact_mapping: ThirdPartyJavaPackageToArtifactMapping,
-    available_artifacts: AvailableThirdPartyArtifacts,
+    first_party_dep_map: FirstPartySymbolMapping,
+    third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
 ) -> JavaInferredDependencies:
     if (
         not java_infer_subsystem.imports
@@ -113,18 +112,16 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     export_types = {i for typ in analysis.export_types for i in consumed_type_mapping.get(typ, [])}
     export_types.update(typ for typ in analysis.export_types if "." in typ)
 
-    dep_map = first_party_dep_map.package_rooted_dependency_map
+    dep_map = first_party_dep_map.symbols
 
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
 
     for typ in types:
-        first_party_matches = dep_map.addresses_for_type(typ)
+        first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
         if java_infer_subsystem.third_party_imports:
-            third_party_matches = find_artifact_mapping(
-                typ, third_party_artifact_mapping, available_artifacts
-            )
+            third_party_matches = find_artifact_mapping(typ, third_party_artifact_mapping)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
@@ -166,7 +163,7 @@ def rules():
         *artifact_mapper.rules(),
         *java_parser_rules(),
         *import_parser.rules(),
-        *package_mapper.rules(),
+        *symbol_mapper.rules(),
         *source_files_rules(),
         UnionRule(InferDependenciesRequest, InferJavaSourceDependencies),
     ]

@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, Snapshot
+from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals import native_engine
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
@@ -52,9 +52,8 @@ class StreamingWorkunitContext:
         """Returns the RunTracker for the current run of Pants."""
         return self._run_tracker
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
-        """Given a list of Digest objects, each representing the contents of a single file, return a
-        list of the bytes corresponding to each of those Digests in sequence."""
+    def single_file_digests_to_bytes(self, digests: Sequence[FileDigest]) -> list[bytes]:
+        """Return `bytes` for each `FileDigest`."""
         return self._scheduler.single_file_digests_to_bytes(digests)
 
     def snapshots_to_file_contents(
@@ -64,7 +63,7 @@ class StreamingWorkunitContext:
         files contained in those `Snapshot`s in sequence."""
         return self._scheduler.snapshots_to_file_contents(snapshots)
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
         ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""
         return self._scheduler.ensure_remote_has_recursive(digests)

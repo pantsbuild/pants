@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
-from pants.engine.internals.native_engine_pyo3 import PantsdConnectionException, PyNailgunClient
+from pants.engine.internals.native_engine import PantsdConnectionException, PyNailgunClient
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
@@ -71,14 +71,14 @@ class STTYSettings:
         try:
             self._tty_flags = termios.tcgetattr(sys.stdin.fileno())
         except termios.error as e:
-            logger.debug("masking tcgetattr exception: {!r}".format(e))
+            logger.debug(f"masking tcgetattr exception: {e!r}")
 
     def restore_tty_flags(self):
         if self._tty_flags:
             try:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, self._tty_flags)
             except termios.error as e:
-                logger.debug("masking tcsetattr exception: {!r}".format(e))
+                logger.debug(f"masking tcsetattr exception: {e!r}")
 
 
 class RemotePantsRunner:
@@ -119,7 +119,7 @@ class RemotePantsRunner:
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
-        executor = GlobalOptions.create_py_executor_pyo3(global_options)
+        executor = GlobalOptions.create_py_executor(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)

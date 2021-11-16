@@ -137,7 +137,7 @@ async def analyze_java_source_dependencies(
             use_nailgun=tool_digest,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
-            description="Run Spoon analysis against Java source",
+            description=f"Analyzing {snapshot.files[0]}",
             level=LogLevel.DEBUG,
         ),
     )

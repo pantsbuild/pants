@@ -9,7 +9,6 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from pathlib import PurePath
 from typing import Any, Iterable, Iterator
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -40,6 +39,7 @@ from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JvmArtifact,
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
@@ -233,25 +233,35 @@ class CoursierResolvedLockfile:
 
     entries: tuple[CoursierLockfileEntry, ...]
 
+    @classmethod
+    def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
+        # TODO: After fixing https://github.com/pantsbuild/pants/issues/13496, coordinate matches
+        # should become exact, and this error message will capture all cases of stale lockfiles.
+        return CoursierError(
+            f"{coord} was not present in resolve `{key.name}` at `{key.path}`.\n"
+            f"If you have recently added new `{JvmArtifact.alias}` targets, you might need to "
+            f"update your lockfile by running `coursier-resolve --names={key.name}`."
+        )
+
     def direct_dependencies(
-        self, coord: Coordinate
+        self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its direct dependencies."""
         entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
         entry = entries.get((coord.group, coord.artifact))
         if entry is None:
-            raise CoursierError(f"{coord} was not present in {self}")
+            raise self._coordinate_not_found(key, coord)
 
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
 
     def dependencies(
-        self, coord: Coordinate
+        self, key: CoursierResolveKey, coord: Coordinate
     ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
         """Return the entry for the given Coordinate, and for its transitive dependencies."""
         entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
         entry = entries.get((coord.group, coord.artifact))
         if entry is None:
-            raise CoursierError(f"{coord} was not present in {self}")
+            raise self._coordinate_not_found(key, coord)
 
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
@@ -270,6 +280,16 @@ class CoursierResolvedLockfile:
         return json.dumps([entry.to_json_dict() for entry in self.entries], indent=4).encode(
             "utf-8"
         )
+
+
+def classpath_dest_filename(coord: str, src_filename: str) -> str:
+    """Calculates the destination filename on the classpath for the given source filename and coord.
+
+    TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
+    """
+    dest_name = coord.replace(":", "_")
+    _, ext = os.path.splitext(src_filename)
+    return f"{dest_name}{ext}"
 
 
 @rule(level=LogLevel.DEBUG)
@@ -343,7 +363,9 @@ async def coursier_resolve_lockfile(
     report_contents = await Get(DigestContents, Digest, report_digest)
     report = json.loads(report_contents[0].content)
 
-    artifact_file_names = tuple(PurePath(dep["file"]).name for dep in report["dependencies"])
+    artifact_file_names = tuple(
+        classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
+    )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
     artifact_digests = await MultiGet(
         Get(Digest, DigestSubset(process_result.output_digest, PathGlobs([output_path])))
@@ -390,7 +412,7 @@ async def fetch_with_coursier(
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
-        Coordinate.from_jvm_artifact_target(request.component.representative)
+        request.resolve, Coordinate.from_jvm_artifact_target(request.component.representative)
     )
 
     classpath_entries = await MultiGet(
@@ -472,8 +494,8 @@ async def coursier_fetch_one_coord(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
-    file_path = PurePath(dep["file"])
-    classpath_dest = f"classpath/{file_path.name}"
+    classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
+    classpath_dest = f"classpath/{classpath_dest_name}"
 
     resolved_file_digest = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
@@ -481,13 +503,13 @@ async def coursier_fetch_one_coord(
     stripped_digest = await Get(Digest, RemovePrefix(resolved_file_digest, "classpath"))
     file_digest = await Get(
         FileDigest,
-        ExtractFileDigest(stripped_digest, file_path.name),
+        ExtractFileDigest(stripped_digest, classpath_dest_name),
     )
     if file_digest != request.file_digest:
         raise CoursierError(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
-    return ClasspathEntry(digest=stripped_digest, filenames=(file_path.name,))
+    return ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,))
 
 
 @rule(level=LogLevel.DEBUG)

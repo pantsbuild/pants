@@ -13,10 +13,11 @@ from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToo
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -114,9 +115,15 @@ async def setup_process_for_parse_dockerfile(
 
 @dataclass(frozen=True)
 class DockerfileInfo:
-    source: str = ""
+    digest: Digest
+    source: str
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DockerfileInfoRequest:
+    address: Address
 
 
 def split_iterable(
@@ -130,23 +137,34 @@ def split_iterable(
 
 
 @rule
-async def parse_dockerfile(source: DockerImageSourceField) -> DockerfileInfo:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(source))
+async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
+    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    target = wrapped_target.target
+    sources = await Get(
+        HydratedSources,
+        HydrateSourcesRequest(
+            target.get(SourcesField),
+            for_sources_types=(DockerImageSourceField,),
+            enable_codegen=True,
+        ),
+    )
+
+    dockerfile = sources.snapshot.files[0]
+
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
-            hydrated_sources.snapshot.digest,
-            ("version-tags,putative-targets", *hydrated_sources.snapshot.files),
+            sources.snapshot.digest,
+            ("version-tags,putative-targets", dockerfile),
         ),
     )
 
     output = result.stdout.decode("utf-8").strip().split("\n")
     version_tags, putative_targets = split_iterable("---", output)
 
-    # There can only be a single file in the snapshot, due to the
-    # DockerImageSourceField.expected_num_files == 1.
     return DockerfileInfo(
-        source=hydrated_sources.snapshot.files[0],
+        digest=sources.snapshot.digest,
+        source=dockerfile,
         putative_target_addresses=putative_targets,
         version_tags=version_tags,
     )

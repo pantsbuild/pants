@@ -16,7 +16,7 @@ from typing import Any
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.engine.internals import native_engine, native_engine_pyo3
+from pants.engine.internals import native_engine
 from pants.option.config import Config
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -236,7 +236,7 @@ class RunTracker:
 
         output = []
         try:
-            with open(self.run_logs_file, "r") as f:
+            with open(self.run_logs_file) as f:
                 output = f.readlines()
         except OSError as e:
             logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
@@ -245,4 +245,4 @@ class RunTracker:
 
     @property
     def counter_names(self) -> tuple[str, ...]:
-        return tuple(native_engine_pyo3.all_counter_names())
+        return tuple(native_engine.all_counter_names())

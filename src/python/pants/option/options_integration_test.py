@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
@@ -11,7 +12,6 @@ from pants.testutil.pants_integration_test import (
     run_pants_with_workdir,
     setup_tmpdir,
 )
-from pants.util.contextutil import temporary_dir
 
 
 def test_invalid_options() -> None:
@@ -98,16 +98,16 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         assert "DEPRECATED: option 'another_deprecated'" not in ignore_result.stderr
 
 
-def test_pants_symlink_workdirs() -> None:
-    with temporary_dir() as tmp_dir:
-        symlink_workdir = f"{tmp_dir}/.pants.d"
-        physical_workdir_base = f"{tmp_dir}/workdirs"
-        physical_workdir = f"{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}"
+def test_pants_symlink_workdirs(tmp_path: Path) -> None:
 
-        pants_run = run_pants_with_workdir(
-            [f"--pants-physical-workdir-base={physical_workdir_base}", "help"],
-            workdir=symlink_workdir,
-        )
-        pants_run.assert_success()
-        # Make sure symlink workdir is pointing to physical workdir
-        assert os.readlink(symlink_workdir) == physical_workdir
+    symlink_workdir = tmp_path / ".pants.d"
+    physical_workdir_base = tmp_path / "workdirs"
+    physical_workdir = physical_workdir_base / safe_filename_from_path(symlink_workdir.as_posix())
+
+    pants_run = run_pants_with_workdir(
+        [f"--pants-physical-workdir-base={physical_workdir_base.as_posix()}", "help"],
+        workdir=symlink_workdir.as_posix(),
+    )
+    pants_run.assert_success()
+    # Make sure symlink workdir is pointing to physical workdir
+    assert Path(os.readlink(symlink_workdir.as_posix())) == physical_workdir
