@@ -7,7 +7,6 @@ import os
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Dict, List, Optional
 
 from pants.base.build_environment import get_buildroot
 from pants.option.option_value_container import OptionValueContainer
@@ -49,11 +48,11 @@ class TestOptionsBootstrapper:
     def test_bootstrap_seed_values(self) -> None:
         def assert_seed_values(
             *,
-            config: Optional[Dict[str, str]] = None,
-            env: Optional[Dict[str, str]] = None,
-            args: Optional[List[str]] = None,
-            workdir: Optional[str] = None,
-            distdir: Optional[str] = None,
+            config: dict[str, str] | None = None,
+            env: dict[str, str] | None = None,
+            args: list[str] | None = None,
+            workdir: str | None = None,
+            distdir: str | None = None,
         ) -> None:
             self.assert_bootstrap_options(
                 config=config,
