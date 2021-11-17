@@ -52,6 +52,13 @@ class SourceAnalysisTraverser extends Traverser {
     result
   }
 
+  def withSuppressProvidedNames[T](f: () => T): Unit = {
+    val origSkipProvidedNames = skipProvidedNames
+    skipProvidedNames = true
+    f()
+    skipProvidedNames = origSkipProvidedNames
+  }
+
   def recordImport(name: String, isWildcard: Boolean): Unit = {
     val fullPackageName = nameParts.mkString(".")
     if (!importsByScope.contains(fullPackageName)) {
@@ -126,7 +133,7 @@ class SourceAnalysisTraverser extends Traverser {
       super.apply(rhs)
     }
 
-    case Defn.Def(_mods, nameNode, _tparams, _paramss, decltpe, body) => {
+    case Defn.Def(_mods, nameNode, _tparams, params, decltpe, body) => {
       val name = extractName(nameNode)
       recordProvidedName(name)
 
@@ -134,10 +141,9 @@ class SourceAnalysisTraverser extends Traverser {
         recordConsumedSymbol(extractName(tpe))
       })
 
-      val oldSkipProvidedNames = skipProvidedNames
-      skipProvidedNames = true
-      apply(body)
-      skipProvidedNames = oldSkipProvidedNames
+      params.foreach(param => apply(param))
+
+      withSuppressProvidedNames(() => apply(body))
     }
 
     case Import(importers) => {
@@ -157,6 +163,25 @@ class SourceAnalysisTraverser extends Traverser {
     case Init(tpe, _name, _argss) => {
       val name = extractName(tpe)
       recordConsumedSymbol(name)
+    }
+
+    case Term.Param(_mods, _name, decltpe, _default) => {
+      decltpe.foreach(tpe => {
+        recordConsumedSymbol(extractName(tpe))
+      })
+    }
+
+    case Ctor.Primary(_mods, _name, params_list) => {
+      params_list.foreach(params => {
+        params.foreach(param => apply(param))
+      })
+    }
+
+    case Ctor.Secondary(_mods, _name, params_list, init, stats) => {
+      params_list.foreach(params => {
+        params.foreach(param => apply(param))
+      })
+      init.argss.foreach(arg => apply(arg))
     }
 
     case node @ Term.Select(_, _) => {

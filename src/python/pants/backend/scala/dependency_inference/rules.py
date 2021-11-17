@@ -56,6 +56,8 @@ async def infer_scala_dependencies_via_source_analysis(
     symbols: OrderedSet[str] = OrderedSet()
     if scala_infer_subsystem.imports:
         symbols.update(analysis.all_imports())
+    if scala_infer_subsystem.consumed_types:
+        symbols.update(analysis.fully_qualified_consumed_symbols())
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:

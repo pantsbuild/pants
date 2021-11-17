@@ -1127,6 +1127,16 @@ def test_single_source_path_globs(
             assert getattr(actual, attr) == expect
 
 
+def test_single_source_field_bans_globs() -> None:
+    class TestSingleSourceField(SingleSourceField):
+        pass
+
+    with pytest.raises(InvalidFieldException):
+        TestSingleSourceField("*.ext", Address("project"))
+    with pytest.raises(InvalidFieldException):
+        TestSingleSourceField("!f.ext", Address("project"))
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `ExplicitlyProvidedDependencies` helper functions
 # -----------------------------------------------------------------------------------------------

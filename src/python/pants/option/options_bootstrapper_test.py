@@ -1,8 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
-import unittest
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
@@ -16,9 +17,9 @@ from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
 
 
-class OptionsBootstrapperTest(unittest.TestCase):
+class TestOptionsBootstrapper:
     @staticmethod
-    def _config_path(path: Optional[str]) -> List[str]:
+    def _config_path(path: str | None) -> list[str]:
         if path is None:
             return ["--pants-config-files=[]"]
         return [f"--pants-config-files=['{path}']"]
@@ -26,9 +27,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def assert_bootstrap_options(
         self,
         *,
-        config: Optional[Dict[str, str]] = None,
-        env: Optional[Dict[str, str]] = None,
-        args: Optional[List[str]] = None,
+        config: dict[str, str] | None = None,
+        env: dict[str, str] | None = None,
+        args: list[str] | None = None,
         **expected_entries,
     ) -> None:
         with temporary_file(binary_mode=False) as fp:
@@ -43,7 +44,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             vals = bootstrapper.get_bootstrap_options().for_global_scope()
 
         vals_dict = {k: getattr(vals, k) for k in expected_entries}
-        self.assertEqual(expected_entries, vals_dict)
+        assert expected_entries == vals_dict
 
     def test_bootstrap_seed_values(self) -> None:
         def assert_seed_values(
@@ -141,8 +142,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
             opts.register("foo", "--bar")
             opts.register("fruit", "--apple")
-        self.assertEqual("/qux/baz", opts.for_scope("foo").bar)
-        self.assertEqual("/pear/banana", opts.for_scope("fruit").apple)
+        assert "/qux/baz" == opts.for_scope("foo").bar
+        assert "/pear/banana" == opts.for_scope("fruit").apple
 
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_DISTDIR"
@@ -150,8 +151,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
         bootstrapper = OptionsBootstrapper.create(
             env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
         )
-        self.assertIn(included, bootstrapper.env)
-        self.assertNotIn(excluded, bootstrapper.env)
+        assert included in bootstrapper.env
+        assert excluded not in bootstrapper.env
 
     def test_create_bootstrapped_multiple_pants_config_files(self) -> None:
         """When given multiple config files, the later files should take precedence when options
@@ -182,10 +183,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
             options.register("compile_apt", "--worker-count")
             options.register("fruit", "--apple")
 
-            self.assertEqual(
-                str(expected_worker_count), options.for_scope("compile_apt").worker_count
-            )
-            self.assertEqual("red", options.for_scope("fruit").apple)
+            assert str(expected_worker_count) == options.for_scope("compile_apt").worker_count
+            assert "red" == options.for_scope("fruit").apple
 
         with temporary_file(binary_mode=False) as fp1, temporary_file(binary_mode=False) as fp2:
             fp1.write(
@@ -250,7 +249,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
-            self.assertEqual("coursier", opts_single_config.for_scope("resolver").resolver)
+            assert "coursier" == opts_single_config.for_scope("resolver").resolver
 
     def test_full_options_caching(self) -> None:
         with temporary_file_path() as config:
@@ -298,17 +297,17 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
         # No short options passed - defaults presented.
         vals = parse_options()
-        self.assertIsNone(vals.logdir)
-        self.assertEqual(LogLevel.INFO, vals.level)
+        assert vals.logdir is None
+        assert LogLevel.INFO == vals.level
 
         # Unrecognized short options passed and ignored - defaults presented.
         vals = parse_options("-_UnderscoreValue", "-^")
-        self.assertIsNone(vals.logdir)
-        self.assertEqual(LogLevel.INFO, vals.level)
+        assert vals.logdir is None
+        assert LogLevel.INFO == vals.level
 
         vals = parse_options("-d/tmp/logs", "-ldebug")
-        self.assertEqual("/tmp/logs", vals.logdir)
-        self.assertEqual(LogLevel.DEBUG, vals.level)
+        assert "/tmp/logs" == vals.logdir
+        assert LogLevel.DEBUG == vals.level
 
     def test_bootstrap_options_passthrough_dup_ignored(self) -> None:
         def parse_options(*args: str) -> OptionValueContainer:
@@ -320,81 +319,68 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
 
         vals = parse_options("main", "args", "-d/tmp/frogs", "--", "-d/tmp/logs")
-        self.assertEqual("/tmp/frogs", vals.logdir)
+        assert "/tmp/frogs" == vals.logdir
 
         vals = parse_options("main", "args", "--", "-d/tmp/logs")
-        self.assertIsNone(vals.logdir)
+        assert vals.logdir is None
 
     def test_bootstrap_options_explicit_config_path(self) -> None:
         def config_path(*args, **env):
             return OptionsBootstrapper.get_config_file_paths(env, args)
 
-        self.assertEqual(
-            ["/foo/bar/pants.toml"],
-            config_path("main", "args", "--pants-config-files=['/foo/bar/pants.toml']"),
+        assert ["/foo/bar/pants.toml"] == config_path(
+            "main", "args", "--pants-config-files=['/foo/bar/pants.toml']"
         )
 
-        self.assertEqual(
-            ["/from/env1", "/from/env2"],
-            config_path("main", "args", PANTS_CONFIG_FILES="['/from/env1', '/from/env2']"),
+        assert ["/from/env1", "/from/env2"] == config_path(
+            "main", "args", PANTS_CONFIG_FILES="['/from/env1', '/from/env2']"
         )
 
-        self.assertEqual(
-            ["/from/flag"],
-            config_path(
-                "main",
-                "args",
-                "-x",
-                "--pants-config-files=['/from/flag']",
-                "goal",
-                "--other-flag",
-                PANTS_CONFIG_FILES="['/from/env']",
-            ),
+        assert ["/from/flag"] == config_path(
+            "main",
+            "args",
+            "-x",
+            "--pants-config-files=['/from/flag']",
+            "goal",
+            "--other-flag",
+            PANTS_CONFIG_FILES="['/from/env']",
         )
 
         # Test appending to the default.
-        self.assertEqual(
-            [f"{get_buildroot()}/pants.toml", "/from/env", "/from/flag"],
-            config_path(
-                "main",
-                "args",
-                "-x",
-                "--pants-config-files=+['/from/flag']",
-                "goal",
-                "--other-flag",
-                PANTS_CONFIG_FILES="+['/from/env']",
-            ),
+        assert [f"{get_buildroot()}/pants.toml", "/from/env", "/from/flag"] == config_path(
+            "main",
+            "args",
+            "-x",
+            "--pants-config-files=+['/from/flag']",
+            "goal",
+            "--other-flag",
+            PANTS_CONFIG_FILES="+['/from/env']",
         )
 
         # Test replacing the default, then appending.
-        self.assertEqual(
-            ["/from/env", "/from/flag"],
-            config_path(
-                "main",
-                "args",
-                "-x",
-                "--pants-config-files=+['/from/flag']",
-                "goal",
-                "--other-flag",
-                PANTS_CONFIG_FILES="['/from/env']",
-            ),
+        assert ["/from/env", "/from/flag"] == config_path(
+            "main",
+            "args",
+            "-x",
+            "--pants-config-files=+['/from/flag']",
+            "goal",
+            "--other-flag",
+            PANTS_CONFIG_FILES="['/from/env']",
         )
 
-        self.assertEqual(
-            ["/from/flag"],
-            config_path(
-                "main",
-                "args",
-                "-x",
-                "--pants-config-files=['/from/flag']",
-                "goal",
-                "--other-flag",
-                PANTS_CONFIG_FILES="+['/from/env']",
-            ),
+        assert ["/from/flag"] == config_path(
+            "main",
+            "args",
+            "-x",
+            "--pants-config-files=['/from/flag']",
+            "goal",
+            "--other-flag",
+            PANTS_CONFIG_FILES="+['/from/env']",
         )
 
     def test_setting_pants_config_in_config(self, tmp_path: Path) -> None:
         # Test that setting pants_config in the config file has no effect.
+
         config1 = tmp_path / "config1"
         config2 = tmp_path / "config2"
         config1.write_text(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")

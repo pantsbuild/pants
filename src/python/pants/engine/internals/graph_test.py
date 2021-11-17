@@ -1312,17 +1312,6 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f3.txt",
     )
 
-    # `SingleSourceField` must have one file.
-    with engine_error(contains="must have 1 file"):
-        sources_rule_runner.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    SingleSourceField("*.txt", Address("", target_name="example"))
-                ),
-            ],
-        )
-
 
 # -----------------------------------------------------------------------------------------------
 # Test codegen. Also see `engine/target_test.py`.

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.java.compile import javac
-from pants.backend.java.dependency_inference import import_parser, java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
 from pants.backend.java.goals import check, tailor
 from pants.backend.java.package import deploy_jar
@@ -45,7 +45,6 @@ def rules():
         *coursier.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
-        *import_parser.rules(),
         *java_parser.rules(),
         *java_parser_launcher.rules(),
         *symbol_mapper.rules(),

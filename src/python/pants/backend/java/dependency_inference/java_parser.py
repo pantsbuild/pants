@@ -15,7 +15,7 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
 )
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.core.util_rules.source_files import SourceFiles
-from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests
+from pants.engine.fs import AddPrefix, Digest, DigestContents, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.jdk_rules import JdkSetup
@@ -24,6 +24,11 @@ from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class JavaSourceDependencyAnalysisRequest:
+    snapshot: Snapshot
 
 
 @dataclass(frozen=True)
@@ -54,22 +59,30 @@ async def resolve_fallible_result_to_analysis(
 
 
 @rule(level=LogLevel.DEBUG)
+async def make_analysis_request_from_source_files(
+    source_files: SourceFiles,
+) -> JavaSourceDependencyAnalysisRequest:
+    return JavaSourceDependencyAnalysisRequest(snapshot=source_files.snapshot)
+
+
+@rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     bash: BashBinary,
     jdk_setup: JdkSetup,
     processor_classfiles: JavaParserCompiledClassfiles,
-    source_files: SourceFiles,
+    request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
-    if len(source_files.files) > 1:
+    snapshot = request.snapshot
+    if len(snapshot.files) > 1:
         raise ValueError(
-            f"parse_java_package expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
+            f"parse_java_package expects sources with exactly 1 source file, but found {len(snapshot.files)}."
         )
-    elif len(source_files.files) == 0:
+    elif len(snapshot.files) == 0:
         raise ValueError(
             "parse_java_package expects sources with exactly 1 source file, but found none."
         )
     source_prefix = "__source_to_analyze"
-    source_path = os.path.join(source_prefix, source_files.files[0])
+    source_path = os.path.join(source_prefix, snapshot.files[0])
     processorcp_relpath = "__processorcp"
 
     (
@@ -85,7 +98,7 @@ async def analyze_java_source_dependencies(
             ),
         ),
         Get(Digest, AddPrefix(processor_classfiles.digest, processorcp_relpath)),
-        Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
+        Get(Digest, AddPrefix(snapshot.digest, source_prefix)),
     )
 
     tool_digest = await Get(
@@ -124,7 +137,7 @@ async def analyze_java_source_dependencies(
             use_nailgun=tool_digest,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
-            description=f"Analyzing {source_files.files[0]}",
+            description=f"Analyzing {snapshot.files[0]}",
             level=LogLevel.DEBUG,
         ),
     )

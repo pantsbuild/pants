@@ -18,7 +18,17 @@ class ScalaInferSubsystem(Subsystem):
             type=bool,
             help="Infer a target's dependencies by parsing import statements from sources.",
         )
+        register(
+            "--consumed-types",
+            default=True,
+            type=bool,
+            help=("Infer a target's dependencies by parsing consumed types from sources."),
+        )
 
     @property
     def imports(self) -> bool:
         return cast(bool, self.options.imports)
+
+    @property
+    def consumed_types(self) -> bool:
+        return cast(bool, self.options.consumed_types)

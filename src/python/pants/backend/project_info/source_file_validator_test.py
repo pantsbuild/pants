@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
-import unittest
+
+import pytest
 
 from pants.backend.project_info.source_file_validator import (
     Matcher,
@@ -15,26 +16,27 @@ from pants.backend.project_info.source_file_validator import (
 # Note that some parts of these tests are just exercising various capabilities of the regex engine.
 # This is not something we technically need to test, but it's useful for sanity checking, and for
 # showcasing common use-cases.
-class MatcherTest(unittest.TestCase):
+class TestMatcher:
     def test_match(self):
         m = Matcher(r"Here is a two-digit number: \d\d")
-        self.assertTrue(m.matches("Here is a two-digit number: 42"))
-        self.assertFalse(m.matches("Here is a two-digit number: 4"))
+        assert m.matches("Here is a two-digit number: 42")
+        assert not m.matches("Here is a two-digit number: 4")
 
     def test_inverse_match(self):
         m = Matcher(r"Here is a two-digit number: \d\d", inverted=True)
-        self.assertFalse(m.matches("Here is a two-digit number: 42"))
-        self.assertTrue(m.matches("Here is a two-digit number: 4"))
+        assert not m.matches("Here is a two-digit number: 42")
+        assert m.matches("Here is a two-digit number: 4")
 
     def test_multiline_match(self):
         m = Matcher("^bar$")
-        self.assertFalse(m.matches("foo\nbar\nbaz\n"))
+        assert not m.matches("foo\nbar\nbaz\n")
         m = Matcher("(?m)^bar$")
-        self.assertTrue(m.matches("foo\nbar\nbaz\n"))
+        assert m.matches("foo\nbar\nbaz\n")
 
 
-class MultiMatcherTest(unittest.TestCase):
-    def setUp(self):
+class TestMultiMatcherTest:
+    @pytest.fixture()
+    def matcher(self) -> MultiMatcher:
         config = {
             "path_patterns": [
                 {"name": "python_src", "pattern": r"\.py$"},
@@ -80,13 +82,13 @@ class MultiMatcherTest(unittest.TestCase):
                 "multi_encodings2": ("dummy",),
             },
         }
-        self._rm = MultiMatcher(ValidationConfig.from_dict(config))
+        return MultiMatcher(ValidationConfig.from_dict(config))
 
-    def test_get_applicable_content_pattern_names(self):
+    def test_get_applicable_content_pattern_names(self, matcher: MultiMatcher) -> None:
         def check(expected_content_pattern_names, expected_encoding, path):
-            content_pattern_names, encoding = self._rm.get_applicable_content_pattern_names(path)
-            self.assertEqual(expected_content_pattern_names, content_pattern_names)
-            self.assertEqual(expected_encoding, encoding)
+            content_pattern_names, encoding = matcher.get_applicable_content_pattern_names(path)
+            assert expected_content_pattern_names == content_pattern_names
+            assert expected_encoding == encoding
 
         check({"python_header", "no_six"}, "utf8", "foo/bar/baz.py")
         check({"jvm_header"}, "utf8", "foo/bar/baz.java")
@@ -94,7 +96,7 @@ class MultiMatcherTest(unittest.TestCase):
         check(set(), None, "foo/bar/baz.c")
         check(set(), None, "foo/bar/bazpy")
 
-    def test_check_content(self):
+    def test_check_content(self, matcher: MultiMatcher) -> None:
         py_file_content = (
             textwrap.dedent(
                 """
@@ -114,34 +116,30 @@ class MultiMatcherTest(unittest.TestCase):
             .lstrip()
             .encode("utf8")
         )
-        self.assertEqual(
-            (("python_header",), ("no_six",)),
-            self._rm.check_content(("python_header", "no_six"), py_file_content, "utf8"),
+        assert (("python_header",), ("no_six",)) == matcher.check_content(
+            ("python_header", "no_six"), py_file_content, "utf8"
         )
 
-        self.assertEqual(
-            RegexMatchResult("foo/bar/baz.py", ("python_header",), ("no_six",)),
-            self._rm.check_source_file("foo/bar/baz.py", py_file_content),
-        )
+        assert RegexMatchResult(
+            "foo/bar/baz.py", ("python_header",), ("no_six",)
+        ) == matcher.check_source_file("foo/bar/baz.py", py_file_content)
 
-    def test_multiple_encodings_error(self):
-        with self.assertRaisesRegex(
+    def test_multiple_encodings_error(self, matcher: MultiMatcher) -> None:
+        with pytest.raises(
             ValueError,
-            r"Path matched patterns with multiple content "
-            r"encodings \(ascii, utf8\): hello\/world.foo",
+            match=r"Path matched patterns with multiple content encodings \(ascii, utf8\): hello\/world.foo",
         ):
-            self._rm.get_applicable_content_pattern_names("hello/world.foo")
+            matcher.get_applicable_content_pattern_names("hello/world.foo")
 
-    def test_pattern_name_checks(self):
+    def test_pattern_name_checks(self, matcher: MultiMatcher) -> None:
         bad_config1 = {
             "path_patterns": [],
             "content_patterns": [],
             "required_matches": {"unknown_path_pattern1": (), "unknown_path_pattern2": ()},
         }
-        with self.assertRaisesRegex(
+        with pytest.raises(
             ValueError,
-            "required_matches uses unknown path pattern names: "
-            "unknown_path_pattern1, unknown_path_pattern2",
+            match="required_matches uses unknown path pattern names: unknown_path_pattern1, unknown_path_pattern2",
         ):
             MultiMatcher(ValidationConfig.from_dict(bad_config1))
 
@@ -150,8 +148,9 @@ class MultiMatcherTest(unittest.TestCase):
             "content_patterns": [],
             "required_matches": {"dummy": ("unknown_content_pattern1",)},
         }
-        with self.assertRaisesRegex(
+        with pytest.raises(
             ValueError,
-            "required_matches uses unknown content " "pattern names: unknown_content_pattern1",
+            match="required_matches uses unknown content "
+            "pattern names: unknown_content_pattern1",
         ):
             MultiMatcher(ValidationConfig.from_dict(bad_config2))

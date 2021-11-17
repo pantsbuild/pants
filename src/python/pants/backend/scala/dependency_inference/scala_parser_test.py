@@ -107,7 +107,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             }
 
             object Functions {
-              def func1(a: Integer): Unit = {
+              def func1(a: Integer, b: AParameterType): Unit = {
                 val a = foo + 5
                 val b = bar(5, "hello") + OuterObject.NestedVal
               }
@@ -115,6 +115,12 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
             class ASubClass extends ABaseClass with ATrait1 with ATrait2.Nested { }
             trait ASubTrait extends ATrait1 with ATrait2.Nested { }
+
+            class HasPrimaryConstructor(foo: SomeTypeInPrimaryConstructor) extends BaseWithConstructor(foo) {
+               def this(bar: SomeTypeInSecondaryConstructor) {
+                 this(bar)
+               }
+            }
             """
             ),
         }
@@ -166,6 +172,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.Functions.func1",
             "org.pantsbuild.example.ASubClass",
             "org.pantsbuild.example.ASubTrait",
+            "org.pantsbuild.example.HasPrimaryConstructor",
         ]
     )
 
@@ -186,8 +193,47 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
-                ["bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
+                ["Integer", "AParameterType", "bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
             ),
-            "org.pantsbuild.example": FrozenOrderedSet(["ABaseClass", "ATrait1", "ATrait2.Nested"]),
+            "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
+                ["bar", "SomeTypeInSecondaryConstructor"]
+            ),
+            "org.pantsbuild.example": FrozenOrderedSet(
+                ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
+            ),
         }
     )
+
+    assert set(analysis.fully_qualified_consumed_symbols()) == {
+        # Because they contain dots, and thus might be fully qualified. See #13545.
+        "ATrait2.Nested",
+        "OuterObject.NestedVal",
+        # Because of the wildcard import.
+        "java.io.+",
+        "java.io.ABaseClass",
+        "java.io.AParameterType",
+        "java.io.ATrait1",
+        "java.io.ATrait2.Nested",
+        "java.io.BaseWithConstructor",
+        "java.io.OuterObject.NestedVal",
+        "java.io.String",
+        "java.io.Unit",
+        "java.io.Integer",
+        "java.io.SomeTypeInSecondaryConstructor",
+        "java.io.bar",
+        "java.io.foo",
+        # Because it's the top-most scope in the file.
+        "org.pantsbuild.example.+",
+        "org.pantsbuild.example.ABaseClass",
+        "org.pantsbuild.example.AParameterType",
+        "org.pantsbuild.example.BaseWithConstructor",
+        "org.pantsbuild.example.Integer",
+        "org.pantsbuild.example.SomeTypeInSecondaryConstructor",
+        "org.pantsbuild.example.ATrait1",
+        "org.pantsbuild.example.ATrait2.Nested",
+        "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.String",
+        "org.pantsbuild.example.Unit",
+        "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.foo",
+    }
