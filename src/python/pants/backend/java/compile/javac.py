@@ -14,7 +14,6 @@ from pants.backend.java.dependency_inference.rules import rules as java_dep_infe
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -26,7 +25,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, SourcesField
+from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -85,10 +84,13 @@ async def compile_java_source(
         for tgt in request.component.members
         if JavaFieldSet.is_applicable(tgt)
     )
-    flat_exports = (export for i in inferred_dependencies for export in i.exports)
-    export_targets = await Get(CoarsenedTargets, Addresses(flat_exports))
-    export_classpath_entries_ = (deps_to_classpath_entries.get(export) for export in export_targets)
-    export_classpath_entries = [i for i in export_classpath_entries_ if i is not None]
+    flat_exports = {export for i in inferred_dependencies for export in i.exports}
+
+    export_classpath_entries = [
+        classpath_entry
+        for coarsened_target, classpath_entry in deps_to_classpath_entries.items()
+        if any(m.address in flat_exports for m in coarsened_target.members)
+    ]
 
     # Then collect the component's sources.
     component_members_with_sources = tuple(
@@ -228,7 +230,7 @@ async def compile_java_source(
     if export_classpath_entries:
         merged_export_digest = await Get(
             Digest,
-            MergeDigests((output_classpath.digest, *[i.digest for i in export_classpath_entries])),
+            MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries))),
         )
         merged_classpath = ClasspathEntry.merge(
             merged_export_digest, (output_classpath, *export_classpath_entries)
