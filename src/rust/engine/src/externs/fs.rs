@@ -1,7 +1,10 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::Path;
+use std::collections::hash_map::DefaultHasher;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 
 use either::Either;
 use itertools::Itertools;
@@ -18,6 +21,8 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
   m.add_class::<PyFileDigest>()?;
   m.add_class::<PySnapshot>()?;
+  m.add_class::<PyAddPrefix>()?;
+  m.add_class::<PyRemovePrefix>()?;
 
   m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
@@ -28,13 +33,20 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   Ok(())
 }
 
-// -----------------------------------------------------------------------------
-// PyDigest & PyFileDigest
-// -----------------------------------------------------------------------------
-
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PyDigest(pub Digest);
+
+impl fmt::Display for PyDigest {
+  fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+    write!(
+      f,
+      "Digest('{}', {})",
+      self.0.hash.to_hex(),
+      self.0.size_bytes
+    )
+  }
+}
 
 #[pymethods]
 impl PyDigest {
@@ -50,13 +62,13 @@ impl PyDigest {
   }
 
   fn __repr__(&self) -> String {
-    format!("Digest('{}', {})", self.0.hash.to_hex(), self.0.size_bytes)
+    format!("{}", self)
   }
 
   fn __richcmp__(&self, other: &PyDigest, op: CompareOp, py: Python) -> PyObject {
     match op {
-      CompareOp::Eq => (self.0 == other.0).into_py(py),
-      CompareOp::Ne => (self.0 != other.0).into_py(py),
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
       _ => py.NotImplemented(),
     }
   }
@@ -73,7 +85,7 @@ impl PyDigest {
 }
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PyFileDigest(pub Digest);
 
 #[pymethods]
@@ -99,8 +111,8 @@ impl PyFileDigest {
 
   fn __richcmp__(&self, other: &PyFileDigest, op: CompareOp, py: Python) -> PyObject {
     match op {
-      CompareOp::Eq => (self.0 == other.0).into_py(py),
-      CompareOp::Ne => (self.0 != other.0).into_py(py),
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
       _ => py.NotImplemented(),
     }
   }
@@ -115,10 +127,6 @@ impl PyFileDigest {
     self.0.size_bytes
   }
 }
-
-// -----------------------------------------------------------------------------
-// PySnapshot
-// -----------------------------------------------------------------------------
 
 #[pyclass]
 pub struct PySnapshot(pub Snapshot);
@@ -196,6 +204,68 @@ impl PySnapshot {
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
     PyTuple::new(py, dirs)
+  }
+}
+
+#[pyclass]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyAddPrefix(pub Digest, pub PathBuf);
+
+#[pymethods]
+impl PyAddPrefix {
+  #[new]
+  fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
+    Self(digest.0, prefix)
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash.prefix_hash().hash(&mut s);
+    self.1.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    format!("AddPrefix('{}', {})", PyDigest(self.0), self.1.display())
+  }
+
+  fn __richcmp__(&self, other: &PyAddPrefix, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+}
+
+#[pyclass]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyRemovePrefix(pub Digest, pub PathBuf);
+
+#[pymethods]
+impl PyRemovePrefix {
+  #[new]
+  fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
+    Self(digest.0, prefix)
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash.prefix_hash().hash(&mut s);
+    self.1.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    format!("RemovePrefix('{}', {})", PyDigest(self.0), self.1.display())
+  }
+
+  fn __richcmp__(&self, other: &PyRemovePrefix, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
   }
 }
 
