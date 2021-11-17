@@ -1,22 +1,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from functools import partial
+from pathlib import Path
 from textwrap import dedent
-from typing import Dict, List, Optional
 
 from pants.base.build_environment import get_buildroot
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
 
 
 class TestOptionsBootstrapper:
     @staticmethod
-    def _config_path(path: Optional[str]) -> List[str]:
+    def _config_path(path: str | None) -> list[str]:
         if path is None:
             return ["--pants-config-files=[]"]
         return [f"--pants-config-files=['{path}']"]
@@ -24,9 +26,9 @@ class TestOptionsBootstrapper:
     def assert_bootstrap_options(
         self,
         *,
-        config: Optional[Dict[str, str]] = None,
-        env: Optional[Dict[str, str]] = None,
-        args: Optional[List[str]] = None,
+        config: dict[str, str] | None = None,
+        env: dict[str, str] | None = None,
+        args: list[str] | None = None,
         **expected_entries,
     ) -> None:
         with temporary_file(binary_mode=False) as fp:
@@ -46,11 +48,11 @@ class TestOptionsBootstrapper:
     def test_bootstrap_seed_values(self) -> None:
         def assert_seed_values(
             *,
-            config: Optional[Dict[str, str]] = None,
-            env: Optional[Dict[str, str]] = None,
-            args: Optional[List[str]] = None,
-            workdir: Optional[str] = None,
-            distdir: Optional[str] = None,
+            config: dict[str, str] | None = None,
+            env: dict[str, str] | None = None,
+            args: list[str] | None = None,
+            workdir: str | None = None,
+            distdir: str | None = None,
         ) -> None:
             self.assert_bootstrap_options(
                 config=config,
@@ -375,47 +377,42 @@ class TestOptionsBootstrapper:
             PANTS_CONFIG_FILES="+['/from/env']",
         )
 
-    def test_setting_pants_config_in_config(self) -> None:
+    def test_setting_pants_config_in_config(self, tmp_path: Path) -> None:
         # Test that setting pants_config in the config file has no effect.
-        with temporary_dir() as tmpdir:
-            config1 = os.path.join(tmpdir, "config1")
-            config2 = os.path.join(tmpdir, "config2")
-            with open(config1, "w") as out1:
-                out1.write(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")
-            with open(config2, "w") as out2:
-                out2.write("[DEFAULT]\nlogdir = 'logdir2'\n")
 
-            ob = OptionsBootstrapper.create(
-                env={}, args=[f"--pants-config-files=['{config1}']"], allow_pantsrc=False
+        config1 = tmp_path / "config1"
+        config2 = tmp_path / "config2"
+        config1.write_text(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")
+        config2.write_text("[DEFAULT]\nlogdir = 'logdir2'\n")
+
+        ob = OptionsBootstrapper.create(
+            env={}, args=[f"--pants-config-files=['{config1.as_posix()}']"], allow_pantsrc=False
+        )
+        logdir = ob.get_bootstrap_options().for_global_scope().logdir
+        assert "logdir1" == logdir
+
+    def test_alias_pyupgrade(self, tmp_path: Path) -> None:
+        config = tmp_path / "config"
+        config.write_text(
+            dedent(
+                """\
+                    [cli.alias]
+                    pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
+                    """
             )
-            logdir = ob.get_bootstrap_options().for_global_scope().logdir
-            assert "logdir1" == logdir
+        )
 
-    def test_alias_pyupgrade(self) -> None:
-        with temporary_dir() as tmpdir:
-            config = os.path.join(tmpdir, "config")
-            with open(config, "w") as out:
-                out.write(
-                    dedent(
-                        """\
-                        [cli.alias]
-                        pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
-                        """
-                    )
-                )
+        config_arg = f"--pants-config-files=['{config.as_posix()}']"
+        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False)
 
-            config_arg = f"--pants-config-files=['{config}']"
-            ob = OptionsBootstrapper.create(
-                env={}, args=[config_arg, "pyupgrade"], allow_pantsrc=False
-            )
+        assert (
+            config_arg,
+            "--backend-packages=pants.backend.python.lint.pyupgrade",
+            "fmt",
+        ) == ob.args
 
-            assert (
-                config_arg,
-                "--backend-packages=pants.backend.python.lint.pyupgrade",
-                "fmt",
-            ) == ob.args
-            assert (
-                "./pants",
-                config_arg,
-                "--backend-packages=pants.backend.python.lint.pyupgrade",
-            ) == ob.bootstrap_args
+        assert (
+            "./pants",
+            config_arg,
+            "--backend-packages=pants.backend.python.lint.pyupgrade",
+        ) == ob.bootstrap_args
