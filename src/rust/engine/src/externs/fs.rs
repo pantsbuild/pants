@@ -209,24 +209,34 @@ impl PySnapshot {
 
 #[pyclass]
 #[derive(Clone, Debug, PartialEq)]
-pub struct PyAddPrefix(pub Digest, pub PathBuf);
+pub struct PyAddPrefix {
+  pub digest: Digest,
+  pub prefix: PathBuf,
+}
 
 #[pymethods]
 impl PyAddPrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
-    Self(digest.0, prefix)
+    Self {
+      digest: digest.0,
+      prefix,
+    }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.0.hash.prefix_hash().hash(&mut s);
-    self.1.hash(&mut s);
+    self.digest.hash.prefix_hash().hash(&mut s);
+    self.prefix.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
-    format!("AddPrefix('{}', {})", PyDigest(self.0), self.1.display())
+    format!(
+      "AddPrefix('{}', {})",
+      PyDigest(self.digest),
+      self.prefix.display()
+    )
   }
 
   fn __richcmp__(&self, other: &PyAddPrefix, op: CompareOp, py: Python) -> PyObject {
@@ -240,24 +250,34 @@ impl PyAddPrefix {
 
 #[pyclass]
 #[derive(Clone, Debug, PartialEq)]
-pub struct PyRemovePrefix(pub Digest, pub PathBuf);
+pub struct PyRemovePrefix {
+  pub digest: Digest,
+  pub prefix: PathBuf,
+}
 
 #[pymethods]
 impl PyRemovePrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
-    Self(digest.0, prefix)
+    Self {
+      digest: digest.0,
+      prefix,
+    }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.0.hash.prefix_hash().hash(&mut s);
-    self.1.hash(&mut s);
+    self.digest.hash.prefix_hash().hash(&mut s);
+    self.prefix.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
-    format!("RemovePrefix('{}', {})", PyDigest(self.0), self.1.display())
+    format!(
+      "RemovePrefix('{}', {})",
+      PyDigest(self.digest),
+      self.prefix.display()
+    )
   }
 
   fn __richcmp__(&self, other: &PyRemovePrefix, op: CompareOp, py: Python) -> PyObject {

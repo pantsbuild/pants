@@ -309,12 +309,12 @@ fn remove_prefix_request_to_digest(
         .extract::<PyRemovePrefix>()
         .map_err(|e| throw(format!("{}", e)))
     })?;
-    let prefix = RelativePath::new(py_remove_prefix.1)
+    let prefix = RelativePath::new(py_remove_prefix.prefix)
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = context
       .core
       .store()
-      .strip_prefix(py_remove_prefix.0, prefix)
+      .strip_prefix(py_remove_prefix.digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -334,12 +334,12 @@ fn add_prefix_request_to_digest(
         .extract::<PyAddPrefix>()
         .map_err(|e| throw(format!("{}", e)))
     })?;
-    let prefix = RelativePath::new(py_add_prefix.1)
+    let prefix = RelativePath::new(py_add_prefix.prefix)
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = context
       .core
       .store()
-      .add_prefix(py_add_prefix.0, prefix)
+      .add_prefix(py_add_prefix.digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
