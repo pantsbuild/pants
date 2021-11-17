@@ -187,12 +187,12 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         # Tests that a rule that "uses itself" multiple times per invoke works.
         rules = [fib, QueryRule(Fib, (int,))]
         (fib_10,) = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
-        self.assertEqual(55, fib_10.val)
+        assert 55 == fib_10.val
 
     def test_no_include_trace_error_raises_boring_error(self):
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-        with self.assertRaises(ExecutionError) as cm:
+        with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
         self.assert_equal_with_printing(
             "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
@@ -201,7 +201,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-        with self.assertRaises(ExecutionError) as cm:
+        with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[B(), B()]))
         self.assert_equal_with_printing(
             dedent(
@@ -218,7 +218,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     def test_include_trace_error_raises_error_with_trace(self):
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
+        with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
         self.assert_equal_with_printing(
             dedent(
@@ -242,22 +242,22 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     def test_nonexistent_root(self) -> None:
         rules = [QueryRule(A, [B])]
         # No rules are available to compute A.
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as cm:
             self.scheduler(rules, include_trace_on_error=False)
         assert (
             "No installed rules return the type A, and it was not provided by potential callers of "
-        ) in str(cm.exception)
+        ) in str(cm.value)
 
     def test_missing_query_rule(self) -> None:
         # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
         # for the graph to work when making a synchronous call via `Scheduler.product_request`.
         scheduler = self.mk_scheduler(rules=[upcast], include_trace_on_error=False)
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             scheduler.product_request(MyFloat, subjects=[MyInt(0)])
         assert (
             "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
             "for MyInt)."
-        ) in str(cm.exception)
+        ) in str(cm.value)
 
 
 @dataclass

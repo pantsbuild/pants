@@ -3,7 +3,6 @@
 
 import ast
 import re
-import unittest
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -87,7 +86,7 @@ def fmt_rule(
     return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
 
 
-class RuleVisitorTest(unittest.TestCase):
+class TestRuleVisitor:
     @staticmethod
     def _parse_rule_gets(rule_text: str, **types: Type) -> List[AwaitableConstraints]:
         rule_visitor = _RuleVisitor(
@@ -392,27 +391,27 @@ async def a_goal_rule_generator(console: Console) -> Example:
     return Example(exit_code=0)
 
 
-class RuleTest(unittest.TestCase):
+class TestRule:
     def test_run_rule_goal_rule_generator(self):
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
             mock_gets=[MockGet(output_type=A, input_type=str, mock=lambda _: A())],
         )
-        self.assertEqual(res, Example(0))
+        assert res == Example(0)
 
     def test_side_effecting_inputs(self) -> None:
         @goal_rule
         def valid_rule(console: Console, b: str) -> Example:
             return Example(exit_code=0)
 
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as cm:
 
             @rule
             def invalid_rule(console: Console, b: str) -> bool:
                 return False
 
-        error_str = str(cm.exception)
+        error_str = str(cm.value)
         assert (
             "(@rule pants.engine.rules_test:invalid_rule) may not have a side-effecting parameter"
             in error_str
@@ -429,28 +428,28 @@ def test_rule_index_creation_fails_with_bad_declaration_type():
     )
 
 
-class RuleArgumentAnnotationTest(unittest.TestCase):
+class TestRuleArgumentAnnotation:
     def test_annotations_kwargs(self):
         @rule(level=LogLevel.INFO)
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(a_named_rule.rule.canonical_name, "pants.engine.rules_test.a_named_rule")
-        self.assertEqual(a_named_rule.rule.desc, None)
-        self.assertEqual(a_named_rule.rule.level, LogLevel.INFO)
+        assert a_named_rule.rule is not None
+        assert a_named_rule.rule.canonical_name == "pants.engine.rules_test.a_named_rule"
+        assert a_named_rule.rule.desc is None
+        assert a_named_rule.rule.level == LogLevel.INFO
 
         @rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(another_named_rule.rule.canonical_name, "something_different")
-        self.assertEqual(another_named_rule.rule.desc, "Human readable desc")
-        self.assertEqual(another_named_rule.rule.level, LogLevel.TRACE)
+        assert a_named_rule.rule is not None
+        assert another_named_rule.rule.canonical_name == "something_different"
+        assert another_named_rule.rule.desc == "Human readable desc"
+        assert another_named_rule.rule.level == LogLevel.TRACE
 
     def test_bogus_rules(self):
-        with self.assertRaises(UnrecognizedRuleArgument):
+        with pytest.raises(UnrecognizedRuleArgument):
 
             @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
             def a_named_rule(a: int, b: str) -> bool:
@@ -469,40 +468,40 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
             return Example(exit_code=0)
 
         name = some_goal_rule.rule.canonical_name
-        self.assertEqual(name, "some_other_name")
+        assert name == "some_other_name"
 
 
-class GraphVertexTypeAnnotationTest(unittest.TestCase):
+class TestGraphVertexTypeAnnotation:
     def test_nominal(self):
         @rule
         def dry(a: int, b: str, c: float) -> bool:
             return False
 
-        self.assertIsNotNone(dry.rule)
+        assert dry.rule is not None
 
     def test_missing_return_annotation(self):
-        with self.assertRaises(MissingReturnTypeAnnotation):
+        with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
             def dry(a: int, b: str, c: float):
                 return False
 
     def test_bad_return_annotation(self):
-        with self.assertRaises(MissingReturnTypeAnnotation):
+        with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
             def dry(a: int, b: str, c: float) -> 42:
                 return False
 
     def test_missing_parameter_annotation(self):
-        with self.assertRaises(MissingParameterTypeAnnotation):
+        with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
             def dry(a: int, b, c: float) -> bool:
                 return False
 
     def test_bad_parameter_annotation(self):
-        with self.assertRaises(MissingParameterTypeAnnotation):
+        with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
             def dry(a: int, b: 42, c: float) -> bool:
@@ -532,9 +531,7 @@ def test_goal_rule_not_returning_a_goal() -> None:
     assert str(exc.value) == "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
 
 
-class RuleGraphTest(unittest.TestCase):
-    maxDiff = None
-
+class TestRuleGraph:
     def test_ruleset_with_ambiguity(self):
         @rule
         def a_from_b_and_c(b: B, c: C) -> A:
@@ -545,7 +542,7 @@ class RuleGraphTest(unittest.TestCase):
             pass
 
         rules = [a_from_b_and_c, a_from_c_and_b, QueryRule(A, (B, C))]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
         assert_equal_graph_output(
@@ -576,7 +573,7 @@ class RuleGraphTest(unittest.TestCase):
             pass
 
         rules = [a_from_b, QueryRule(A, ())]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
             "No installed rules return the type B, and it was not provided by potential "
@@ -613,7 +610,7 @@ class RuleGraphTest(unittest.TestCase):
             d_from_a_and_suba,
         ]
 
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
         assert_equal_graph_output(
@@ -648,7 +645,7 @@ class RuleGraphTest(unittest.TestCase):
             return D()
 
         rules = [d_singleton, d_for_b, QueryRule(D, (B,))]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
         self.assert_equal_with_printing(

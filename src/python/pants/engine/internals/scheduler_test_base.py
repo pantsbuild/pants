@@ -74,7 +74,7 @@ class SchedulerTestBase:
             _, state = throws[0]
             raise state.exc
 
-        self.assertEqual(len(returns), 1)
+        assert len(returns) == 1
 
         _, state = returns[0]
         return state

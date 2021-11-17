@@ -12,12 +12,12 @@ class TestSubprocessProcessHandler(unittest.TestCase):
     def test_exit_1(self):
         process = subprocess.Popen(["/bin/sh", "-c", "exit 1"])
         process_handler = SubprocessProcessHandler(process)
-        self.assertEqual(process_handler.wait(), 1)
+        assert process_handler.wait() == 1
 
     def test_exit_0(self):
         process = subprocess.Popen(["/bin/sh", "-c", "exit 0"])
         process_handler = SubprocessProcessHandler(process)
-        self.assertEqual(process_handler.wait(), 0)
+        assert process_handler.wait() == 0
 
     def test_communicate_teeing_retrieves_stdout_and_stderr(self):
         process = subprocess.Popen(
@@ -42,24 +42,21 @@ class TestSubprocessProcessHandler(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
         process_handler = SubprocessProcessHandler(process)
-        self.assertEqual(
-            process_handler.communicate_teeing_stdout_and_stderr(),
-            (
-                dedent(
-                    """\
+        assert process_handler.communicate_teeing_stdout_and_stderr() == (
+            dedent(
+                """\
                     1out
                     2out
                     3out
                     """
-                ).encode(),
-                dedent(
-                    """\
+            ).encode(),
+            dedent(
+                """\
                     1err
                     2err
                     3err
                     """
-                ).encode(),
-            ),
+            ).encode(),
         )
         # Sadly, this test doesn't test that sys.std{out,err} also receive the output.
         # You can see it when you run it, but any way we have of spying on sys.std{out,err}
