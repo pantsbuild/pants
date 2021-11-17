@@ -3,7 +3,6 @@
 
 import itertools
 import time
-import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List, Optional, Tuple
@@ -176,34 +175,31 @@ def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
 
 
-class EngineTest(unittest.TestCase, SchedulerTestBase):
-
-    assert_equal_with_printing = assert_equal_with_printing
-
+class TestEngine(SchedulerTestBase):
     def scheduler(self, rules, include_trace_on_error):
         return self.mk_scheduler(rules=rules, include_trace_on_error=include_trace_on_error)
 
-    def test_recursive_multi_get(self):
+    def test_recursive_multi_get(self) -> None:
         # Tests that a rule that "uses itself" multiple times per invoke works.
         rules = [fib, QueryRule(Fib, (int,))]
         (fib_10,) = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
         assert 55 == fib_10.val
 
-    def test_no_include_trace_error_raises_boring_error(self):
+    def test_no_include_trace_error_raises_boring_error(self) -> None:
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
         with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-        self.assert_equal_with_printing(
-            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
+        assert_equal_with_printing(
+            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.value)
         )
 
-    def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
+    def test_no_include_trace_error_multiple_paths_raises_executionerror(self) -> None:
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
         with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[B(), B()]))
-        self.assert_equal_with_printing(
+        assert_equal_with_printing(
             dedent(
                 """
                 2 Exceptions encountered:
@@ -212,15 +208,15 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                   Exception: An exception for B
                 """
             ).lstrip(),
-            str(cm.exception),
+            str(cm.value),
         )
 
-    def test_include_trace_error_raises_error_with_trace(self):
+    def test_include_trace_error_raises_error_with_trace(self) -> None:
         rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=True)
         with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-        self.assert_equal_with_printing(
+        assert_equal_with_printing(
             dedent(
                 """
                 1 Exception encountered:
@@ -236,7 +232,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 Exception: An exception for B
                 """
             ).lstrip(),
-            remove_locations_from_traceback(str(cm.exception)),
+            remove_locations_from_traceback(str(cm.value)),
         )
 
     def test_nonexistent_root(self) -> None:
@@ -298,7 +294,7 @@ def run_tracker() -> RunTracker:
     return new_run_tracker()
 
 
-class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
+class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
         self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
     ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
@@ -316,7 +312,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         return scheduler, tracker, handler
 
-    def test_streaming_workunits_reporting(self):
+    def test_streaming_workunits_reporting(self) -> None:
         scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
         with handler:
             scheduler.product_request(Fib, subjects=[0])
@@ -334,7 +330,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert len(flattened) == 11
         assert tracker.finished
 
-    def test_streaming_workunits_parent_id_and_rule_metadata(self):
+    def test_streaming_workunits_parent_id_and_rule_metadata(self) -> None:
         scheduler, tracker, handler = self._fixture_for_rules(
             [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         )
@@ -465,7 +461,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
 
-    def test_engine_aware_rule(self):
+    def test_engine_aware_rule(self) -> None:
         @dataclass(frozen=True)
         class ModifiedOutput(EngineAwareReturnType):
             _level: LogLevel
@@ -490,7 +486,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         assert workunit["level"] == "ERROR"
 
-    def test_engine_aware_param(self):
+    def test_engine_aware_param(self) -> None:
         @dataclass(frozen=True)
         class ModifiedMetadata(EngineAwareParameter):
             def metadata(self):
@@ -512,7 +508,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         assert workunit["metadata"] == {"example": "thing"}
 
-    def test_engine_aware_none_case(self):
+    def test_engine_aware_none_case(self) -> None:
         @dataclass(frozen=True)
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
