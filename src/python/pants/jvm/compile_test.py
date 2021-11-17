@@ -12,8 +12,9 @@ But this module should include `@rules` for multiple languages, even though the 
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Sequence
+from typing import Sequence, cast
 
+import chevron
 import pytest
 
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
@@ -27,6 +28,7 @@ from pants.backend.java.target_types import (
 from pants.backend.java.target_types import rules as java_target_types_rules
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
@@ -34,11 +36,11 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Target, UnexpandedTargets
+from pants.engine.target import CoarsenedTarget, Target, UnexpandedTargets
 from pants.engine.unions import UnionMembership
-from pants.jvm import jdk_rules, testutil
+from pants.jvm import classpath, jdk_rules, testutil
+from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
-    ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
@@ -52,7 +54,6 @@ from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
-    make_resolve,
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
@@ -69,9 +70,11 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_rules(),
+            *classpath.rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
             *java_dep_inf_rules(),
+            *scala_dep_inf_rules(),
             *javac_rules(),
             *jdk_rules.rules(),
             *scalac_rules(),
@@ -80,10 +83,8 @@ def rule_runner() -> RuleRunner:
             *java_target_types_rules(),
             *util_rules(),
             *testutil.rules(),
+            QueryRule(Classpath, (Addresses,)),
             QueryRule(UnexpandedTargets, (Addresses,)),
-            QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(ClasspathEntry, (CompileJavaSourceRequest,)),
-            QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
         ],
         target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifact],
     )
@@ -97,29 +98,51 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-JAVA_LIB_SOURCE = dedent(
-    """
-    package org.pantsbuild.example.lib;
+def java_lib_source(extra_imports: Sequence[str] = ()) -> str:
+    return cast(
+        str,
+        chevron.render(
+            dedent(
+                """\
+            package org.pantsbuild.example.lib;
 
-    public class C {
-        public static String HELLO = "hello!";
-    }
-    """
-)
+            {{#extra_imports}}
+            import {{.}};
+            {{/extra_imports}}
 
-SCALA_MAIN_SOURCE = dedent(
-    """
-    package org.pantsbuild.example
+            public class C {
+                public static String HELLO = "hello!";
+            }
+            """
+            ),
+            {"extra_imports": extra_imports},
+        ),
+    )
 
-    import org.pantsbuild.example.lib.C
 
-    object Main {
-        def main(args: Array[String]): Unit = {
-            println(C.HELLO)
-        }
-    }
-    """
-)
+def scala_main_source(extra_imports: Sequence[str] = ()) -> str:
+    return cast(
+        str,
+        chevron.render(
+            dedent(
+                """\
+            package org.pantsbuild.example
+
+            import org.pantsbuild.example.lib.C
+            {{#extra_imports}}
+            import {{.}}
+            {{/extra_imports}}
+
+            object Main {
+                def main(args: Array[String]): Unit = {
+                    println(C.HELLO)
+                }
+            }
+            """
+            ),
+            {"extra_imports": extra_imports},
+        ),
+    )
 
 
 class CompileMockSourceRequest(ClasspathEntryRequest):
@@ -191,38 +214,42 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
 def test_compile_mixed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                scala_sources(
-                    name = 'main',
-                    dependencies = [
-                        'lib/C.java',
-                    ]
-                )
-                """
-            ),
+            "BUILD": "scala_sources(name='main')",
             "coursier_resolve.lockfile": "[]",
-            "Example.scala": SCALA_MAIN_SOURCE,
+            "Example.scala": scala_main_source(),
             "lib/BUILD": "java_sources()",
-            "lib/C.java": JAVA_LIB_SOURCE,
+            "lib/C.java": java_lib_source(),
         }
     )
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
-        [
-            CompileScalaSourceRequest(
-                component=expect_single_expanded_coarsened_target(
-                    rule_runner, Address(spec_path="", target_name="main")
-                ),
-                resolve=make_resolve(rule_runner),
-            )
-        ],
+    classpath = rule_runner.request(
+        Classpath, [Addresses([Address(spec_path="", target_name="main")])]
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {
-        ".Example.scala.main.jar": {
+    rendered_classpath = rule_runner.request(RenderedClasspath, [classpath.content.digest])
+    assert rendered_classpath.content == {
+        "__cp/.Example.scala.main.jar": {
             "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
-        }
+        },
+        "__cp/lib.C.java.jar": {
+            "org/pantsbuild/example/lib/C.class",
+        },
     }
+
+
+@maybe_skip_jdk_test
+def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
+    # Add an extra import to the Java file which will force a cycle between them.
+    rule_runner.write_files(
+        {
+            "BUILD": "scala_sources(name='main')",
+            "coursier_resolve.lockfile": "[]",
+            "Example.scala": scala_main_source(),
+            "lib/BUILD": "java_sources()",
+            "lib/C.java": java_lib_source(["org.pantsbuild.example.Main"]),
+        }
+    )
+
+    main_address = Address(spec_path="", target_name="main")
+    assert len(expect_single_expanded_coarsened_target(rule_runner, main_address).members) == 2
+    rule_runner.request(Classpath, [Addresses([main_address])])
