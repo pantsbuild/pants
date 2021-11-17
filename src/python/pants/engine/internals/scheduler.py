@@ -16,7 +16,6 @@ from typing_extensions import TypedDict
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
 from pants.engine.fs import (
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
@@ -31,7 +30,6 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
     Paths,
-    RemovePrefix,
     Snapshot,
 )
 from pants.engine.goal import Goal
@@ -156,8 +154,6 @@ class Scheduler:
             digest_entries=DigestEntries,
             path_globs=PathGlobs,
             merge_digests=MergeDigests,
-            add_prefix=AddPrefix,
-            remove_prefix=RemovePrefix,
             create_digest=CreateDigest,
             digest_subset=DigestSubset,
             download_file=DownloadFile,

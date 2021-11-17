@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::context::Context;
 use crate::externs;
+use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyRemovePrefix};
 use crate::nodes::{
   lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
   NodeResult, Paths, RunId, SessionValues, Snapshot,
@@ -18,7 +19,6 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use crate::externs::fs::PyFileDigest;
 use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -302,21 +302,19 @@ fn remove_prefix_request_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core;
-  let store = core.store();
   async move {
-    let (input_digest, raw_prefix) = Python::with_gil(|py| {
-      let py_remove_prefix = (*args[0]).as_ref(py);
-      let py_digest = externs::getattr(py_remove_prefix, "digest").unwrap();
-      let input_digest = lift_directory_digest(py_digest).map_err(throw)?;
-      let prefix: String = externs::getattr(py_remove_prefix, "prefix").unwrap();
-      let res: NodeResult<(Digest, String)> = Ok((input_digest, prefix));
-      res
+    let py_remove_prefix = Python::with_gil(|py| {
+      (*args[0])
+        .as_ref(py)
+        .extract::<PyRemovePrefix>()
+        .map_err(|e| throw(format!("{}", e)))
     })?;
-    let prefix = RelativePath::new(PathBuf::from(raw_prefix))
+    let prefix = RelativePath::new(py_remove_prefix.prefix)
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-    let digest = store
-      .strip_prefix(input_digest, prefix)
+    let digest = context
+      .core
+      .store()
+      .strip_prefix(py_remove_prefix.digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -329,21 +327,19 @@ fn add_prefix_request_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core;
-  let store = core.store();
   async move {
-    let (input_digest, raw_prefix) = Python::with_gil(|py| {
-      let py_add_prefix = (*args[0]).as_ref(py);
-      let py_digest = externs::getattr(py_add_prefix, "digest").unwrap();
-      let input_digest = lift_directory_digest(py_digest).map_err(throw)?;
-      let prefix: String = externs::getattr(py_add_prefix, "prefix").unwrap();
-      let res: NodeResult<(Digest, String)> = Ok((input_digest, prefix));
-      res
+    let py_add_prefix = Python::with_gil(|py| {
+      (*args[0])
+        .as_ref(py)
+        .extract::<PyAddPrefix>()
+        .map_err(|e| throw(format!("{}", e)))
     })?;
-    let prefix = RelativePath::new(PathBuf::from(raw_prefix))
+    let prefix = RelativePath::new(py_add_prefix.prefix)
       .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-    let digest = store
-      .add_prefix(input_digest, prefix)
+    let digest = context
+      .core
+      .store()
+      .add_prefix(py_add_prefix.digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();

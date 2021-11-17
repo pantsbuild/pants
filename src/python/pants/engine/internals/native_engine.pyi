@@ -77,6 +77,35 @@ class PySnapshot:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
+class PyAddPrefix:
+    """A request to add the specified prefix path to every file and directory in the digest.
+
+    Example:
+
+        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
+    """
+
+    def __init__(self, digest: PyDigest, prefix: str) -> None: ...
+    def __eq__(self, other: PyAddPrefix | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PyRemovePrefix:
+    """A request to remove the specified prefix path from every file and directory in the digest.
+
+    This will fail if there are any files or directories in the original input digest without the
+    specified prefix.
+
+    Example:
+
+        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
+    """
+
+    def __init__(self, digest: PyDigest, prefix: str) -> None: ...
+    def __eq__(self, other: PyRemovePrefix | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
 EMPTY_DIGEST: PyDigest
 EMPTY_FILE_DIGEST: PyFileDigest
 EMPTY_SNAPSHOT: PySnapshot

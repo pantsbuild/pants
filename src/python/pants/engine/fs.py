@@ -16,7 +16,13 @@ from pants.engine.internals.native_engine import (  # noqa: F401
     EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
 )
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
-from pants.engine.internals.native_engine import PyDigest, PyFileDigest, PySnapshot
+from pants.engine.internals.native_engine import (
+    PyAddPrefix,
+    PyDigest,
+    PyFileDigest,
+    PyRemovePrefix,
+    PySnapshot,
+)
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
@@ -29,6 +35,8 @@ if TYPE_CHECKING:
 Digest = PyDigest
 FileDigest = PyFileDigest
 Snapshot = PySnapshot
+AddPrefix = PyAddPrefix
+RemovePrefix = PyRemovePrefix
 
 
 @dataclass(frozen=True)
@@ -223,35 +231,6 @@ class MergeDigests:
             result = await Get(Digest, MergeDigests([digest1, digest2])
         """
         self.digests = tuple(digests)
-
-
-@dataclass(frozen=True)
-class RemovePrefix:
-    """A request to remove the specified prefix path from every file and directory in the digest.
-
-    This will fail if there are any files or directories in the original input digest without the
-    specified prefix.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
-
-
-@dataclass(frozen=True)
-class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
 
 
 @dataclass(frozen=True)
