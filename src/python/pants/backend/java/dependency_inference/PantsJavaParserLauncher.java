@@ -57,18 +57,21 @@ class CompilationUnitAnalysis {
         Optional<String> declaredPackage,
         ArrayList<Import> imports,
         ArrayList<String> topLevelTypes,
-        ArrayList<String> consumedTypes
+        ArrayList<String> consumedTypes,
+        ArrayList<String> exportTypes
     ) {
         this.declaredPackage = declaredPackage;
         this.imports = imports;
         this.topLevelTypes = topLevelTypes;
         this.consumedTypes = consumedTypes;
+        this.exportTypes = exportTypes;
     }
 
     public final Optional<String> declaredPackage;
     public final ArrayList<Import> imports;
     public final ArrayList<String> topLevelTypes;
     public final ArrayList<String> consumedTypes;
+    public final ArrayList<String> exportTypes;
 }
 
 
@@ -142,35 +145,41 @@ public class PantsJavaParserLauncher {
                 .collect(Collectors.toList()));
 
         HashSet<Type> candidateConsumedTypes = new HashSet<>();
-        HashSet<String> identifiers = new HashSet<>();
+        HashSet<Type> candidateExportTypes = new HashSet<>();
+        
+        Consumer<Type> consumed = (type) -> { candidateConsumedTypes.add(type); };
+        Consumer<Type> export = (type) -> { candidateConsumedTypes.add(type); candidateExportTypes.add(type); };
+
+        HashSet<String> consumedIdentifiers = new HashSet<>();
+        HashSet<String> exportIdentifiers = new HashSet<>();
 
         cu.walk(new Consumer<Node>() {
             @Override
             public void accept(Node node) {
                 if (node instanceof NodeWithType) {
                     NodeWithType<?, ?> typedNode = (NodeWithType<?, ?>) node;
-                    candidateConsumedTypes.add(typedNode.getType());
+                    consumed.accept(typedNode.getType());
                 }
                 if (node instanceof VariableDeclarator) {
                     VariableDeclarator varDecl = (VariableDeclarator) node;
-                    candidateConsumedTypes.add(varDecl.getType());
+                    consumed.accept(varDecl.getType());
                 }
                 if (node instanceof MethodDeclaration) {
-                    MethodDeclaration methodDecl = (MethodDeclaration) node;
-                    candidateConsumedTypes.add(methodDecl.getType());
+                    MethodDeclaration methodDecl = (MethodDeclaration) node;                    
+                    export.accept(methodDecl.getType());
                     for (Parameter param : methodDecl.getParameters()) {
-                        candidateConsumedTypes.add(param.getType());
+                        export.accept(param.getType());
                     }
-                    candidateConsumedTypes.addAll(methodDecl.getThrownExceptions());
+                    methodDecl.getThrownExceptions().stream().forEach(consumed);
                 }
                 if (node instanceof ClassOrInterfaceDeclaration) {
                     ClassOrInterfaceDeclaration classOrIntfDecl = (ClassOrInterfaceDeclaration) node;
-                    candidateConsumedTypes.addAll(classOrIntfDecl.getExtendedTypes());
-                    candidateConsumedTypes.addAll(classOrIntfDecl.getImplementedTypes());
+                    classOrIntfDecl.getExtendedTypes().stream().forEach(export);
+                    classOrIntfDecl.getImplementedTypes().stream().forEach(export);
                 }
                 if (node instanceof AnnotationExpr) {
                     AnnotationExpr annoExpr = (AnnotationExpr) node;
-                    identifiers.add(annoExpr.getNameAsString());
+                    consumedIdentifiers.add(annoExpr.getNameAsString());
                 }
                 if (node instanceof MethodCallExpr) {
                     MethodCallExpr methodCallExpr = (MethodCallExpr) node;
@@ -179,7 +188,7 @@ public class PantsJavaParserLauncher {
                         Expression scope = scopeExprOpt.get();
                         if (scope instanceof NameExpr) {
                             NameExpr nameExpr = (NameExpr) scope;
-                            identifiers.add(nameExpr.getNameAsString());
+                            consumedIdentifiers.add(nameExpr.getNameAsString());
                         }
                     }
                 }
@@ -188,7 +197,7 @@ public class PantsJavaParserLauncher {
                     Expression scope = fieldAccessExpr.getScope();
                     if (scope instanceof NameExpr) {
                         NameExpr nameExpr = (NameExpr) scope;
-                        identifiers.add(nameExpr.getNameAsString());
+                        consumedIdentifiers.add(nameExpr.getNameAsString());
                     }
                 }
             }
@@ -196,12 +205,15 @@ public class PantsJavaParserLauncher {
 
         for (Type type : candidateConsumedTypes) {
             List<String> identifiersForType = unwrapIdentifiersForType(type);
-            identifiers.addAll(identifiersForType);
+            consumedIdentifiers.addAll(identifiersForType);
+            if (candidateExportTypes.contains(type)) {
+                exportIdentifiers.addAll(identifiersForType);
+            }
         }
 
-        ArrayList<String> consumedTypes = new ArrayList<>(identifiers);
-
-        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedTypes);
+        ArrayList<String> consumedTypes = new ArrayList<>(consumedIdentifiers);
+        ArrayList<String> exportTypes = new ArrayList<>(exportIdentifiers);
+        CompilationUnitAnalysis analysis = new CompilationUnitAnalysis(declaredPackage, imports, topLevelTypes, consumedTypes, exportTypes);
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new Jdk8Module());
         mapper.writeValue(new File(analysisOutputPath), analysis);
