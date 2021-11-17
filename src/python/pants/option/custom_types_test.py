@@ -70,11 +70,11 @@ class CustomTypesTest(unittest.TestCase):
         assert expected == ListValueComponent.create(s).val
 
     def assert_split_list(self, s: str, *, expected: List[str]) -> None:
-        self.assertEqual(expected, ListValueComponent._split_modifier_expr(s))
+        assert expected == ListValueComponent._split_modifier_expr(s)
 
     def test_unset_bool(self):
         # UnsetBool should only be use-able as a singleton value via its type.
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             UnsetBool()
 
     def test_dict(self) -> None:
@@ -88,7 +88,7 @@ class CustomTypesTest(unittest.TestCase):
         assert_dict_parsed('{ "a": [1, 2] + [3, 4] }', expected={"a": [1, 2, 3, 4]})
 
         def assert_dict_error(s: str) -> None:
-            with self.assertRaises(ParseError):
+            with pytest.raises(ParseError):
                 assert_dict_parsed(s, expected={})
 
         assert_dict_error("[]")
