@@ -69,6 +69,11 @@ _orgs = (
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
     Org("Ocrolus", "https://www.ocrolus.com/", "https://files.readme.io/ff166fa-ocrolus-small.png"),
     Org(
+        "Orca Security",
+        "https://orca.security/",
+        "https://files.readme.io/e87f6c5-Orca_Security-small.png",
+    ),
+    Org(
         "People Data Labs",
         "https://www.peopledatalabs.com/",
         "https://files.readme.io/8c4f5cd-peopledatalabs-small.png",
