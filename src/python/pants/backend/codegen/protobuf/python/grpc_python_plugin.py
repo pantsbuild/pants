@@ -20,8 +20,8 @@ class GrpcPythonPlugin(TemplatedExternalTool):
         "{platform}/grpc_python_plugin"
     )
     default_url_platform_mapping = {
-        "macos_arm64": "macos",
-        "macos_x86_64": "macos",
+        "macos_arm64": "macos/x86_64",  # TODO: Build for arm64.
+        "macos_x86_64": "macos/x86_64",
         "linux_arm64": "linux/arm64",
         "linux_x86_64": "linux/x86_64",
     }
