@@ -88,4 +88,5 @@ def rules():
         *collect_rules(),
         *archive.rules(),
         QueryRule(RenderedClasspath, (Digest,)),
+        QueryRule(CoarsenedTargets, (Addresses,)),
     ]
