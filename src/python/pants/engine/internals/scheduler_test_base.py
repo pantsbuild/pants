@@ -29,7 +29,7 @@ class SchedulerTestBase:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
 
         build_root = tmp_path / "build_root"
-        build_root.mkdir()
+        build_root.mkdir(parents=True)
 
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         named_caches_dir = os.path.realpath(safe_mkdtemp())
