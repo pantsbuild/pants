@@ -24,7 +24,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
 use process_execution::{CacheDest, CacheName, NamedCaches};
-use pyo3::{PyAny, Python};
+use pyo3::{PyAny, PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -303,18 +303,20 @@ fn remove_prefix_request_to_digest(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let py_remove_prefix = Python::with_gil(|py| {
-      (*args[0])
+    let (digest, prefix) = Python::with_gil(|py| {
+      let py_remove_prefix = (*args[0])
         .as_ref(py)
-        .extract::<PyRemovePrefix>()
-        .map_err(|e| throw(format!("{}", e)))
+        .extract::<PyRef<PyRemovePrefix>>()
+        .map_err(|e| throw(format!("{}", e)))?;
+      let prefix = RelativePath::new(&py_remove_prefix.prefix)
+        .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
+      let res: NodeResult<(Digest, RelativePath)> = Ok((py_remove_prefix.digest, prefix));
+      res
     })?;
-    let prefix = RelativePath::new(py_remove_prefix.prefix)
-      .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = context
       .core
       .store()
-      .strip_prefix(py_remove_prefix.digest, prefix)
+      .strip_prefix(digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -328,18 +330,20 @@ fn add_prefix_request_to_digest(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let py_add_prefix = Python::with_gil(|py| {
-      (*args[0])
+    let (digest, prefix) = Python::with_gil(|py| {
+      let py_add_prefix = (*args[0])
         .as_ref(py)
-        .extract::<PyAddPrefix>()
-        .map_err(|e| throw(format!("{}", e)))
+        .extract::<PyRef<PyAddPrefix>>()
+        .map_err(|e| throw(format!("{}", e)))?;
+      let prefix = RelativePath::new(&py_add_prefix.prefix)
+        .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
+      let res: NodeResult<(Digest, RelativePath)> = Ok((py_add_prefix.digest, prefix));
+      res
     })?;
-    let prefix = RelativePath::new(py_add_prefix.prefix)
-      .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
     let digest = context
       .core
       .store()
-      .add_prefix(py_add_prefix.digest, prefix)
+      .add_prefix(digest, prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
