@@ -312,7 +312,7 @@ def fmt_non_param_edge(
             via_return_func = color
     else:
         return_func_fmt = return_func.format()
-        via_return_func = "-> {" + f'"{return_func_fmt}\nfor {product_name}"' + "}"
+        via_return_func = f'-> {{"{return_func_fmt}\nfor {product_name}"}}'
 
     via_func_subject = RuleFormatRequest.format_rule(subject)
 
@@ -339,9 +339,9 @@ def remove_whitespace_from_graph_output(s: str) -> str:
     return no_pre_or_post_quotes_whitespace.strip()
 
 
-def assert_equal_graph_output(test_case, expected, actual):
+def assert_equal_graph_output(expected, actual):
     return assert_equal_with_printing(
-        test_case, expected, actual, uniform_formatter=remove_whitespace_from_graph_output
+        expected, actual, uniform_formatter=remove_whitespace_from_graph_output
     )
 
 
