@@ -10,7 +10,7 @@ import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from io import BytesIO
-from typing import DefaultDict, cast
+from typing import DefaultDict, Tuple, cast
 
 from colors import green, red
 
@@ -380,11 +380,118 @@ def maybe_rename_deprecated_targets(
     )
 
 
+# ------------------------------------------------------------------------------------------
+# Rename deprecated field types fixer
+# ------------------------------------------------------------------------------------------
+
+
+class RenameDeprecatedFieldsRequest(DeprecationFixerRequest):
+    pass
+
+
+class RenamedFieldTypes(FrozenDict[Tuple[str, str], str]):
+    """Deprecated field type names for target to new names."""
+
+
+@rule
+def determine_renamed_field_types(
+    target_types: RegisteredTargetTypes, union_membership: UnionMembership
+) -> RenamedFieldTypes:
+    renamed_field_types = {}
+    for tgt in target_types.types:
+        for field_type in tgt.class_field_types(union_membership):
+            if field_type.deprecated_alias is None:
+                continue
+            renamed_field_types[(tgt.alias, field_type.deprecated_alias)] = field_type.alias
+            if tgt.deprecated_alias is not None:
+                renamed_field_types[
+                    (tgt.deprecated_alias, field_type.deprecated_alias)
+                ] = field_type.alias
+    return RenamedFieldTypes(renamed_field_types)
+
+
+@rule(desc="Check for deprecated field type names", level=LogLevel.DEBUG)
+def maybe_rename_deprecated_fields(
+    request: RenameDeprecatedFieldsRequest,
+    renamed_field_types: RenamedFieldTypes,
+) -> RewrittenBuildFile:
+    target = None
+    level = 0
+    tokens = iter(request.tokenize())
+    applied_renames: set[tuple[str, str]] = set()
+
+    def parse_level(token: tokenize.TokenInfo) -> bool:
+        nonlocal target
+        nonlocal level
+
+        if target is None or token.type is not tokenize.OP:  # type: ignore[unreachable]
+            return False
+        if token.string == "(":  # type: ignore[unreachable]
+            level += 1
+        elif token.string == ")":
+            level -= 1
+            if level < 1:
+                target = None
+        else:
+            return False
+        return True
+
+    def next_op_is(string: str) -> bool:
+        for next_token in tokens:
+            if next_token.type is tokenize.NL:
+                continue
+            parse_level(next_token)
+            return next_token.type is tokenize.OP and next_token.string == string
+        return False
+
+    def should_be_renamed(token: tokenize.TokenInfo) -> bool:
+        nonlocal target
+        nonlocal level
+
+        if parse_level(token):
+            return False
+
+        if token.type is not tokenize.NAME:
+            return False
+
+        if target is None and next_op_is("("):
+            target = token.string
+            level = 1
+            return False
+
+        if level > 1 or not next_op_is("="):
+            return False
+
+        return (target, token.string) in renamed_field_types
+
+    updated_text_lines = list(request.lines)
+    for token in tokens:
+        if not should_be_renamed(token):
+            continue
+        line_index = token.start[0] - 1
+        line = request.lines[line_index]
+        prefix = line[: token.start[1]]
+        suffix = line[token.end[1] :]
+        new_symbol = renamed_field_types[(cast(str, target), token.string)]
+        applied_renames.add((f"{target}.{token.string}", f"{target}.{new_symbol}"))
+        updated_text_lines[line_index] = f"{prefix}{new_symbol}{suffix}"
+
+    return RewrittenBuildFile(
+        request.path,
+        tuple(updated_text_lines),
+        change_descriptions=tuple(
+            f"Rename `{request.red(deprecated)}` to `{request.green(new)}`"
+            for deprecated, new in sorted(applied_renames)
+        ),
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *pex.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
+        UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),
         # NB: We want this to come at the end so that running Black happens after all our
         # deprecation fixers.
         UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
