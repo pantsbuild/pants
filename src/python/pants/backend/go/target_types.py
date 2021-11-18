@@ -143,22 +143,11 @@ class GoFirstPartyPackageDependenciesField(Dependencies):
     pass
 
 
-class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
-    alias = "subpath"
-    help = (
-        "The path from the owning `go.mod` to this package's directory, e.g. `subdir`.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
 class GoFirstPartyPackageTarget(Target):
     alias = "go_first_party_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoImportPathField,
-        GoFirstPartyPackageSubpathField,
         GoFirstPartyPackageDependenciesField,
         GoFirstPartyPackageSourcesField,
     )

@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
     GoImportPathField,
     GoThirdPartyPackageDependenciesField,
 )
@@ -68,9 +66,7 @@ async def setup_build_go_package_target_request(
         _first_party_pkg_info = _maybe_first_party_pkg_info.info
 
         digest = _first_party_pkg_info.digest
-        subpath = os.path.join(
-            target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
-        )
+        subpath = _first_party_pkg_info.subpath
         minimum_go_version = _first_party_pkg_info.minimum_go_version
 
         go_file_names = _first_party_pkg_info.go_files

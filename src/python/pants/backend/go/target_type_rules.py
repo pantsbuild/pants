@@ -14,7 +14,6 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
     GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
     GoFirstPartyPackageTarget,
     GoImportPathField,
     GoModPackageSourcesField,
@@ -222,7 +221,6 @@ async def generate_targets_from_go_mod(
         return GoFirstPartyPackageTarget(
             {
                 GoImportPathField.alias: import_path,
-                GoFirstPartyPackageSubpathField.alias: subpath,
                 GoFirstPartyPackageSourcesField.alias: tuple(
                     sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
                 ),

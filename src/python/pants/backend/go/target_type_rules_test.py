@@ -20,7 +20,6 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageRequest,
     GoBinaryTarget,
     GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
     GoFirstPartyPackageTarget,
     GoImportPathField,
     GoModTarget,
@@ -190,7 +189,6 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
                 GoImportPathField.alias: (
                     os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
                 ),
-                GoFirstPartyPackageSubpathField.alias: rel_dir,
                 GoFirstPartyPackageSourcesField.alias: tuple(sources),
             },
             Address("src/go", generated_name=f"./{rel_dir}"),
@@ -234,10 +232,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
 
 def test_package_targets_cannot_be_manually_created() -> None:
     with pytest.raises(InvalidTargetException):
-        GoFirstPartyPackageTarget(
-            {GoImportPathField.alias: "foo", GoFirstPartyPackageSubpathField.alias: "foo"},
-            Address("foo"),
-        )
+        GoFirstPartyPackageTarget({GoImportPathField.alias: "foo"}, Address("foo"))
     with pytest.raises(InvalidTargetException):
         GoThirdPartyPackageTarget(
             {GoImportPathField.alias: "foo"},

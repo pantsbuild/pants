@@ -10,11 +10,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoImportPathField,
-)
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
@@ -95,7 +91,9 @@ async def compute_first_party_package_info(
     )
     target = wrapped_target.target
     import_path = target[GoImportPathField].value
-    subpath = target[GoFirstPartyPackageSubpathField].value
+
+    # The generated_name will have been set to `./{subpath}`.
+    subpath = request.address.generated_name[2:]  # type: ignore[index]
 
     pkg_sources = await Get(
         HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
