@@ -8,7 +8,7 @@ import os
 from abc import ABCMeta
 from collections import deque
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -32,6 +32,13 @@ class ClasspathSourceMissing(Exception):
 
 class ClasspathSourceAmbiguity(Exception):
     """Too many compiler instances were compatible with a CoarsenedTarget."""
+
+
+class _ClasspathEntryRequestClassification(Enum):
+    COMPATIBLE = auto()
+    PARTIAL = auto()
+    CONSUME_ONLY = auto()
+    INCOMPATIBLE = auto()
 
 
 @union
@@ -70,13 +77,13 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         impls = union_membership.get(ClasspathEntryRequest)
         for impl in impls:
             classification = ClasspathEntryRequest.classify_impl(impl, component)
-            if not classification:
+            if classification == _ClasspathEntryRequestClassification.INCOMPATIBLE:
                 continue
-            if "compatible" == classification:
+            elif classification == _ClasspathEntryRequestClassification.COMPATIBLE:
                 compatible.append(impl)
-            elif "partial" == classification:
+            elif classification == _ClasspathEntryRequestClassification.PARTIAL:
                 partial.append(impl)
-            elif "consume_only" == classification:
+            elif classification == _ClasspathEntryRequestClassification.CONSUME_ONLY:
                 consume_only.append(impl)
 
         if len(compatible) == 1:
@@ -108,23 +115,21 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
             )
 
     @staticmethod
-    def classify_impl(impl: type[ClasspathEntryRequest], component: CoarsenedTarget) -> str | None:
-        """Return `compatible`, `partial`, `consume_only`, or None.
-
-        TODO: Make the return value an enum.
-        """
+    def classify_impl(
+        impl: type[ClasspathEntryRequest], component: CoarsenedTarget
+    ) -> _ClasspathEntryRequestClassification:
         targets = component.members
         compatible = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
-        if not compatible:
-            return None
+        if compatible == 0:
+            return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):
-            return "compatible"
+            return _ClasspathEntryRequestClassification.COMPATIBLE
         consume_only = sum(
             1 for t in targets for fs in impl.field_sets_consume_only if fs.is_applicable(t)
         )
         if compatible + consume_only == len(targets):
-            return "consume_only"
-        return "partial"
+            return _ClasspathEntryRequestClassification.CONSUME_ONLY
+        return _ClasspathEntryRequestClassification.PARTIAL
 
 
 @frozen_after_init
