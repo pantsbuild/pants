@@ -24,6 +24,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -40,7 +41,6 @@ def rule_runner() -> RuleRunner:
     rule_runner.set_options(
         [],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        # env={""},
     )
     rule_runner.write_files(
         {
@@ -155,5 +155,28 @@ def test_docker_push_registries(rule_runner: RuleRunner) -> None:
                 "inhouse1.registry/registries/registries:latest",
                 "inhouse2.registry/registries/registries:latest",
             )
+        ),
+    )
+
+
+def test_docker_push_env(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--docker-env-vars=DOCKER_CONFIG"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        env={"DOCKER_CONFIG": "/etc/docker/custom-config"},
+    )
+    result, docker = run_publish(rule_runner, Address("src/default"))
+    assert len(result) == 1
+    assert_publish(
+        result[0],
+        ("default/default:latest",),
+        None,
+        process_assertion(
+            argv=(
+                docker.path,
+                "push",
+                "default/default:latest",
+            ),
+            env=FrozenDict({"DOCKER_CONFIG": "/etc/docker/custom-config"}),
         ),
     )
