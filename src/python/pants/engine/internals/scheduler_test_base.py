@@ -3,12 +3,13 @@
 
 import os
 from pathlib import Path
+
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.util.contextutil import temporary_file_path
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_mkdtemp
 
 
 class SchedulerTestBase:
@@ -26,9 +27,8 @@ class SchedulerTestBase:
         include_trace_on_error: bool = True,
     ) -> SchedulerSession:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
-        
 
-        build_root = tmp_path/ "build_root"
+        build_root = tmp_path / "build_root"
         build_root.mkdir()
 
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
@@ -36,7 +36,7 @@ class SchedulerTestBase:
         scheduler = Scheduler(
             ignore_patterns=[],
             use_gitignore=False,
-            build_root=build_root,
+            build_root=build_root.as_posix(),
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             ca_certs_path=None,
