@@ -86,6 +86,8 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class MockDependencies(Dependencies):
     supports_transitive_excludes = True
+    deprecated_alias = "deprecated_field"
+    deprecated_alias_removal_version = "9.9.9.dev0"
 
 
 class SpecialCasedDeps1(SpecialCasedDependencies):
@@ -540,11 +542,18 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
     }
 
 
+def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
+    transitive_targets_rule_runner.write_files({"BUILD": "target(name='t', deprecated_field=[])"})
+    transitive_targets_rule_runner.get_target(Address("", target_name="t"))
+    assert len(caplog.records) == 1
+    assert "Instead, use `dependencies`" in caplog.text
+
+
 def test_resolve_deprecated_target_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
     transitive_targets_rule_runner.write_files({"BUILD": "deprecated_target(name='t')"})
     transitive_targets_rule_runner.get_target(Address("", target_name="t"))
     assert len(caplog.records) == 1
-    assert "Instead, use `target`"
+    assert "Instead, use `target`" in caplog.text
 
 
 def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) -> None:
