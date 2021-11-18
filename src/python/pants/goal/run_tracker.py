@@ -108,7 +108,7 @@ class RunTracker:
         return [
             backend
             for backend in self._all_options.for_global_scope().backend_packages
-            if backend.starts_with("pants.backend.")
+            if backend.startswith("pants.backend.")
         ]
 
     def start(self, run_start_time: float, specs: list[str]) -> None:
