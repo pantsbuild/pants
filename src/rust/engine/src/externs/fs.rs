@@ -21,6 +21,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
   m.add_class::<PyFileDigest>()?;
   m.add_class::<PySnapshot>()?;
+  m.add_class::<PyMergeDigests>()?;
   m.add_class::<PyAddPrefix>()?;
   m.add_class::<PyRemovePrefix>()?;
 
@@ -204,6 +205,41 @@ impl PySnapshot {
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
     PyTuple::new(py, dirs)
+  }
+}
+
+#[pyclass]
+#[derive(Debug, PartialEq)]
+pub struct PyMergeDigests(pub Vec<Digest>);
+
+#[pymethods]
+impl PyMergeDigests {
+  #[new]
+  fn __new__(digests: Vec<PyDigest>) -> Self {
+    Self(digests.into_iter().map(|py_digest| py_digest.0).collect())
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let digests = self
+      .0
+      .iter()
+      .map(|d| format!("{}", PyDigest(*d)))
+      .join(", ");
+    format!("MergeDigests([{}])", digests)
+  }
+
+  fn __richcmp__(&self, other: &PyMergeDigests, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
   }
 }
 

@@ -77,6 +77,22 @@ class PySnapshot:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
+class PyMergeDigests:
+    """A request to merge several digests into one single digest.
+
+    This will fail if there are any conflicting changes, such as two digests having the same
+    file but with different content.
+
+    Example:
+
+        result = await Get(Digest, MergeDigests([digest1, digest2])
+    """
+
+    def __init__(self, digests: Sequence[PyDigest]) -> None: ...
+    def __eq__(self, other: PyMergeDigests | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
 class PyAddPrefix:
     """A request to add the specified prefix path to every file and directory in the digest.
 
