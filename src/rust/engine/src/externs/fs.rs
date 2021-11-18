@@ -208,7 +208,7 @@ impl PySnapshot {
 }
 
 #[pyclass]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct PyAddPrefix {
   pub digest: Digest,
   pub prefix: PathBuf,
@@ -249,7 +249,7 @@ impl PyAddPrefix {
 }
 
 #[pyclass]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct PyRemovePrefix {
   pub digest: Digest,
   pub prefix: PathBuf,
