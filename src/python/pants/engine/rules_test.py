@@ -546,7 +546,6 @@ class TestRuleGraph:
             create_scheduler(rules)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 Encountered 1 rule graph error:
@@ -614,7 +613,6 @@ class TestRuleGraph:
             create_scheduler(rules)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 Rules with errors: 2
@@ -668,7 +666,6 @@ class TestRuleGraph:
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -695,7 +692,6 @@ class TestRuleGraph:
         rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -721,7 +717,6 @@ class TestRuleGraph:
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -748,7 +743,6 @@ class TestRuleGraph:
         rules = [a_from_suba_and_b, b, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -788,7 +782,6 @@ class TestRuleGraph:
         rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -818,7 +811,6 @@ class TestRuleGraph:
         rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -851,7 +843,6 @@ class TestRuleGraph:
         rules = [a_from_c, a, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -880,7 +871,6 @@ class TestRuleGraph:
         rules = [a_from_c, a, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules, validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -914,7 +904,6 @@ class TestRuleGraph:
         fullgraph = self.create_full_graph(rules, validate=False)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -957,7 +946,6 @@ class TestRuleGraph:
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -985,7 +973,6 @@ class TestRuleGraph:
         rules = [a_from_suba, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1019,7 +1006,6 @@ class TestRuleGraph:
         rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1058,7 +1044,6 @@ class TestRuleGraph:
         ]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1092,7 +1077,6 @@ class TestRuleGraph:
         rules = [a, b_from_d, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
