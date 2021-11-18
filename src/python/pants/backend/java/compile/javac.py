@@ -83,7 +83,10 @@ async def compile_java_source(
     )
     # Re-request inferred dependencies to get a list of export dependency addresses
     inferred_dependencies = await MultiGet(
-        Get(JavaInferredDependencies, JavaInferredDependenciesAndExportsRequest(tgt.address))
+        Get(
+            JavaInferredDependencies,
+            JavaInferredDependenciesAndExportsRequest(tgt[JavaSourceField]),
+        )
         for tgt in request.component.members
         if JavaFieldSet.is_applicable(tgt)
     )
