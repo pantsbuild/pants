@@ -25,17 +25,6 @@ from pants.engine.target import (
 )
 from pants.option.global_options import FilesNotFoundBehavior
 
-
-class GoImportPathField(StringField):
-    alias = "import_path"
-    help = (
-        "Import path in Go code to import this package.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
 # -----------------------------------------------------------------------------------------------
@@ -147,7 +136,6 @@ class GoFirstPartyPackageTarget(Target):
     alias = "go_first_party_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        GoImportPathField,
         GoFirstPartyPackageDependenciesField,
         GoFirstPartyPackageSourcesField,
     )
@@ -171,6 +159,16 @@ class GoFirstPartyPackageTarget(Target):
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
+
+
+class GoImportPathField(StringField):
+    alias = "import_path"
+    help = (
+        "Import path in Go code to import this package.\n\n"
+        "This field should not be overridden; use the value from target generation."
+    )
+    required = True
+    value: str
 
 
 class GoThirdPartyPackageDependenciesField(Dependencies):

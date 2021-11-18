@@ -24,6 +24,8 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
+    FirstPartyPkgImportPath,
+    FirstPartyPkgImportPathRequest,
     FirstPartyPkgInfoRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
@@ -67,7 +69,11 @@ class AllGoTargets(Targets):
 
 @rule(desc="Find all Go targets in project", level=LogLevel.DEBUG)
 def find_all_go_targets(tgts: AllTargets) -> AllGoTargets:
-    return AllGoTargets(t for t in tgts if t.has_field(GoImportPathField))
+    return AllGoTargets(
+        t
+        for t in tgts
+        if t.has_field(GoImportPathField) or t.has_field(GoFirstPartyPackageSourcesField)
+    )
 
 
 @dataclass(frozen=True)
@@ -78,9 +84,22 @@ class ImportPathToPackages:
 @rule(desc="Map all Go targets to their import paths", level=LogLevel.DEBUG)
 async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPackages:
     mapping: dict[str, list[Address]] = defaultdict(list)
+    first_party_addresses = []
+    first_party_gets = []
     for tgt in go_tgts:
-        import_path = tgt[GoImportPathField].value
-        mapping[import_path].append(tgt.address)
+        if tgt.has_field(GoImportPathField):
+            import_path = tgt[GoImportPathField].value
+            mapping[import_path].append(tgt.address)
+        else:
+            first_party_addresses.append(tgt.address)
+            first_party_gets.append(
+                Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(tgt.address))
+            )
+
+    first_party_import_paths = await MultiGet(first_party_gets)
+    for import_path_info, addr in zip(first_party_import_paths, first_party_addresses):
+        mapping[import_path_info.import_path].append(addr)
+
     frozen_mapping = FrozenDict({ip: tuple(tgts) for ip, tgts in mapping.items()})
     return ImportPathToPackages(frozen_mapping)
 
@@ -216,14 +235,12 @@ async def generate_targets_from_go_mod(
 
     def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
         subpath = fast_relpath(dir, generator_addr.spec_path)
-        import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
 
         return GoFirstPartyPackageTarget(
             {
-                GoImportPathField.alias: import_path,
                 GoFirstPartyPackageSourcesField.alias: tuple(
                     sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
-                ),
+                )
             },
             # E.g. `src/go:mod#./subdir`.
             generator_addr.create_generated(f"./{subpath}"),

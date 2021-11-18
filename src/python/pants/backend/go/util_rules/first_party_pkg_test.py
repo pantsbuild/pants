@@ -21,6 +21,8 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
+    FirstPartyPkgImportPath,
+    FirstPartyPkgImportPathRequest,
     FirstPartyPkgInfoRequest,
 )
 from pants.engine.addresses import Address
@@ -42,11 +44,41 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             *assembly.rules(),
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
+            QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
         ],
         target_types=[GoModTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+@pytest.mark.parametrize("mod_dir", ("", "src/go/"))
+def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
+    rule_runner.write_files(
+        {
+            f"{mod_dir}BUILD": "go_mod(name='mod')\n",
+            f"{mod_dir}go.mod": "module go.example.com/foo",
+            f"{mod_dir}f.go": "",
+            f"{mod_dir}dir/f.go": "",
+        }
+    )
+    info = rule_runner.request(
+        FirstPartyPkgImportPath,
+        [FirstPartyPkgImportPathRequest(Address(mod_dir, target_name="mod", generated_name="./"))],
+    )
+    assert info.import_path == "go.example.com/foo"
+    assert info.subpath == ""
+
+    info = rule_runner.request(
+        FirstPartyPkgImportPath,
+        [
+            FirstPartyPkgImportPathRequest(
+                Address(mod_dir, target_name="mod", generated_name="./dir")
+            )
+        ],
+    )
+    assert info.import_path == "go.example.com/foo/dir"
+    assert info.subpath == "dir"
 
 
 def test_package_info(rule_runner: RuleRunner) -> None:

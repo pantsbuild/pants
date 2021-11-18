@@ -185,12 +185,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
 
     def gen_first_party_tgt(rel_dir: str, sources: list[str]) -> GoFirstPartyPackageTarget:
         return GoFirstPartyPackageTarget(
-            {
-                GoImportPathField.alias: (
-                    os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
-                ),
-                GoFirstPartyPackageSourcesField.alias: tuple(sources),
-            },
+            {GoFirstPartyPackageSourcesField.alias: tuple(sources)},
             Address("src/go", generated_name=f"./{rel_dir}"),
             residence_dir=os.path.join("src/go", rel_dir).rstrip("/"),
         )
@@ -232,7 +227,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
 
 def test_package_targets_cannot_be_manually_created() -> None:
     with pytest.raises(InvalidTargetException):
-        GoFirstPartyPackageTarget({GoImportPathField.alias: "foo"}, Address("foo"))
+        GoFirstPartyPackageTarget({}, Address("foo"))
     with pytest.raises(InvalidTargetException):
         GoThirdPartyPackageTarget(
             {GoImportPathField.alias: "foo"},

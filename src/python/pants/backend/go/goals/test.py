@@ -7,7 +7,7 @@ import os
 from typing import Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField, GoImportPathField
+from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -21,13 +21,11 @@ from pants.backend.go.util_rules.first_party_pkg import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
-from pants.build_graph.address import Address
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -118,9 +116,8 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
-    maybe_pkg_info, wrapped_target = await MultiGet(
-        Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
-        Get(WrappedTarget, Address, field_set.address),
+    maybe_pkg_info = await Get(
+        FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)
     )
 
     if maybe_pkg_info.info is None:
@@ -135,9 +132,7 @@ async def run_go_tests(
             output_setting=test_subsystem.output,
         )
     pkg_info = maybe_pkg_info.info
-
-    target = wrapped_target.target
-    import_path = target[GoImportPathField].value
+    import_path = pkg_info.import_path
 
     testmain = await Get(
         GeneratedTestMain,
