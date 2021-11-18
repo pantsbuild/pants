@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
+from pathlib import Path
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
@@ -19,21 +19,17 @@ class SchedulerTestBase:
 
     _executor = PyExecutor(core_threads=2, max_threads=4)
 
-    def _create_work_dir(self):
-        work_dir = safe_mkdtemp()
-        self.addCleanup(safe_rmtree, work_dir)
-        return work_dir
-
     def mk_scheduler(
         self,
+        tmp_path: Path,
         rules,
         include_trace_on_error: bool = True,
     ) -> SchedulerSession:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
-        work_dir = self._create_work_dir()
+        
 
-        build_root = os.path.join(work_dir, "build_root")
-        os.makedirs(build_root)
+        build_root = tmp_path/ "build_root"
+        build_root.mkdir()
 
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         named_caches_dir = os.path.realpath(safe_mkdtemp())
