@@ -192,6 +192,7 @@ async def resolve_targets(
 ) -> Targets:
     # Replace all generating targets with what it generates. Otherwise, keep it. If a target
     # generator does not generate any targets, keep the target generator.
+    # TODO: This method does not preserve the order of inputs.
     expanded_targets: OrderedSet[Target] = OrderedSet()
     generator_targets = []
     generate_gets = []

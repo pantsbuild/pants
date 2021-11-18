@@ -52,17 +52,20 @@ async def compile_java_source(
     union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
-    # Request the component's direct dependency classpath.
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(
-                FallibleClasspathEntry,
-                ClasspathEntryRequest,
-                ClasspathEntryRequest.for_targets(
-                    union_membership, component=coarsened_dep, resolve=request.resolve
-                ),
+    # Request the component's direct dependency classpath, and additionally any preqrequisite.
+    classpath_entry_requests = [
+        *((request.prerequisite,) if request.prerequisite else ()),
+        *(
+            ClasspathEntryRequest.for_targets(
+                union_membership, component=coarsened_dep, resolve=request.resolve
             )
             for coarsened_dep in request.component.dependencies
+        ),
+    ]
+    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
+        await MultiGet(
+            Get(FallibleClasspathEntry, ClasspathEntryRequest, cpe)
+            for cpe in classpath_entry_requests
         )
     )
 

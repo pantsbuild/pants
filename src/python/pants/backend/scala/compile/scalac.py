@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from itertools import chain
 
+from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 class CompileScalaSourceRequest(ClasspathEntryRequest):
     field_sets = (ScalaFieldSet, ScalaGeneratorFieldSet)
+    field_sets_consume_only = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
 @rule(desc="Compile with scalac")
@@ -78,7 +80,7 @@ async def compile_scala_source(
                 SourceFiles,
                 SourceFilesRequest(
                     (t.get(SourcesField),),
-                    for_sources_types=(ScalaSourceField,),
+                    for_sources_types=(ScalaSourceField, JavaSourceField),
                     enable_codegen=True,
                 ),
             )
