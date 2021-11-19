@@ -7,8 +7,8 @@ import dataclasses
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
     GoImportPathField,
+    GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.build_pkg import (
@@ -31,8 +31,8 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class BuildGoPackageTargetRequest(EngineAwareParameter):
-    """Build a `go_first_party_package` or `go_third_party_package` target and its dependencies as
-    `__pkg__.a` files."""
+    """Build a `go_package` or `go_third_party_package` target and its dependencies as `__pkg__.a`
+    files."""
 
     address: Address
     is_main: bool = False
@@ -51,7 +51,7 @@ async def setup_build_go_package_target_request(
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
-    if target.has_field(GoFirstPartyPackageSourcesField):
+    if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_info = await Get(
             FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
         )
@@ -114,7 +114,7 @@ async def setup_build_go_package_target_request(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
         if (
-            tgt.has_field(GoFirstPartyPackageSourcesField)
+            tgt.has_field(GoPackageSourcesField)
             or tgt.has_field(GoThirdPartyPackageDependenciesField)
         )
     )

@@ -10,7 +10,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
@@ -128,7 +128,7 @@ async def compute_first_party_package_info(
 
     pkg_sources = await Get(
         HydratedSources,
-        HydrateSourcesRequest(wrapped_target.target[GoFirstPartyPackageSourcesField]),
+        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
     )
     input_digest = await Get(
         Digest,
