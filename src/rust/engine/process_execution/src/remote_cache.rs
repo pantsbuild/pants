@@ -27,8 +27,16 @@ use workunit_store::{
 use crate::remote::make_execute_request;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, RemoteCacheWarningsBehavior,
+  ProcessCacheScope, ProcessMetadata,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum RemoteCacheWarningsBehavior {
+  Ignore,
+  FirstOnly,
+  Backoff,
+}
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.

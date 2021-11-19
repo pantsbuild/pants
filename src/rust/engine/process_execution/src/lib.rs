@@ -32,11 +32,12 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub use log::Level;
-
 use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
+use concrete_time::{Duration, TimeSpan};
+use fs::RelativePath;
 use hashing::{Digest, EMPTY_FINGERPRINT};
+use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
@@ -45,6 +46,8 @@ use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, Work
 pub mod cache;
 #[cfg(test)]
 mod cache_tests;
+
+pub mod children;
 
 pub mod local;
 #[cfg(test)]
@@ -64,9 +67,9 @@ pub mod named_caches;
 
 extern crate uname;
 
+pub use crate::children::ManagedChild;
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
-use concrete_time::{Duration, TimeSpan};
-use fs::RelativePath;
+pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
@@ -658,14 +661,6 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
   fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
     Arc::new(*command_runner)
   }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
-#[strum(serialize_all = "snake_case")]
-pub enum RemoteCacheWarningsBehavior {
-  Ignore,
-  FirstOnly,
-  Backoff,
 }
 
 #[cfg(test)]
