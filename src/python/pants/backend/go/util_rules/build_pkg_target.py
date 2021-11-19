@@ -31,8 +31,8 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class BuildGoPackageTargetRequest(EngineAwareParameter):
-    """Build a `go_first_party_package` or `go_third_party_package` target and its dependencies as
-    `__pkg__.a` files."""
+    """Build a `go_package` or `go_third_party_package` target and its dependencies as `__pkg__.a`
+    files."""
 
     address: Address
     is_main: bool = False

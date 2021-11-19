@@ -74,7 +74,7 @@ class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
     alias = "package_sources"
     default = ("**/*.go", "**/*.s")
     help = (
-        "What sources to generate `go_first_party_package` targets for.\n\n"
+        "What sources to generate `go_package` targets for.\n\n"
         "Pants will generate one target per matching directory.\n\n"
         "Pants does not yet support some file types like `.c` and `.h` files, along with cgo "
         "files. If you need to use these files, please open a feature request at "
@@ -111,7 +111,7 @@ class GoModTarget(Target):
     )
     help = (
         "A first-party Go module (corresponding to a `go.mod` file).\n\n"
-        "Generates `go_first_party_package` targets for each directory from the "
+        "Generates `go_package` targets for each directory from the "
         "`package_sources` field, and generates `go_third_party_package` targets based on "
         "the `require` directives in your `go.mod`.\n\n"
         "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
@@ -139,7 +139,7 @@ class GoPackageTarget(Target):
         "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
         "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
         "target where you have your `go.mod` file, which will generate "
-        "`go_first_party_package` targets for you."
+        "`go_package` targets for you."
     )
 
     def validate(self) -> None:
@@ -201,8 +201,8 @@ class GoThirdPartyPackageTarget(Target):
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
     help = (
-        "Address of the `go_first_party_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `go_first_party_package` for the same "
+        "Address of the `go_package` with the `main` for this binary.\n\n"
+        "If not specified, will default to the `go_package` for the same "
         "directory as this target's BUILD file. You should usually rely on this default."
     )
     value: str

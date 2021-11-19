@@ -142,7 +142,7 @@ async def infer_go_dependencies(
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in go_first_party_package at address '{addr}'."
+                f"in go_package at address '{addr}'."
             )
 
     return InferredDependencies(inferred_dependencies)
@@ -194,7 +194,7 @@ async def inject_go_third_party_package_dependencies(
 
 
 # -----------------------------------------------------------------------------------------------
-# Generate `go_first_party_package` and `go_third_party_package` targets
+# Generate `go_package` and `go_third_party_package` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -203,10 +203,7 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
 
 
 @rule(
-    desc=(
-        "Generate `go_first_party_package` and `go_third_party_package` targets from `go_mod` "
-        "target"
-    ),
+    desc=("Generate `go_package` and `go_third_party_package` targets from `go_mod` " "target"),
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_go_mod(
@@ -283,11 +280,11 @@ async def determine_main_pkg_for_go_binary(
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_first_party_package` target, but was the address for a "
+                "a `go_package` target, but was the address for a "
                 f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
                 "Hint: you should normally not specify this field so that Pants will find the "
-                "`go_first_party_package` target for you. (Pants generates "
-                "`go_first_party_package` targets based on the `go_mod` target)."
+                "`go_package` target for you. (Pants generates "
+                "`go_package` targets based on the `go_mod` target)."
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
@@ -304,17 +301,17 @@ async def determine_main_pkg_for_go_binary(
     alias = wrapped_tgt.target.alias
     if not relevant_pkg_targets:
         raise ResolveError(
-            f"The `{alias}` target {addr} requires that there is a `go_first_party_package` "
+            f"The `{alias}` target {addr} requires that there is a `go_package` "
             f"target for its directory {addr.spec_path}, but none were found.\n\n"
-            "Have you added a `go_mod` target (which will generate `go_first_party_package` "
+            "Have you added a `go_mod` target (which will generate `go_package` "
             "targets)?"
         )
     raise ResolveError(
-        f"There are multiple `go_first_party_package` targets for the same directory of the "
+        f"There are multiple `go_package` targets for the same directory of the "
         f"`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
         "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
-        "`go_first_party_package` targets so that only one remains: "
+        "`go_package` targets so that only one remains: "
         f"{sorted(tgt.address.spec for tgt in relevant_pkg_targets)}"
     )
 

@@ -293,9 +293,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
 
     with engine_error(ResolveError, contains="none were found"):
         get_main(Address("missing"))
-    with engine_error(ResolveError, contains="There are multiple `go_first_party_package` targets"):
+    with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
         get_main(Address("ambiguous"))
-    with engine_error(
-        InvalidFieldException, contains="must point to a `go_first_party_package` target"
-    ):
+    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
         get_main(Address("explicit_wrong_type"))
