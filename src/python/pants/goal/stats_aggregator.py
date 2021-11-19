@@ -47,16 +47,15 @@ class StatsAggregatorSubsystem(Subsystem):
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
-    def __init__(self, *, enabled: bool, has_histogram_module: bool) -> None:
+    def __init__(self, *, has_histogram_module: bool) -> None:
         super().__init__()
-        self.enabled = enabled
         self.has_histogram_module = has_histogram_module
         self.counters: Counter = Counter()
 
     @property
     def can_finish_async(self) -> bool:
-        # If the callback is activated, we need to finish synchronously for access to the console.
-        return not self.enabled
+        # We need to finish synchronously for access to the console.
+        return False
 
     def __call__(
         self,
@@ -66,9 +65,6 @@ class StatsAggregatorCallback(WorkunitsCallback):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        if not self.enabled:
-            return
-
         # Aggregate counters on completed workunits.
         for workunit in completed_workunits:
             if "counters" in workunit:
@@ -130,23 +126,24 @@ def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
     enabled = subsystem.log
+    if not enabled:
+        return WorkunitsCallbackFactory(None)
 
     has_histogram_module = False
-    if enabled:
-        try:
-            import hdrh.histogram  # noqa: F401
-        except ImportError:
-            logger.warning(
-                "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
-                "be shown at the end of the run, or permanently add "
-                "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
-                "the `hdrhistogram` dependency from PyPI."
-            )
-        else:
-            has_histogram_module = True
+    try:
+        import hdrh.histogram  # noqa: F401
+    except ImportError:
+        logger.warning(
+            "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
+            "be shown at the end of the run, or permanently add "
+            "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
+            "the `hdrhistogram` dependency from PyPI."
+        )
+    else:
+        has_histogram_module = True
 
     return WorkunitsCallbackFactory(
-        lambda: StatsAggregatorCallback(enabled=enabled, has_histogram_module=has_histogram_module)
+        lambda: StatsAggregatorCallback(has_histogram_module=has_histogram_module)
     )
 
 
