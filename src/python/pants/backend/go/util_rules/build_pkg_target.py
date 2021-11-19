@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
     GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
     GoImportPathField,
     GoThirdPartyPackageDependenciesField,
 )
@@ -52,7 +50,6 @@ async def setup_build_go_package_target_request(
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
-    import_path = target[GoImportPathField].value
 
     if target.has_field(GoFirstPartyPackageSourcesField):
         _maybe_first_party_pkg_info = await Get(
@@ -61,16 +58,15 @@ async def setup_build_go_package_target_request(
         if _maybe_first_party_pkg_info.info is None:
             return FallibleBuildGoPackageRequest(
                 None,
-                import_path,
+                _maybe_first_party_pkg_info.import_path,
                 exit_code=_maybe_first_party_pkg_info.exit_code,
                 stderr=_maybe_first_party_pkg_info.stderr,
             )
         _first_party_pkg_info = _maybe_first_party_pkg_info.info
 
         digest = _first_party_pkg_info.digest
-        subpath = os.path.join(
-            target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
-        )
+        import_path = _first_party_pkg_info.import_path
+        subpath = _first_party_pkg_info.subpath
         minimum_go_version = _first_party_pkg_info.minimum_go_version
 
         go_file_names = _first_party_pkg_info.go_files
@@ -82,6 +78,8 @@ async def setup_build_go_package_target_request(
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
+        import_path = target[GoImportPathField].value
+
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
