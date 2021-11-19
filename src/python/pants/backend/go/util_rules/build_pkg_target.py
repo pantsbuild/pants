@@ -7,8 +7,8 @@ import dataclasses
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
     GoImportPathField,
+    GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.build_pkg import (
@@ -51,7 +51,7 @@ async def setup_build_go_package_target_request(
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
-    if target.has_field(GoFirstPartyPackageSourcesField):
+    if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_info = await Get(
             FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
         )
@@ -114,7 +114,7 @@ async def setup_build_go_package_target_request(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
         if (
-            tgt.has_field(GoFirstPartyPackageSourcesField)
+            tgt.has_field(GoPackageSourcesField)
             or tgt.has_field(GoThirdPartyPackageDependenciesField)
         )
     )

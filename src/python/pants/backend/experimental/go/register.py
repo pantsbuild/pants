@@ -9,8 +9,8 @@ from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import (
     GoBinaryTarget,
-    GoFirstPartyPackageTarget,
     GoModTarget,
+    GoPackageTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -28,7 +28,7 @@ from pants.backend.go.util_rules import (
 
 
 def target_types():
-    return [GoFirstPartyPackageTarget, GoModTarget, GoThirdPartyPackageTarget, GoBinaryTarget]
+    return [GoPackageTarget, GoModTarget, GoThirdPartyPackageTarget, GoBinaryTarget]
 
 
 def rules():

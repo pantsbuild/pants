@@ -13,11 +13,11 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageTarget,
     GoImportPathField,
     GoModPackageSourcesField,
     GoModTarget,
+    GoPackageSourcesField,
+    GoPackageTarget,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
@@ -70,9 +70,7 @@ class AllGoTargets(Targets):
 @rule(desc="Find all Go targets in project", level=LogLevel.DEBUG)
 def find_all_go_targets(tgts: AllTargets) -> AllGoTargets:
     return AllGoTargets(
-        t
-        for t in tgts
-        if t.has_field(GoImportPathField) or t.has_field(GoFirstPartyPackageSourcesField)
+        t for t in tgts if t.has_field(GoImportPathField) or t.has_field(GoPackageSourcesField)
     )
 
 
@@ -106,7 +104,7 @@ async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPac
 
 # TODO: Use dependency injection. This doesn't actually look at the Sources field.
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoFirstPartyPackageSourcesField
+    infer_from = GoPackageSourcesField
 
 
 @rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
@@ -233,12 +231,12 @@ async def generate_targets_from_go_mod(
     dir_to_filenames = group_by_dir(go_paths.files)
     matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
 
-    def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
+    def create_first_party_package_tgt(dir: str) -> GoPackageTarget:
         subpath = fast_relpath(dir, generator_addr.spec_path)
 
-        return GoFirstPartyPackageTarget(
+        return GoPackageTarget(
             {
-                GoFirstPartyPackageSourcesField.alias: tuple(
+                GoPackageSourcesField.alias: tuple(
                     sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
                 )
             },
@@ -282,7 +280,7 @@ async def determine_main_pkg_for_go_binary(
             AddressInput,
             AddressInput.parse(request.field.value, relative_to=addr.spec_path),
         )
-        if not wrapped_specified_tgt.target.has_field(GoFirstPartyPackageSourcesField):
+        if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
                 "a `go_first_party_package` target, but was the address for a "
@@ -297,7 +295,7 @@ async def determine_main_pkg_for_go_binary(
     relevant_pkg_targets = [
         tgt
         for tgt in candidate_targets
-        if tgt.has_field(GoFirstPartyPackageSourcesField) and tgt.residence_dir == addr.spec_path
+        if tgt.has_field(GoPackageSourcesField) and tgt.residence_dir == addr.spec_path
     ]
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)

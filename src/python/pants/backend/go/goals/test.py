@@ -7,7 +7,7 @@ import os
 from typing import Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -61,9 +61,9 @@ TEST_FLAGS = {
 
 
 class GoTestFieldSet(TestFieldSet):
-    required_fields = (GoFirstPartyPackageSourcesField,)
+    required_fields = (GoPackageSourcesField,)
 
-    sources: GoFirstPartyPackageSourcesField
+    sources: GoPackageSourcesField
 
 
 def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:

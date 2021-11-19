@@ -120,27 +120,23 @@ class GoModTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_first_party_package` target
+# `go_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoFirstPartyPackageSourcesField(MultipleSourcesField):
+class GoPackageSourcesField(MultipleSourcesField):
     expected_file_extensions = (".go", ".s")
 
 
-class GoFirstPartyPackageDependenciesField(Dependencies):
+class GoPackageDependenciesField(Dependencies):
     pass
 
 
-class GoFirstPartyPackageTarget(Target):
-    alias = "go_first_party_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        GoFirstPartyPackageDependenciesField,
-        GoFirstPartyPackageSourcesField,
-    )
+class GoPackageTarget(Target):
+    alias = "go_package"
+    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependenciesField, GoPackageSourcesField)
     help = (
-        "A Go package (corresponding to a directory with `.go` files).\n\n"
+        "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
         "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
         "target where you have your `go.mod` file, which will generate "
         "`go_first_party_package` targets for you."
