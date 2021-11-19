@@ -32,6 +32,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::time;
 
 use clap::{value_t, App, Arg};
 use futures::future::FutureExt;
@@ -47,16 +48,16 @@ use tokio::task;
 use tokio_stream::wrappers::SignalStream;
 use tokio_stream::StreamExt;
 
-const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
+const TTL: time::Duration = time::Duration::from_secs(0);
 
-const CREATE_TIME: time::Timespec = time::Timespec { sec: 1, nsec: 0 };
+const CREATE_TIME: time::SystemTime = time::SystemTime::UNIX_EPOCH;
 
-fn dir_attr_for(inode: Inode) -> fuse::FileAttr {
-  attr_for(inode, 0, fuse::FileType::Directory, 0x555)
+fn dir_attr_for(inode: Inode) -> fuser::FileAttr {
+  attr_for(inode, 0, fuser::FileType::Directory, 0x555)
 }
 
-fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::FileAttr {
-  fuse::FileAttr {
+fn attr_for(inode: Inode, size: u64, kind: fuser::FileType, perm: u16) -> fuser::FileAttr {
+  fuser::FileAttr {
     ino: inode,
     size: size,
     // TODO: Find out whether blocks is actually important
@@ -71,6 +72,8 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
     uid: 0,
     gid: 0,
     rdev: 0,
+    // TODO: Find out whether blksize is actually important
+    blksize: 1,
     flags: 0,
   }
 }
@@ -111,7 +114,7 @@ struct InodeDetails {
 #[derive(Debug)]
 struct ReaddirEntry {
   inode: Inode,
-  kind: fuse::FileType,
+  kind: fuser::FileType,
   name: OsString,
 }
 
@@ -260,18 +263,18 @@ impl BuildResultFS {
     }
   }
 
-  pub fn file_attr_for(&mut self, inode: Inode) -> Option<fuse::FileAttr> {
+  pub fn file_attr_for(&mut self, inode: Inode) -> Option<fuser::FileAttr> {
     self.inode_digest_cache.get(&inode).map(|f| {
       attr_for(
         inode,
         f.digest.size_bytes as u64,
-        fuse::FileType::RegularFile,
+        fuser::FileType::RegularFile,
         if f.is_executable { 0o555 } else { 0o444 },
       )
     })
   }
 
-  pub fn dir_attr_for(&mut self, digest: Digest) -> Result<fuse::FileAttr, i32> {
+  pub fn dir_attr_for(&mut self, digest: Digest) -> Result<fuser::FileAttr, i32> {
     match self.inode_for_directory(digest) {
       Ok(Some(inode)) => Ok(dir_attr_for(inode)),
       Ok(None) => Err(libc::ENOENT),
@@ -287,22 +290,22 @@ impl BuildResultFS {
       ROOT => Ok(vec![
         ReaddirEntry {
           inode: ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("."),
         },
         ReaddirEntry {
           inode: ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from(".."),
         },
         ReaddirEntry {
           inode: DIGEST_ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("digest"),
         },
         ReaddirEntry {
           inode: DIRECTORY_ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("directory"),
         },
       ]),
@@ -336,12 +339,12 @@ impl BuildResultFS {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
-                  kind: fuse::FileType::Directory,
+                  kind: fuser::FileType::Directory,
                   name: OsString::from("."),
                 },
                 ReaddirEntry {
                   inode: DIRECTORY_ROOT,
-                  kind: fuse::FileType::Directory,
+                  kind: fuser::FileType::Directory,
                   name: OsString::from(".."),
                 },
               ];
@@ -350,7 +353,7 @@ impl BuildResultFS {
                 (
                   directory.digest.clone(),
                   directory.name.clone(),
-                  fuse::FileType::Directory,
+                  fuser::FileType::Directory,
                   true,
                 )
               });
@@ -358,7 +361,7 @@ impl BuildResultFS {
                 (
                   file.digest.clone(),
                   file.name.clone(),
-                  fuse::FileType::RegularFile,
+                  fuser::FileType::RegularFile,
                   file.is_executable,
                 )
               });
@@ -369,8 +372,8 @@ impl BuildResultFS {
                   libc::ENOENT
                 })?;
                 let maybe_child_inode = match filetype {
-                  fuse::FileType::Directory => self.inode_for_directory(child_digest),
-                  fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
+                  fuser::FileType::Directory => self.inode_for_directory(child_digest),
+                  fuser::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
                   _ => unreachable!(),
                 };
                 match maybe_child_inode {
@@ -411,12 +414,16 @@ impl BuildResultFS {
 //  2: /digest
 //  3: /directory
 //  ... created on demand and cached for the lifetime of the program.
-impl fuse::Filesystem for BuildResultFS {
-  fn init(&mut self, _req: &fuse::Request) -> Result<(), libc::c_int> {
+impl fuser::Filesystem for BuildResultFS {
+  fn init(
+    &mut self,
+    _req: &fuser::Request,
+    _config: &mut fuser::KernelConfig,
+  ) -> Result<(), libc::c_int> {
     self.sender.send(BRFSEvent::Init).map_err(|_| 1)
   }
 
-  fn destroy(&mut self, _req: &fuse::Request) {
+  fn destroy(&mut self) {
     self
       .sender
       .send(BRFSEvent::Destroy)
@@ -426,10 +433,10 @@ impl fuse::Filesystem for BuildResultFS {
   // Used to answer stat calls
   fn lookup(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     parent: Inode,
     name: &OsStr,
-    reply: fuse::ReplyEntry,
+    reply: fuser::ReplyEntry,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -516,7 +523,7 @@ impl fuse::Filesystem for BuildResultFS {
     })
   }
 
-  fn getattr(&mut self, _req: &fuse::Request<'_>, inode: Inode, reply: fuse::ReplyAttr) {
+  fn getattr(&mut self, _req: &fuser::Request<'_>, inode: Inode, reply: fuser::ReplyAttr) {
     let runtime = self.runtime.clone();
     runtime.enter(|| match inode {
       ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
@@ -542,12 +549,14 @@ impl fuse::Filesystem for BuildResultFS {
   // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
   fn read(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     inode: Inode,
     _fh: u64,
     offset: i64,
     size: u32,
-    reply: fuse::ReplyData,
+    _flags: i32,
+    _lock_owner: Option<u64>,
+    reply: fuser::ReplyData,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -599,12 +608,12 @@ impl fuse::Filesystem for BuildResultFS {
 
   fn readdir(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     inode: Inode,
     // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
     _fh: u64,
     offset: i64,
-    mut reply: fuse::ReplyDirectory,
+    mut reply: fuser::ReplyDirectory,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -631,10 +640,10 @@ impl fuse::Filesystem for BuildResultFS {
   // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
   fn listxattr(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     _inode: Inode,
     _size: u32,
-    reply: fuse::ReplyXattr,
+    reply: fuser::ReplyXattr,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -643,11 +652,11 @@ impl fuse::Filesystem for BuildResultFS {
   }
 }
 
-pub fn mount<'a, P: AsRef<Path>>(
+pub fn mount<P: AsRef<Path>>(
   mount_path: P,
   store: Store,
   runtime: task_executor::Executor,
-) -> std::io::Result<(fuse::BackgroundSession<'a>, Receiver<BRFSEvent>)> {
+) -> std::io::Result<(fuser::BackgroundSession, Receiver<BRFSEvent>)> {
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
     .iter()
@@ -658,7 +667,7 @@ pub fn mount<'a, P: AsRef<Path>>(
   let brfs = BuildResultFS::new(sender, runtime, store);
 
   debug!("About to spawn_mount with options {:?}", options);
-  let result = unsafe { fuse::spawn_mount(brfs, &mount_path, &options) };
+  let result = fuser::spawn_mount(brfs, &mount_path, &options);
   // N.B.: The session won't be used by the caller, but we return it since a reference must be
   // maintained to prevent early dropping which unmounts the filesystem.
   result.map(|session| (session, receiver))
