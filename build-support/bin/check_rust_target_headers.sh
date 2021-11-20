@@ -2,7 +2,8 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-"${REPO_ROOT}/cargo" install cargo-ensure-prefix --version "=0.1.3"
+"${REPO_ROOT}/cargo" install cargo-ensure-prefix \
+  --git=https://github.com/pantsbuild/cargo-ensure-prefix --branch=upgrade_deps_for_rust_2021_support
 
 if ! out="$("${REPO_ROOT}/cargo" ensure-prefix \
   --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" \
