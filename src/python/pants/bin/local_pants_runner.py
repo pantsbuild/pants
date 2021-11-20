@@ -221,11 +221,7 @@ class LocalPantsRunner:
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
             WorkunitsCallbackFactories, [self.union_membership]
         )
-        return tuple(
-            wcf.callback_factory()
-            for wcf in workunits_callback_factories
-            if wcf.callback_factory is not None
-        )
+        return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 
     def _run_inner(self) -> ExitCode:
         goals = tuple(self.options.goals)

@@ -126,24 +126,24 @@ def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
     enabled = subsystem.log
-    if not enabled:
-        return WorkunitsCallbackFactory(None)
-
     has_histogram_module = False
-    try:
-        import hdrh.histogram  # noqa: F401
-    except ImportError:
-        logger.warning(
-            "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
-            "be shown at the end of the run, or permanently add "
-            "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
-            "the `hdrhistogram` dependency from PyPI."
-        )
-    else:
-        has_histogram_module = True
+    if enabled:
+        try:
+            import hdrh.histogram  # noqa: F401
+        except ImportError:
+            logger.warning(
+                "Please run with `--plugins=hdrhistogram` if you would like histogram summaries to "
+                "be shown at the end of the run, or permanently add "
+                "`[GLOBAL].plugins = ['hdrhistogram']`. This will cause Pants to install "
+                "the `hdrhistogram` dependency from PyPI."
+            )
+        else:
+            has_histogram_module = True
 
     return WorkunitsCallbackFactory(
         lambda: StatsAggregatorCallback(has_histogram_module=has_histogram_module)
+        if enabled
+        else None
     )
 
 

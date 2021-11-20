@@ -138,7 +138,7 @@ class WorkunitsCallbackFactory:
     rule. See #11354 for discussion of that limitation.
     """
 
-    callback_factory: Callable[[], WorkunitsCallback] | None
+    callback_factory: Callable[[], WorkunitsCallback | None]
 
 
 class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):

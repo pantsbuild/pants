@@ -188,12 +188,9 @@ def construct_callback(
             )
             enabled = False
 
-    if not enabled:
-        return WorkunitsCallbackFactory(None)
-    else:
-        return WorkunitsCallbackFactory(
-            lambda: AnonymousTelemetryCallback(cast(str, unhashed_repo_id))
-        )
+    return WorkunitsCallbackFactory(
+        lambda: AnonymousTelemetryCallback(cast(str, unhashed_repo_id)) if enabled else None
+    )
 
 
 def rules():
