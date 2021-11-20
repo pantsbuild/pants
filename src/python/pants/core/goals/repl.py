@@ -14,6 +14,7 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
@@ -134,20 +135,24 @@ async def run_repl(
         )
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
-        )
+        input_digest = request.digest
+        if request.run_in_workspace:
+            workspace.write_digest(
+                request.digest,
+                path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+                # We don't want to influence whether the InteractiveProcess is able to restart. Because
+                # we're writing into a temp directory, we can safely mark this side_effecting=False.
+                side_effecting=False,
+            )
+            input_digest = EMPTY_DIGEST
+
         env = {**complete_env, **request.extra_env}
         result = await Effect(
             InteractiveProcessResult,
             InteractiveProcess(
                 argv=request.args,
                 env=env,
-                input_digest=request.digest,
+                input_digest=input_digest,
                 run_in_workspace=request.run_in_workspace,
                 restartable=repl_subsystem.restartable,
                 append_only_caches=request.append_only_caches,
