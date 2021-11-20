@@ -198,8 +198,20 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
-                ["TupleTypeArg2", "foo", "TupleTypeArg1", "LambdaReturnType", "+", "Unit", "Integer",
-                 "LambdaTypeArg2", "AParameterType", "LambdaTypeArg1", "bar", "OuterObject.NestedVal"]
+                [
+                    "TupleTypeArg2",
+                    "foo",
+                    "TupleTypeArg1",
+                    "LambdaReturnType",
+                    "+",
+                    "Unit",
+                    "Integer",
+                    "LambdaTypeArg2",
+                    "AParameterType",
+                    "LambdaTypeArg1",
+                    "bar",
+                    "OuterObject.NestedVal",
+                ]
             ),
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
                 ["bar", "SomeTypeInSecondaryConstructor"]
@@ -231,8 +243,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.SomeTypeInSecondaryConstructor",
         "java.io.bar",
         "java.io.foo",
-        'java.io.TupleTypeArg1',
-        'java.io.TupleTypeArg2',
+        "java.io.TupleTypeArg1",
+        "java.io.TupleTypeArg2",
         # Because it's the top-most scope in the file.
         "org.pantsbuild.example.+",
         "org.pantsbuild.example.ABaseClass",
@@ -247,9 +259,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.bar",
         "org.pantsbuild.example.foo",
-        'org.pantsbuild.example.LambdaReturnType',
-        'org.pantsbuild.example.LambdaTypeArg1',
-        'org.pantsbuild.example.LambdaTypeArg2',
-        'org.pantsbuild.example.TupleTypeArg1',
-        'org.pantsbuild.example.TupleTypeArg2',
+        "org.pantsbuild.example.LambdaReturnType",
+        "org.pantsbuild.example.LambdaTypeArg1",
+        "org.pantsbuild.example.LambdaTypeArg2",
+        "org.pantsbuild.example.TupleTypeArg1",
+        "org.pantsbuild.example.TupleTypeArg2",
     }
