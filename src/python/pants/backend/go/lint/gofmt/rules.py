@@ -12,7 +12,7 @@ from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -28,9 +28,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class GofmtFieldSet(FieldSet):
-    required_fields = (GoFirstPartyPackageSourcesField,)
+    required_fields = (GoPackageSourcesField,)
 
-    sources: GoFirstPartyPackageSourcesField
+    sources: GoPackageSourcesField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

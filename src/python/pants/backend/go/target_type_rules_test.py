@@ -19,11 +19,10 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
     GoBinaryTarget,
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoFirstPartyPackageTarget,
     GoImportPathField,
     GoModTarget,
+    GoPackageSourcesField,
+    GoPackageTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -123,14 +122,14 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     tgt1 = rule_runner.get_target(Address("foo", generated_name="./cmd"))
     inferred_deps1 = rule_runner.request(
         InferredDependencies,
-        [InferGoPackageDependenciesRequest(tgt1[GoFirstPartyPackageSourcesField])],
+        [InferGoPackageDependenciesRequest(tgt1[GoPackageSourcesField])],
     )
     assert inferred_deps1.dependencies == FrozenOrderedSet([Address("foo", generated_name="./pkg")])
 
     tgt2 = rule_runner.get_target(Address("foo", generated_name="./pkg"))
     inferred_deps2 = rule_runner.request(
         InferredDependencies,
-        [InferGoPackageDependenciesRequest(tgt2[GoFirstPartyPackageSourcesField])],
+        [InferGoPackageDependenciesRequest(tgt2[GoPackageSourcesField])],
     )
     assert inferred_deps2.dependencies == FrozenOrderedSet(
         [Address("foo", generated_name="github.com/google/uuid")]
@@ -140,7 +139,7 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     bad_tgt = rule_runner.get_target(Address("foo", generated_name="./bad"))
     assert not rule_runner.request(
         InferredDependencies,
-        [InferGoPackageDependenciesRequest(bad_tgt[GoFirstPartyPackageSourcesField])],
+        [InferGoPackageDependenciesRequest(bad_tgt[GoPackageSourcesField])],
     )
 
 
@@ -184,15 +183,9 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     generator = rule_runner.get_target(Address("src/go"))
     generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
 
-    def gen_first_party_tgt(rel_dir: str, sources: list[str]) -> GoFirstPartyPackageTarget:
-        return GoFirstPartyPackageTarget(
-            {
-                GoImportPathField.alias: (
-                    os.path.join("example.com/src/go", rel_dir) if rel_dir else "example.com/src/go"
-                ),
-                GoFirstPartyPackageSubpathField.alias: rel_dir,
-                GoFirstPartyPackageSourcesField.alias: tuple(sources),
-            },
+    def gen_first_party_tgt(rel_dir: str, sources: list[str]) -> GoPackageTarget:
+        return GoPackageTarget(
+            {GoPackageSourcesField.alias: tuple(sources)},
             Address("src/go", generated_name=f"./{rel_dir}"),
             residence_dir=os.path.join("src/go", rel_dir).rstrip("/"),
         )
@@ -234,10 +227,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
 
 def test_package_targets_cannot_be_manually_created() -> None:
     with pytest.raises(InvalidTargetException):
-        GoFirstPartyPackageTarget(
-            {GoImportPathField.alias: "foo", GoFirstPartyPackageSubpathField.alias: "foo"},
-            Address("foo"),
-        )
+        GoPackageTarget({}, Address("foo"))
     with pytest.raises(InvalidTargetException):
         GoThirdPartyPackageTarget(
             {GoImportPathField.alias: "foo"},
@@ -303,9 +293,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
 
     with engine_error(ResolveError, contains="none were found"):
         get_main(Address("missing"))
-    with engine_error(ResolveError, contains="There are multiple `go_first_party_package` targets"):
+    with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
         get_main(Address("ambiguous"))
-    with engine_error(
-        InvalidFieldException, contains="must point to a `go_first_party_package` target"
-    ):
+    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
         get_main(Address("explicit_wrong_type"))
