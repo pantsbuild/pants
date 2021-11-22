@@ -42,7 +42,7 @@ async def map_first_party_scala_targets_to_symbols(
 
     symbol_map = SymbolMap()
     for address, analysis in address_and_analysis:
-        for symbol in analysis.provided_names:
+        for symbol in analysis.provided_symbols:
             symbol_map.add_symbol(symbol, address)
 
     return symbol_map

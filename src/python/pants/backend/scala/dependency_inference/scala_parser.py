@@ -111,7 +111,8 @@ class ScalaImport:
 
 @dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    provided_names: FrozenOrderedSet[str]
+    provided_symbols: FrozenOrderedSet[str]
+    provided_symbols_encoded: FrozenOrderedSet[str]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
 
@@ -165,7 +166,8 @@ class ScalaSourceDependencyAnalysis:
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            provided_names=FrozenOrderedSet(d["providedNames"]),
+            provided_symbols=FrozenOrderedSet(d["providedSymbols"]),
+            provided_symbols_encoded=FrozenOrderedSet(d["providedSymbolsEncoded"]),
             imports_by_scope=FrozenDict(
                 {
                     key: tuple(ScalaImport.from_json_dict(v) for v in values)
@@ -182,7 +184,8 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_names": list(self.provided_names),
+            "provided_symbols": list(self.provided_symbols),
+            "provided_symbols_encoded": list(self.provided_symbols_encoded),
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()
