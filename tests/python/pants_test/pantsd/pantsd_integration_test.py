@@ -498,26 +498,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         finally:
             rm_rf(test_path)
 
-    @unittest.skip("TODO https://github.com/pantsbuild/pants/issues/7654")
-    def test_pantsd_parse_exception_success(self):
-        # This test covers the case described in #6426, where a run that is failing fast due to an
-        # exception can race other completing work. We expect all runs to fail due to the error
-        # that has been introduced, but none of them should hang.
-        test_path = "testprojects/3rdparty/this_is_definitely_not_a_valid_directory"
-        test_build_file = os.path.join(test_path, "BUILD")
-        invalid_symbol = "this_is_definitely_not_a_valid_symbol"
-
-        try:
-            safe_mkdir(test_path, clean=True)
-            safe_file_dump(test_build_file, f"{invalid_symbol}()")
-            for _ in range(3):
-                with self.pantsd_run_context(success=False) as ctx:
-                    result = ctx.runner(["list", "testprojects::"])
-                    ctx.checker.assert_started()
-                    self.assertIn(invalid_symbol, result.stderr)
-        finally:
-            rm_rf(test_path)
-
     def _assert_pantsd_keyboardinterrupt_signal(
         self, signum: int, regexps: list[str] | None = None
     ):
@@ -527,15 +507,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         """
         with self.pantsd_test_context() as (workdir, config, checker):
-            client_handle, waiter_process_pid, _ = launch_waiter(workdir=workdir, config=config)
+            client_handle, waiter_pid, child_pid, _ = launch_waiter(workdir=workdir, config=config)
             client_pid = client_handle.process.pid
-            waiter_process = psutil.Process(waiter_process_pid)
+            waiter_process = psutil.Process(waiter_pid)
+            child_process = psutil.Process(waiter_pid)
 
             assert waiter_process.is_running()
+            assert child_process.is_running()
             checker.assert_started()
 
             # This should kill the client, which will cancel the run on the server, which will
-            # kill the waiting process.
+            # kill the waiting process and its child.
             os.kill(client_pid, signum)
             client_run = client_handle.join()
             client_run.assert_failure()
@@ -543,9 +525,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             for regexp in regexps or []:
                 self.assertRegex(client_run.stderr, regexp)
 
-            # pantsd should still be running, but the waiter process should have been killed.
+            # pantsd should still be running, but the waiter process and child should have been
+            # killed.
             time.sleep(5)
             assert not waiter_process.is_running()
+            assert not child_process.is_running()
             checker.assert_running()
 
     def test_pantsd_sigint(self):
@@ -560,7 +544,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": -1, "level": "debug"}}
         with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
             # Run a process that will wait forever.
-            first_run_handle, _, file_to_create = launch_waiter(workdir=workdir, config=config)
+            first_run_handle, _, _, file_to_create = launch_waiter(workdir=workdir, config=config)
 
             checker.assert_started()
             checker.assert_running()

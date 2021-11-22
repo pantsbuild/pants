@@ -57,14 +57,15 @@ def attempts(
 
 def launch_waiter(
     *, workdir: str, config: Mapping | None = None
-) -> tuple[PantsJoinHandle, int, str]:
+) -> tuple[PantsJoinHandle, int, int, str]:
     """Launch a process that will wait forever for a file to be created.
 
-    Returns the pid of the pants client, the pid of the waiting child process, and the file to
-    create to cause the waiting child to exit.
+    Returns the pants client handle, the pid of the waiting process, the pid of a child of the
+    waiting process, and the file to create to cause the waiting child to exit.
     """
     file_to_make = os.path.join(workdir, "some_magic_file")
     waiter_pid_file = os.path.join(workdir, "pid_file")
+    child_pid_file = os.path.join(workdir, "child_pid_file")
 
     argv = [
         "run",
@@ -72,15 +73,18 @@ def launch_waiter(
         "--",
         file_to_make,
         waiter_pid_file,
+        child_pid_file,
     ]
     client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
     waiter_pid = -1
     for _ in attempts("The waiter process should have written its pid."):
         waiter_pid_str = maybe_read_file(waiter_pid_file)
-        if waiter_pid_str:
+        child_pid_str = maybe_read_file(child_pid_file)
+        if waiter_pid_str and child_pid_str:
             waiter_pid = int(waiter_pid_str)
+            child_pid = int(child_pid_str)
             break
-    return client_handle, waiter_pid, file_to_make
+    return client_handle, waiter_pid, child_pid, file_to_make
 
 
 class PantsDaemonMonitor(ProcessManager):

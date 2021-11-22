@@ -313,11 +313,9 @@ class Target:
             target generator was explicitly defined. Target generators can, however, set this to
             the directory where the generated target provides metadata for. For example, a
             file-based target like `python_source` should set this to the parent directory of
-            its file. A directory-based target like `go_first_party_package` should set it to the
-            directory. A subtree-based target might set it to the root of the subtree. A file-less
-            target like `go_third_party_package` should keep the default of `address.spec_path`.
-            This field impacts how command line specs work, so that globs like `dir:` know whether
-            to match the target or not.
+            its file. A file-less target like `go_third_party_package` should keep the default of
+            `address.spec_path`. This field impacts how command line specs work, so that globs
+            like `dir:` know whether to match the target or not.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:

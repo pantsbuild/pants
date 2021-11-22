@@ -107,7 +107,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     ("3rdparty/requirements-test.txt",),
                     ("3rdparty/requirements-test.txt",),
                     addressable=False,
-                    kwargs={"requirements_relpath": "requirements-test.txt"},
+                    kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget, "src/python/foo", "foo", ["__init__.py"]

@@ -23,7 +23,7 @@ use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
-use process_execution::{CacheDest, CacheName, NamedCaches};
+use process_execution::{CacheDest, CacheName, ManagedChild, NamedCaches};
 use pyo3::{PyAny, PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -677,8 +677,6 @@ fn interactive_process(
     command.env_clear();
     command.envs(env);
 
-    command.kill_on_drop(true);
-
     let exit_status = session.clone()
       .with_console_ui_disabled(async move {
         // Once any UI is torn down, grab exclusive access to the console.
@@ -705,14 +703,18 @@ fn interactive_process(
               .try_clone_as_file()
               .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
           ));
-        let mut subprocess = command
-          .spawn()
-          .map_err(|e| format!("Error executing interactive process: {}", e))?;
+        let mut subprocess = ManagedChild::spawn(command)?;
         tokio::select! {
           _ = session.cancelled() => {
-            // The Session was cancelled: kill the process, and then wait for it to exit (to avoid
-            // zombies).
-            subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+            // The Session was cancelled: attempt to kill the process group / process, and
+            // then wait for it to exit (to avoid zombies).
+            if let Err(e) = subprocess.kill_pgid() {
+              // Failed to kill the PGID: try the non-group form.
+              log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
+                         This is unexpected: please file an issue about this problem at \
+                         [https://github.com/pantsbuild/pants/issues/new]", e);
+              subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+            };
             subprocess.wait().await.map_err(|e| e.to_string())
           }
           exit_status = subprocess.wait() => {

@@ -25,17 +25,6 @@ from pants.engine.target import (
 )
 from pants.option.global_options import FilesNotFoundBehavior
 
-
-class GoImportPathField(StringField):
-    alias = "import_path"
-    help = (
-        "Import path in Go code to import this package.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
 # -----------------------------------------------------------------------------------------------
@@ -85,7 +74,7 @@ class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
     alias = "package_sources"
     default = ("**/*.go", "**/*.s")
     help = (
-        "What sources to generate `go_first_party_package` targets for.\n\n"
+        "What sources to generate `go_package` targets for.\n\n"
         "Pants will generate one target per matching directory.\n\n"
         "Pants does not yet support some file types like `.c` and `.h` files, along with cgo "
         "files. If you need to use these files, please open a feature request at "
@@ -122,7 +111,7 @@ class GoModTarget(Target):
     )
     help = (
         "A first-party Go module (corresponding to a `go.mod` file).\n\n"
-        "Generates `go_first_party_package` targets for each directory from the "
+        "Generates `go_package` targets for each directory from the "
         "`package_sources` field, and generates `go_third_party_package` targets based on "
         "the `require` directives in your `go.mod`.\n\n"
         "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
@@ -131,42 +120,26 @@ class GoModTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_first_party_package` target
+# `go_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoFirstPartyPackageSourcesField(MultipleSourcesField):
+class GoPackageSourcesField(MultipleSourcesField):
     expected_file_extensions = (".go", ".s")
 
 
-class GoFirstPartyPackageDependenciesField(Dependencies):
+class GoPackageDependenciesField(Dependencies):
     pass
 
 
-class GoFirstPartyPackageSubpathField(StringField, AsyncFieldMixin):
-    alias = "subpath"
+class GoPackageTarget(Target):
+    alias = "go_package"
+    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependenciesField, GoPackageSourcesField)
     help = (
-        "The path from the owning `go.mod` to this package's directory, e.g. `subdir`.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
-class GoFirstPartyPackageTarget(Target):
-    alias = "go_first_party_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        GoImportPathField,
-        GoFirstPartyPackageSubpathField,
-        GoFirstPartyPackageDependenciesField,
-        GoFirstPartyPackageSourcesField,
-    )
-    help = (
-        "A Go package (corresponding to a directory with `.go` files).\n\n"
+        "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
         "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
         "target where you have your `go.mod` file, which will generate "
-        "`go_first_party_package` targets for you."
+        "`go_package` targets for you."
     )
 
     def validate(self) -> None:
@@ -182,6 +155,16 @@ class GoFirstPartyPackageTarget(Target):
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
+
+
+class GoImportPathField(StringField):
+    alias = "import_path"
+    help = (
+        "Import path in Go code to import this package.\n\n"
+        "This field should not be overridden; use the value from target generation."
+    )
+    required = True
+    value: str
 
 
 class GoThirdPartyPackageDependenciesField(Dependencies):
@@ -218,8 +201,8 @@ class GoThirdPartyPackageTarget(Target):
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
     help = (
-        "Address of the `go_first_party_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `go_first_party_package` for the same "
+        "Address of the `go_package` with the `main` for this binary.\n\n"
+        "If not specified, will default to the `go_package` for the same "
         "directory as this target's BUILD file. You should usually rely on this default."
     )
     value: str

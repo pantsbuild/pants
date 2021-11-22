@@ -2,7 +2,7 @@
 name = "sharded_lmdb"
 version = "0.0.1"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bytes = "1.0"
