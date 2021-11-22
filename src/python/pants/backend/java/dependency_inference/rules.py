@@ -12,9 +12,9 @@ from pants.backend.java.dependency_inference.java_parser import rules as java_pa
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.backend.java.target_types import JavaSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -22,6 +22,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    SourcesField,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -48,7 +49,7 @@ class JavaInferredDependencies:
 
 @dataclass(frozen=True)
 class JavaInferredDependenciesAndExportsRequest:
-    address: Address
+    source: SourcesField
 
 
 @rule(desc="Inferring Java dependencies by source analysis")
@@ -58,7 +59,7 @@ async def infer_java_dependencies_via_source_analysis(
 
     jids = await Get(
         JavaInferredDependencies,
-        JavaInferredDependenciesAndExportsRequest(request.sources_field.address),
+        JavaInferredDependenciesAndExportsRequest(request.sources_field),
     )
     return InferredDependencies(dependencies=jids.dependencies)
 
@@ -77,19 +78,17 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     ):
         return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))
 
-    address = request.address
-    if not address.is_file_target:
-        raise Exception(
-            "Java source analysis requires a snapshot with a "
-            f"single Java source file, but was provided with address `{address}`."
-        )
-    a = await Get(Digest, PathGlobs([address.filename]))
-    s = await Get(Snapshot, Digest, a)
+    address = request.source.address
 
     wrapped_tgt = await Get(WrappedTarget, Address, address)
+    source_files = await Get(SourceFiles, SourceFilesRequest([wrapped_tgt.target[JavaSourceField]]))
+
     explicitly_provided_deps, analysis = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(JavaSourceDependencyAnalysis, JavaSourceDependencyAnalysisRequest(snapshot=s)),
+        Get(
+            JavaSourceDependencyAnalysis,
+            JavaSourceDependencyAnalysisRequest(source_files=source_files),
+        ),
     )
 
     types: OrderedSet[str] = OrderedSet()
