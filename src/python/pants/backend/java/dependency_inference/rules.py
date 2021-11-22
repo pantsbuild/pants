@@ -49,7 +49,7 @@ class JavaInferredDependencies:
 
 @dataclass(frozen=True)
 class JavaInferredDependenciesAndExportsRequest:
-    sources_field: SourcesField
+    source: SourcesField
 
 
 @rule(desc="Inferring Java dependencies by source analysis")
@@ -78,7 +78,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     ):
         return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))
 
-    address = request.sources_field.address
+    address = request.source.address
 
     wrapped_tgt = await Get(WrappedTarget, Address, address)
     source_files = await Get(SourceFiles, SourceFilesRequest([wrapped_tgt.target[JavaSourceField]]))
