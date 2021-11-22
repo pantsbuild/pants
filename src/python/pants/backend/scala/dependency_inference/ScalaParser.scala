@@ -38,6 +38,42 @@ class SourceAnalysisTraverser extends Traverser {
     }
   }
 
+  def extractNamesFromTypeTree(tree: Tree): Vector[String] = {
+    tree match {
+      case Type.Name(name) => Vector(name)
+      case Type.Select(qual, Type.Name(name)) => {
+        val qualName = extractName(qual)
+        Vector(s"${qualName}.${name}")
+      }
+      case Type.Apply(tpe, args) => extractNamesFromTypeTree(tpe) ++ args.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.ApplyInfix(lhs, _op, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.Function(params, res) =>
+        params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
+      case Type.PolyFunction(_tparams, tpe) => extractNamesFromTypeTree(tpe)
+      case Type.ContextFunction(params, res) =>
+        params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
+      case Type.Tuple(args) => args.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.With(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.And(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.Or(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      // TODO: Recurse into `_stats` to find additional types.
+      // A `Type.Refine` represents syntax: A { def f: Int }
+      case Type.Refine(typeOpt, _stats) => typeOpt.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.Existential(tpe, _stats) => extractNamesFromTypeTree(tpe)
+      case Type.Annotate(tpe, _annots) => extractNamesFromTypeTree(tpe)
+      case Type.Lambda(_tparams, tpe) => extractNamesFromTypeTree(tpe)
+      case Type.Bounds(loOpt, hiOpt) =>
+        loOpt.toVector.flatMap(extractNamesFromTypeTree(_)) ++ hiOpt.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.ByName(tpe) => extractNamesFromTypeTree(tpe)
+      case Type.Repeated(tpe) => extractNamesFromTypeTree(tpe)
+      // TODO: Should we extract a type from _tpe?
+      // `Type.Match` represents this Scala 3 syntax: type T = match { case A => B }
+      case Type.Match(_tpe, cases) => cases.toVector.flatMap(extractNamesFromTypeTree(_))
+      case TypeCase(pat, body) => extractNamesFromTypeTree(pat) ++ extractNamesFromTypeTree(body)
+      case _ => Vector()
+    }
+  }
+
   def recordProvidedName(name: String): Unit = {
     if (!skipProvidedNames) {
       val fullPackageName = nameParts.mkString(".")
@@ -128,7 +164,7 @@ class SourceAnalysisTraverser extends Traverser {
         recordProvidedName(name)
       })
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -138,7 +174,7 @@ class SourceAnalysisTraverser extends Traverser {
       recordProvidedName(name)
 
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
 
       params.foreach(param => apply(param))
@@ -161,13 +197,12 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Init(tpe, _name, _argss) => {
-      val name = extractName(tpe)
-      recordConsumedSymbol(name)
+      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
     }
 
     case Term.Param(_mods, _name, decltpe, _default) => {
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
     }
 
