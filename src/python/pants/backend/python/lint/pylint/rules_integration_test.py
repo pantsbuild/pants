@@ -17,6 +17,8 @@ from pants.backend.python.target_types import PythonRequirementTarget, PythonSou
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
@@ -75,6 +77,7 @@ def assert_success(
     assert len(result) == 1
     assert "Your code has been rated at 10.00/10" in result[0].stdout
     assert result[0].exit_code == 0
+    assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.platform_specific_behavior
@@ -99,6 +102,21 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.py:2:0: C0103" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
+
+
+def test_report_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_pylint(
+        rule_runner, [tgt], extra_args=["--pylint-args='--output=reports/output.txt'"]
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result[0].stdout.strip() == ""
+    report_files = rule_runner.request(DigestContents, [result[0].report])
+    assert len(report_files) == 1
+    assert f"{PACKAGE}/f.py:2:0: C0103" in report_files[0].content.decode()
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -118,6 +136,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/good.py" not in result[0].stdout
     assert f"{PACKAGE}/bad.py:2:0: C0103" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 @skip_unless_python27_and_python3_present
@@ -267,6 +286,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_type_stubs(rule_runner: RuleRunner) -> None:
@@ -278,6 +298,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.pyi:2:0: C0103" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
@@ -313,6 +334,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 4
     assert f"{PACKAGE}/f.py:10:8: W5301" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_source_plugin(rule_runner: RuleRunner) -> None:
@@ -397,6 +419,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     result = run_pylint_with_plugin(tgt)
     assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.py:2:0: C9871" in result.stdout
+    assert result.report == EMPTY_DIGEST
 
     # Ensure that running Pylint on the plugin itself still works.
     plugin_tgt = rule_runner.get_target(
@@ -405,3 +428,4 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     result = run_pylint_with_plugin(plugin_tgt)
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout
+    assert result.report == EMPTY_DIGEST
