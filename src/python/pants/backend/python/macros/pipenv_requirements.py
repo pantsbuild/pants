@@ -58,7 +58,7 @@ class PipenvRequirements:
             requirement name as the default module, e.g. "Django" will default to
             `modules=["django"]`.
         :param pipfile_target: a `_python_requirements_file` target to provide for cache invalidation
-        if the requirements_relpath value is not in the current rel_path
+        if the source value is not in the current rel_path
         """
         if requirements_relpath and source:
             raise ValueError(
