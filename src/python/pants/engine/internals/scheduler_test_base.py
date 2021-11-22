@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from pathlib import Path
 
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.util.contextutil import temporary_file_path
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_mkdtemp
 
 
 class SchedulerTestBase:
@@ -19,28 +20,23 @@ class SchedulerTestBase:
 
     _executor = PyExecutor(core_threads=2, max_threads=4)
 
-    def _create_work_dir(self):
-        work_dir = safe_mkdtemp()
-        self.addCleanup(safe_rmtree, work_dir)
-        return work_dir
-
     def mk_scheduler(
         self,
+        tmp_path: Path,
         rules,
         include_trace_on_error: bool = True,
     ) -> SchedulerSession:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
-        work_dir = self._create_work_dir()
 
-        build_root = os.path.join(work_dir, "build_root")
-        os.makedirs(build_root)
+        build_root = tmp_path / "build_root"
+        build_root.mkdir(parents=True, exist_ok=True)
 
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         named_caches_dir = os.path.realpath(safe_mkdtemp())
         scheduler = Scheduler(
             ignore_patterns=[],
             use_gitignore=False,
-            build_root=build_root,
+            build_root=build_root.as_posix(),
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             ca_certs_path=None,
@@ -74,7 +70,7 @@ class SchedulerTestBase:
             _, state = throws[0]
             raise state.exc
 
-        self.assertEqual(len(returns), 1)
+        assert len(returns) == 1
 
         _, state = returns[0]
         return state
