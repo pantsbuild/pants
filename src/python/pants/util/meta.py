@@ -196,6 +196,10 @@ def frozen_after_init(cls: C) -> C:
             )
         prev_setattr(self, key, value)  # type: ignore[call-arg]
 
+    if hasattr(cls, "__slots__"):
+        # Ensure that the `__slots__` optimisation is still available for this class.
+        cls.__slots__ = set("_is_frozen", *cls.__slots__)
+
     cls._freeze_instance = freeze_instance
     cls._unfreeze_instance = unfreeze_instance
     cls.__init__ = new_init
