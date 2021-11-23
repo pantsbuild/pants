@@ -64,6 +64,11 @@ class JvmArtifactPackagesField(StringSequenceField):
     )
 
 
+class JvmProvidesTypesField(StringSequenceField):
+    alias = "experimental_provides_types"
+    help = "TODO: Add help for this."
+
+
 class JvmArtifactFieldSet(FieldSet):
 
     group: JvmArtifactGroupField

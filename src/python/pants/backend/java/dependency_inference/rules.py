@@ -133,6 +133,8 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
         third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
         if java_infer_subsystem.third_party_imports:
             third_party_matches = find_artifact_mapping(typ, third_party_artifact_mapping)
+            if "AbstractMatcher" in str(request.source.address):
+                logger.warning("%s", f"TPM: {third_party_matches}")
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue

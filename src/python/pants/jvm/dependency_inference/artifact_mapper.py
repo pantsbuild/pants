@@ -16,6 +16,7 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactGroupField,
     JvmArtifactPackagesField,
+    JvmProvidesTypesField,
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -38,6 +39,14 @@ class UnversionedCoordinate:
         return UnversionedCoordinate(group=coordinate_parts[0], artifact=coordinate_parts[1])
 
 
+class FirstPartySourceProvided:
+    """Marks when a first-party source has declared that it provides a given JVM symbol.
+
+    This resolves disambiguation cases in dependency inference when a first-party source provides
+    one type in a package that is otherwise fulfilled by third-party artifacts.
+    """
+
+
 @dataclass(frozen=True)
 class AvailableThirdPartyArtifacts:
     """Maps JVM unversioned coordinates to target `Address`es and declared packages."""
@@ -56,6 +65,9 @@ class AvailableThirdPartyArtifacts:
 
 
 class MutableTrieNode:
+
+    __slots__ = ["children", "recursive", "addresses"]  # don't use a `dict` to store attrs
+
     def __init__(self):
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
@@ -71,6 +83,14 @@ class MutableTrieNode:
 
 @frozen_after_init
 class FrozenTrieNode:
+
+    __slots__ = [
+        "_is_frozen",
+        "_children",
+        "_recursive",
+        "_addresses",
+    ]  # don't use a `dict` to store attrs
+
     def __init__(self, node: MutableTrieNode) -> None:
         children = {}
         for key, child in node.children.items():
@@ -110,10 +130,23 @@ class AllJvmArtifactTargets(Targets):
     pass
 
 
+class AllJvmTypeProvidingTargets(Targets):
+    pass
+
+
 @rule(desc="Find all jvm_artifact targets in project", level=LogLevel.DEBUG)
 def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
     return AllJvmArtifactTargets(
         tgt for tgt in targets if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+    )
+
+
+@rule(desc="Find all targets with experimental_provides fields in project", level=LogLevel.DEBUG)
+def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTargets:
+    return AllJvmTypeProvidingTargets(
+        tgt
+        for tgt in targets
+        if tgt.has_fields((JvmProvidesTypesField,)) and tgt[JvmProvidesTypesField].value is not None
     )
 
 
@@ -126,6 +159,7 @@ class ThirdPartyPackageToArtifactMapping:
 async def find_available_third_party_artifacts(
     all_jvm_artifact_tgts: AllJvmArtifactTargets,
 ) -> AvailableThirdPartyArtifacts:
+
     address_mapping: dict[UnversionedCoordinate, OrderedSet[Address]] = defaultdict(OrderedSet)
     package_mapping: dict[UnversionedCoordinate, OrderedSet[str]] = defaultdict(OrderedSet)
     for tgt in all_jvm_artifact_tgts:
@@ -163,6 +197,7 @@ async def find_available_third_party_artifacts(
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
     available_artifacts: AvailableThirdPartyArtifacts,
+    all_jvm_type_providing_tgts: AllJvmTypeProvidingTargets,
 ) -> ThirdPartyPackageToArtifactMapping:
     """Implements the mapping logic from the `jvm_artifact` and `java-infer` help."""
 
