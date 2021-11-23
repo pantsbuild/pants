@@ -158,7 +158,6 @@ custom_command = "build-support/bin/generate_all_lockfiles.sh"
 # TODO: These should move into 3rdparty, as should jvm_artifact definitions.
 exampleapp = "testprojects/src/jvm/org/pantsbuild/example/app/coursier_resolve.lockfile"
 pants_java_parser = "src/python/pants/backend/java/dependency_inference/coursier_resolve.lockfile"
-scala_testprojects = "testprojects/src/scala/coursier_resolve.lockfile"
 
 [toolchain-setup]
 repo = "pants"
