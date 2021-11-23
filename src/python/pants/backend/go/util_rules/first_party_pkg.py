@@ -54,16 +54,15 @@ class FirstPartyPkgImportPathRequest(EngineAwareParameter):
 class FirstPartyPkgInfo:
     """All the info and digest needed to build a first-party Go package.
 
-    The digest does not strip its source files. You must set `working_dir` appropriately to use
-    the `subpath`.
+    The digest does not strip its source files; `dir_path` is relative to the build root.
 
     Use `FirstPartyPkgImportPath` if you only need the derived import path.
     """
 
     digest: Digest
+    dir_path: str
 
     import_path: str
-    subpath: str
 
     imports: tuple[str, ...]
     test_imports: tuple[str, ...]
@@ -193,7 +192,7 @@ async def compute_first_party_package_info(
 
     info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
-        subpath=os.path.join(request.address.spec_path, import_path_info.dir_path_rel_to_gomod),
+        dir_path=os.path.join(request.address.spec_path, import_path_info.dir_path_rel_to_gomod),
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
@@ -231,7 +230,7 @@ async def setup_analyzer() -> PackageAnalyzerSetup:
         BuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
-            subpath="",
+            dir_path="",
             digest=source_digest,
             go_file_names=tuple(fc.path for fc in analyer_sources_content),
             s_file_names=(),

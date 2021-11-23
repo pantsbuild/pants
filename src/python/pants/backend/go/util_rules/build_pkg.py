@@ -32,7 +32,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         *,
         import_path: str,
         digest: Digest,
-        subpath: str,
+        dir_path: str,
         go_file_names: tuple[str, ...],
         s_file_names: tuple[str, ...],
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
@@ -48,7 +48,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
 
         self.import_path = import_path
         self.digest = digest
-        self.subpath = subpath
+        self.dir_path = dir_path
         self.go_file_names = go_file_names
         self.s_file_names = s_file_names
         self.direct_dependencies = direct_dependencies
@@ -59,7 +59,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             (
                 self.import_path,
                 self.digest,
-                self.subpath,
+                self.dir_path,
                 self.go_file_names,
                 self.s_file_names,
                 self.direct_dependencies,
@@ -76,7 +76,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"{self.__class__}("
             f"import_path={repr(self.import_path)}, "
             f"digest={self.digest}, "
-            f"subpath={self.subpath}, "
+            f"dir_path={self.dir_path}, "
             f"go_file_names={self.go_file_names}, "
             f"go_file_names={self.s_file_names}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
@@ -96,7 +96,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             self._hashcode == other._hashcode
             and self.import_path == other.import_path
             and self.digest == other.digest
-            and self.subpath == other.subpath
+            and self.dir_path == other.dir_path
             and self.go_file_names == other.go_file_names
             and self.s_file_names == other.s_file_names
             and self.minimum_go_version == other.minimum_go_version
@@ -266,7 +266,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
     if request.s_file_names:
         assembly_setup = await Get(
             FallibleAssemblyPreCompilation,
-            AssemblyPreCompilationRequest(input_digest, request.s_file_names, request.subpath),
+            AssemblyPreCompilationRequest(input_digest, request.s_file_names, request.dir_path),
         )
         if assembly_setup.result is None:
             return FallibleBuiltGoPackage(
@@ -307,7 +307,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         compile_args.append("-complete")
 
     relativized_sources = (
-        f"./{request.subpath}/{name}" if request.subpath else f"./{name}"
+        f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}"
         for name in request.go_file_names
     )
     compile_args.extend(["--", *relativized_sources])
@@ -337,7 +337,7 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
                 compilation_digest,
                 assembly_digests,
                 request.s_file_names,
-                request.subpath,
+                request.dir_path,
             ),
         )
         if assembly_result.result.exit_code != 0:
