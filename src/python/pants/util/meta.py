@@ -170,8 +170,8 @@ def frozen_after_init(cls: C) -> C:
 
     The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
     `__init__()`, but who still want to remain as immutable as possible (e.g. for safety with the V2
-    engine). When using with dataclasses, this should be the outermost decorator applied, i.e. appear
-    before `@dataclass` in source.
+    engine). When using with dataclasses, this should be the outermost decorator applied, i.e.
+    appear before `@dataclass` in source.
     """
 
     prev_init = cls.__init__
