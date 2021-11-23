@@ -67,7 +67,7 @@ def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
         [FirstPartyPkgImportPathRequest(Address(mod_dir, target_name="mod", generated_name="./"))],
     )
     assert info.import_path == "go.example.com/foo"
-    assert info.subpath == ""
+    assert info.dir_path_rel_to_gomod == ""
 
     info = rule_runner.request(
         FirstPartyPkgImportPath,
@@ -78,7 +78,7 @@ def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
         ],
     )
     assert info.import_path == "go.example.com/foo/dir"
-    assert info.subpath == "dir"
+    assert info.dir_path_rel_to_gomod == "dir"
 
 
 def test_package_info(rule_runner: RuleRunner) -> None:

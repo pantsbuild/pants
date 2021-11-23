@@ -229,16 +229,16 @@ async def generate_targets_from_go_mod(
     matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
 
     def create_first_party_package_tgt(dir: str) -> GoPackageTarget:
-        subpath = fast_relpath(dir, generator_addr.spec_path)
+        dir_path_rel_to_gomod = fast_relpath(dir, generator_addr.spec_path)
 
         return GoPackageTarget(
             {
                 GoPackageSourcesField.alias: tuple(
-                    sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
+                    sorted(os.path.join(dir_path_rel_to_gomod, f) for f in dir_to_filenames[dir])
                 )
             },
             # E.g. `src/go:mod#./subdir`.
-            generator_addr.create_generated(f"./{subpath}"),
+            generator_addr.create_generated(f"./{dir_path_rel_to_gomod}"),
             union_membership,
             residence_dir=dir,
         )

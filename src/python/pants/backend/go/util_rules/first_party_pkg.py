@@ -39,7 +39,7 @@ class FirstPartyPkgImportPath:
     """
 
     import_path: str
-    subpath: str
+    dir_path_rel_to_gomod: str
 
 
 @dataclass(frozen=True)
@@ -106,12 +106,16 @@ async def compute_first_party_package_import_path(
 ) -> FirstPartyPkgImportPath:
     owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
 
-    # The generated_name will have been set to `./{subpath}`.
-    subpath = request.address.generated_name[2:]  # type: ignore[index]
+    # The generated_name will have been set to `./{dir_path_rel_to_gomod}`.
+    dir_path_rel_to_gomod = request.address.generated_name[2:]  # type: ignore[index]
 
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
-    import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
-    return FirstPartyPkgImportPath(import_path, subpath)
+    import_path = (
+        f"{go_mod_info.import_path}/{dir_path_rel_to_gomod}"
+        if dir_path_rel_to_gomod
+        else go_mod_info.import_path
+    )
+    return FirstPartyPkgImportPath(import_path, dir_path_rel_to_gomod)
 
 
 @dataclass(frozen=True)
@@ -139,10 +143,14 @@ async def compute_first_party_package_info(
         Digest,
         MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
     )
-    path = request.address.spec_path if request.address.spec_path else "."
-    path = os.path.join(path, import_path_info.subpath) if import_path_info.subpath else path
-    if not path:
-        path = "."
+
+    path = request.address.spec_path or "."
+    path = (
+        os.path.join(path, import_path_info.dir_path_rel_to_gomod)
+        if import_path_info.dir_path_rel_to_gomod
+        else path
+    )
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -185,7 +193,7 @@ async def compute_first_party_package_info(
 
     info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
-        subpath=os.path.join(request.address.spec_path, import_path_info.subpath),
+        subpath=os.path.join(request.address.spec_path, import_path_info.dir_path_rel_to_gomod),
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
