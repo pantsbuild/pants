@@ -3,5 +3,7 @@
 
 java_sources(
     compatible_resolves=["exampleapp"],
-    experimental_provides_types=["com.google.common.truth.BadAndDangerous",]
+    experimental_provides_types=[
+        "com.google.common.truth.BadAndDangerous",
+    ],
 )
