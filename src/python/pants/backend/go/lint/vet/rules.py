@@ -54,7 +54,7 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
 
     input_digest = await Get(
         Digest,
-        MergeDigests([source_files.snapshot.digest, *(info.digest for info in go_mod_infos)]),
+        MergeDigests([source_files.snapshot.digest, *(info.digest for info in set(go_mod_infos))]),
     )
 
     process_result = await Get(

@@ -17,7 +17,7 @@ class GoVetSubsystem(Subsystem):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use `go vet`` when running `{register.bootstrap.pants_bin_name} lint`.",
+            help=f"Don't use `go vet` when running `{register.bootstrap.pants_bin_name} lint`.",
         )
 
     @property

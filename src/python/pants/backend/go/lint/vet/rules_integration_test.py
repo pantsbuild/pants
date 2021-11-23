@@ -55,9 +55,7 @@ def rule_runner() -> RuleRunner:
             SubsystemRule(GoVetSubsystem),
         ],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.experimental.go.lint.vet"], env_inherit={"PATH"}
-    )
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -96,11 +94,8 @@ def run_go_vet(
     *,
     extra_args: list[str] | None = None,
 ) -> tuple[LintResult, ...]:
-    args = (extra_args or []) + ["--backend-packages=pants.backend.experimental.go.lint.vet"]
-    rule_runner.set_options(
-        args,
-        env_inherit={"PATH"},
-    )
+    args = extra_args or []
+    rule_runner.set_options(args, env_inherit={"PATH"})
     field_sets = [GoVetFieldSet.create(tgt) for tgt in targets]
     lint_results = rule_runner.request(LintResults, [GoVetRequest(field_sets)])
     return lint_results.results
