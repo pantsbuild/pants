@@ -135,7 +135,7 @@ class FrozenTrieNode:
         )
 
     def __repr__(self):
-        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, addresses={self._addresses})"
+        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, addresses={self._addresses}, first_party={self._first_party})"
 
 
 class AllJvmArtifactTargets(Targets):
@@ -214,7 +214,10 @@ async def compute_java_third_party_artifact_mapping(
     """Implements the mapping logic from the `jvm_artifact` and `java-infer` help."""
 
     def insert(
-        mapping: MutableTrieNode, package_pattern: str, addresses: Iterable[Address]
+        mapping: MutableTrieNode,
+        package_pattern: str,
+        addresses: Iterable[Address],
+        first_party: bool,
     ) -> None:
         imp_parts = package_pattern.split(".")
         recursive = False
@@ -228,6 +231,7 @@ async def compute_java_third_party_artifact_mapping(
             current_node = child_node
 
         current_node.addresses.update(addresses)
+        current_node.first_party = first_party
         current_node.recursive = recursive
 
     # Build a default mapping from coord to package.
@@ -252,7 +256,12 @@ async def compute_java_third_party_artifact_mapping(
             # Default to exposing the `group` name as a package.
             packages = (f"{coord.group}.**",)
         for package in packages:
-            insert(mapping, package, addresses)
+            insert(mapping, package, addresses, False)
+
+    # Mark types that have strong first-party declarations as first-party
+    for tgt in all_jvm_type_providing_tgts:
+        for provides_types in tgt[JvmProvidesTypesField].value or []:
+            insert(mapping, provides_types, [], True)
 
     return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
 
