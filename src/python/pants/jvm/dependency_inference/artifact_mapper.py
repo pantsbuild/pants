@@ -66,12 +66,18 @@ class AvailableThirdPartyArtifacts:
 
 class MutableTrieNode:
 
-    __slots__ = ["children", "recursive", "addresses"]  # don't use a `dict` to store attrs
+    __slots__ = [
+        "children",
+        "recursive",
+        "addresses",
+        "first_party",
+    ]  # don't use a `dict` to store attrs
 
     def __init__(self):
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
         self.addresses: OrderedSet[Address] = OrderedSet()
+        self.first_party: bool = False
 
     def ensure_child(self, name: str) -> MutableTrieNode:
         if name in self.children:
@@ -89,7 +95,8 @@ class FrozenTrieNode:
         "_children",
         "_recursive",
         "_addresses",
-    ]  # don't use a `dict` to store attrs
+        "_first_party",
+    ]  # don't use a `dict` to store attrs (speeds up attr access significantly)
 
     def __init__(self, node: MutableTrieNode) -> None:
         children = {}
@@ -98,6 +105,7 @@ class FrozenTrieNode:
         self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
         self._recursive: bool = node.recursive
         self._addresses: FrozenOrderedSet[Address] = FrozenOrderedSet(node.addresses)
+        self._first_party: bool = node.first_party
 
     def find_child(self, name: str) -> FrozenTrieNode | None:
         return self._children.get(name)
@@ -105,6 +113,10 @@ class FrozenTrieNode:
     @property
     def recursive(self) -> bool:
         return self._recursive
+
+    @property
+    def first_party(self) -> bool:
+        return self._first_party
 
     @property
     def addresses(self) -> FrozenOrderedSet[Address]:
@@ -266,6 +278,9 @@ def find_artifact_mapping(
     # If the length of the found nodes equals the number of parts of the package path, then there
     # is an exact match.
     if len(found_nodes) == len(imp_parts):
+        best_match = found_nodes[-1]
+        if best_match.first_party:
+            return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
         return found_nodes[-1].addresses
 
     # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
