@@ -8,20 +8,24 @@ import scala.meta._
 import scala.meta.transversers.Traverser
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
+import scala.reflect.NameTransformer
 
 case class AnImport(name: String, isWildcard: Boolean)
 
 case class Analysis(
-  providedNames: Vector[String],
-  importsByScope: HashMap[String, ArrayBuffer[AnImport]],
-  consumedSymbolsByScope: HashMap[String, HashSet[String]],
+   providedSymbols: Vector[String],
+   providedSymbolsEncoded: Vector[String],
+   importsByScope: HashMap[String, ArrayBuffer[AnImport]],
+   consumedSymbolsByScope: HashMap[String, HashSet[String]],
 )
+
+case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
   var skipProvidedNames = false
 
-  val providedNames = ArrayBuffer[String]()
+  val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
   val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
 
@@ -74,10 +78,29 @@ class SourceAnalysisTraverser extends Traverser {
     }
   }
 
-  def recordProvidedName(name: String): Unit = {
+  def recordProvidedName(symbolName: String, sawClass: Boolean = false, sawTrait: Boolean = false, sawObject: Boolean = false): Unit = {
     if (!skipProvidedNames) {
       val fullPackageName = nameParts.mkString(".")
-      providedNames.append(s"${fullPackageName}.${name}")
+      if (!providedSymbolsByScope.contains(fullPackageName)) {
+        providedSymbolsByScope(fullPackageName) = HashMap[String, ProvidedSymbol]()
+      }
+      val providedSymbols = providedSymbolsByScope(fullPackageName)
+
+      if (providedSymbols.contains(symbolName)) {
+        val existingSymbol = providedSymbols(symbolName)
+        val newSymbol = ProvidedSymbol(
+          sawClass = existingSymbol.sawClass || sawClass,
+          sawTrait = existingSymbol.sawTrait || sawTrait,
+          sawObject = existingSymbol.sawObject || sawObject,
+        )
+        providedSymbols(symbolName) = newSymbol
+      } else {
+        providedSymbols(symbolName) = ProvidedSymbol(
+          sawClass = sawClass,
+          sawTrait = sawTrait,
+          sawObject = sawObject
+        )
+      }
     }
   }
 
@@ -126,19 +149,19 @@ class SourceAnalysisTraverser extends Traverser {
 
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
-      recordProvidedName(name)
+      recordProvidedName(name, sawClass = true)
       visitTemplate(templ, name)
     }
 
     case Defn.Trait(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
-      recordProvidedName(name)
+      recordProvidedName(name, sawTrait = true)
       visitTemplate(templ, name)
     }
 
     case Defn.Object(_mods, nameNode, templ) => {
       val name = extractName(nameNode)
-      recordProvidedName(name)
+      recordProvidedName(name, sawObject = true)
       visitTemplate(templ, name)
     }
 
@@ -231,6 +254,37 @@ class SourceAnalysisTraverser extends Traverser {
 
     case node => super.apply(node)
   }
+
+  def gatherProvidedSymbols(): Vector[String] = {
+    providedSymbolsByScope.flatMap({ case (scopeName, symbolsForScope) =>
+      symbolsForScope.keys.map(symbolName => s"${scopeName}.${symbolName}").toVector
+    }).toVector
+  }
+
+  def gatherEncodedProvidedSymbols(): Vector[String] = {
+    providedSymbolsByScope.flatMap({ case (scopeName, symbolsForScope) =>
+      val encodedSymbolsForScope = symbolsForScope.flatMap({ case (symbolName, symbol) => {
+        val encodedSymbolName = NameTransformer.encode(symbolName)
+        val result = ArrayBuffer[String](encodedSymbolName)
+        if (symbol.sawObject) {
+          result.append(encodedSymbolName + "$")
+          result.append(encodedSymbolName + "$.MODULE$")
+        }
+        result.toVector
+      }})
+
+      encodedSymbolsForScope.map(symbolName => s"${scopeName}.${symbolName}")
+    }).toVector
+  }
+
+  def toAnalysis: Analysis = {
+    Analysis(
+      providedSymbols = gatherProvidedSymbols(),
+      providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
+      importsByScope = importsByScope,
+      consumedSymbolsByScope = consumedSymbolsByScope,
+    )
+  }
 }
 
 object ScalaParser {
@@ -244,12 +298,7 @@ object ScalaParser {
 
     val analysisTraverser = new SourceAnalysisTraverser()
     analysisTraverser.apply(tree)
-
-    Analysis(
-      providedNames = analysisTraverser.providedNames.toVector,
-      importsByScope = analysisTraverser.importsByScope,
-      consumedSymbolsByScope = analysisTraverser.consumedSymbolsByScope,
-    )
+    analysisTraverser.toAnalysis
   }
 
   def main(args: Array[String]): Unit = {
