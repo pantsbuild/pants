@@ -12,7 +12,12 @@ from typing import ClassVar
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
@@ -99,12 +104,12 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 async def compute_first_party_package_import_path(
     request: FirstPartyPkgImportPathRequest,
 ) -> FirstPartyPkgImportPath:
-    go_mod_address = request.address.maybe_convert_to_target_generator()
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
 
     # The generated_name will have been set to `./{subpath}`.
     subpath = request.address.generated_name[2:]  # type: ignore[index]
 
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
     import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
     return FirstPartyPkgImportPath(import_path, subpath)
 
@@ -119,11 +124,11 @@ class PackageAnalyzerSetup:
 async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgInfo:
-    go_mod_address = request.address.maybe_convert_to_target_generator()
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
     wrapped_target, import_path_info, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+        Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
     )
 
     pkg_sources = await Get(
