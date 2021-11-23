@@ -7,11 +7,13 @@ from dataclasses import dataclass
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.selectors import Get
+from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -22,9 +24,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class GoVetFieldSet(FieldSet):
-    required_fields = (GoFirstPartyPackageSourcesField,)
+    required_fields = (GoPackageSourcesField,)
 
-    sources: GoFirstPartyPackageSourcesField
+    sources: GoPackageSourcesField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -45,11 +47,21 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         SourceFilesRequest(field_set.sources for field_set in request.field_sets),
     )
 
+    go_mod_infos = await MultiGet(
+        Get(GoModInfo, GoModInfoRequest(field_set.address.maybe_convert_to_target_generator()))
+        for field_set in request.field_sets
+    )
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests([source_files.snapshot.digest, *(info.digest for info in go_mod_infos)]),
+    )
+
     process_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
             ("vet", *(f"./{p}" for p in source_files.snapshot.dirs)),
-            input_digest=source_files.snapshot.digest,
+            input_digest=input_digest,
             description=f"Run `go vet` on {pluralize(len(source_files.snapshot.files), 'file')}.",
         ),
     )

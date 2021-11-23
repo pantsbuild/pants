@@ -13,11 +13,14 @@ from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
 from pants.backend.go.lint.vet.rules import rules as go_vet_rules
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
-from pants.backend.go.target_types import GoFirstPartyPackageTarget, GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
     first_party_pkg,
     go_mod,
     import_analysis,
+    link,
     sdk,
     third_party_pkg,
 )
@@ -33,7 +36,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoFirstPartyPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget],
         rules=[
             *fmt.rules(),
             *skip_field.rules(),
@@ -45,6 +48,9 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             *go_mod.rules(),
             *import_analysis.rules(),
+            *link.rules(),
+            *build_pkg.rules(),
+            *assembly.rules(),
             QueryRule(LintResults, (GoVetRequest,)),
             SubsystemRule(GoVetSubsystem),
         ],
@@ -119,8 +125,10 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "f.go" in lint_results[0].stdout
+    assert lint_results[0].exit_code == 2
+    assert (
+        "./f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
+    )
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -138,8 +146,10 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad/f.go" in lint_results[0].stdout
+    assert lint_results[0].exit_code == 2
+    assert (
+        "bad/f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
+    )
     assert "good/f.go" not in lint_results[0].stdout
 
 
