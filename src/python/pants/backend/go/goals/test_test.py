@@ -472,3 +472,24 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout
     assert "FAIL: TestAddExternal" in result.stdout
+
+
+def test_skip_tests(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "f_test.go": "",
+            "BUILD": textwrap.dedent(
+                """\
+                go_package(name='run')
+                go_package(name='skip', skip_tests=True)
+                """
+            ),
+        }
+    )
+
+    def is_applicable(tgt_name: str) -> bool:
+        tgt = rule_runner.get_target(Address("", target_name=tgt_name))
+        return GoTestFieldSet.is_applicable(tgt)
+
+    assert is_applicable("run")
+    assert not is_applicable("skip")

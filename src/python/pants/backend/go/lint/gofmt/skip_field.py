@@ -8,7 +8,7 @@ from pants.engine.target import BoolField
 class SkipGofmtField(BoolField):
     alias = "skip_gofmt"
     default = False
-    help = "If true, don't run gofmt on this target's code."
+    help = "If true, don't run gofmt on this package."
 
 
 def rules():
