@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pants.build_graph.address import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+from pants.jvm.dependency_inference.artifact_mapper import AllJvmTypeProvidingTargets
+from pants.jvm.target_types import JvmProvidesTypesField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -78,6 +80,7 @@ class FirstPartySymbolMapping:
 @rule(level=LogLevel.DEBUG)
 async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
+    targets_that_provide_types: AllJvmTypeProvidingTargets,
 ) -> FirstPartySymbolMapping:
     all_mappings = await MultiGet(
         Get(
@@ -91,6 +94,25 @@ async def merge_first_party_module_mappings(
     merged_dep_map = SymbolMap()
     for dep_map in all_mappings:
         merged_dep_map.merge(dep_map)
+
+    # `experimental_provides_types` ("`provides`") can be declared on a `java_sources` target,
+    # so each generated `java_source` target will have that `provides` annotation. All that matters
+    # here is that _one_ of the souce files amongst the set of sources actually provides that type.
+
+    # Collect each address associated with a `provides` annotation and index by the provided type.
+    provided_types: dict[str, set[Address]] = defaultdict(set)
+    for tgt in targets_that_provide_types:
+        for provided_type in tgt[JvmProvidesTypesField].value or []:
+            provided_types[provided_type].add(tgt.address)
+
+    # Check that at least one address declared by each `provides` value actually provides the type:
+    for provided_type, provided_addresses in provided_types.items():
+        symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type)
+        if not provided_addresses.intersection(symbol_addresses):
+            raise Exception(
+                f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "
+                f"`{provided_type}`, however, it does not appear to actually provide that type."
+            )
 
     return FirstPartySymbolMapping(merged_dep_map)
 
