@@ -148,7 +148,7 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
     return AllJvmTypeProvidingTargets(
         tgt
         for tgt in targets
-        if tgt.has_fields((JvmProvidesTypesField,)) and tgt[JvmProvidesTypesField].value is not None
+        if tgt.has_field(JvmProvidesTypesField) and tgt[JvmProvidesTypesField].value is not None
     )
 
 
@@ -250,8 +250,8 @@ async def compute_java_third_party_artifact_mapping(
 
     # Mark types that have strong first-party declarations as first-party
     for tgt in all_jvm_type_providing_tgts:
-        for provides_types in tgt[JvmProvidesTypesField].value or []:
-            insert(mapping, provides_types, [], True)
+        for provides_type in tgt[JvmProvidesTypesField].value or []:
+            insert(mapping, provides_type, [], True)
 
     return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
 
