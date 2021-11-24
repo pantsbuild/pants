@@ -5,6 +5,7 @@ import os
 from typing import Iterable, Optional
 
 from pants.base.build_environment import pants_version
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.util.meta import classproperty
@@ -45,6 +46,29 @@ class PantsRequirementCAOF:
         :param modules: The modules exposed by the dist, e.g. `['pants.testutil']`. This defaults
             to the name of the dist without the leading `pantsbuild`.
         """
+        warn_or_error(
+            "2.10.0.dev0",
+            "the `pants_requirement` macro",
+            (
+                "Use the target `pants_requirements` instead. First, add "
+                "`pants.backend.plugin_development` to `[GLOBAL].backend_packages` in "
+                "`pants.toml`. Then, delete all `pants_requirement` calls and replace them with "
+                "a single `pants_requirements(name='pants')`.\n\n"
+                "By default, `pants_requirements` will generate a `python_requirement` target for "
+                "both `pantsbuild.pants` and `pantsbuild.pants.testutil`.\n\n"
+                "The address for the generated targets will be different, e.g. "
+                "`pants-plugins:pants#pantsbuild.pants` rather than "
+                "`pants-plugins:pantsbuild.pants`. If you're using dependency inference, you "
+                "should not need to update anything.\n\n"
+                "The version of Pants is more useful now. If you're using a dev release, the "
+                "version will be the exact release you're on, like before, to reduce the risk of "
+                "a Plugin API change breaking your plugin. But if you're using a release candidate "
+                "or stable release, the version will now be any non-dev release in the release "
+                "series, e.g. any release candidate or stable release in Pants 2.9. This allows "
+                "consumers of your plugin to use different patch versions than what you release "
+                "the plugin with."
+            ),
+        )
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"
         if not (dist == "pantsbuild.pants" or dist.startswith("pantsbuild.pants.")):
