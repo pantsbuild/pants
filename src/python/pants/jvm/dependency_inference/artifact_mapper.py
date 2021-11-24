@@ -39,14 +39,6 @@ class UnversionedCoordinate:
         return UnversionedCoordinate(group=coordinate_parts[0], artifact=coordinate_parts[1])
 
 
-class FirstPartySourceProvided:
-    """Marks when a first-party source has declared that it provides a given JVM symbol.
-
-    This resolves disambiguation cases in dependency inference when a first-party source provides
-    one type in a package that is otherwise fulfilled by third-party artifacts.
-    """
-
-
 @dataclass(frozen=True)
 class AvailableThirdPartyArtifacts:
     """Maps JVM unversioned coordinates to target `Address`es and declared packages."""
