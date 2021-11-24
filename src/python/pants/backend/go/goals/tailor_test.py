@@ -51,41 +51,97 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_find_putative_go_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            # No `go_mod`, should be created.
-            "src/go/unowned/go.mod": "module example.com/src/go/unowned\n",
-            # Already has `go_mod`.
-            "src/go/owned/go.mod": "module example.com/src/go/owned\n",
-            "src/go/owned/BUILD": "go_mod()\n",
-            # Missing `go_binary()`, should be created.
-            "src/go/owned/pkg1/app.go": "package main",
-            "src/go/owned/pkg1/BUILD": "go_package()",
-            # Already has a `go_binary()`.
-            "src/go/owned/pkg2/app.go": "package main",
-            "src/go/owned/pkg2/BUILD": "go_binary()\ngo_package(name='pkg')",
-            # Has a `go_binary` defined in a different directory.
-            "src/go/owned/pkg3/subdir/app.go": "package main",
-            "src/go/owned/pkg3/subdir/BUILD": "go_package()",
-            "src/go/owned/pkg3/BUILD": "go_binary(main='src/go/owned/pkg3/subdir')",
-        }
-    )
+def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"unowned/go.mod": "", "owned/go.mod": "", "owned/BUILD": "go_mod()"})
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
-            AllOwnedSources(["src/go/owned/go.mod"]),
+            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources(["owned/go.mod"]),
         ],
     )
     assert putative_targets == PutativeTargets(
         [
             PutativeTarget.for_target_type(
-                GoModTarget, path="src/go/unowned", name="unowned", triggering_sources=["go.mod"]
+                GoModTarget, path="unowned", name="unowned", triggering_sources=["go.mod"]
+            )
+        ]
+    )
+
+
+def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "unowned/f.go": "",
+            "unowned/f1.go": "",
+            "owned/f.go": "",
+            "owned/BUILD": "go_package()",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources(["owned/f.go"]),
+        ],
+    )
+    assert putative_targets == PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path="unowned",
+                name="unowned",
+                triggering_sources=["f.go", "f1.go"],
+            )
+        ]
+    )
+
+
+def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "missing_binary_tgt/app.go": "package main",
+            "missing_binary_tgt/BUILD": "go_package()",
+            "tgt_already_exists/app.go": "package main",
+            "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()",
+            "missing_pkg_and_binary_tgt/app.go": "package main",
+            "main_set_to_different_dir/subdir/app.go": "package main",
+            "main_set_to_different_dir/subdir/BUILD": "go_package()",
+            "main_set_to_different_dir/BUILD": "go_binary(main='main_set_to_different_dir/subdir')",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources(
+                [
+                    "missing_binary_tgt/app.go",
+                    "tgt_already_exists/app.go",
+                    "main_set_to_different_dir/subdir/app.go",
+                ]
+            ),
+        ],
+    )
+    assert putative_targets == PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                GoBinaryTarget,
+                path="missing_binary_tgt",
+                name="bin",
+                triggering_sources=[],
+                kwargs={"name": "bin"},
+            ),
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path="missing_pkg_and_binary_tgt",
+                name="missing_pkg_and_binary_tgt",
+                triggering_sources=["app.go"],
+                kwargs={},
             ),
             PutativeTarget.for_target_type(
                 GoBinaryTarget,
-                path="src/go/owned/pkg1",
+                path="missing_pkg_and_binary_tgt",
                 name="bin",
                 triggering_sources=[],
                 kwargs={"name": "bin"},
