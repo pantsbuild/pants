@@ -19,7 +19,7 @@ from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace, EMPTY_FILE_DIGEST
+from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
