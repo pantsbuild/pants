@@ -53,6 +53,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TriBoolField,
+    ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
 from pants.option.subsystem import Subsystem
@@ -515,18 +516,11 @@ class PythonTestsTimeout(IntField):
     alias = "timeout"
     help = (
         "A timeout (in seconds) used by each test file belonging to this target.\n\n"
-        "This only applies if the option `--pytest-timeouts` is set to True."
+        "If unset, will default to `[pytest].timeout_default`; if that option is also unset, "
+        "then the test will never time out. Will never exceed `[pytest].timeout_maximum`. Only "
+        "applies if the option `--pytest-timeouts` is set to true (the default)."
     )
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address)
-        if value is not None and value < 1:
-            raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{value}."
-            )
-        return value
+    valid_numbers = ValidNumbers.positive_only
 
     def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
