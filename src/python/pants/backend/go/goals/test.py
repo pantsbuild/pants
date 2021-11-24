@@ -222,7 +222,7 @@ async def run_go_tests(
     )
     if maybe_built_main_pkg.output is None:
         assert maybe_built_main_pkg.stderr is not None
-        compilation_failure(maybe_built_main_pkg.exit_code, maybe_built_main_pkg.stderr)
+        return compilation_failure(maybe_built_main_pkg.exit_code, maybe_built_main_pkg.stderr)
     built_main_pkg = maybe_built_main_pkg.output
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
