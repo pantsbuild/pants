@@ -493,3 +493,23 @@ def test_skip_tests(rule_runner: RuleRunner) -> None:
 
     assert is_applicable("run")
     assert not is_applicable("skip")
+
+
+def test_no_tests(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.skipped
