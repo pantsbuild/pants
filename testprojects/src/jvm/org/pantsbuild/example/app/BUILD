@@ -10,11 +10,3 @@ deploy_jar(
 scala_sources(
     compatible_resolves=["exampleapp"],
 )
-
-jvm_artifact(
-    name="com.google.truth_truth",
-    group="com.google.truth",
-    artifact="truth",
-    version="0.45",
-    # scope = "test",
-)
