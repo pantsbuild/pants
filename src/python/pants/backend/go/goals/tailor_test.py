@@ -8,7 +8,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals.tailor import PutativeGoTargetsRequest, has_package_main
 from pants.backend.go.goals.tailor import rules as go_tailor_rules
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             QueryRule(PutativeTargets, [PutativeGoTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[GoModTarget, GoBinaryTarget],
+        target_types=[GoModTarget, GoBinaryTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -61,12 +61,14 @@ def test_find_putative_go_targets(rule_runner: RuleRunner) -> None:
             "src/go/owned/BUILD": "go_mod()\n",
             # Missing `go_binary()`, should be created.
             "src/go/owned/pkg1/app.go": "package main",
+            "src/go/owned/pkg1/BUILD": "go_package()",
             # Already has a `go_binary()`.
             "src/go/owned/pkg2/app.go": "package main",
-            "src/go/owned/pkg2/BUILD": "go_binary()",
+            "src/go/owned/pkg2/BUILD": "go_binary()\ngo_package(name='pkg')",
             # Has a `go_binary` defined in a different directory.
             "src/go/owned/pkg3/subdir/app.go": "package main",
-            "src/go/owned/pkg3/BUILD": "go_binary(main='src/go/owned#./pkg3/subdir')",
+            "src/go/owned/pkg3/subdir/BUILD": "go_package()",
+            "src/go/owned/pkg3/BUILD": "go_binary(main='src/go/owned/pkg3/subdir')",
         }
     )
     putative_targets = rule_runner.request(

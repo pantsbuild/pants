@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import os.path
 from textwrap import dedent
 from typing import Iterable
 
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -46,7 +47,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
         ],
-        target_types=[GoModTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -56,26 +57,23 @@ def rule_runner() -> RuleRunner:
 def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
     rule_runner.write_files(
         {
-            f"{mod_dir}BUILD": "go_mod(name='mod')\n",
+            f"{mod_dir}BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
             f"{mod_dir}go.mod": "module go.example.com/foo",
             f"{mod_dir}f.go": "",
             f"{mod_dir}dir/f.go": "",
+            f"{mod_dir}dir/BUILD": "go_package()",
         }
     )
     info = rule_runner.request(
         FirstPartyPkgImportPath,
-        [FirstPartyPkgImportPathRequest(Address(mod_dir, target_name="mod", generated_name="./"))],
+        [FirstPartyPkgImportPathRequest(Address(mod_dir, target_name="pkg"))],
     )
     assert info.import_path == "go.example.com/foo"
     assert info.dir_path_rel_to_gomod == ""
 
     info = rule_runner.request(
         FirstPartyPkgImportPath,
-        [
-            FirstPartyPkgImportPathRequest(
-                Address(mod_dir, target_name="mod", generated_name="./dir")
-            )
-        ],
+        [FirstPartyPkgImportPathRequest(Address(os.path.join(mod_dir, "dir")))],
     )
     assert info.import_path == "go.example.com/foo/dir"
     assert info.dir_path_rel_to_gomod == "dir"
@@ -120,6 +118,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+            "foo/pkg/BUILD": "go_package()",
             "foo/cmd/main.go": dedent(
                 """\
                 package main
@@ -139,6 +138,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
                 func TestBar(t *testing.T) {}
                 """
             ),
+            "foo/cmd/BUILD": "go_package()",
         }
     )
 
@@ -157,7 +157,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
     ) -> None:
         maybe_info = rule_runner.request(
             FallibleFirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{dir_path}"))],
+            [FirstPartyPkgInfoRequest(Address(os.path.join("foo", dir_path)))],
         )
         assert maybe_info.info is not None
         info = maybe_info.info
@@ -202,7 +202,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
 def test_invalid_package(rule_runner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "go_mod(name='mod')\n",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
             "go.mod": dedent(
                 """\
                 module go.example.com/foo
@@ -214,7 +214,7 @@ def test_invalid_package(rule_runner) -> None:
     )
     maybe_info = rule_runner.request(
         FallibleFirstPartyPkgInfo,
-        [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+        [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
     )
     assert maybe_info.info is None
     assert maybe_info.exit_code == 1
@@ -225,7 +225,7 @@ def test_invalid_package(rule_runner) -> None:
 def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "go_mod(name='mod')\n",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
             "go.mod": dedent(
                 """\
                 module go.example.com/foo
@@ -254,14 +254,14 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     with engine_error(NotImplementedError):
         rule_runner.request(
             FallibleFirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+            [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
         )
 
 
 def test_embeds_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "go_mod(name='mod')\n",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
             "go.mod": dedent(
                 """\
                 module go.example.com/foo
@@ -299,7 +299,7 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     )
     maybe_info = rule_runner.request(
         FallibleFirstPartyPkgInfo,
-        [FirstPartyPkgInfoRequest(Address("", target_name="mod", generated_name="./"))],
+        [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
     )
     assert maybe_info.info is not None
     info = maybe_info.info

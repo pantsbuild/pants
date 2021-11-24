@@ -9,7 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
         ],
-        target_types=[GoModTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -122,12 +122,12 @@ def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "BUILD": "go_mod(name='mod')",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
         }
     )
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./"),
+        Address("", target_name="pkg"),
         expected_import_path="example.com/greeter",
         expected_dir_path="",
         expected_go_file_names=["greeter.go"],
@@ -196,6 +196,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+            "greeter/quoter/BUILD": "go_package()",
             "greeter/lib.go": dedent(
                 """\
                 package greeter
@@ -212,6 +213,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+            "greeter/BUILD": "go_package()",
             "main.go": dedent(
                 """\
                 package main
@@ -236,7 +238,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
                 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
                 """
             ),
-            "BUILD": "go_mod(name='mod')",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
         }
     )
 
@@ -273,7 +275,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     quoter_import_path = "example.com/project/greeter/quoter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./greeter/quoter"),
+        Address("greeter/quoter"),
         expected_import_path=quoter_import_path,
         expected_dir_path="greeter/quoter",
         expected_go_file_names=["lib.go"],
@@ -284,17 +286,17 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
     greeter_import_path = "example.com/project/greeter"
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./greeter"),
+        Address("greeter"),
         expected_import_path=greeter_import_path,
         expected_dir_path="greeter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[quoter_import_path, xerrors_import_path],
+        expected_direct_dependency_import_paths=[xerrors_import_path, quoter_import_path],
         expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
     )
 
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="mod", generated_name="./"),
+        Address("", target_name="pkg"),
         expected_import_path="example.com/project",
         expected_dir_path="",
         expected_go_file_names=["main.go"],
@@ -318,7 +320,9 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
             ),
             "BUILD": "go_mod(name='mod')",
             "direct/f.go": "invalid!!!",
+            "direct/BUILD": "go_package()",
             "dep/f.go": "invalid!!!",
+            "dep/BUILD": "go_package()",
             "uses_dep/f.go": dedent(
                 """\
                 package uses_dep
@@ -330,12 +334,12 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+            "uses_dep/BUILD": "go_package()",
         }
     )
 
     direct_build_request = rule_runner.request(
-        FallibleBuildGoPackageRequest,
-        [BuildGoPackageTargetRequest(Address("", target_name="mod", generated_name="./direct"))],
+        FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest(Address("direct"))]
     )
     assert direct_build_request.request is None
     assert direct_build_request.exit_code == 1
@@ -344,8 +348,7 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     )
 
     dep_build_request = rule_runner.request(
-        FallibleBuildGoPackageRequest,
-        [BuildGoPackageTargetRequest(Address("", target_name="mod", generated_name="./uses_dep"))],
+        FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest(Address("uses_dep"))]
     )
     assert dep_build_request.request is None
     assert dep_build_request.exit_code == 1

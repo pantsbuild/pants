@@ -5,13 +5,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -20,10 +19,8 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
-    StringSequenceField,
     Target,
 )
-from pants.option.global_options import FilesNotFoundBehavior
 
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
@@ -69,51 +66,17 @@ class GoModDependenciesField(Dependencies):
     alias = "_dependencies"
 
 
-# TODO(#12953): generalize this?
-class GoModPackageSourcesField(StringSequenceField, AsyncFieldMixin):
-    alias = "package_sources"
-    default = ("**/*.go", "**/*.s")
-    help = (
-        "What sources to generate `go_package` targets for.\n\n"
-        "Pants will generate one target per matching directory.\n\n"
-        "Pants does not yet support some file types like `.c` and `.h` files, along with cgo "
-        "files. If you need to use these files, please open a feature request at "
-        "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-        "prioritize adding support."
-    )
-
-    def _prefix_glob_with_address(self, glob: str) -> str:
-        if glob.startswith("!"):
-            return f"!{os.path.join(self.address.spec_path, glob[1:])}"
-        return os.path.join(self.address.spec_path, glob)
-
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
-        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
-        return PathGlobs(
-            (self._prefix_glob_with_address(glob) for glob in self.value or ()),
-            conjunction=GlobExpansionConjunction.any_match,
-            glob_match_error_behavior=error_behavior,
-            description_of_origin=(
-                f"{self.address}'s `{self.alias}` field"
-                if error_behavior != GlobMatchErrorBehavior.ignore
-                else None
-            ),
-        )
-
-
 class GoModTarget(Target):
     alias = "go_mod"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
         GoModSourcesField,
-        GoModPackageSourcesField,
     )
     help = (
         "A first-party Go module (corresponding to a `go.mod` file).\n\n"
-        "Generates `go_package` targets for each directory from the "
-        "`package_sources` field, and generates `go_third_party_package` targets based on "
-        "the `require` directives in your `go.mod`.\n\n"
+        "Generates `go_third_party_package` targets based on the `require` directives in your "
+        "`go.mod`.\n\n"
         "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
         "`go mod tidy` directly to update your `go.mod` and `go.sum`."
     )
@@ -125,7 +88,32 @@ class GoModTarget(Target):
 
 
 class GoPackageSourcesField(MultipleSourcesField):
+    default = ("*.go", "*.s")
     expected_file_extensions = (".go", ".s")
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if not value_or_default:
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
+                f"the target's directory, but it was set to {repr(value_or_default)}."
+            )
+
+        # Ban recursive globs and subdirectories. We assume that a `go_package` corresponds
+        # to exactly one directory.
+        invalid_globs = [
+            glob for glob in (value_or_default or ()) if "**" in glob or os.path.sep in glob
+        ]
+        if invalid_globs:
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} must only have globs for the "
+                f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
+                f"but it was set to: {sorted(value_or_default)}"
+            )
+        return value_or_default
 
 
 class GoPackageDependenciesField(Dependencies):
@@ -137,19 +125,8 @@ class GoPackageTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependenciesField, GoPackageSourcesField)
     help = (
         "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
-        "target where you have your `go.mod` file, which will generate "
-        "`go_package` targets for you."
+        "Expects that there is a `go_mod` target in the current or ancestor directory."
     )
-
-    def validate(self) -> None:
-        if not self.address.is_generated_target:
-            raise InvalidTargetException(
-                f"The `{self.alias}` target type should not be manually created in BUILD "
-                f"files, but it was created for {self.address}.\n\n"
-                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
-                f"generate `{self.alias}` targets for you."
-            )
 
 
 # -----------------------------------------------------------------------------------------------
