@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -48,9 +53,14 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         SourceFilesRequest(field_set.sources for field_set in request.field_sets),
     )
 
+    owning_go_mods = await MultiGet(
+        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.field_sets
+    )
+
+    owning_go_mod_addresses = tuple(set(x.address for x in owning_go_mods))
+
     go_mod_infos = await MultiGet(
-        Get(GoModInfo, GoModInfoRequest(field_set.address.maybe_convert_to_target_generator()))
-        for field_set in request.field_sets
+        Get(GoModInfo, GoModInfoRequest(address)) for address in owning_go_mod_addresses
     )
 
     input_digest = await Get(

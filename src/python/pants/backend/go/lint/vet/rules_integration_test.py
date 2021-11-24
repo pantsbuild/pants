@@ -107,8 +107,14 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.go": GOOD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    rule_runner.write_files(
+        {
+            "f.go": GOOD_FILE,
+            "go.mod": GO_MOD,
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
@@ -116,8 +122,14 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    rule_runner.write_files(
+        {
+            "f.go": BAD_FILE,
+            "go.mod": GO_MOD,
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 2
@@ -130,14 +142,16 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "go.mod": GO_MOD,
-            "BUILD": "go_mod(name='mod')",
+            "BUILD": "go_mod(name='mod')\n",
+            "good/BUILD": "go_package()\n",
             "good/f.go": GOOD_FILE,
+            "bad/BUILD": "go_package()\n",
             "bad/f.go": BAD_FILE,
         }
     )
     tgts = [
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./good")),
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./bad")),
+        rule_runner.get_target(Address("good", target_name="good")),
+        rule_runner.get_target(Address("bad", target_name="bad")),
     ]
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
@@ -149,7 +163,13 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')"})
-    tgt = rule_runner.get_target(Address("", target_name="mod", generated_name="./"))
+    rule_runner.write_files(
+        {
+            "f.go": BAD_FILE,
+            "go.mod": GO_MOD,
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt], extra_args=["--go-vet-skip"])
     assert not lint_results
