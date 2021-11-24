@@ -1314,12 +1314,14 @@ class ValidNumbers(Enum):
         if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
             if num < 0:
                 raise InvalidFieldException(
-                    f"The {repr(alias)} field in target {address} must be >=0, but was set to `{num}`."
+                    f"The {repr(alias)} field in target {address} must be greater than or equal to "
+                    f"zero, but was set to `{num}`."
                 )
             return
         if num <= 0:
             raise InvalidFieldException(
-                f"The {repr(alias)} field in target {address} must be >0, but was set to `{num}`."
+                f"The {repr(alias)} field in target {address} must be greater than zero, but was "
+                f"set to `{num}`."
             )
 
 
