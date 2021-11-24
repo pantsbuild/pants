@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os.path
 from dataclasses import dataclass
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
@@ -57,10 +58,12 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         MergeDigests([source_files.snapshot.digest, *(info.digest for info in set(go_mod_infos))]),
     )
 
+    package_dirs = sorted(list(set(os.path.dirname(f) for f in source_files.snapshot.files)))
+
     process_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
-            ("vet", *(f"./{p}" for p in source_files.snapshot.dirs)),
+            ("vet", *(f"./{p}" for p in package_dirs)),
             input_digest=input_digest,
             description=f"Run `go vet` on {pluralize(len(source_files.snapshot.files), 'file')}.",
         ),
