@@ -14,6 +14,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     InvalidFieldException,
     InvalidTargetException,
@@ -120,12 +121,24 @@ class GoPackageDependenciesField(Dependencies):
     pass
 
 
+class SkipGoTestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this package's tests."
+
+
 class GoPackageTarget(Target):
     alias = "go_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependenciesField, GoPackageSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoPackageDependenciesField,
+        GoPackageSourcesField,
+        SkipGoTestsField,
+    )
     help = (
         "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
-        "Expects that there is a `go_mod` target in the current or ancestor directory."
+        "Expects that there is a `go_mod` target in its directory or in an ancestor "
+        "directory."
     )
 
 

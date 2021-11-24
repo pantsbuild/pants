@@ -3,7 +3,13 @@
 
 import pytest
 
-from pants.backend.shell.shunit2_test_runner import add_source_shunit2
+from pants.backend.shell.shunit2_test_runner import Shunit2FieldSet, add_source_shunit2
+from pants.backend.shell.target_types import (
+    Shunit2TestSourceField,
+    Shunit2TestTarget,
+    SkipShunit2TestsField,
+)
+from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 
 
@@ -30,3 +36,15 @@ def test_add_source_shunit2(original: str, expected: str) -> None:
     result = add_source_shunit2(FileContent("f.sh", original.encode())).content.decode()
     print(result)
     assert result == expected
+
+
+@pytest.mark.parametrize("skipped", (True, False))
+def test_skip_tests(skipped: bool) -> None:
+    tgt = Shunit2TestTarget(
+        {Shunit2TestSourceField.alias: "tests.sh", SkipShunit2TestsField.alias: skipped},
+        Address("tests"),
+    )
+    if skipped:
+        assert not Shunit2FieldSet.is_applicable(tgt)
+    else:
+        assert Shunit2FieldSet.is_applicable(tgt)

@@ -12,6 +12,7 @@ from pants.backend.shell.target_types import (
     Shunit2TestsGeneratorTarget,
     Shunit2TestSourceField,
     Shunit2TestTimeoutField,
+    SkipShunit2TestsField,
 )
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
@@ -47,7 +48,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -62,6 +63,10 @@ class Shunit2FieldSet(TestFieldSet):
     timeout: Shunit2TestTimeoutField
     shell: Shunit2ShellField
     runtime_package_dependencies: RuntimePackageDependenciesField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipShunit2TestsField).value
 
 
 @dataclass(frozen=True)
