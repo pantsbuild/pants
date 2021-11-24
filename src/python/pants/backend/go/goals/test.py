@@ -7,7 +7,7 @@ import os
 from typing import Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
-from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField, SkipGoTestsField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -26,6 +26,7 @@ from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -64,6 +65,10 @@ class GoTestFieldSet(TestFieldSet):
     required_fields = (GoPackageSourcesField,)
 
     sources: GoPackageSourcesField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipGoTestsField).value
 
 
 def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:

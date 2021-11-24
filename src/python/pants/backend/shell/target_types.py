@@ -106,6 +106,12 @@ class Shunit2TestTimeoutField(IntField):
     valid_numbers = ValidNumbers.positive_only
 
 
+class SkipShunit2TestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this target's tests."
+
+
 class Shunit2TestSourceField(ShellSourceField):
     pass
 
@@ -123,6 +129,7 @@ class Shunit2TestTarget(Target):
         Shunit2TestSourceField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
+        SkipShunit2TestsField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
@@ -167,6 +174,7 @@ class Shunit2TestsGeneratorTarget(Target):
         Shunit2TestsGeneratorSourcesField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
+        SkipShunit2TestsField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
         Shunit2TestsOverrideField,
