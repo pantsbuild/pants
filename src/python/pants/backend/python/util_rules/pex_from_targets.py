@@ -48,6 +48,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -582,15 +583,34 @@ class RequirementsPexRequest:
 
 
 @rule
-async def get_requirements_pex(request: RequirementsPexRequest) -> PexRequest:
+async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSetup) -> PexRequest:
+    if setup.run_against_entire_lockfile and request.internal_only:
+        opt_pex_request = await Get(
+            OptionalPexRequest,
+            _RepositoryPexRequest(
+                addresses=sorted(request.addresses),
+                internal_only=request.internal_only,
+                hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
+                direct_deps_only=request.direct_deps_only,
+                resolve_and_lockfile=request.resolve_and_lockfile,
+            ),
+        )
+        if opt_pex_request.maybe_pex_request is None:
+            raise ValueError(
+                "[python].run_against_entire_lockfile was set, but could not find a "
+                "lockfile or constraints file for this target set. See "
+                f"{doc_url('python-third-party-dependencies')} for details."
+            )
+        return opt_pex_request.maybe_pex_request
+
     pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest(
             addresses=sorted(request.addresses),
             output_filename="requirements.pex",
+            internal_only=request.internal_only,
             include_source_files=False,
             hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-            internal_only=request.internal_only,
             direct_deps_only=request.direct_deps_only,
             resolve_and_lockfile=request.resolve_and_lockfile,
         ),

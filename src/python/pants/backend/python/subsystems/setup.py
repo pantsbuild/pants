@@ -150,6 +150,20 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--run-against-entire-lockfile",
+            advanced=True,
+            default=False,
+            type=bool,
+            help=(
+                "If enabled, when running binaries, tests and repls Pants will use the entire "
+                "lockfile/constraints file instead of just the relevant subset. This will improve "
+                "performance and reduce cache size, at the expense of caching granularity and "
+                "hermeticity. This option does not affect packaging deployable artifacts, such as "
+                "PEX files, wheels and cloud functions, which will still use just the exact "
+                "subset of requirements needed."
+            ),
+        )
+        register(
             "--interpreter-search-paths",
             advanced=True,
             type=list,
@@ -260,6 +274,10 @@ class PythonSetup(Subsystem):
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
         return cast(InvalidLockfileBehavior, self.options.invalid_lockfile_behavior)
+
+    @property
+    def run_against_entire_lockfile(self) -> bool:
+        return cast(bool, self.options.run_against_entire_lockfile)
 
     @property
     def resolve_all_constraints(self) -> bool:
