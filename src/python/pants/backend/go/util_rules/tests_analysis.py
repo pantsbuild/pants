@@ -10,9 +10,11 @@ from typing import ClassVar
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import Process, ProcessResult
+from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -24,9 +26,10 @@ class GenerateTestMainRequest(EngineAwareParameter):
     test_paths: FrozenOrderedSet[str]
     xtest_paths: FrozenOrderedSet[str]
     import_path: str
+    address: Address
 
-    def debug_hint(self) -> str | None:
-        return self.import_path
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,7 @@ class GeneratedTestMain:
     digest: Digest
     has_tests: bool
     has_xtests: bool
+    failed_exit_code_and_stderr: tuple[int, str] | None
 
     TEST_MAIN_FILE = "_testmain.go"
     TEST_PKG = "_test"
@@ -100,21 +104,29 @@ async def generate_testmain(
     xtest_paths = tuple(f"{GeneratedTestMain.XTEST_PKG}:{path}" for path in request.xtest_paths)
 
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         Process(
             argv=(analyzer.PATH, request.import_path, *test_paths, *xtest_paths),
             input_digest=input_digest,
-            description=f"Analyze Go test sources for {request.import_path}",
+            description=f"Analyze Go test sources for {request.address}",
             level=LogLevel.DEBUG,
             output_files=("_testmain.go",),
         ),
     )
+    if result.exit_code != 0:
+        return GeneratedTestMain(
+            digest=EMPTY_DIGEST,
+            has_tests=False,
+            has_xtests=False,
+            failed_exit_code_and_stderr=(result.exit_code, result.stderr.decode("utf-8")),
+        )
 
     metadata = json.loads(result.stdout.decode("utf-8"))
     return GeneratedTestMain(
         digest=result.output_digest,
         has_tests=metadata["has_tests"],
         has_xtests=metadata["has_xtests"],
+        failed_exit_code_and_stderr=None,
     )
 
 
