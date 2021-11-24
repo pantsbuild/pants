@@ -135,7 +135,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
 
     def assert_pkg_info(
         import_path: str,
-        subpath: str,
+        dir_path: str,
         imports: tuple[str, ...],
         go_files: tuple[str, ...],
         extra_files: tuple[str, ...],
@@ -144,19 +144,19 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert import_path in all_packages.import_paths_to_pkg_info
         pkg_info = all_packages.import_paths_to_pkg_info[import_path]
         assert pkg_info.import_path == import_path
-        assert pkg_info.subpath == subpath
+        assert pkg_info.dir_path == dir_path
         assert pkg_info.imports == imports
         assert pkg_info.go_files == go_files
         assert not pkg_info.s_files
         snapshot = rule_runner.request(Snapshot, [pkg_info.digest])
         assert set(snapshot.files) == {
-            os.path.join(subpath, file_name) for file_name in (*go_files, *extra_files)
+            os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }
         assert pkg_info.minimum_go_version == minimum_go_version
 
     assert_pkg_info(
         import_path="github.com/google/uuid",
-        subpath="github.com/google/uuid@v1.3.0",
+        dir_path="github.com/google/uuid@v1.3.0",
         imports=(
             "bytes",
             "crypto/md5",
@@ -209,7 +209,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     )
     assert_pkg_info(
         import_path="golang.org/x/text/unicode/bidi",
-        subpath="golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
+        dir_path="golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
         imports=("container/list", "fmt", "log", "sort", "unicode/utf8"),
         go_files=("bidi.go", "bracket.go", "core.go", "prop.go", "tables.go", "trieval.go"),
         extra_files=(
@@ -515,7 +515,7 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
         ThirdPartyPkgInfo,
         [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest)],
     )
-    assert pkg_info.subpath == "github.com/hashicorp/consul/api@v1.3.0"
+    assert pkg_info.dir_path == "github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
 
 
@@ -545,6 +545,6 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     )
     assert pkg_info.error is not None
     # This particular error is tricky because `Dir` will not have been set, which we need to
-    # determine the subpath and the digest.
-    assert pkg_info.subpath == ""
+    # determine the dir_path and the digest.
+    assert pkg_info.dir_path == ""
     assert pkg_info.digest == EMPTY_DIGEST

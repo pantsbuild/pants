@@ -41,9 +41,9 @@ class ThirdPartyPkgInfo:
     """
 
     import_path: str
-    subpath: str
 
     digest: Digest
+    dir_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
@@ -165,7 +165,7 @@ async def download_and_analyze_third_party_packages(
         all_pkg_info_kwargs.append(
             dict(
                 import_path=import_path,
-                subpath=dir_path,
+                dir_path=dir_path,
                 imports=tuple(pkg_json.get("Imports", ())),
                 go_files=tuple(pkg_json.get("GoFiles", ())),
                 s_files=tuple(pkg_json.get("SFiles", ())),
@@ -244,7 +244,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
         )
         return None, ThirdPartyPkgInfo(
             import_path=import_path,
-            subpath="",
+            dir_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),

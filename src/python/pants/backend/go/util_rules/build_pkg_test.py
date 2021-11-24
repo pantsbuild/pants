@@ -69,7 +69,7 @@ def assert_built(
 def test_build_pkg(rule_runner: RuleRunner) -> None:
     transitive_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep/transitive",
-        subpath="dep/transitive",
+        dir_path="dep/transitive",
         go_file_names=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -92,7 +92,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
     )
     direct_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",
-        subpath="dep",
+        dir_path="dep",
         go_file_names=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -115,7 +115,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
     )
     main = BuildGoPackageRequest(
         import_path="example.com/foo",
-        subpath="",
+        dir_path="",
         go_file_names=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -160,7 +160,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
 def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
     invalid_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",
-        subpath="dep",
+        dir_path="dep",
         go_file_names=("f.go",),
         digest=rule_runner.make_snapshot({"dep/f.go": "invalid!!!"}).digest,
         s_file_names=(),
@@ -169,7 +169,7 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
     )
     main = BuildGoPackageRequest(
         import_path="example.com/foo",
-        subpath="",
+        dir_path="",
         go_file_names=("f.go",),
         digest=rule_runner.make_snapshot(
             {

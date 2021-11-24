@@ -78,14 +78,14 @@ def assert_pkg_target_built(
     addr: Address,
     *,
     expected_import_path: str,
-    expected_subpath: str,
+    expected_dir_path: str,
     expected_direct_dependency_import_paths: list[str],
     expected_transitive_dependency_import_paths: list[str],
     expected_go_file_names: list[str],
 ) -> None:
     build_request = rule_runner.request(BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr)])
     assert build_request.import_path == expected_import_path
-    assert build_request.subpath == expected_subpath
+    assert build_request.dir_path == expected_dir_path
     assert build_request.go_file_names == tuple(expected_go_file_names)
     assert not build_request.s_file_names
     assert [
@@ -129,7 +129,7 @@ def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name="./"),
         expected_import_path="example.com/greeter",
-        expected_subpath="",
+        expected_dir_path="",
         expected_go_file_names=["greeter.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
@@ -160,7 +160,7 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=import_path),
         expected_import_path=import_path,
-        expected_subpath="github.com/google/uuid@v1.3.0",
+        expected_dir_path="github.com/google/uuid@v1.3.0",
         expected_go_file_names=[
             "dce.go",
             "doc.go",
@@ -245,7 +245,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_internal_import_path),
         expected_import_path=xerrors_internal_import_path,
-        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543/internal",
+        expected_dir_path="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543/internal",
         expected_go_file_names=["internal.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
@@ -256,7 +256,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name=xerrors_import_path),
         expected_import_path=xerrors_import_path,
-        expected_subpath="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543",
+        expected_dir_path="golang.org/x/xerrors@v0.0.0-20191204190536-9bdfabe68543",
         expected_go_file_names=[
             "adaptor.go",
             "doc.go",
@@ -275,7 +275,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name="./greeter/quoter"),
         expected_import_path=quoter_import_path,
-        expected_subpath="greeter/quoter",
+        expected_dir_path="greeter/quoter",
         expected_go_file_names=["lib.go"],
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
@@ -286,7 +286,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name="./greeter"),
         expected_import_path=greeter_import_path,
-        expected_subpath="greeter",
+        expected_dir_path="greeter",
         expected_go_file_names=["lib.go"],
         expected_direct_dependency_import_paths=[quoter_import_path, xerrors_import_path],
         expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
@@ -296,7 +296,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="mod", generated_name="./"),
         expected_import_path="example.com/project",
-        expected_subpath="",
+        expected_dir_path="",
         expected_go_file_names=["main.go"],
         expected_direct_dependency_import_paths=[greeter_import_path],
         expected_transitive_dependency_import_paths=[

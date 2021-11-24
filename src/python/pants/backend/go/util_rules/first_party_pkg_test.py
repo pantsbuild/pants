@@ -67,7 +67,7 @@ def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
         [FirstPartyPkgImportPathRequest(Address(mod_dir, target_name="mod", generated_name="./"))],
     )
     assert info.import_path == "go.example.com/foo"
-    assert info.subpath == ""
+    assert info.dir_path_rel_to_gomod == ""
 
     info = rule_runner.request(
         FirstPartyPkgImportPath,
@@ -78,7 +78,7 @@ def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
         ],
     )
     assert info.import_path == "go.example.com/foo/dir"
-    assert info.subpath == "dir"
+    assert info.dir_path_rel_to_gomod == "dir"
 
 
 def test_package_info(rule_runner: RuleRunner) -> None:
@@ -143,7 +143,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
     )
 
     def assert_info(
-        subpath: str,
+        dir_path: str,
         *,
         imports: list[str],
         test_imports: list[str],
@@ -157,12 +157,12 @@ def test_package_info(rule_runner: RuleRunner) -> None:
     ) -> None:
         maybe_info = rule_runner.request(
             FallibleFirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{subpath}"))],
+            [FirstPartyPkgInfoRequest(Address("foo", generated_name=f"./{dir_path}"))],
         )
         assert maybe_info.info is not None
         info = maybe_info.info
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
-        expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{subpath}/*.go"])])
+        expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{dir_path}/*.go"])])
         assert actual_snapshot == expected_snapshot
 
         assert info.imports == tuple(imports)

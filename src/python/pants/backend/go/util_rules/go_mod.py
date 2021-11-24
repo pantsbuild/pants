@@ -18,6 +18,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
+    InvalidTargetException,
     UnexpandedTargets,
     WrappedTarget,
 )
@@ -52,10 +53,10 @@ async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
         reverse=True,
     )
     if not go_mod_targets:
-        raise Exception(
-            f"The target {request.address} does not have any `go_mod` target in any ancestor "
-            "BUILD files. To fix, please make sure your project has a `go.mod` file and add a "
-            "`go_mod` target (you can run `./pants tailor` to do this)."
+        raise InvalidTargetException(
+            f"The target {request.address} does not have a `go_mod` target in its BUILD file or "
+            "any ancestor BUILD files. To fix, please make sure your project has a `go.mod` file "
+            "and add a `go_mod` target (you can run `./pants tailor` to do this)."
         )
     nearest_go_mod_target = go_mod_targets[0]
     return OwningGoMod(nearest_go_mod_target.address)

@@ -60,7 +60,7 @@ async def setup_analyzer() -> AnalyzerSetup:
         BuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
-            subpath="",
+            dir_path="",
             digest=source_digest,
             go_file_names=(source_entry.path,),
             s_file_names=(),
