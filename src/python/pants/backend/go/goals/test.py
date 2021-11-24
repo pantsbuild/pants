@@ -154,17 +154,7 @@ async def run_go_tests(
     )
 
     if not testmain.has_tests and not testmain.has_xtests:
-        # Nothing to do so return an empty result.
-        # TODO: There should really be a "skipped entirely" mechanism for `TestResult`.
-        return TestResult(
-            exit_code=0,
-            stdout="",
-            stderr="",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            address=field_set.address,
-            output_setting=test_subsystem.output,
-        )
+        return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
 
     # Construct the build request for the package under test.
     maybe_test_pkg_build_request = await Get(
@@ -268,7 +258,7 @@ async def run_go_tests(
             input_digest=binary.digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
-            level=LogLevel.INFO,
+            level=LogLevel.DEBUG,
         ),
     )
     return TestResult.from_fallible_process_result(result, field_set.address, test_subsystem.output)

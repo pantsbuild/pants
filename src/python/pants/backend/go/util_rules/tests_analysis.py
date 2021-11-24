@@ -10,20 +10,23 @@ from typing import ClassVar
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
-class GenerateTestMainRequest:
+class GenerateTestMainRequest(EngineAwareParameter):
     digest: Digest
     test_paths: FrozenOrderedSet[str]
     xtest_paths: FrozenOrderedSet[str]
     import_path: str
+
+    def debug_hint(self) -> str | None:
+        return self.import_path
 
 
 @dataclass(frozen=True)
