@@ -4,8 +4,8 @@
 import pytest
 from packaging.version import Version
 
-from pants.backend.python.macros import pants_requirements
-from pants.backend.python.macros.pants_requirements import (
+from pants.backend.plugin_development import pants_requirements
+from pants.backend.plugin_development.pants_requirements import (
     GenerateFromPantsRequirementsRequest,
     PantsRequirementsTargetGenerator,
     determine_version,

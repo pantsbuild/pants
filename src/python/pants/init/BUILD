@@ -20,6 +20,7 @@ target(
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/google_cloud_function/python",
+        "src/python/pants/backend/plugin_development",
         "src/python/pants/backend/project_info",
         "src/python/pants/backend/python",
         "src/python/pants/backend/python/lint/bandit",
