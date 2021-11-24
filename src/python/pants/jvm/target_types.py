@@ -64,6 +64,17 @@ class JvmArtifactPackagesField(StringSequenceField):
     )
 
 
+class JvmProvidesTypesField(StringSequenceField):
+    alias = "experimental_provides_types"
+    help = (
+        "Signals that the specified types should be fulfilled by these source files during "
+        "dependency inference. This allows for specific types within packages that are otherwise "
+        "inferred as belonging to `jvm_artifact` targets to be unambiguously inferred as belonging "
+        "to this first-party source. If a given type is defined, at least one source file captured "
+        "by this target must actually provide that symbol."
+    )
+
+
 class JvmArtifactFieldSet(FieldSet):
 
     group: JvmArtifactGroupField

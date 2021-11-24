@@ -16,6 +16,7 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactGroupField,
     JvmArtifactPackagesField,
+    JvmProvidesTypesField,
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -56,10 +57,18 @@ class AvailableThirdPartyArtifacts:
 
 
 class MutableTrieNode:
+    __slots__ = [
+        "children",
+        "recursive",
+        "addresses",
+        "first_party",
+    ]  # don't use a `dict` to store attrs
+
     def __init__(self):
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
         self.addresses: OrderedSet[Address] = OrderedSet()
+        self.first_party: bool = False
 
     def ensure_child(self, name: str) -> MutableTrieNode:
         if name in self.children:
@@ -71,6 +80,14 @@ class MutableTrieNode:
 
 @frozen_after_init
 class FrozenTrieNode:
+    __slots__ = [
+        "_is_frozen",
+        "_children",
+        "_recursive",
+        "_addresses",
+        "_first_party",
+    ]  # don't use a `dict` to store attrs (speeds up attr access significantly)
+
     def __init__(self, node: MutableTrieNode) -> None:
         children = {}
         for key, child in node.children.items():
@@ -78,6 +95,7 @@ class FrozenTrieNode:
         self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
         self._recursive: bool = node.recursive
         self._addresses: FrozenOrderedSet[Address] = FrozenOrderedSet(node.addresses)
+        self._first_party: bool = node.first_party
 
     def find_child(self, name: str) -> FrozenTrieNode | None:
         return self._children.get(name)
@@ -85,6 +103,10 @@ class FrozenTrieNode:
     @property
     def recursive(self) -> bool:
         return self._recursive
+
+    @property
+    def first_party(self) -> bool:
+        return self._first_party
 
     @property
     def addresses(self) -> FrozenOrderedSet[Address]:
@@ -103,10 +125,14 @@ class FrozenTrieNode:
         )
 
     def __repr__(self):
-        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, addresses={self._addresses})"
+        return f"FrozenTrieNode(children={repr(self._children)}, recursive={self._recursive}, addresses={self._addresses}, first_party={self._first_party})"
 
 
 class AllJvmArtifactTargets(Targets):
+    pass
+
+
+class AllJvmTypeProvidingTargets(Targets):
     pass
 
 
@@ -114,6 +140,15 @@ class AllJvmArtifactTargets(Targets):
 def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
     return AllJvmArtifactTargets(
         tgt for tgt in targets if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+    )
+
+
+@rule(desc="Find all targets with experimental_provides fields in project", level=LogLevel.DEBUG)
+def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTargets:
+    return AllJvmTypeProvidingTargets(
+        tgt
+        for tgt in targets
+        if tgt.has_field(JvmProvidesTypesField) and tgt[JvmProvidesTypesField].value is not None
     )
 
 
@@ -126,6 +161,7 @@ class ThirdPartyPackageToArtifactMapping:
 async def find_available_third_party_artifacts(
     all_jvm_artifact_tgts: AllJvmArtifactTargets,
 ) -> AvailableThirdPartyArtifacts:
+
     address_mapping: dict[UnversionedCoordinate, OrderedSet[Address]] = defaultdict(OrderedSet)
     package_mapping: dict[UnversionedCoordinate, OrderedSet[str]] = defaultdict(OrderedSet)
     for tgt in all_jvm_artifact_tgts:
@@ -163,11 +199,15 @@ async def find_available_third_party_artifacts(
 async def compute_java_third_party_artifact_mapping(
     java_infer_subsystem: JavaInferSubsystem,
     available_artifacts: AvailableThirdPartyArtifacts,
+    all_jvm_type_providing_tgts: AllJvmTypeProvidingTargets,
 ) -> ThirdPartyPackageToArtifactMapping:
     """Implements the mapping logic from the `jvm_artifact` and `java-infer` help."""
 
     def insert(
-        mapping: MutableTrieNode, package_pattern: str, addresses: Iterable[Address]
+        mapping: MutableTrieNode,
+        package_pattern: str,
+        addresses: Iterable[Address],
+        first_party: bool,
     ) -> None:
         imp_parts = package_pattern.split(".")
         recursive = False
@@ -181,6 +221,7 @@ async def compute_java_third_party_artifact_mapping(
             current_node = child_node
 
         current_node.addresses.update(addresses)
+        current_node.first_party = first_party
         current_node.recursive = recursive
 
     # Build a default mapping from coord to package.
@@ -205,7 +246,12 @@ async def compute_java_third_party_artifact_mapping(
             # Default to exposing the `group` name as a package.
             packages = (f"{coord.group}.**",)
         for package in packages:
-            insert(mapping, package, addresses)
+            insert(mapping, package, addresses, False)
+
+    # Mark types that have strong first-party declarations as first-party
+    for tgt in all_jvm_type_providing_tgts:
+        for provides_type in tgt[JvmProvidesTypesField].value or []:
+            insert(mapping, provides_type, [], True)
 
     return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
 
@@ -231,6 +277,9 @@ def find_artifact_mapping(
     # If the length of the found nodes equals the number of parts of the package path, then there
     # is an exact match.
     if len(found_nodes) == len(imp_parts):
+        best_match = found_nodes[-1]
+        if best_match.first_party:
+            return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
         return found_nodes[-1].addresses
 
     # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
