@@ -4,24 +4,200 @@
 from __future__ import annotations
 
 import logging
+import os
+from abc import ABCMeta
+from collections import deque
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
+from typing import ClassVar, Iterable, Iterator, Sequence
 
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import CoarsenedTarget, FieldSet
+from pants.engine.unions import UnionMembership, union
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
 
+class ClasspathSourceMissing(Exception):
+    """No compiler instances were compatible with a CoarsenedTarget."""
+
+
+class ClasspathSourceAmbiguity(Exception):
+    """Too many compiler instances were compatible with a CoarsenedTarget."""
+
+
+class _ClasspathEntryRequestClassification(Enum):
+    COMPATIBLE = auto()
+    PARTIAL = auto()
+    CONSUME_ONLY = auto()
+    INCOMPATIBLE = auto()
+
+
+@union
 @dataclass(frozen=True)
+class ClasspathEntryRequest(metaclass=ABCMeta):
+    """A request for a ClasspathEntry for the given CoarsenedTarget and resolve.
+
+    TODO: Move to `classpath.py`.
+    """
+
+    component: CoarsenedTarget
+    resolve: CoursierResolveKey
+    # If this request contains some FieldSets which do _not_ match this request class's
+    # FieldSets a prerequisite request will be set. When set, the provider of the
+    # ClasspathEntry should recurse with this request first, and include it as a dependency.
+    prerequisite: ClasspathEntryRequest | None = None
+
+    # The FieldSet types that this request subclass can produce a ClasspathEntry for. A request
+    # will only be constructed if it is compatible with all of the members of the CoarsenedTarget,
+    # or if a `prerequisite` request will provide an entry for the rest of the members.
+    field_sets: ClassVar[tuple[type[FieldSet], ...]]
+
+    # Additional FieldSet types that this request subclass may consume (but not produce a
+    # ClasspathEntry for) iff they are contained in a component with FieldSets matching
+    # `cls.field_sets`.
+    field_sets_consume_only: ClassVar[tuple[type[FieldSet], ...]] = ()
+
+    @staticmethod
+    def for_targets(
+        union_membership: UnionMembership, component: CoarsenedTarget, resolve: CoursierResolveKey
+    ) -> ClasspathEntryRequest:
+        """Constructs a subclass compatible with the members of the CoarsenedTarget."""
+        compatible = []
+        partial = []
+        consume_only = []
+        impls = union_membership.get(ClasspathEntryRequest)
+        for impl in impls:
+            classification = ClasspathEntryRequest.classify_impl(impl, component)
+            if classification == _ClasspathEntryRequestClassification.INCOMPATIBLE:
+                continue
+            elif classification == _ClasspathEntryRequestClassification.COMPATIBLE:
+                compatible.append(impl)
+            elif classification == _ClasspathEntryRequestClassification.PARTIAL:
+                partial.append(impl)
+            elif classification == _ClasspathEntryRequestClassification.CONSUME_ONLY:
+                consume_only.append(impl)
+
+        if len(compatible) == 1:
+            return compatible[0](component, resolve, None)
+
+        # No single request can handle the entire component: see whether there are exactly one
+        # partial and consume_only impl to handle it together.
+        if not compatible and len(partial) == 1 and len(consume_only) == 1:
+            # TODO: Precompute which requests might be partial for others?
+            if set(partial[0].field_sets).issubset(set(consume_only[0].field_sets_consume_only)):
+                return partial[0](component, resolve, consume_only[0](component, resolve, None))
+
+        impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
+        targets_str = "\n  ".join(
+            sorted(f"{t.address.spec}\t({type(t).alias})" for t in component.members)
+        )
+        if compatible:
+            raise ClasspathSourceAmbiguity(
+                f"More than one JVM classpath provider ({impls_str}) was compatible with "
+                f"the inputs:\n  {targets_str}"
+            )
+        else:
+            # TODO: There is more subtlety of error messages possible here if there are multiple
+            # partial providers, but can cross that bridge when we have them (multiple Scala or Java
+            # compiler implementations, for example).
+            raise ClasspathSourceMissing(
+                f"No JVM classpath providers (from: {impls_str}) were compatible with the "
+                f"combination of inputs:\n  {targets_str}"
+            )
+
+    @staticmethod
+    def classify_impl(
+        impl: type[ClasspathEntryRequest], component: CoarsenedTarget
+    ) -> _ClasspathEntryRequestClassification:
+        targets = component.members
+        compatible = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        if compatible == 0:
+            return _ClasspathEntryRequestClassification.INCOMPATIBLE
+        if compatible == len(targets):
+            return _ClasspathEntryRequestClassification.COMPATIBLE
+        consume_only = sum(
+            1 for t in targets for fs in impl.field_sets_consume_only if fs.is_applicable(t)
+        )
+        if compatible + consume_only == len(targets):
+            return _ClasspathEntryRequestClassification.CONSUME_ONLY
+        return _ClasspathEntryRequestClassification.PARTIAL
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class ClasspathEntry:
-    """A JVM classpath entry, which will always be either zero or one JAR file."""
+    """A JVM classpath entry represented as a series of JAR files, and their dependencies.
+
+    This is a series of JAR files in order to account for "exported" dependencies, when a node
+    and some of its dependencies are indistinguishable (such as for aliases, or potentially
+    explicitly declared or inferred `exported=` lists in the future).
+
+    This class additionally keeps filenames in order to preserve classpath ordering for the
+    `classpath_arg` method: although Digests encode filenames, they are stored sorted.
+
+    TODO: Move to `classpath.py`.
+    TODO: Generalize via https://github.com/pantsbuild/pants/issues/13112.
+    """
 
     digest: Digest
+    filenames: tuple[str, ...]
+    dependencies: FrozenOrderedSet[ClasspathEntry]
+
+    def __init__(
+        self,
+        digest: Digest,
+        filenames: Iterable[str] = (),
+        dependencies: Iterable[ClasspathEntry] = (),
+    ):
+        self.digest = digest
+        self.filenames = tuple(filenames)
+        self.dependencies = FrozenOrderedSet(dependencies)
+
+    @classmethod
+    def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
+        """After merging the Digests for entries, merge their filenames and dependencies."""
+        return cls(
+            digest,
+            (f for cpe in entries for f in cpe.filenames),
+            (d for cpe in entries for d in cpe.dependencies),
+        )
+
+    @classmethod
+    def arg(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> str:
+        """Builds the non-recursive classpath arg for the given entries.
+
+        To construct a recursive classpath arg, first expand the entries with `cls.closure()`.
+        """
+        return ":".join(os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
+
+    @classmethod
+    def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
+        """All ClasspathEntries reachable from the given roots."""
+
+        visited = set()
+        queue = deque(roots)
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
+
+    def __repr__(self):
+        return f"ClasspathEntry({self.filenames}, dependencies={len(self.dependencies)})"
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 class CompileResult(Enum):
@@ -67,8 +243,18 @@ class FallibleClasspathEntry(EngineAwareReturnType):
             stderr=stderr,
         )
 
+    @classmethod
+    def if_all_succeeded(
+        cls, fallible_classpath_entries: Sequence[FallibleClasspathEntry]
+    ) -> tuple[ClasspathEntry, ...] | None:
+        """If all given FallibleClasspathEntries succeeded, return them as ClasspathEntries."""
+        classpath_entries = tuple(fcc.output for fcc in fallible_classpath_entries if fcc.output)
+        if len(classpath_entries) != len(fallible_classpath_entries):
+            return None
+        return classpath_entries
+
     def level(self) -> LogLevel:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.DEBUG
+        return LogLevel.ERROR if self.result == CompileResult.FAILED else LogLevel.DEBUG
 
     def message(self) -> str:
         message = self.description

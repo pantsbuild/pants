@@ -1,6 +1,6 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
@@ -26,7 +26,6 @@ members = [
   "cache",
   "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -68,7 +67,6 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -98,11 +96,11 @@ crate-type = ["cdylib"]
 
 [features]
 # NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
-# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# unfortunately, enabling `extension-module` causes tests linked against `pyo3` to fail. We
 # define a feature to enable that, but we do not enable it by default: someone building this module
 # in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
 #  see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["cpython/extension-module"]
+extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
@@ -114,8 +112,6 @@ protos = { path = "protos" }
 bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
-# TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
-cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
 crossbeam-channel = "0.4"
 derivative = "2.2"
 double-checked-cell-async = "2.0"
@@ -138,6 +134,8 @@ num_enum = "0.4"
 parking_lot = "0.11"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
+# TODO: Switch back to official PyO3 once https://github.com/PyO3/pyo3/pull/1990 is released.
+pyo3 = { git = "https://github.com/PyO3/pyo3.git", rev = "45059cbdb81fd3ab72a5ce530e3b99cc90383327" }
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
@@ -155,7 +153,6 @@ tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = "2.1"
-uuid = { version = "0.7", features = ["v4"] }
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
@@ -163,6 +160,9 @@ workunit_store = { path = "workunit_store" }
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
 env_logger = "0.5.4"
+
+[build-dependencies]
+pyo3-build-config = "0.15"
 
 [patch.crates-io]
 # TODO: Waiting for release after https://github.com/mitsuhiko/console/pull/93.

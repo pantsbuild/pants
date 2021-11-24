@@ -137,7 +137,7 @@ async def find_putative_targets(
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
                     addressable=False,
-                    kwargs={} if name == "requirements.txt" else {"requirements_relpath": name},
+                    kwargs={} if name == "requirements.txt" else {"source": name},
                 )
             )
 

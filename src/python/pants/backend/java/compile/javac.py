@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from itertools import chain
 
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.dependency_inference.rules import (
+    JavaInferredDependencies,
+    JavaInferredDependenciesAndExportsRequest,
+)
+from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
+from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -21,36 +25,23 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, SourcesField
-from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
+from pants.engine.target import SourcesField
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    CompileResult,
+    FallibleClasspathEntry,
+)
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    Coordinate,
-    Coordinates,
-    CoursierResolvedLockfile,
-    CoursierResolveKey,
-    FilterDependenciesRequest,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class JavacFieldSet(FieldSet):
-    required_fields = (JavaSourceField,)
-
-    sources: JavaSourceField
-
-
-@dataclass(frozen=True)
-class CompileJavaSourceRequest:
-    component: CoarsenedTarget
-    resolve: CoursierResolveKey
+class CompileJavaSourceRequest(ClasspathEntryRequest):
+    field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
 @rule(desc="Compile with javac")
@@ -58,26 +49,54 @@ async def compile_java_source(
     bash: BashBinary,
     jdk_setup: JdkSetup,
     zip_binary: ZipBinary,
+    union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
-    # Request the component's direct dependency classpath.
-    direct_dependency_classfiles_fallible = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            CompileJavaSourceRequest(component=coarsened_dep, resolve=request.resolve),
-        )
-        for coarsened_dep in request.component.dependencies
-    )
-    direct_dependency_classfiles = [
-        fcc.output for fcc in direct_dependency_classfiles_fallible if fcc.output
+    # Request the component's direct dependency classpath, and additionally any preqrequisite.
+    classpath_entry_requests = [
+        *((request.prerequisite,) if request.prerequisite else ()),
+        *(
+            ClasspathEntryRequest.for_targets(
+                union_membership, component=coarsened_dep, resolve=request.resolve
+            )
+            for coarsened_dep in request.component.dependencies
+        ),
     ]
-    if len(direct_dependency_classfiles) != len(direct_dependency_classfiles_fallible):
+    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
+        await MultiGet(
+            Get(FallibleClasspathEntry, ClasspathEntryRequest, cpe)
+            for cpe in classpath_entry_requests
+        )
+    )
+
+    if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.DEPENDENCY_FAILED,
             output=None,
             exit_code=1,
         )
+
+    # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
+    deps_to_classpath_entries = dict(
+        zip(request.component.dependencies, direct_dependency_classpath_entries or ())
+    )
+    # Re-request inferred dependencies to get a list of export dependency addresses
+    inferred_dependencies = await MultiGet(
+        Get(
+            JavaInferredDependencies,
+            JavaInferredDependenciesAndExportsRequest(tgt[JavaSourceField]),
+        )
+        for tgt in request.component.members
+        if JavaFieldSet.is_applicable(tgt)
+    )
+    flat_exports = {export for i in inferred_dependencies for export in i.exports}
+
+    export_classpath_entries = [
+        classpath_entry
+        for coarsened_target, classpath_entry in deps_to_classpath_entries.items()
+        if any(m.address in flat_exports for m in coarsened_target.members)
+    ]
 
     # Then collect the component's sources.
     component_members_with_sources = tuple(
@@ -103,66 +122,41 @@ async def compile_java_source(
         if sources.snapshot.digest != EMPTY_DIGEST
     ]
     if not component_members_and_java_source_files:
-        # If the component has no sources, it is acting as an alias for its dependencies: return
-        # their merged classpaths.
-        dependencies_digest = await Get(
-            Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)
+        # Is a generator, and so exports all of its direct deps.
+        exported_digest = await Get(
+            Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
         )
+        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
-            output=ClasspathEntry(digest=dependencies_digest),
+            output=classpath_entry,
             exit_code=0,
         )
 
-    filter_coords = Coordinates(
-        (
-            Coordinate.from_jvm_artifact_target(dep)
-            for item in CoarsenedTargets(request.component.dependencies).closure()
-            for dep in item.members
-            if JvmArtifactFieldSet.is_applicable(dep)
-        )
-    )
-
-    unfiltered_lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
-    lockfile = await Get(
-        CoursierResolvedLockfile, FilterDependenciesRequest(filter_coords, unfiltered_lockfile)
-    )
-
     dest_dir = "classfiles"
-    (
-        materialized_classpath,
-        merged_direct_dependency_classpath_digest,
-        dest_dir_digest,
-    ) = await MultiGet(
+    (merged_direct_dependency_classpath_digest, dest_dir_digest) = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__thirdpartycp",
-                lockfiles=(lockfile,),
-            ),
+            Digest,
+            MergeDigests(classfiles.digest for classfiles in direct_dependency_classpath_entries),
         ),
-        Get(Digest, MergeDigests(classfiles.digest for classfiles in direct_dependency_classfiles)),
         Get(
             Digest,
             CreateDigest([Directory(dest_dir)]),
         ),
     )
 
-    prefixed_direct_dependency_classpath = await Get(
-        Snapshot, AddPrefix(merged_direct_dependency_classpath_digest, "__usercp")
+    usercp = "__cp"
+    prefixed_direct_dependency_classpath_digest = await Get(
+        Digest, AddPrefix(merged_direct_dependency_classpath_digest, usercp)
     )
-
-    classpath_arg = ":".join(
-        [*prefixed_direct_dependency_classpath.files, *materialized_classpath.classpath_entries()]
-    )
+    classpath_arg = ClasspathEntry.arg(direct_dependency_classpath_entries, prefix=usercp)
 
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_direct_dependency_classpath.digest,
-                materialized_classpath.digest,
+                prefixed_direct_dependency_classpath_digest,
                 dest_dir_digest,
                 jdk_setup.digest,
                 *(
@@ -235,15 +229,31 @@ async def compile_java_source(
         # a `package-info.java` in a single partition.
         jar_output_digest = EMPTY_DIGEST
 
+    output_classpath = ClasspathEntry(
+        jar_output_digest, (output_file,), direct_dependency_classpath_entries
+    )
+
+    if export_classpath_entries:
+        merged_export_digest = await Get(
+            Digest,
+            MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries))),
+        )
+        merged_classpath = ClasspathEntry.merge(
+            merged_export_digest, (output_classpath, *export_classpath_entries)
+        )
+        output_classpath = merged_classpath
+
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),
         compile_result,
-        ClasspathEntry(jar_output_digest),
+        output_classpath,
     )
 
 
 def rules():
     return [
         *collect_rules(),
+        *java_dep_inference_rules(),
         *jvm_compile_rules(),
+        UnionRule(ClasspathEntryRequest, CompileJavaSourceRequest),
     ]

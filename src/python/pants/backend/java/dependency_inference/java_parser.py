@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class JavaSourceDependencyAnalysisRequest:
+    source_files: SourceFiles
+
+
+@dataclass(frozen=True)
 class FallibleJavaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
 
@@ -54,15 +59,23 @@ async def resolve_fallible_result_to_analysis(
 
 
 @rule(level=LogLevel.DEBUG)
+async def make_analysis_request_from_source_files(
+    source_files: SourceFiles,
+) -> JavaSourceDependencyAnalysisRequest:
+    return JavaSourceDependencyAnalysisRequest(source_files=source_files)
+
+
+@rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     bash: BashBinary,
     jdk_setup: JdkSetup,
     processor_classfiles: JavaParserCompiledClassfiles,
-    source_files: SourceFiles,
+    request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
+    source_files = request.source_files
     if len(source_files.files) > 1:
         raise ValueError(
-            f"parse_java_package expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
+            f"parse_java_package expects sources with exactly 1 source file, but found {len(source_files.files)}."
         )
     elif len(source_files.files) == 0:
         raise ValueError(
@@ -124,7 +137,7 @@ async def analyze_java_source_dependencies(
             use_nailgun=tool_digest,
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
-            description="Run Spoon analysis against Java source",
+            description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,
         ),
     )

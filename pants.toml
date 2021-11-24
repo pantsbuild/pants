@@ -16,11 +16,13 @@ backend_packages.add = [
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
   "pants.backend.experimental.docker",
+  "pants.backend.experimental.docker.lint.hadolint",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
+  "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
 plugins = [
@@ -153,7 +155,8 @@ config = "@build-support/regexes/config.yaml"
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [jvm.resolves]
-exampleapp = "testprojects/src/java/org/pantsbuild/example/app/coursier_resolve.lockfile"
+# TODO: These should move into 3rdparty, as should jvm_artifact definitions.
+exampleapp = "testprojects/src/jvm/org/pantsbuild/example/app/coursier_resolve.lockfile"
 pants_java_parser = "src/python/pants/backend/java/dependency_inference/coursier_resolve.lockfile"
 
 [toolchain-setup]

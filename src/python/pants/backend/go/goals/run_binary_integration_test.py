@@ -35,6 +35,7 @@ def test_run_binary() -> None:
         "BUILD": dedent(
             """\
                 go_mod(name='mod')
+                go_package(name='pkg')
                 go_binary(name='bin')
                 """
         ),

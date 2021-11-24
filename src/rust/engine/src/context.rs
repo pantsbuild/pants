@@ -32,8 +32,8 @@ use regex::Regex;
 use rule_graph::RuleGraph;
 use store::{self, Store};
 use task_executor::Executor;
-use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
+use workunit_store::RunId;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -67,6 +67,7 @@ pub struct Core {
   pub build_root: PathBuf,
   pub local_parallelism: usize,
   pub sessions: Sessions,
+  pub named_caches_dir: PathBuf,
 }
 
 #[derive(Clone, Debug)]
@@ -476,6 +477,7 @@ impl Core {
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
       sessions,
+      named_caches_dir,
     })
   }
 
@@ -539,7 +541,7 @@ pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: Uuid,
+  run_id: RunId,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -574,7 +576,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type RunId = Uuid;
+  type RunId = RunId;
 
   fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
     Box::new(self.stats.lock())

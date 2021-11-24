@@ -9,16 +9,41 @@ from dataclasses import dataclass
 
 import pytest
 
+from pants.build_graph.address import Address
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import UnzipBinary
-from pants.engine.fs import Digest, RemovePrefix, Snapshot
+from pants.engine.addresses import Addresses
+from pants.engine.fs import Digest, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.jvm.resolve.key import CoursierResolveKey
+from pants.testutil.rule_runner import RuleRunner
 
 
 def maybe_skip_jdk_test(func):
     run_jdk_tests = bool(ast.literal_eval(os.environ.get("PANTS_RUN_JDK_TESTS", "True")))
     return pytest.mark.skipif(not run_jdk_tests, reason="Skip JDK tests")(func)
+
+
+def expect_single_expanded_coarsened_target(
+    rule_runner: RuleRunner, address: Address
+) -> CoarsenedTarget:
+    expanded_target = rule_runner.request(Targets, [Addresses([address])]).expect_single()
+    coarsened_targets = rule_runner.request(
+        CoarsenedTargets, [Addresses([expanded_target.address])]
+    )
+    assert len(coarsened_targets) == 1
+    return coarsened_targets[0]
+
+
+def make_resolve(
+    rule_runner: RuleRunner,
+    resolve_name: str = "test",
+    resolve_path: str = "coursier_resolve.lockfile",
+) -> CoursierResolveKey:
+    digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
+    return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
 
 
 @dataclass(frozen=True)
@@ -63,4 +88,5 @@ def rules():
         *collect_rules(),
         *archive.rules(),
         QueryRule(RenderedClasspath, (Digest,)),
+        QueryRule(CoarsenedTargets, (Addresses,)),
     ]

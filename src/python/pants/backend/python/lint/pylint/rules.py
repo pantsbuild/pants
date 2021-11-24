@@ -15,16 +15,16 @@ from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Target, Targets
@@ -82,8 +82,7 @@ async def pylint_lint_partition(
 ) -> LintResult:
     requirements_pex_get = Get(
         Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             (field_set.address for field_set in partition.field_sets),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
@@ -112,12 +111,21 @@ async def pylint_lint_partition(
     field_set_sources_get = Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
+    # Ensure that the empty report dir exists.
+    report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
 
-    pylint_pex, requirements_pex, prepared_python_sources, field_set_sources = await MultiGet(
+    (
+        pylint_pex,
+        requirements_pex,
+        prepared_python_sources,
+        field_set_sources,
+        report_directory,
+    ) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
         prepare_python_sources_get,
         field_set_sources_get,
+        report_directory_digest_get,
     )
 
     pylint_runner_pex, config_files = await MultiGet(
@@ -147,6 +155,7 @@ async def pylint_lint_partition(
                 config_files.snapshot.digest,
                 first_party_plugins.sources_digest,
                 prepared_python_sources.source_files.snapshot.digest,
+                report_directory,
             )
         ),
     )
@@ -157,13 +166,17 @@ async def pylint_lint_partition(
             pylint_runner_pex,
             argv=generate_argv(field_set_sources, pylint),
             input_digest=input_digest,
+            output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
             description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
+    report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
-        result, partition_description=str(sorted(str(c) for c in partition.interpreter_constraints))
+        result,
+        partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
+        report=report,
     )
 
 

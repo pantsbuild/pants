@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
     MultipleSourcesField,
@@ -26,6 +29,20 @@ class ScalaSourceField(SingleSourceField):
 
 class ScalaGeneratorSources(MultipleSourcesField):
     expected_file_extensions = (".scala",)
+
+
+@dataclass(frozen=True)
+class ScalaFieldSet(FieldSet):
+    required_fields = (ScalaSourceField,)
+
+    sources: ScalaSourceField
+
+
+@dataclass(frozen=True)
+class ScalaGeneratorFieldSet(FieldSet):
+    required_fields = (ScalaGeneratorSources,)
+
+    sources: ScalaGeneratorSources
 
 
 # -----------------------------------------------------------------------------------------------

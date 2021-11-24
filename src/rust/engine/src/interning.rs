@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::hash;
 use std::sync::atomic;
 
-use cpython::{ObjectProtocol, PyErr, PyType, Python, ToPyObject};
 use parking_lot::{Mutex, RwLock};
+use pyo3::prelude::{PyResult, Python};
 
 use crate::externs;
 use crate::python::{Fnv, Key, Value};
@@ -51,10 +51,10 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn key_insert(&self, py: Python, v: Value) -> Result<Key, PyErr> {
+  pub fn key_insert(&self, py: Python, v: Value) -> PyResult<Key> {
     let (intern_key, type_id) = {
-      let obj = v.to_py_object(py).into();
-      (InternKey(v.hash(py)?, obj), (&v.get_type(py)).into())
+      let obj = (*v).as_ref(py);
+      (InternKey(obj.hash()?, v.clone()), obj.get_type().into())
     };
 
     py.allow_threads(|| {
@@ -99,27 +99,11 @@ impl Eq for InternKey {}
 
 impl PartialEq for InternKey {
   fn eq(&self, other: &InternKey) -> bool {
-    externs::equals(&self.1, &other.1)
+    Python::with_gil(|py| externs::equals((*self.1).as_ref(py), (*other.1).as_ref(py)))
   }
 }
 
 impl hash::Hash for InternKey {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
-  }
-}
-
-struct InternType(isize, PyType);
-
-impl Eq for InternType {}
-
-impl PartialEq for InternType {
-  fn eq(&self, other: &InternType) -> bool {
-    self.1 == other.1
-  }
-}
-
-impl hash::Hash for InternType {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
     self.0.hash(state);
   }

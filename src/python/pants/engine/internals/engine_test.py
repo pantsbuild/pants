@@ -3,8 +3,8 @@
 
 import itertools
 import time
-import unittest
 from dataclasses import dataclass, field
+from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional, Tuple
 
@@ -176,34 +176,35 @@ def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
 
 
-class EngineTest(unittest.TestCase, SchedulerTestBase):
-
-    assert_equal_with_printing = assert_equal_with_printing
-
-    def scheduler(self, rules, include_trace_on_error):
-        return self.mk_scheduler(rules=rules, include_trace_on_error=include_trace_on_error)
-
-    def test_recursive_multi_get(self):
-        # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [fib, QueryRule(Fib, (int,))]
-        (fib_10,) = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
-        self.assertEqual(55, fib_10.val)
-
-    def test_no_include_trace_error_raises_boring_error(self):
-        rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-        self.assert_equal_with_printing(
-            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
+class TestEngine(SchedulerTestBase):
+    def scheduler(self, tmp_path: Path, rules, include_trace_on_error):
+        return self.mk_scheduler(
+            tmp_path, rules=rules, include_trace_on_error=include_trace_on_error
         )
 
-    def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
+    def test_recursive_multi_get(self, tmp_path: Path) -> None:
+        # Tests that a rule that "uses itself" multiple times per invoke works.
+        rules = [fib, QueryRule(Fib, (int,))]
+        (fib_10,) = self.mk_scheduler(tmp_path, rules=rules).product_request(Fib, subjects=[10])
+        assert 55 == fib_10.val
+
+    def test_no_include_trace_error_raises_boring_error(self, tmp_path: Path) -> None:
         rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
-        with self.assertRaises(ExecutionError) as cm:
+        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=False)
+        with pytest.raises(ExecutionError) as cm:
+            list(scheduler.product_request(A, subjects=[(B())]))
+        assert_equal_with_printing(
+            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.value)
+        )
+
+    def test_no_include_trace_error_multiple_paths_raises_executionerror(
+        self, tmp_path: Path
+    ) -> None:
+        rules = [nested_raise, QueryRule(A, (B,))]
+        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=False)
+        with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[B(), B()]))
-        self.assert_equal_with_printing(
+        assert_equal_with_printing(
             dedent(
                 """
                 2 Exceptions encountered:
@@ -212,15 +213,15 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                   Exception: An exception for B
                 """
             ).lstrip(),
-            str(cm.exception),
+            str(cm.value),
         )
 
-    def test_include_trace_error_raises_error_with_trace(self):
+    def test_include_trace_error_raises_error_with_trace(self, tmp_path: Path) -> None:
         rules = [nested_raise, QueryRule(A, (B,))]
-        scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
+        scheduler = self.scheduler(tmp_path, rules, include_trace_on_error=True)
+        with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-        self.assert_equal_with_printing(
+        assert_equal_with_printing(
             dedent(
                 """
                 1 Exception encountered:
@@ -236,28 +237,28 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 Exception: An exception for B
                 """
             ).lstrip(),
-            remove_locations_from_traceback(str(cm.exception)),
+            remove_locations_from_traceback(str(cm.value)),
         )
 
-    def test_nonexistent_root(self) -> None:
+    def test_nonexistent_root(self, tmp_path: Path) -> None:
         rules = [QueryRule(A, [B])]
         # No rules are available to compute A.
-        with self.assertRaises(ValueError) as cm:
-            self.scheduler(rules, include_trace_on_error=False)
+        with pytest.raises(ValueError) as cm:
+            self.scheduler(tmp_path, rules, include_trace_on_error=False)
         assert (
             "No installed rules return the type A, and it was not provided by potential callers of "
-        ) in str(cm.exception)
+        ) in str(cm.value)
 
-    def test_missing_query_rule(self) -> None:
+    def test_missing_query_rule(self, tmp_path: Path) -> None:
         # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
         # for the graph to work when making a synchronous call via `Scheduler.product_request`.
-        scheduler = self.mk_scheduler(rules=[upcast], include_trace_on_error=False)
-        with self.assertRaises(Exception) as cm:
+        scheduler = self.mk_scheduler(tmp_path, rules=[upcast], include_trace_on_error=False)
+        with pytest.raises(Exception) as cm:
             scheduler.product_request(MyFloat, subjects=[MyInt(0)])
         assert (
             "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
             "for MyInt)."
-        ) in str(cm.exception)
+        ) in str(cm.value)
 
 
 @dataclass
@@ -298,11 +299,11 @@ def run_tracker() -> RunTracker:
     return new_run_tracker()
 
 
-class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
+class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
-        self, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
+        self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
     ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
-        scheduler = self.mk_scheduler(rules, include_trace_on_error=False)
+        scheduler = self.mk_scheduler(tmp_path, rules, include_trace_on_error=False)
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
@@ -316,15 +317,19 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         return scheduler, tracker, handler
 
-    def test_streaming_workunits_reporting(self):
-        scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
+    def test_streaming_workunits_reporting(self, tmp_path: Path) -> None:
+        scheduler, tracker, handler = self._fixture_for_rules(
+            tmp_path / "start", [fib, QueryRule(Fib, (int,))]
+        )
         with handler:
             scheduler.product_request(Fib, subjects=[0])
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
         assert len(flattened) == 1
 
-        scheduler, tracker, handler = self._fixture_for_rules([fib, QueryRule(Fib, (int,))])
+        scheduler, tracker, handler = self._fixture_for_rules(
+            tmp_path / "second", [fib, QueryRule(Fib, (int,))]
+        )
         with handler:
             scheduler.product_request(Fib, subjects=[10])
 
@@ -334,9 +339,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert len(flattened) == 11
         assert tracker.finished
 
-    def test_streaming_workunits_parent_id_and_rule_metadata(self):
+    def test_streaming_workunits_parent_id_and_rule_metadata(self, tmp_path: Path) -> None:
         scheduler, tracker, handler = self._fixture_for_rules(
-            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
+            tmp_path,
+            [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
         )
         with handler:
             i = Input()
@@ -391,8 +397,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r4["description"] == "Rule number 4"
         assert r4["level"] == "INFO"
 
-    def test_streaming_workunit_log_levels(self) -> None:
+    def test_streaming_workunit_log_levels(self, tmp_path: Path) -> None:
         scheduler, tracker, handler = self._fixture_for_rules(
+            tmp_path,
             [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))],
             max_workunit_verbosity=LogLevel.TRACE,
         )
@@ -422,10 +429,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
         assert r1["parent_id"] == select["span_id"]
 
-    def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
+    def test_streaming_workunit_log_level_parent_rewrite(self, tmp_path: Path) -> None:
         rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
 
-        scheduler, tracker, info_level_handler = self._fixture_for_rules(rules)
+        scheduler, tracker, info_level_handler = self._fixture_for_rules(tmp_path, rules)
         with info_level_handler:
             i = Input()
             scheduler.product_request(Alpha, subjects=[i])
@@ -444,7 +451,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r_C["parent_id"] == r_A["span_id"]
 
         scheduler, tracker, debug_level_handler = self._fixture_for_rules(
-            rules, max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, rules, max_workunit_verbosity=LogLevel.TRACE
         )
         with debug_level_handler:
             i = Input()
@@ -465,7 +472,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
 
-    def test_engine_aware_rule(self):
+    def test_engine_aware_rule(self, tmp_path: Path) -> None:
         @dataclass(frozen=True)
         class ModifiedOutput(EngineAwareReturnType):
             _level: LogLevel
@@ -479,7 +486,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path,
+            [a_rule, QueryRule(ModifiedOutput, (int,))],
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler:
             scheduler.product_request(ModifiedOutput, subjects=[0])
@@ -490,7 +499,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         assert workunit["level"] == "ERROR"
 
-    def test_engine_aware_param(self):
+    def test_engine_aware_param(self, tmp_path: Path) -> None:
         @dataclass(frozen=True)
         class ModifiedMetadata(EngineAwareParameter):
             def metadata(self):
@@ -501,7 +510,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return 1
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(int, (ModifiedMetadata,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path,
+            [a_rule, QueryRule(int, (ModifiedMetadata,))],
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler:
             scheduler.product_request(int, subjects=[ModifiedMetadata()])
@@ -512,7 +523,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         assert workunit["metadata"] == {"example": "thing"}
 
-    def test_engine_aware_none_case(self):
+    def test_engine_aware_none_case(self, tmp_path: Path) -> None:
         @dataclass(frozen=True)
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
@@ -528,7 +539,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return ModifiedOutput(val=n, _level=None)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(ModifiedOutput, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path,
+            [a_rule, QueryRule(ModifiedOutput, (int,))],
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler:
             scheduler.product_request(ModifiedOutput, subjects=[0])
@@ -539,7 +552,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         assert workunit["level"] == "TRACE"
 
-    def test_artifacts_on_engine_aware_type(self) -> None:
+    def test_artifacts_on_engine_aware_type(self, tmp_path: Path) -> None:
         @dataclass(frozen=True)
         class Output(EngineAwareReturnType):
             val: int
@@ -552,7 +565,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
             scheduler.product_request(Output, subjects=[0])
@@ -564,7 +577,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         artifacts = workunit["artifacts"]
         assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
 
-    def test_metadata_on_engine_aware_type(self) -> None:
+    def test_metadata_on_engine_aware_type(self, tmp_path: Path) -> None:
         @dataclass(frozen=True)
         class Output(EngineAwareReturnType):
             val: int
@@ -577,7 +590,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
             scheduler.product_request(Output, subjects=[0])
@@ -590,7 +603,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         metadata = workunit["metadata"]
         assert metadata == {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
 
-    def test_metadata_non_string_key_behavior(self) -> None:
+    def test_metadata_non_string_key_behavior(self, tmp_path: Path) -> None:
         # If someone passes a non-string key in a metadata() method,
         # this should fail to produce a meaningful metadata entry on
         # the workunit (with a warning), but not fail.
@@ -607,7 +620,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             return Output(val=n)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
             scheduler.product_request(Output, subjects=[0])
@@ -850,7 +863,7 @@ def test_context_object_on_streaming_workunits(
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
                     output = context.single_file_digests_to_bytes([digest])
-                    assert output == (b"stdout output\n",)
+                    assert output == [b"stdout output\n"]
 
     handler = StreamingWorkunitHandler(
         scheduler,

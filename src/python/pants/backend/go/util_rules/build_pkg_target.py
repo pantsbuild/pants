@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
-import os
+import dataclasses
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
     GoImportPathField,
+    GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.build_pkg import (
@@ -32,8 +31,8 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class BuildGoPackageTargetRequest(EngineAwareParameter):
-    """Build a `go_first_party_package` or `go_third_party_package` target and its dependencies as
-    `__pkg__.a` files."""
+    """Build a `go_package` or `go_third_party_package` target and its dependencies as `__pkg__.a`
+    files."""
 
     address: Address
     is_main: bool = False
@@ -51,25 +50,23 @@ async def setup_build_go_package_target_request(
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
-    import_path = target[GoImportPathField].value
 
-    if target.has_field(GoFirstPartyPackageSourcesField):
+    if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_info = await Get(
             FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
         )
         if _maybe_first_party_pkg_info.info is None:
             return FallibleBuildGoPackageRequest(
                 None,
-                import_path,
+                _maybe_first_party_pkg_info.import_path,
                 exit_code=_maybe_first_party_pkg_info.exit_code,
                 stderr=_maybe_first_party_pkg_info.stderr,
             )
         _first_party_pkg_info = _maybe_first_party_pkg_info.info
 
         digest = _first_party_pkg_info.digest
-        subpath = os.path.join(
-            target.address.spec_path, target[GoFirstPartyPackageSubpathField].value
-        )
+        import_path = _first_party_pkg_info.import_path
+        dir_path = _first_party_pkg_info.dir_path
         minimum_go_version = _first_party_pkg_info.minimum_go_version
 
         go_file_names = _first_party_pkg_info.go_files
@@ -81,6 +78,8 @@ async def setup_build_go_package_target_request(
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
+        import_path = target[GoImportPathField].value
+
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
@@ -95,7 +94,7 @@ async def setup_build_go_package_target_request(
         if _third_party_pkg_info.error:
             raise _third_party_pkg_info.error
 
-        subpath = _third_party_pkg_info.subpath
+        dir_path = _third_party_pkg_info.dir_path
         digest = _third_party_pkg_info.digest
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
@@ -115,20 +114,24 @@ async def setup_build_go_package_target_request(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
         if (
-            tgt.has_field(GoFirstPartyPackageSourcesField)
+            tgt.has_field(GoPackageSourcesField)
             or tgt.has_field(GoThirdPartyPackageDependenciesField)
         )
     )
     direct_dependencies = []
     for maybe_dep in maybe_direct_dependencies:
         if maybe_dep.request is None:
-            return maybe_dep
+            return dataclasses.replace(
+                maybe_dep,
+                import_path="main" if request.is_main else import_path,
+                dependency_failed=True,
+            )
         direct_dependencies.append(maybe_dep.request)
 
     result = BuildGoPackageRequest(
         digest=digest,
         import_path="main" if request.is_main else import_path,
-        subpath=subpath,
+        dir_path=dir_path,
         go_file_names=go_file_names,
         s_file_names=s_file_names,
         minimum_go_version=minimum_go_version,

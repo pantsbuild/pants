@@ -9,7 +9,9 @@ import pytest
 
 from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet, HadolintRequest
 from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
+from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.python.util_rules import pex
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -21,9 +23,11 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *hadolint_rules(),
             *config_files.rules(),
+            *docker_rules(),
             *external_tool.rules(),
+            *hadolint_rules(),
+            *pex.rules(),
             *source_files.rules(),
             QueryRule(LintResults, [HadolintRequest]),
         ],

@@ -10,7 +10,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import check
 from pants.backend.go.goals.check import GoCheckFieldSet, GoCheckRequest
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             QueryRule(CheckResults, [GoCheckRequest]),
         ],
-        target_types=[GoModTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -59,7 +59,9 @@ def test_check(rule_runner: RuleRunner) -> None:
                 go 1.17
                 """
             ),
+            "BUILD": "go_mod(name='mod')",
             "bad/f.go": "invalid!!!",
+            "bad/BUILD": "go_package()",
             "good/f.go": dedent(
                 """\
                 package greeter
@@ -71,13 +73,10 @@ def test_check(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "BUILD": "go_mod(name='mod')",
+            "good/BUILD": "go_package()",
         }
     )
-    targets = [
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./bad")),
-        rule_runner.get_target(Address("", target_name="mod", generated_name="./good")),
-    ]
+    targets = [rule_runner.get_target(Address("bad")), rule_runner.get_target(Address("good"))]
     results = rule_runner.request(
         CheckResults, [GoCheckRequest(GoCheckFieldSet.create(tgt) for tgt in targets)]
     ).results

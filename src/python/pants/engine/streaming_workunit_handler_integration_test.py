@@ -67,7 +67,7 @@ def test_ctrl_c(pantsd: bool) -> None:
         dest = os.path.join(workdir, "dest.log")
 
         # Start a pantsd run that will wait forever, then kill the pantsd client.
-        client_handle, _, _ = launch_waiter(
+        client_handle, _, _, _ = launch_waiter(
             workdir=workdir, config=workunit_logger_config(dest, pantsd=pantsd)
         )
         client_pid = client_handle.process.pid

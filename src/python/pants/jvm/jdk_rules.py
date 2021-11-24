@@ -13,12 +13,8 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, Merge
 from pants.engine.internals.selectors import Get
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.jvm.resolve.coursier_fetch import (
-    Coordinate,
-    Coordinates,
-    CoursierLockfileEntry,
-    ResolvedClasspathEntry,
-)
+from pants.jvm.compile import ClasspathEntry
+from pants.jvm.resolve.coursier_fetch import Coordinate, Coordinates, CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
@@ -52,10 +48,10 @@ class JdkSetup:
 @rule
 async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary) -> JdkSetup:
     nailgun = await Get(
-        ResolvedClasspathEntry,
+        ClasspathEntry,
         CoursierLockfileEntry(
             coord=Coordinate.from_coord_str("com.martiansoftware:nailgun-server:0.9.1"),
-            file_name="nailgun-server-0.9.1.jar",
+            file_name="com.martiansoftware_nailgun-server_0.9.1.jar",
             direct_dependencies=Coordinates(),
             dependencies=Coordinates(),
             file_digest=FileDigest(
@@ -131,7 +127,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
                 ]
             ),
         ),
-        nailgun_jar=nailgun.file_name,
+        nailgun_jar=nailgun.filenames[0],
         coursier=coursier,
     )
 

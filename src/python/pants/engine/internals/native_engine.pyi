@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 from io import RawIOBase
-from typing import Any, Sequence, TextIO, Tuple
+from typing import Any, Iterable, Sequence, TextIO, Tuple
 
 from typing_extensions import Protocol
 
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcessResult
@@ -16,13 +17,145 @@ from pants.engine.process import InteractiveProcessResult
 #   see https://github.com/psf/black/issues/1548
 # flake8: noqa: E302
 
+# ------------------------------------------------------------------------------
+# Scheduler
+# ------------------------------------------------------------------------------
+
+class PyExecutor:
+    def __init__(self, core_threads: int, max_threads: int) -> None: ...
+
+# ------------------------------------------------------------------------------
+# FS
+# ------------------------------------------------------------------------------
+
+class PyDigest:
+    """A Digest is a lightweight reference to a set of files known about by the engine.
+
+    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
+    Get(DigestContents, Digest)` to see the actual file content.
+    """
+
+    def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
+    @property
+    def fingerprint(self) -> str: ...
+    @property
+    def serialized_bytes_length(self) -> int: ...
+    def __eq__(self, other: PyDigest | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PyFileDigest:
+    """A FileDigest is a digest that refers to a file's content, without its name."""
+
+    def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
+    @property
+    def fingerprint(self) -> str: ...
+    @property
+    def serialized_bytes_length(self) -> int: ...
+    def __eq__(self, other: PyFileDigest | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PySnapshot:
+    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
+    names/content.
+
+    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+    """
+
+    @classmethod
+    def _unsafe_create(
+        cls, digest: PyDigest, files: Sequence[str], dirs: Sequence[str]
+    ) -> PySnapshot: ...
+    @property
+    def digest(self) -> PyDigest: ...
+    @property
+    def dirs(self) -> tuple[str, ...]: ...
+    @property
+    def files(self) -> tuple[str, ...]: ...
+    def __eq__(self, other: PySnapshot | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PyAddPrefix:
+    """A request to add the specified prefix path to every file and directory in the digest.
+
+    Example:
+
+        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
+    """
+
+    def __init__(self, digest: PyDigest, prefix: str) -> None: ...
+    def __eq__(self, other: PyAddPrefix | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PyRemovePrefix:
+    """A request to remove the specified prefix path from every file and directory in the digest.
+
+    This will fail if there are any files or directories in the original input digest without the
+    specified prefix.
+
+    Example:
+
+        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
+    """
+
+    def __init__(self, digest: PyDigest, prefix: str) -> None: ...
+    def __eq__(self, other: PyRemovePrefix | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+EMPTY_DIGEST: PyDigest
+EMPTY_FILE_DIGEST: PyFileDigest
+EMPTY_SNAPSHOT: PySnapshot
+
+def default_cache_path() -> str: ...
+
+# TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't
+#  cast to `tuple()` when not necessary.
+def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
+
+# ------------------------------------------------------------------------------
+# Workunits
+# ------------------------------------------------------------------------------
+
+def all_counter_names() -> list[str]: ...
+
+# ------------------------------------------------------------------------------
+# Nailgun
+# ------------------------------------------------------------------------------
+
+class PyNailgunClient:
+    def __init__(self, port: int, executor: PyExecutor) -> None: ...
+    def execute(self, command: str, args: list[str], env: dict[str, str]) -> int: ...
+
+class PantsdConnectionException(Exception):
+    pass
+
+class PantsdClientException(Exception):
+    pass
+
+# ------------------------------------------------------------------------------
+# Testutil
+# ------------------------------------------------------------------------------
+
+class PyStubCASBuilder:
+    def always_errors(self) -> PyStubCASBuilder: ...
+    def build(self, executor: PyExecutor) -> PyStubCAS: ...
+
+class PyStubCAS:
+    @classmethod
+    def builder(cls) -> PyStubCASBuilder: ...
+    @property
+    def address(self) -> str: ...
+
 class RawFdRunner(Protocol):
     def __call__(
         self,
         command: str,
         args: tuple[str, ...],
         env: dict[str, str],
-        working_directory: bytes,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,
@@ -33,12 +166,12 @@ def capture_snapshots(
     scheduler: PyScheduler,
     session: PySession,
     path_globs_and_root_tuple_wrapper: _PathGlobsAndRootCollection,
-) -> tuple[PySnapshot, ...]: ...
-def ensure_remote_has_recursive(scheduler: PyScheduler, digests: list[PyDigest]) -> None: ...
-
-# TODO: Should this be a proper FileDigest? Maybe create PyFileDigest.
+) -> list[PySnapshot]: ...
+def ensure_remote_has_recursive(
+    scheduler: PyScheduler, digests: list[PyDigest | PyFileDigest]
+) -> None: ...
 def single_file_digests_to_bytes(
-    scheduler: PyScheduler, digests: list[PyDigest]
+    scheduler: PyScheduler, digests: list[PyFileDigest]
 ) -> list[bytes]: ...
 def write_digest(
     scheduler: PyScheduler, session: PySession, digest: PyDigest, path_prefix: str
@@ -108,7 +241,7 @@ def scheduler_create(
 ) -> PyScheduler: ...
 def scheduler_execute(
     scheduler: PyScheduler, session: PySession, execution_request: PyExecutionRequest
-) -> tuple: ...
+) -> list: ...
 def scheduler_metrics(scheduler: PyScheduler, session: PySession) -> dict[str, int]: ...
 def scheduler_shutdown(scheduler: PyScheduler, timeout_secs: int) -> None: ...
 def session_new_run_id(session: PySession) -> None: ...
@@ -125,7 +258,7 @@ def session_record_test_observation(
 def session_isolated_shallow_clone(session: PySession, build_id: str) -> PySession: ...
 def graph_len(scheduler: PyScheduler) -> int: ...
 def graph_visualize(scheduler: PyScheduler, session: PySession, path: str) -> None: ...
-def graph_invalidate_paths(scheduler: PyScheduler, paths: Sequence[str]) -> int: ...
+def graph_invalidate_paths(scheduler: PyScheduler, paths: Iterable[str]) -> int: ...
 def graph_invalidate_all_paths(scheduler: PyScheduler) -> int: ...
 def graph_invalidate_all(scheduler: PyScheduler) -> None: ...
 def check_invalidation_watcher_liveness(scheduler: PyScheduler) -> None: ...
@@ -143,26 +276,6 @@ def strongly_connected_components(
     adjacency_lists: Sequence[Tuple[Any, Sequence[Any]]]
 ) -> Sequence[Sequence[Any]]: ...
 
-class PyDigest:
-    def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
-    @property
-    def fingerprint(self) -> str: ...
-    @property
-    def serialized_bytes_length(self) -> int: ...
-
-class PySnapshot:
-    def __init__(self) -> None: ...
-    @classmethod
-    def _create_for_testing(
-        cls, digest: PyDigest, files: Sequence[str], dirs: Sequence[str]
-    ) -> PySnapshot: ...
-    @property
-    def digest(self) -> PyDigest: ...
-    @property
-    def dirs(self) -> tuple[str, ...]: ...
-    @property
-    def files(self) -> tuple[str, ...]: ...
-
 class PyExecutionRequest:
     def __init__(
         self, *, poll: bool, poll_delay_in_ms: int | None, timeout_in_ms: int | None
@@ -170,9 +283,6 @@ class PyExecutionRequest:
 
 class PyExecutionStrategyOptions:
     def __init__(self, **kwargs: Any) -> None: ...
-
-class PyExecutor:
-    def __init__(self, *, core_threads: int, max_threads: int) -> None: ...
 
 class PyGeneratorResponseBreak:
     def __init__(self, val: Any) -> None: ...
@@ -184,7 +294,7 @@ class PyGeneratorResponseGetMulti:
     def __init__(self, gets: tuple[PyGeneratorResponseGet, ...]) -> None: ...
 
 class PyNailgunServer:
-    pass
+    def port(self) -> int: ...
 
 class PyRemotingOptions:
     def __init__(self, **kwargs: Any) -> None: ...

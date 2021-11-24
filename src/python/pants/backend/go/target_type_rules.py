@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -13,18 +12,17 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoFirstPartyPackageTarget,
     GoImportPathField,
-    GoModPackageSourcesField,
     GoModTarget,
+    GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
+    FirstPartyPkgImportPath,
+    FirstPartyPkgImportPathRequest,
     FirstPartyPkgInfoRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
@@ -37,9 +35,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, SiblingAddresses
-from pants.core.goals.tailor import group_by_dir
 from pants.engine.addresses import Address, AddressInput
-from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -54,8 +50,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
-from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -68,7 +62,9 @@ class AllGoTargets(Targets):
 
 @rule(desc="Find all Go targets in project", level=LogLevel.DEBUG)
 def find_all_go_targets(tgts: AllTargets) -> AllGoTargets:
-    return AllGoTargets(t for t in tgts if t.has_field(GoImportPathField))
+    return AllGoTargets(
+        t for t in tgts if t.has_field(GoImportPathField) or t.has_field(GoPackageSourcesField)
+    )
 
 
 @dataclass(frozen=True)
@@ -79,16 +75,29 @@ class ImportPathToPackages:
 @rule(desc="Map all Go targets to their import paths", level=LogLevel.DEBUG)
 async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPackages:
     mapping: dict[str, list[Address]] = defaultdict(list)
+    first_party_addresses = []
+    first_party_gets = []
     for tgt in go_tgts:
-        import_path = tgt[GoImportPathField].value
-        mapping[import_path].append(tgt.address)
+        if tgt.has_field(GoImportPathField):
+            import_path = tgt[GoImportPathField].value
+            mapping[import_path].append(tgt.address)
+        else:
+            first_party_addresses.append(tgt.address)
+            first_party_gets.append(
+                Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(tgt.address))
+            )
+
+    first_party_import_paths = await MultiGet(first_party_gets)
+    for import_path_info, addr in zip(first_party_import_paths, first_party_addresses):
+        mapping[import_path_info.import_path].append(addr)
+
     frozen_mapping = FrozenDict({ip: tuple(tgts) for ip, tgts in mapping.items()})
     return ImportPathToPackages(frozen_mapping)
 
 
 # TODO: Use dependency injection. This doesn't actually look at the Sources field.
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoFirstPartyPackageSourcesField
+    infer_from = GoPackageSourcesField
 
 
 @rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
@@ -126,7 +135,7 @@ async def infer_go_dependencies(
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
-                f"in go_first_party_package at address '{addr}'."
+                f"in go_package at address '{addr}'."
             )
 
     return InferredDependencies(inferred_dependencies)
@@ -178,7 +187,7 @@ async def inject_go_third_party_package_dependencies(
 
 
 # -----------------------------------------------------------------------------------------------
-# Generate `go_first_party_package` and `go_third_party_package` targets
+# Generate `go_third_party_package` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -186,56 +195,18 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
     generate_from = GoModTarget
 
 
-@rule(
-    desc=(
-        "Generate `go_first_party_package` and `go_third_party_package` targets from `go_mod` "
-        "target"
-    ),
-    level=LogLevel.DEBUG,
-)
+@rule(desc="Generate `go_third_party_package` targets from `go_mod` target", level=LogLevel.DEBUG)
 async def generate_targets_from_go_mod(
     request: GenerateTargetsFromGoModRequest,
-    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    go_mod_info, go_paths = await MultiGet(
-        Get(GoModInfo, GoModInfoRequest(generator_addr)),
-        Get(
-            Paths,
-            PathGlobs,
-            request.generator[GoModPackageSourcesField].path_globs(files_not_found_behavior),
-        ),
-    )
-    all_third_party_packages = await Get(
-        AllThirdPartyPackages,
-        AllThirdPartyPackagesRequest(go_mod_info.stripped_digest),
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
+    all_packages = await Get(
+        AllThirdPartyPackages, AllThirdPartyPackagesRequest(go_mod_info.stripped_digest)
     )
 
-    dir_to_filenames = group_by_dir(go_paths.files)
-    matched_dirs = [dir for dir, filenames in dir_to_filenames.items() if filenames]
-
-    def create_first_party_package_tgt(dir: str) -> GoFirstPartyPackageTarget:
-        subpath = fast_relpath(dir, generator_addr.spec_path)
-        import_path = f"{go_mod_info.import_path}/{subpath}" if subpath else go_mod_info.import_path
-
-        return GoFirstPartyPackageTarget(
-            {
-                GoImportPathField.alias: import_path,
-                GoFirstPartyPackageSubpathField.alias: subpath,
-                GoFirstPartyPackageSourcesField.alias: tuple(
-                    sorted(os.path.join(subpath, f) for f in dir_to_filenames[dir])
-                ),
-            },
-            # E.g. `src/go:mod#./subdir`.
-            generator_addr.create_generated(f"./{subpath}"),
-            union_membership,
-            residence_dir=dir,
-        )
-
-    first_party_pkgs = (create_first_party_package_tgt(dir) for dir in matched_dirs)
-
-    def create_third_party_package_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
+    def create_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {GoImportPathField.alias: pkg_info.import_path},
             # E.g. `src/go:mod#github.com/google/uuid`.
@@ -244,11 +215,10 @@ async def generate_targets_from_go_mod(
             residence_dir=generator_addr.spec_path,
         )
 
-    third_party_pkgs = (
-        create_third_party_package_tgt(pkg_info)
-        for pkg_info in all_third_party_packages.import_paths_to_pkg_info.values()
+    return GeneratedTargets(
+        request.generator,
+        (create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()),
     )
-    return GeneratedTargets(request.generator, (*first_party_pkgs, *third_party_pkgs))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -267,14 +237,13 @@ async def determine_main_pkg_for_go_binary(
             AddressInput,
             AddressInput.parse(request.field.value, relative_to=addr.spec_path),
         )
-        if not wrapped_specified_tgt.target.has_field(GoFirstPartyPackageSourcesField):
+        if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_first_party_package` target, but was the address for a "
+                "a `go_package` target, but was the address for a "
                 f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
                 "Hint: you should normally not specify this field so that Pants will find the "
-                "`go_first_party_package` target for you. (Pants generates "
-                "`go_first_party_package` targets based on the `go_mod` target)."
+                "`go_package` target for you."
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
@@ -282,7 +251,7 @@ async def determine_main_pkg_for_go_binary(
     relevant_pkg_targets = [
         tgt
         for tgt in candidate_targets
-        if tgt.has_field(GoFirstPartyPackageSourcesField) and tgt.residence_dir == addr.spec_path
+        if tgt.has_field(GoPackageSourcesField) and tgt.residence_dir == addr.spec_path
     ]
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)
@@ -291,17 +260,16 @@ async def determine_main_pkg_for_go_binary(
     alias = wrapped_tgt.target.alias
     if not relevant_pkg_targets:
         raise ResolveError(
-            f"The `{alias}` target {addr} requires that there is a `go_first_party_package` "
+            f"The `{alias}` target {addr} requires that there is a `go_package` "
             f"target for its directory {addr.spec_path}, but none were found.\n\n"
-            "Have you added a `go_mod` target (which will generate `go_first_party_package` "
-            "targets)?"
+            "(Run `./pants tailor` to automatically add `go_package` targets.)"
         )
     raise ResolveError(
-        f"There are multiple `go_first_party_package` targets for the same directory of the "
+        f"There are multiple `go_package` targets for the same directory of the "
         f"`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
         "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
-        "`go_first_party_package` targets so that only one remains: "
+        "`go_package` targets so that only one remains: "
         f"{sorted(tgt.address.spec for tgt in relevant_pkg_targets)}"
     )
 

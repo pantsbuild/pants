@@ -16,7 +16,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -35,7 +35,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -159,7 +159,6 @@ async def setup_pytest_for_target(
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
-    complete_env: CompleteEnvironment,
 ) -> TestSetup:
     transitive_targets, plugin_setups = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
@@ -171,8 +170,7 @@ async def setup_pytest_for_target(
 
     requirements_pex_get = Get(
         Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(
+        RequirementsPexRequest(
             [request.field_set.address],
             internal_only=True,
             resolve_and_lockfile=request.field_set.resolve.resolve_and_lockfile(python_setup),
@@ -199,17 +197,23 @@ async def setup_pytest_for_target(
     # to test, rather than using auto-discovery.
     field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.source]))
 
+    field_set_extra_env_get = Get(
+        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+    )
+
     (
         pytest_pex,
         requirements_pex,
         prepared_sources,
         field_set_source_files,
+        field_set_extra_env,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
+        field_set_extra_env_get,
         extra_output_directory_digest_get,
     )
 
@@ -289,9 +293,9 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
-        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within
-        # `python_tests`
-        **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
+        # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
+        # `python_tests`.
+        **field_set_extra_env,
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.

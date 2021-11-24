@@ -12,7 +12,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
             QueryRule(FallibleBuiltGoPackage, (BuildGoPackageRequest,)),
         ],
-        target_types=[GoBinaryTarget, GoModTarget],
+        target_types=[GoBinaryTarget, GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -113,6 +113,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
+                go_package(name="pkg")
                 go_binary(name="bin")
                 """
             ),
@@ -132,7 +133,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
 def test_build_invalid_package(rule_runner: RuleRunner) -> None:
     request = BuildGoPackageRequest(
         import_path="example.com/assembly",
-        subpath="",
+        dir_path="",
         go_file_names=("add_amd64.go", "add_arm64.go"),
         digest=rule_runner.make_snapshot(
             {

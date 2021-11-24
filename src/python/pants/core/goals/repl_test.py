@@ -18,7 +18,11 @@ class MockRepl(ReplImplementation):
 @rule
 async def create_mock_repl_request(repl: MockRepl) -> ReplRequest:
     digest = await Get(Digest, CreateDigest([FileContent("repl.sh", b"exit 0")]))
-    return ReplRequest(digest=digest, args=("/bin/bash", repl.in_chroot("repl.sh")))
+    return ReplRequest(
+        digest=digest,
+        args=("/bin/bash", "repl.sh"),
+        run_in_workspace=False,
+    )
 
 
 @pytest.fixture

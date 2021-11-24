@@ -1,0 +1,76 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+import pytest
+
+from pants.backend.java.goals import tailor
+from pants.backend.java.goals.tailor import PutativeJavaTargetsRequest, classify_source_files
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
+from pants.core.goals.tailor import (
+    AllOwnedSources,
+    PutativeTarget,
+    PutativeTargets,
+    PutativeTargetsSearchPaths,
+)
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import RuleRunner
+
+
+def test_classify_source_files() -> None:
+    test_files = {
+        "foo/bar/BazTest.java",
+    }
+    lib_files = {"foo/bar/Baz.java", "foo/SomeClass.java"}
+
+    assert {
+        JunitTestsGeneratorTarget: test_files,
+        JavaSourcesGeneratorTarget: lib_files,
+    } == classify_source_files(test_files | lib_files)
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    rule_runner = RuleRunner(
+        rules=[
+            *tailor.rules(),
+            QueryRule(PutativeTargets, (PutativeJavaTargetsRequest, AllOwnedSources)),
+        ],
+        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
+    )
+    rule_runner.set_options(["--backend-packages=pants.backend.experimental.java"])
+    return rule_runner
+
+
+def test_find_putative_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/java/owned/BUILD": "java_sources()\n",
+            "src/java/owned/OwnedFile.java": "package owned",
+            "src/java/unowned/UnownedFile.java": "package unowned\n",
+            "src/java/unowned/UnownedFileTest.java": "package unowned\n",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeJavaTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            AllOwnedSources(["src/java/owned/OwnedFile.java"]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    JavaSourcesGeneratorTarget, "src/java/unowned", "unowned", ["UnownedFile.java"]
+                ),
+                PutativeTarget.for_target_type(
+                    JunitTestsGeneratorTarget,
+                    "src/java/unowned",
+                    "tests",
+                    ["UnownedFileTest.java"],
+                    kwargs={"name": "tests"},
+                ),
+            ]
+        )
+        == putative_targets
+    )

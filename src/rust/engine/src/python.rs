@@ -1,19 +1,18 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use fnv::FnvHasher;
-
 use std::convert::AsRef;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::externs;
-
-use cpython::{
-  FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, PyType, Python, ToPyObject,
-};
+use fnv::FnvHasher;
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyType};
+use pyo3::{FromPyObject, ToPyObject};
 use smallvec::SmallVec;
+
+use crate::externs;
 
 pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
 
@@ -36,10 +35,11 @@ impl<'x> Params {
       for param in &params[1..] {
         if param.type_id() == prev.type_id() {
           return Err(format!(
-            "Values used as `Params` must have distinct types, but the following values had the same type (`{}`):\n  {}\n  {}",
-            externs::type_to_str(*prev.type_id()),
-            externs::key_to_str(prev),
-            externs::key_to_str(param)
+            "Values used as `Params` must have distinct types, but the following \
+            values had the same type (`{}`):\n  {}\n  {}",
+            prev.type_id(),
+            prev,
+            param,
           ));
         }
         prev = param;
@@ -114,57 +114,66 @@ impl fmt::Display for Params {
 
 pub type Id = u64;
 
-///
 /// A pointer to an underlying PyTypeObject instance.
-///
-/// NB: This is a void pointer because the `cpython::ffi::PyTypeObject` is not public.
-///
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeId(*mut std::ffi::c_void);
+pub struct TypeId(*mut pyo3::ffi::PyTypeObject);
 
 unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
-  pub fn as_py_type(&self, py: Python) -> PyType {
+  pub fn new(py_type: &PyType) -> Self {
+    py_type.into()
+  }
+
+  pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
     // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
     // type is not unloaded. That is true today, but would not be if we implemented support for hot
     // reloading of plugins.
-    unsafe { PyType::from_type_ptr(py, self.0 as _) }
+    unsafe { PyType::from_type_ptr(py, self.0) }
   }
 
-  fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::type_to_str(self))
+  pub fn is_union(&self) -> bool {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let unions_module = py.import("pants.engine.unions").unwrap();
+    let is_union_func = unions_module.getattr("is_union").unwrap();
+    is_union_func
+      .call1((self.as_py_type(py),))
+      .unwrap()
+      .extract()
+      .unwrap()
   }
 }
 
 impl From<&PyType> for TypeId {
   fn from(py_type: &PyType) -> Self {
-    TypeId(py_type.as_type_ptr() as *mut std::ffi::c_void)
+    TypeId(py_type.as_type_ptr())
+  }
+}
+
+impl fmt::Debug for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    Python::with_gil(|py| {
+      let name = self.as_py_type(py).name().unwrap();
+      write!(f, "{}", name)
+    })
+  }
+}
+
+impl fmt::Display for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
 impl rule_graph::TypeId for TypeId {
-  ///
   /// Render a string for a collection of TypeIds.
-  ///
   fn display<I>(type_ids: I) -> String
   where
     I: Iterator<Item = TypeId>,
   {
     display_sorted_in_parens(type_ids)
-  }
-}
-
-impl fmt::Debug for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
-  }
-}
-
-impl fmt::Display for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty_print(f)
   }
 }
 
@@ -174,58 +183,40 @@ impl fmt::Display for TypeId {
 pub struct Function(pub Key);
 
 impl Function {
-  /// A Python function's module, e.g. `project.app`.
-  pub fn module(&self) -> String {
-    let val = externs::val_for(&self.0);
-    externs::getattr_as_string(&val, "__module__")
-  }
-
-  /// A Python function's name, without its module.
-  pub fn name(&self) -> String {
-    let val = externs::val_for(&self.0);
-    externs::getattr_as_string(&val, "__name__")
-  }
-
-  /// The line number of a Python function's first line.
-  pub fn line_number(&self) -> u64 {
-    let val = externs::val_for(&self.0);
-    // NB: this is a custom dunder method that Python code should populate before sending the
-    // function (e.g. an `@rule`) through FFI.
-    externs::getattr(&val, "__line_number__").unwrap()
-  }
-
   /// The function represented as `path.to.module:lineno:func_name`.
   pub fn full_name(&self) -> String {
-    format!("{}:{}:{}", self.module(), self.line_number(), self.name())
-  }
-}
-
-impl fmt::Display for Function {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}()", self.full_name())
+    let (module, name, line_no) = Python::with_gil(|py| {
+      let val = self.0.to_value();
+      let obj = (*val).as_ref(py);
+      let module: String = externs::getattr(obj, "__module__").unwrap();
+      let name: String = externs::getattr(obj, "__name__").unwrap();
+      // NB: this is a custom dunder method that Python code should populate before sending the
+      // function (e.g. an `@rule`) through FFI.
+      let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
+      (module, name, line_no)
+    });
+    format!("{}:{}:{}", module, line_no, name)
   }
 }
 
 impl fmt::Debug for Function {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}()", self.full_name())
   }
 }
 
-///
+impl fmt::Display for Function {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
+  }
+}
+
 /// An interned key for a Value for use as a key in HashMaps and sets.
-///
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
-}
-
-impl fmt::Debug for Key {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::key_to_str(self))
-  }
 }
 
 impl Eq for Key {}
@@ -242,9 +233,15 @@ impl hash::Hash for Key {
   }
 }
 
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self.to_value())
+  }
+}
+
 impl fmt::Display for Key {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::key_to_str(self))
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
@@ -260,24 +257,31 @@ impl Key {
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
+
+  pub fn from_value(val: Value) -> PyResult<Key> {
+    let gil = Python::acquire_gil();
+    externs::INTERNS.key_insert(gil.python(), val)
+  }
+
+  pub fn to_value(&self) -> Value {
+    externs::INTERNS.key_get(self)
+  }
 }
 
-///
-/// We wrap PyObject (which cannot be cloned without acquiring the GIL) in an Arc in order to avoid
-/// accessing the Gil in many cases.
-///
+// TODO: simplify to use `PyObject` (aka `Py<PyAny>`) directly. There is no benefit to wrapping
+// this in an `Arc`, given that it's already GIL-independent.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
 
 impl Value {
-  pub fn new(handle: PyObject) -> Value {
-    Value(Arc::new(handle))
+  pub fn new(obj: PyObject) -> Value {
+    Value(Arc::new(obj))
   }
 
   // NB: Longer name because overloaded in a few places.
   pub fn consume_into_py_object(self, py: Python) -> PyObject {
     match Arc::try_unwrap(self.0) {
-      Ok(handle) => handle,
+      Ok(obj) => obj,
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
   }
@@ -285,7 +289,7 @@ impl Value {
 
 impl PartialEq for Value {
   fn eq(&self, other: &Value) -> bool {
-    externs::equals(&self.0, &other.0)
+    Python::with_gil(|py| externs::equals((*self.0).as_ref(py), (*other.0).as_ref(py)))
   }
 }
 
@@ -306,26 +310,30 @@ impl AsRef<PyObject> for Value {
 }
 
 impl fmt::Debug for Value {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(self.as_ref()))
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let repr = Python::with_gil(|py| {
+      let obj = (*self.0).as_ref(py);
+      externs::val_to_str(obj)
+    });
+    write!(f, "{}", repr)
   }
 }
 
 impl fmt::Display for Value {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::val_to_str(self.as_ref()))
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
-impl FromPyObject<'_> for Value {
-  fn extract(py: Python, obj: &PyObject) -> PyResult<Self> {
-    Ok(obj.clone_ref(py).into())
+impl<'source> FromPyObject<'source> for Value {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let py = obj.py();
+    Ok(obj.into_py(py).into())
   }
 }
 
 impl ToPyObject for &Value {
-  type ObjectType = PyObject;
-  fn to_py_object(&self, py: Python) -> PyObject {
+  fn to_object(&self, py: Python) -> PyObject {
     self.0.clone_ref(py)
   }
 }
@@ -333,18 +341,15 @@ impl ToPyObject for &Value {
 impl From<Value> for PyObject {
   fn from(value: Value) -> Self {
     match Arc::try_unwrap(value.0) {
-      Ok(handle) => handle,
-      Err(arc_handle) => {
-        let gil = Python::acquire_gil();
-        arc_handle.clone_ref(gil.python())
-      }
+      Ok(obj) => obj,
+      Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
     }
   }
 }
 
 impl From<PyObject> for Value {
-  fn from(handle: PyObject) -> Self {
-    Value::new(handle)
+  fn from(obj: PyObject) -> Self {
+    Value::new(obj)
   }
 }
 
@@ -393,25 +398,29 @@ impl Failure {
     let py = gil.python();
     Failure::from_py_err_with_gil(py, py_err)
   }
-  pub fn from_py_err_with_gil(py: Python, mut py_err: PyErr) -> Failure {
-    let val = Value::from(py_err.instance(py));
-    let python_traceback = if let Some(tb) = py_err.ptraceback.as_ref() {
+
+  pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
+    let maybe_ptraceback = py_err
+      .ptraceback(py)
+      .map(|traceback| traceback.to_object(py));
+    let val = Value::from(py_err.into_py(py));
+    let python_traceback = if let Some(tb) = maybe_ptraceback {
       let locals = PyDict::new(py);
       locals
-        .set_item(py, "traceback", py.import("traceback").unwrap())
+        .set_item("traceback", py.import("traceback").unwrap())
         .unwrap();
-      locals.set_item(py, "tb", tb).unwrap();
-      locals.set_item(py, "val", &val).unwrap();
+      locals.set_item("tb", tb).unwrap();
+      locals.set_item("val", &val).unwrap();
       py.eval(
         "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
         None,
-        Some(&locals),
+        Some(locals),
       )
       .unwrap()
-      .extract::<String>(py)
+      .extract::<String>()
       .unwrap()
     } else {
-      Self::native_traceback(&externs::val_to_str(val.as_ref()))
+      Self::native_traceback(&externs::val_to_str((*val).as_ref(py)))
     };
     Failure::Throw {
       val,
@@ -432,21 +441,29 @@ impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val.as_ref())),
+      Failure::Throw { val, .. } => {
+        let repr = Python::with_gil(|py| {
+          let obj = (*val.0).as_ref(py);
+          externs::val_to_str(obj)
+        });
+        write!(f, "{}", repr)
+      }
     }
   }
 }
 
 impl From<String> for Failure {
   fn from(err: String) -> Self {
-    throw(&err)
+    throw(err)
   }
 }
 
-pub fn throw(msg: &str) -> Failure {
+pub fn throw(msg: String) -> Failure {
+  let gil = Python::acquire_gil();
+  let python_traceback = Failure::native_traceback(&msg);
   Failure::Throw {
-    val: externs::create_exception(msg),
-    python_traceback: Failure::native_traceback(msg),
+    val: externs::create_exception(gil.python(), msg),
+    python_traceback,
     engine_traceback: Vec::new(),
   }
 }

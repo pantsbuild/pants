@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.java_parser import (
     FallibleJavaSourceDependencyAnalysisResult,
 )
@@ -43,7 +42,6 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *java_parser_launcher_rules(),
             *java_parser_rules(),
-            *javac_rules(),
             *source_files.rules(),
             *util_rules(),
             *jdk_rules.rules(),
@@ -124,7 +122,7 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.SimpleSource",
         "org.pantsbuild.example.Foo",
     )
-    assert sorted(analysis.consumed_unqualified_types) == [
+    assert sorted(analysis.consumed_types) == [
         "Date",
         "System",
         "date",  # note: false positive on a variable identifier
@@ -220,14 +218,14 @@ def test_java_parser_unnamed_package(rule_runner: RuleRunner) -> None:
     )
 
     analysis = rule_runner.request(JavaSourceDependencyAnalysis, [source_files])
-    assert analysis.declared_package == ""
+    assert analysis.declared_package is None
     assert analysis.imports == ()
     assert analysis.top_level_types == ("SimpleSource", "Foo")
-    assert analysis.consumed_unqualified_types == ("System",)
+    assert analysis.consumed_types == ("System",)
 
 
 @maybe_skip_jdk_test
-def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None:
+def test_java_parser_consumed_types(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -283,7 +281,7 @@ def test_java_parser_consumed_unqualified_types(rule_runner: RuleRunner) -> None
     assert analysis.declared_package == "org.pantsbuild.test"
     assert analysis.imports == ()
     assert analysis.top_level_types == ("org.pantsbuild.test.AnImpl",)
-    assert sorted(analysis.consumed_unqualified_types) == [
+    assert sorted(analysis.consumed_types) == [
         "AThrownException",
         "ClassAnnotation",
         "FieldAnnotation",

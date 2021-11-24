@@ -5,18 +5,18 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import pkgutil
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoImportPathField,
-)
+from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
@@ -25,21 +25,42 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class FirstPartyPkgImportPath:
+    """The derived import path of a first party package, based on its owning go.mod.
+
+    Use `FirstPartyPkgInfo` instead for more detailed information like parsed imports.
+    """
+
+    import_path: str
+    dir_path_rel_to_gomod: str
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgImportPathRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+
+@dataclass(frozen=True)
 class FirstPartyPkgInfo:
     """All the info and digest needed to build a first-party Go package.
 
-    The digest does not strip its source files. You must set `working_dir` appropriately to use the
-    `go_first_party_package` target's `subpath` field.
+    The digest does not strip its source files; `dir_path` is relative to the build root.
+
+    Use `FirstPartyPkgImportPath` if you only need the derived import path.
     """
 
     digest: Digest
-    subpath: str
+    dir_path: str
 
     import_path: str
 
@@ -78,6 +99,25 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
         return self.address.spec
 
 
+@rule
+async def compute_first_party_package_import_path(
+    request: FirstPartyPkgImportPathRequest,
+) -> FirstPartyPkgImportPath:
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
+
+    # We validate that the sources are for the target's directory, e.g. don't use `**`, so we can
+    # simply look at the address to get the subpath.
+    dir_path_rel_to_gomod = fast_relpath(request.address.spec_path, owning_go_mod.address.spec_path)
+
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
+    import_path = (
+        f"{go_mod_info.import_path}/{dir_path_rel_to_gomod}"
+        if dir_path_rel_to_gomod
+        else go_mod_info.import_path
+    )
+    return FirstPartyPkgImportPath(import_path, dir_path_rel_to_gomod)
+
+
 @dataclass(frozen=True)
 class PackageAnalyzerSetup:
     digest: Digest
@@ -88,30 +128,25 @@ class PackageAnalyzerSetup:
 async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgInfo:
-    go_mod_address = request.address.maybe_convert_to_target_generator()
-    wrapped_target, go_mod_info = await MultiGet(
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
+    wrapped_target, import_path_info, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+        Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
+        Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
     )
-    target = wrapped_target.target
-    import_path = target[GoImportPathField].value
-    subpath = target[GoFirstPartyPackageSubpathField].value
 
     pkg_sources = await Get(
-        HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
+        HydratedSources,
+        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
     )
     input_digest = await Get(
         Digest,
         MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
     )
-    path = request.address.spec_path if request.address.spec_path else "."
-    path = os.path.join(path, subpath) if subpath else path
-    if not path:
-        path = "."
     result = await Get(
         FallibleProcessResult,
         Process(
-            (analyzer.PATH, path),
+            (analyzer.PATH, request.address.spec_path or "."),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
@@ -120,7 +155,7 @@ async def compute_first_party_package_info(
     if result.exit_code != 0:
         return FallibleFirstPartyPkgInfo(
             info=None,
-            import_path=import_path,
+            import_path=import_path_info.import_path,
             exit_code=result.exit_code,
             stderr=result.stderr.decode("utf-8"),
         )
@@ -137,7 +172,7 @@ async def compute_first_party_package_info(
             )
             error += "\n"
         return FallibleFirstPartyPkgInfo(
-            info=None, import_path=import_path, exit_code=1, stderr=error
+            info=None, import_path=import_path_info.import_path, exit_code=1, stderr=error
         )
 
     if "CgoFiles" in metadata:
@@ -150,8 +185,8 @@ async def compute_first_party_package_info(
 
     info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
-        subpath=os.path.join(target.address.spec_path, subpath),
-        import_path=import_path,
+        dir_path=request.address.spec_path,
+        import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
         xtest_imports=tuple(metadata.get("XTestImports", [])),
@@ -164,7 +199,7 @@ async def compute_first_party_package_info(
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
     )
-    return FallibleFirstPartyPkgInfo(info, import_path)
+    return FallibleFirstPartyPkgInfo(info, import_path_info.import_path)
 
 
 @rule
@@ -188,7 +223,7 @@ async def setup_analyzer() -> PackageAnalyzerSetup:
         BuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
-            subpath="",
+            dir_path="",
             digest=source_digest,
             go_file_names=tuple(fc.path for fc in analyer_sources_content),
             s_file_names=(),
