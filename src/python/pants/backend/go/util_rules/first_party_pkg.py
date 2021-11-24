@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import pkgutil
 from dataclasses import dataclass
 from typing import ClassVar
@@ -26,6 +25,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -105,8 +105,9 @@ async def compute_first_party_package_import_path(
 ) -> FirstPartyPkgImportPath:
     owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
 
-    # The generated_name will have been set to `./{dir_path_rel_to_gomod}`.
-    dir_path_rel_to_gomod = request.address.generated_name[2:]  # type: ignore[index]
+    # We validate that the sources are for the target's directory, e.g. don't use `**`, so we can
+    # simply look at the address to get the subpath.
+    dir_path_rel_to_gomod = fast_relpath(request.address.spec_path, owning_go_mod.address.spec_path)
 
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
     import_path = (
@@ -142,18 +143,10 @@ async def compute_first_party_package_info(
         Digest,
         MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
     )
-
-    path = request.address.spec_path or "."
-    path = (
-        os.path.join(path, import_path_info.dir_path_rel_to_gomod)
-        if import_path_info.dir_path_rel_to_gomod
-        else path
-    )
-
     result = await Get(
         FallibleProcessResult,
         Process(
-            (analyzer.PATH, path),
+            (analyzer.PATH, request.address.spec_path or "."),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
@@ -192,7 +185,7 @@ async def compute_first_party_package_info(
 
     info = FirstPartyPkgInfo(
         digest=pkg_sources.snapshot.digest,
-        dir_path=os.path.join(request.address.spec_path, import_path_info.dir_path_rel_to_gomod),
+        dir_path=request.address.spec_path,
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
