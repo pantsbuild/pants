@@ -145,7 +145,7 @@ class ScalaSourcesGeneratorTarget(Target):
         ScalaSourcesGeneratorSourcesField,
         JvmCompatibleResolveNamesField,
         JvmProvidesTypesField,
-   )
+    )
     help = (
         "Generate a `scala_source` target for each file in the `sources` field (defaults to "
         "all files named in the directory whose names end in `.scala` except for those which "

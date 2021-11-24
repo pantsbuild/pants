@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
+class JvmFirstPartyPackageMappingException(Exception):
+    pass
+
+
 class SymbolMap:
     """A mapping of JVM package names to owning addresses."""
 
@@ -109,7 +113,7 @@ async def merge_first_party_module_mappings(
     for provided_type, provided_addresses in provided_types.items():
         symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type)
         if not provided_addresses.intersection(symbol_addresses):
-            raise Exception(
+            raise JvmFirstPartyPackageMappingException(
                 f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "
                 f"`{provided_type}`, however, it does not appear to actually provide that type."
             )
