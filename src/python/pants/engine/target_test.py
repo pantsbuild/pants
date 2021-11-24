@@ -19,6 +19,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
+    FloatField,
     GeneratedTargets,
     GenerateSourcesRequest,
     IntField,
@@ -38,6 +39,7 @@ from pants.engine.target import (
     StringSequenceField,
     Tags,
     Target,
+    ValidNumbers,
     generate_file_level_targets,
     targets_with_sources_types,
 )
@@ -808,6 +810,41 @@ def test_string_field_valid_choices() -> None:
         GivenStrings("carrot", addr)
     with pytest.raises(InvalidFieldChoiceException):
         GivenEnum("carrot", addr)
+
+
+@pytest.mark.parametrize("field_cls", [IntField, FloatField])
+def test_int_float_fields_valid_numbers(field_cls: type) -> None:
+    class AllNums(field_cls):  # type: ignore[valid-type,misc]
+        alias = "all_nums"
+        valid_numbers = ValidNumbers.all
+
+    class PositiveAndZero(field_cls):  # type: ignore[valid-type,misc]
+        alias = "positive_and_zero"
+        valid_numbers = ValidNumbers.positive_and_zero
+
+    class PositiveOnly(field_cls):  # type: ignore[valid-type,misc]
+        alias = "positive_only"
+        valid_numbers = ValidNumbers.positive_only
+
+    addr = Address("nums")
+    neg = -1 if issubclass(field_cls, IntField) else -1.0
+    zero = 0 if issubclass(field_cls, IntField) else 0.0
+    pos = 1 if issubclass(field_cls, IntField) else 1.0
+
+    assert AllNums(neg, addr).value == neg
+    assert AllNums(zero, addr).value == zero
+    assert AllNums(pos, addr).value == pos
+
+    with pytest.raises(InvalidFieldException):
+        PositiveAndZero(neg, addr)
+    assert PositiveAndZero(zero, addr).value == zero
+    assert PositiveAndZero(pos, addr).value == pos
+
+    with pytest.raises(InvalidFieldException):
+        PositiveOnly(neg, addr)
+    with pytest.raises(InvalidFieldException):
+        PositiveOnly(zero, addr)
+    assert PositiveOnly(pos, addr).value == pos
 
 
 def test_sequence_field() -> None:

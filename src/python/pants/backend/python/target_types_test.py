@@ -65,14 +65,6 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
 
-def test_timeout_validation() -> None:
-    with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, Address("", target_name="tests"))
-    with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, Address("", target_name="tests"))
-    assert PythonTestsTimeout(5, Address("", target_name="tests")).value == 5
-
-
 def test_pex_binary_validation() -> None:
     def create_tgt(*, script: str | None = None, entry_point: str | None = None) -> PexBinary:
         return PexBinary(
