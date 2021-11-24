@@ -7,7 +7,11 @@ import os
 from typing import Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
-from pants.backend.go.target_types import GoPackageSourcesField, SkipGoTestsField
+from pants.backend.go.target_types import (
+    GoPackageSourcesField,
+    GoTestTimeoutField,
+    SkipGoTestsField,
+)
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -65,14 +69,17 @@ class GoTestFieldSet(TestFieldSet):
     required_fields = (GoPackageSourcesField,)
 
     sources: GoPackageSourcesField
+    timeout: GoTestTimeoutField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipGoTestsField).value
 
 
-def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
+def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
     result = []
+    if timeout_field_value is not None:
+        result.append(f"-test.timeout={timeout_field_value}s")
 
     i = 0
     next_arg_is_option_value = False
@@ -80,7 +87,8 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
         arg = args[i]
         i += 1
 
-        # If this argument is an option value, then append it to the result and continue to next argument.
+        # If this argument is an option value, then append it to the result and continue to next
+        # argument.
         if next_arg_is_option_value:
             result.append(arg)
             next_arg_is_option_value = False
@@ -106,9 +114,16 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
             option_value = ""
 
         if arg_name in TEST_FLAGS:
+            no_opt_provided = TEST_FLAGS[arg_name] and option_value == ""
+            if arg_name == "timeout" and timeout_field_value is not None:
+                if no_opt_provided:
+                    # Skip the option value.
+                    i += 1
+                continue
+
             rewritten_arg = f"{arg[0:start_index]}test.{arg_name}{option_value}"
             result.append(rewritten_arg)
-            if TEST_FLAGS[arg_name] and option_value == "":
+            if no_opt_provided:
                 next_arg_is_option_value = True
         else:
             result.append(arg)
@@ -249,7 +264,10 @@ async def run_go_tests(
     result = await Get(
         FallibleProcessResult,
         Process(
-            ["./test_runner", *transform_test_args(go_test_subsystem.args)],
+            [
+                "./test_runner",
+                *transform_test_args(go_test_subsystem.args, field_set.timeout.value),
+            ],
             input_digest=binary.digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,

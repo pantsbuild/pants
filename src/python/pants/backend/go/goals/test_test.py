@@ -52,12 +52,38 @@ def rule_runner() -> RuleRunner:
 
 
 def test_transform_test_args() -> None:
-    assert transform_test_args(["-v", "--", "-v"]) == ("-test.v", "--", "-v")
-    assert transform_test_args(["-run=TestFoo", "-v"]) == ("-test.run=TestFoo", "-test.v")
-    assert transform_test_args(["-run", "TestFoo", "-foo", "-v"]) == (
+    assert transform_test_args(["-v", "--", "-v"], timeout_field_value=None) == (
+        "-test.v",
+        "--",
+        "-v",
+    )
+    assert transform_test_args(["-run=TestFoo", "-v"], timeout_field_value=None) == (
+        "-test.run=TestFoo",
+        "-test.v",
+    )
+    assert transform_test_args(["-run", "TestFoo", "-foo", "-v"], timeout_field_value=None) == (
         "-test.run",
         "TestFoo",
         "-foo",
+        "-test.v",
+    )
+
+    assert transform_test_args(["-timeout=1m", "-v"], timeout_field_value=None) == (
+        "-test.timeout=1m",
+        "-test.v",
+    )
+    assert transform_test_args(["-timeout", "1m", "-v"], timeout_field_value=None) == (
+        "-test.timeout",
+        "1m",
+        "-test.v",
+    )
+    assert transform_test_args(["-v"], timeout_field_value=100) == ("-test.timeout=100s", "-test.v")
+    assert transform_test_args(["-timeout=1m", "-v"], timeout_field_value=100) == (
+        "-test.timeout=100s",
+        "-test.v",
+    )
+    assert transform_test_args(["-timeout", "1m", "-v"], timeout_field_value=100) == (
+        "-test.timeout=100s",
         "-test.v",
     )
 

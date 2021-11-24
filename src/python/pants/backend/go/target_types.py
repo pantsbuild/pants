@@ -16,11 +16,13 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    IntField,
     InvalidFieldException,
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
     Target,
+    ValidNumbers,
 )
 
 # -----------------------------------------------------------------------------------------------
@@ -127,12 +129,24 @@ class SkipGoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
+class GoTestTimeoutField(IntField):
+    alias = "test_timeout"
+    help = (
+        "A timeout (in seconds) when running this package's tests.\n\n"
+        "You can set a default timeout by setting `-timeout=2m`, for example, in the "
+        "`[go-test].args` option. Otherwise, if this field is not set, the test will never time "
+        "out."
+    )
+    valid_numbers = ValidNumbers.positive_and_zero
+
+
 class GoPackageTarget(Target):
     alias = "go_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoPackageDependenciesField,
         GoPackageSourcesField,
+        GoTestTimeoutField,
         SkipGoTestsField,
     )
     help = (
