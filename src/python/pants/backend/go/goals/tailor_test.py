@@ -69,7 +69,7 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
+def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "unowned/f.go": "",
@@ -104,9 +104,6 @@ def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
             "missing_binary_tgt/BUILD": "go_package()",
             "tgt_already_exists/app.go": "package main",
             "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()",
-            # TODO: should not fail the build
-            # "missing_pkg_tgt/app.go": "package main",
-            # "missing_pkg_tgt/BUILD": "go_binary()",
             "missing_pkg_and_binary_tgt/app.go": "package main",
             "main_set_to_different_dir/subdir/app.go": "package main",
             "main_set_to_different_dir/subdir/BUILD": "go_package()",

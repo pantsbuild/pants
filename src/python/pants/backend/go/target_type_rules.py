@@ -261,8 +261,9 @@ async def determine_main_pkg_for_go_binary(
     if not relevant_pkg_targets:
         raise ResolveError(
             f"The `{alias}` target {addr} requires that there is a `go_package` "
-            f"target for its directory {addr.spec_path}, but none were found.\n\n"
-            "(Run `./pants tailor` to automatically add `go_package` targets.)"
+            f"target defined in its directory {addr.spec_path}, but none were found.\n\n"
+            "To fix, add a target like `go_package()` or `go_package(name='pkg')` to the BUILD "
+            f"file in {addr.spec_path}."
         )
     raise ResolveError(
         f"There are multiple `go_package` targets for the same directory of the "

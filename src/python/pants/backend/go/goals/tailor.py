@@ -48,9 +48,10 @@ async def find_putative_go_targets(
 ) -> PutativeTargets:
     putative_targets = []
 
-    all_go_mod_files, all_go_files = await MultiGet(
+    all_go_mod_files, all_go_files, all_go_files_digest_contents = await MultiGet(
         Get(Paths, PathGlobs, request.search_paths.path_globs("go.mod")),
         Get(Paths, PathGlobs, request.search_paths.path_globs("*.go")),
+        Get(DigestContents, PathGlobs, request.search_paths.path_globs("*.go")),
     )
 
     # Add `go_mod` targets.
@@ -78,11 +79,9 @@ async def find_putative_go_targets(
         )
 
     # Add `go_binary` targets.
-    # TODO: Don't error if go_binary exists without corresponding go_package.
-    digest_contents = await Get(DigestContents, PathGlobs, request.search_paths.path_globs("*.go"))
     main_package_dirs = [
         os.path.dirname(file_content.path)
-        for file_content in digest_contents
+        for file_content in all_go_files_digest_contents
         if has_package_main(file_content.content)
     ]
     existing_targets = await Get(
