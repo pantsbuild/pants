@@ -51,7 +51,7 @@ class PantsRequirementCAOF:
             "the `pants_requirement` macro",
             (
                 "Use the target `pants_requirements` instead. Specifically, we recommend "
-                "deleting all `pants_requirement` calls and replace with a single "
+                "deleting all `pants_requirement` calls and replacing them with a single "
                 "`pants_requirements(name='pants')`.\n\n"
                 "By default, `pants_requirements` will generate a `python_requirement` target for "
                 "both `pantsbuild.pants` and `pantsbuild.pants.testutil`.\n\n"

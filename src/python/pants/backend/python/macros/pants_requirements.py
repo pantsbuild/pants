@@ -35,7 +35,7 @@ class PantsRequirementsTargetGenerator(Target):
         "to improve stability. If you're currently using a dev release, the version will be set to "
         "that exact dev release. If you're using a release candidate (rc) or stable release, the "
         "version will allow any non-dev-release release within the release series, e.g. "
-        f"`>={MAJOR_MINOR}rc0,<{PANTS_SEMVER.major}.{PANTS_SEMVER.minor + 1}`.\n\n"
+        f"`>={MAJOR_MINOR}.0rc0,<{PANTS_SEMVER.major}.{PANTS_SEMVER.minor + 1}`.\n\n"
         "(If this versioning scheme does not work for you, you can directly create "
         "`python_requirement` targets for `pantsbuild.pants` and `pantsbuild.pants.testutil`. We "
         "also invite you to share your ideas at "
@@ -65,7 +65,7 @@ def determine_version() -> str:
         f"=={PANTS_SEMVER}"
         if PANTS_SEMVER.is_devrelease
         else (
-            f">={PANTS_SEMVER.major}.{PANTS_SEMVER.minor}rc0,"
+            f">={PANTS_SEMVER.major}.{PANTS_SEMVER.minor}.0rc0,"
             f"<{PANTS_SEMVER.major}.{PANTS_SEMVER.minor + 1}"
         )
     )
