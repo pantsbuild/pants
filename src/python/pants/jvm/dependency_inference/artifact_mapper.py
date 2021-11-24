@@ -65,7 +65,6 @@ class AvailableThirdPartyArtifacts:
 
 
 class MutableTrieNode:
-
     __slots__ = [
         "children",
         "recursive",
@@ -89,7 +88,6 @@ class MutableTrieNode:
 
 @frozen_after_init
 class FrozenTrieNode:
-
     __slots__ = [
         "_is_frozen",
         "_children",
