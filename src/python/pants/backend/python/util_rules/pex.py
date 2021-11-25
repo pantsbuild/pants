@@ -518,19 +518,19 @@ async def build_pex(
         ),
     )
 
-    layout = request.layout or PexLayout.ZIPAPP
-    output_files: Iterable[str] | None = None
-    output_directories: Iterable[str] | None = None
     if request.internal_only or is_monolithic_resolve:
         # This is a much friendlier layout for the CAS than the default zipapp.
         layout = PexLayout.PACKED
-        output_directories = [request.output_filename]
     else:
-        if PexLayout.ZIPAPP == layout:
-            output_files = [request.output_filename]
-        else:
-            output_directories = [request.output_filename]
+        layout = request.layout or PexLayout.ZIPAPP
     argv.extend(["--layout", layout.value])
+
+    output_files: Iterable[str] | None = None
+    output_directories: Iterable[str] | None = None
+    if PexLayout.ZIPAPP == layout:
+        output_files = [request.output_filename]
+    else:
+        output_directories = [request.output_filename]
 
     process = await Get(
         Process,
