@@ -179,10 +179,26 @@ class PexBinaryDefaults(Subsystem):
                 "`pex_binary` targets"
             ),
         )
+        register(
+            "--resolve-local-platforms",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                "Whether to resolve a local interpreter that matches each of the "
+                f"`{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` target.\n\n"
+                f"Can be overridden by specifying the `{PexResolveLocalPlatformsField.alias}` "
+                f"parameter of individual `{PexBinary.alias}` targets."
+            ),
+        )
 
     @property
     def emit_warnings(self) -> bool:
         return cast(bool, self.options.emit_warnings)
+
+    @property
+    def resolve_local_platforms(self) -> bool:
+        return cast(bool, self.options.resolve_local_platforms)
 
 
 # See `target_types_rules.py` for a dependency injection rule.
@@ -418,6 +434,22 @@ class PexEmitWarningsField(TriBoolField):
         return self.value
 
 
+class PexResolveLocalPlatformsField(TriBoolField):
+    alias = "resolve_local_platforms"
+    help = (
+        "Attempt to resolve a local interpreter that matches each of the "
+        f"`{PexPlatformsField.alias}` specified.\n\nIf found, use the interpreter to resolve "
+        "distributions and build any that are only available in source distribution form. If not "
+        "(or if this option is `False`), resolve for each platform by accepting only pre-built "
+        "binary distributions (wheels)."
+    )
+
+    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
+        if self.value is None:
+            return pex_binary_defaults.resolve_local_platforms
+        return self.value
+
+
 class PexExecutionMode(Enum):
     ZIPAPP = "zipapp"
     VENV = "venv"
@@ -462,6 +494,7 @@ class PexBinary(Target):
         PexEntryPointField,
         PexScriptField,
         PexPlatformsField,
+        PexResolveLocalPlatformsField,
         PexInheritPathField,
         PexStripEnvField,
         PexIgnoreErrorsField,
