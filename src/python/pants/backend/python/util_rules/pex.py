@@ -66,6 +66,8 @@ from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class Lockfile:
@@ -256,6 +258,11 @@ class PexRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class OptionalPexRequest:
+    maybe_pex_request: PexRequest | None
+
+
+@dataclass(frozen=True)
 class Pex:
     """Wrapper for a digest containing a pex file created with some filename."""
 
@@ -264,7 +271,9 @@ class Pex:
     python: PythonExecutable | None
 
 
-logger = logging.getLogger(__name__)
+@dataclass(frozen=True)
+class OptionalPex:
+    maybe_pex: Pex | None
 
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
@@ -688,6 +697,14 @@ def _build_pex_description(request: PexRequest) -> str:
 async def create_pex(request: PexRequest) -> Pex:
     result = await Get(BuildPexResult, PexRequest, request)
     return result.create_pex()
+
+
+@rule
+async def create_optional_pex(request: OptionalPexRequest) -> OptionalPex:
+    if request.maybe_pex_request is None:
+        return OptionalPex(None)
+    result = await Get(Pex, PexRequest, request.maybe_pex_request)
+    return OptionalPex(result)
 
 
 @dataclass(frozen=True)
