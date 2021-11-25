@@ -139,4 +139,4 @@ Thread [^\n]+ \\(most recent call first\\):
             assert re.search(regex_str, read_file(pid_specific_log_file))
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-            self.assertEqual("", read_file(shared_log_file))
+            assert "" == read_file(shared_log_file)

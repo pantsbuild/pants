@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import enum
 import itertools
 import logging
 import os.path
@@ -316,11 +317,9 @@ class Target:
             target generator was explicitly defined. Target generators can, however, set this to
             the directory where the generated target provides metadata for. For example, a
             file-based target like `python_source` should set this to the parent directory of
-            its file. A directory-based target like `go_first_party_package` should set it to the
-            directory. A subtree-based target might set it to the root of the subtree. A file-less
-            target like `go_third_party_package` should keep the default of `address.spec_path`.
-            This field impacts how command line specs work, so that globs like `dir:` know whether
-            to match the target or not.
+            its file. A file-less target like `go_third_party_package` should keep the default of
+            `address.spec_path`. This field impacts how command line specs work, so that globs
+            like `dir:` know whether to match the target or not.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -1313,22 +1312,52 @@ class TriBoolField(ScalarField[bool]):
         return super().compute_value(raw_value, address)
 
 
+class ValidNumbers(Enum):
+    """What range of numbers are allowed for IntField and FloatField."""
+
+    positive_only = enum.auto()
+    positive_and_zero = enum.auto()
+    all = enum.auto()
+
+    def validate(self, num: float | int | None, alias: str, address: Address) -> None:
+        if num is None or self == self.all:  # type: ignore[comparison-overlap]
+            return
+        if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
+            if num < 0:
+                raise InvalidFieldException(
+                    f"The {repr(alias)} field in target {address} must be greater than or equal to "
+                    f"zero, but was set to `{num}`."
+                )
+            return
+        if num <= 0:
+            raise InvalidFieldException(
+                f"The {repr(alias)} field in target {address} must be greater than zero, but was "
+                f"set to `{num}`."
+            )
+
+
 class IntField(ScalarField[int]):
     expected_type = int
     expected_type_description = "an integer"
+    valid_numbers: ClassVar[ValidNumbers] = ValidNumbers.all
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        cls.valid_numbers.validate(value_or_default, cls.alias, address)
+        return value_or_default
 
 
 class FloatField(ScalarField[float]):
     expected_type = float
     expected_type_description = "a float"
+    valid_numbers: ClassVar[ValidNumbers] = ValidNumbers.all
 
     @classmethod
     def compute_value(cls, raw_value: Optional[float], address: Address) -> Optional[float]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        cls.valid_numbers.validate(value_or_default, cls.alias, address)
+        return value_or_default
 
 
 class StringField(ScalarField[str]):

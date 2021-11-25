@@ -103,6 +103,14 @@ class RunTracker:
     def goals(self) -> list[str]:
         return self._all_options.goals if self._all_options else []
 
+    @property
+    def active_standard_backends(self) -> list[str]:
+        return [
+            backend
+            for backend in self._all_options.for_global_scope().backend_packages
+            if backend.startswith("pants.backend.")
+        ]
+
     def start(self, run_start_time: float, specs: list[str]) -> None:
         """Start tracking this pants run."""
         if self._has_started:
@@ -155,6 +163,7 @@ class RunTracker:
             "standard_goals": [goal for goal in self.goals if goal in self.STANDARD_GOALS],
             # Lets us know of any custom goals were used, without knowing their names.
             "num_goals": str(len(self.goals)),
+            "active_standard_backends": sorted(list(self.active_standard_backends)),
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:

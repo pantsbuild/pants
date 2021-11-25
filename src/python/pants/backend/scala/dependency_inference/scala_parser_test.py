@@ -21,7 +21,7 @@ from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -48,6 +48,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@logging
 def test_parser_simple(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -111,6 +112,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 val a = foo + 5
                 val b = bar(5, "hello") + OuterObject.NestedVal
               }
+              def func2: (TupleTypeArg1, TupleTypeArg2) = {}
+              def func3: (LambdaTypeArg1, LambdaTypeArg2) => LambdaReturnType = {}
             }
 
             class ASubClass extends ABaseClass with ATrait1 with ATrait2.Nested { }
@@ -144,37 +147,79 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         [source_files],
     )
 
-    assert analysis.provided_names == FrozenOrderedSet(
-        [
-            "org.pantsbuild.example.OuterClass",
-            "org.pantsbuild.example.OuterClass.NestedVal",
-            "org.pantsbuild.example.OuterClass.NestedVar",
-            "org.pantsbuild.example.OuterClass.NestedTrait",
-            "org.pantsbuild.example.OuterClass.NestedClass",
-            "org.pantsbuild.example.OuterClass.NestedType",
-            "org.pantsbuild.example.OuterClass.NestedObject",
-            "org.pantsbuild.example.OuterClass.NestedObject.valWithType",
-            "org.pantsbuild.example.OuterTrait",
-            "org.pantsbuild.example.OuterTrait.NestedVal",
-            "org.pantsbuild.example.OuterTrait.NestedVar",
-            "org.pantsbuild.example.OuterTrait.NestedTrait",
-            "org.pantsbuild.example.OuterTrait.NestedClass",
-            "org.pantsbuild.example.OuterTrait.NestedType",
-            "org.pantsbuild.example.OuterTrait.NestedObject",
-            "org.pantsbuild.example.OuterObject",
-            "org.pantsbuild.example.OuterObject.NestedVal",
-            "org.pantsbuild.example.OuterObject.NestedVar",
-            "org.pantsbuild.example.OuterObject.NestedTrait",
-            "org.pantsbuild.example.OuterObject.NestedClass",
-            "org.pantsbuild.example.OuterObject.NestedType",
-            "org.pantsbuild.example.OuterObject.NestedObject",
-            "org.pantsbuild.example.Functions",
-            "org.pantsbuild.example.Functions.func1",
-            "org.pantsbuild.example.ASubClass",
-            "org.pantsbuild.example.ASubTrait",
-            "org.pantsbuild.example.HasPrimaryConstructor",
-        ]
-    )
+    assert sorted(list(analysis.provided_symbols)) == [
+        "org.pantsbuild.example.ASubClass",
+        "org.pantsbuild.example.ASubTrait",
+        "org.pantsbuild.example.Functions",
+        "org.pantsbuild.example.Functions.func1",
+        "org.pantsbuild.example.Functions.func2",
+        "org.pantsbuild.example.Functions.func3",
+        "org.pantsbuild.example.HasPrimaryConstructor",
+        "org.pantsbuild.example.OuterClass",
+        "org.pantsbuild.example.OuterClass.NestedClass",
+        "org.pantsbuild.example.OuterClass.NestedObject",
+        "org.pantsbuild.example.OuterClass.NestedObject.valWithType",
+        "org.pantsbuild.example.OuterClass.NestedTrait",
+        "org.pantsbuild.example.OuterClass.NestedType",
+        "org.pantsbuild.example.OuterClass.NestedVal",
+        "org.pantsbuild.example.OuterClass.NestedVar",
+        "org.pantsbuild.example.OuterObject",
+        "org.pantsbuild.example.OuterObject.NestedClass",
+        "org.pantsbuild.example.OuterObject.NestedObject",
+        "org.pantsbuild.example.OuterObject.NestedTrait",
+        "org.pantsbuild.example.OuterObject.NestedType",
+        "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.OuterObject.NestedVar",
+        "org.pantsbuild.example.OuterTrait",
+        "org.pantsbuild.example.OuterTrait.NestedClass",
+        "org.pantsbuild.example.OuterTrait.NestedObject",
+        "org.pantsbuild.example.OuterTrait.NestedTrait",
+        "org.pantsbuild.example.OuterTrait.NestedType",
+        "org.pantsbuild.example.OuterTrait.NestedVal",
+        "org.pantsbuild.example.OuterTrait.NestedVar",
+    ]
+
+    assert sorted(list(analysis.provided_symbols_encoded)) == [
+        "org.pantsbuild.example.ASubClass",
+        "org.pantsbuild.example.ASubTrait",
+        "org.pantsbuild.example.Functions",
+        "org.pantsbuild.example.Functions$",
+        "org.pantsbuild.example.Functions$.MODULE$",
+        "org.pantsbuild.example.Functions.func1",
+        "org.pantsbuild.example.Functions.func2",
+        "org.pantsbuild.example.Functions.func3",
+        "org.pantsbuild.example.HasPrimaryConstructor",
+        "org.pantsbuild.example.OuterClass",
+        "org.pantsbuild.example.OuterClass.NestedClass",
+        "org.pantsbuild.example.OuterClass.NestedObject",
+        "org.pantsbuild.example.OuterClass.NestedObject$",
+        "org.pantsbuild.example.OuterClass.NestedObject$.MODULE$",
+        "org.pantsbuild.example.OuterClass.NestedObject.valWithType",
+        "org.pantsbuild.example.OuterClass.NestedTrait",
+        "org.pantsbuild.example.OuterClass.NestedType",
+        "org.pantsbuild.example.OuterClass.NestedVal",
+        "org.pantsbuild.example.OuterClass.NestedVar",
+        "org.pantsbuild.example.OuterObject",
+        "org.pantsbuild.example.OuterObject$",
+        "org.pantsbuild.example.OuterObject$.MODULE$",
+        "org.pantsbuild.example.OuterObject.NestedClass",
+        "org.pantsbuild.example.OuterObject.NestedObject",
+        "org.pantsbuild.example.OuterObject.NestedObject$",
+        "org.pantsbuild.example.OuterObject.NestedObject$.MODULE$",
+        "org.pantsbuild.example.OuterObject.NestedTrait",
+        "org.pantsbuild.example.OuterObject.NestedType",
+        "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.OuterObject.NestedVar",
+        "org.pantsbuild.example.OuterTrait",
+        "org.pantsbuild.example.OuterTrait.NestedClass",
+        "org.pantsbuild.example.OuterTrait.NestedObject",
+        "org.pantsbuild.example.OuterTrait.NestedObject$",
+        "org.pantsbuild.example.OuterTrait.NestedObject$.MODULE$",
+        "org.pantsbuild.example.OuterTrait.NestedTrait",
+        "org.pantsbuild.example.OuterTrait.NestedType",
+        "org.pantsbuild.example.OuterTrait.NestedVal",
+        "org.pantsbuild.example.OuterTrait.NestedVar",
+    ]
 
     assert analysis.imports_by_scope == FrozenDict(
         {
@@ -193,7 +238,20 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
-                ["Integer", "AParameterType", "bar", "foo", "OuterObject.NestedVal", "+", "Unit"]
+                [
+                    "TupleTypeArg2",
+                    "foo",
+                    "TupleTypeArg1",
+                    "LambdaReturnType",
+                    "+",
+                    "Unit",
+                    "Integer",
+                    "LambdaTypeArg2",
+                    "AParameterType",
+                    "LambdaTypeArg1",
+                    "bar",
+                    "OuterObject.NestedVal",
+                ]
             ),
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
                 ["bar", "SomeTypeInSecondaryConstructor"]
@@ -219,9 +277,14 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.String",
         "java.io.Unit",
         "java.io.Integer",
+        "java.io.LambdaReturnType",
+        "java.io.LambdaTypeArg1",
+        "java.io.LambdaTypeArg2",
         "java.io.SomeTypeInSecondaryConstructor",
         "java.io.bar",
         "java.io.foo",
+        "java.io.TupleTypeArg1",
+        "java.io.TupleTypeArg2",
         # Because it's the top-most scope in the file.
         "org.pantsbuild.example.+",
         "org.pantsbuild.example.ABaseClass",
@@ -236,4 +299,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.bar",
         "org.pantsbuild.example.foo",
+        "org.pantsbuild.example.LambdaReturnType",
+        "org.pantsbuild.example.LambdaTypeArg1",
+        "org.pantsbuild.example.LambdaTypeArg2",
+        "org.pantsbuild.example.TupleTypeArg1",
+        "org.pantsbuild.example.TupleTypeArg2",
     }

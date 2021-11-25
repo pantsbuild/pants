@@ -11,7 +11,7 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet
 from pants.backend.go.goals.test import rules as test_rules
 from pants.backend.go.goals.test import transform_test_args
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
-        target_types=[GoModTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -65,7 +65,7 @@ def test_transform_test_args() -> None:
 def test_internal_test_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add.go": textwrap.dedent(
                 """
@@ -88,7 +88,7 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
@@ -97,7 +97,7 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
 def test_internal_test_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/bar_test.go": textwrap.dedent(
                 """
@@ -110,7 +110,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
@@ -119,7 +119,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
 def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/fib.go": textwrap.dedent(
                 """
@@ -145,7 +145,7 @@ def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
@@ -155,7 +155,7 @@ def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
 def test_internal_example_passes(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/print_test.go": textwrap.dedent(
                 """
@@ -171,7 +171,7 @@ def test_internal_example_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
@@ -180,7 +180,7 @@ def test_internal_example_passes(rule_runner: RuleRunner) -> None:
 def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add_test.go": textwrap.dedent(
                 """
@@ -200,7 +200,7 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "foo.TestMain called" in result.stdout
@@ -211,12 +211,14 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     """A compilation failure should not cause Pants to error, only the test to fail."""
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             # Test itself is bad.
             "foo/bad_test.go": "invalid!!!",
             # A dependency of the test is bad.
             "foo/dep/f.go": "invalid!!!",
+            "foo/dep/BUILD": "go_package()",
+            "foo/uses_dep/BUILD": "go_package()",
             "foo/uses_dep/f_test.go": textwrap.dedent(
                 """
                 package uses_dep
@@ -235,12 +237,12 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
 
-    tgt = rule_runner.get_target(Address("foo", generated_name="./uses_dep"))
+    tgt = rule_runner.get_target(Address("foo/uses_dep"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
@@ -249,7 +251,7 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
 def test_external_test_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add.go": textwrap.dedent(
                 """
@@ -275,7 +277,7 @@ def test_external_test_success(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
@@ -284,7 +286,7 @@ def test_external_test_success(rule_runner: RuleRunner) -> None:
 def test_external_test_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add.go": textwrap.dedent(
                 """
@@ -317,7 +319,7 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
 def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/fib.go": textwrap.dedent(
                 """
@@ -346,7 +348,7 @@ def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
@@ -356,7 +358,7 @@ def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
 def test_external_example_passes(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/print.go": textwrap.dedent(
                 """
@@ -381,7 +383,7 @@ def test_external_example_passes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
@@ -390,7 +392,7 @@ def test_external_example_passes(rule_runner: RuleRunner) -> None:
 def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add.go": textwrap.dedent(
                 """
@@ -430,7 +432,7 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
 def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "go_mod()",
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
             "foo/go.mod": "module foo",
             "foo/add.go": textwrap.dedent(
                 """
@@ -465,8 +467,82 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address("foo", generated_name="./"))
+    tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout
     assert "FAIL: TestAddExternal" in result.stdout
+
+
+def test_skip_tests(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "f_test.go": "",
+            "BUILD": textwrap.dedent(
+                """\
+                go_package(name='run')
+                go_package(name='skip', skip_tests=True)
+                """
+            ),
+        }
+    )
+
+    def is_applicable(tgt_name: str) -> bool:
+        tgt = rule_runner.get_target(Address("", target_name=tgt_name))
+        return GoTestFieldSet.is_applicable(tgt)
+
+    assert is_applicable("run")
+    assert not is_applicable("skip")
+
+
+def test_no_tests(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.skipped
+
+
+def test_compilation_error(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                !!!
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 1
+    assert "failed to parse" in result.stderr

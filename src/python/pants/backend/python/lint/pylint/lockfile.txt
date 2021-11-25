@@ -14,9 +14,9 @@
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
-astroid==2.8.5; python_version >= "3.6" and python_version < "4.0" \
-    --hash=sha256:abc423a1e85bc1553954a14f2053473d2b7f8baf32eae62a328be24f436b5107 \
-    --hash=sha256:11f7356737b624c42e21e71fe85eea6875cb94c03c82ac76bd535a0ff10b0f25
+astroid==2.8.6; python_version >= "3.6" and python_version < "4.0" \
+    --hash=sha256:cd8326b424c971e7d87678609cf6275d22028afd37d6ac59c16d47f1245882f6 \
+    --hash=sha256:5f6f75e45f15290e73b56f9dfde95b4bf96382284cde406ef4203e928335a495
 colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "4.0" and sys_platform == "win32" or python_version >= "3.6" and python_version < "4.0" and sys_platform == "win32" and python_full_version >= "3.5.0" \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
@@ -55,9 +55,9 @@ platformdirs==2.4.0; python_version >= "3.6" and python_version < "4.0" \
 pylint==2.11.1; python_version >= "3.6" and python_version < "4.0" \
     --hash=sha256:0f358e221c45cbd4dad2a1e4b883e75d28acdcccd29d40c76eb72b307269b126 \
     --hash=sha256:2c9843fff1a88ca0ad98a256806c82c5a8f86086e7ccbdb93297d86c3f90c436
-setuptools==59.1.1; python_version >= "3.6" and python_version < "4.0" \
-    --hash=sha256:fb537610c2dfe77b5896e3ee53dd53fbdd9adc48076c8f28cee3a30fb59a5038 \
-    --hash=sha256:94ee891f4759150cded601a6beb6b08400413aefd0267b692f3f8c6e0bb238e7
+setuptools==59.2.0; python_version >= "3.6" and python_version < "4.0" \
+    --hash=sha256:4adde3d1e1c89bde1c643c64d89cdd94cbfd8c75252ee459d4500bccb9c7d05d \
+    --hash=sha256:157d21de9d055ab9e8ea3186d91e7f4f865e11f42deafa952d90842671fc2576
 toml==0.10.2; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.6" and python_version < "4.0" and python_full_version >= "3.3.0" \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

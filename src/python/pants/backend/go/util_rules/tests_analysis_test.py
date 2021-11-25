@@ -18,8 +18,8 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
+from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -81,6 +81,7 @@ def test_basic_test_analysis(rule_runner: RuleRunner) -> None:
                 FrozenOrderedSet(["foo_test.go"]),
                 FrozenOrderedSet(["bar_test.go"]),
                 "foo",
+                Address("foo"),
             )
         ],
     )
@@ -121,7 +122,11 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
         GeneratedTestMain,
         [
             GenerateTestMainRequest(
-                input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(), "foo"
+                input_digest,
+                FrozenOrderedSet(["foo_test.go"]),
+                FrozenOrderedSet(),
+                "foo",
+                Address("foo"),
             )
         ],
     )
@@ -158,16 +163,22 @@ def test_incorrect_signatures(rule_runner: RuleRunner) -> None:
             },
         ).digest
 
-        with pytest.raises(ExecutionError) as exc_info:
-            rule_runner.request(
-                GeneratedTestMain,
-                [
-                    GenerateTestMainRequest(
-                        input_digest, FrozenOrderedSet(["foo_test.go"]), FrozenOrderedSet(), "foo"
-                    )
-                ],
-            )
-        assert "" in str(exc_info.value)
+        result = rule_runner.request(
+            GeneratedTestMain,
+            [
+                GenerateTestMainRequest(
+                    input_digest,
+                    FrozenOrderedSet(["foo_test.go"]),
+                    FrozenOrderedSet(),
+                    "foo",
+                    Address("foo"),
+                )
+            ],
+        )
+        assert result.failed_exit_code_and_stderr is not None
+        exit_code, stderr = result.failed_exit_code_and_stderr
+        assert exit_code == 1
+        assert err_msg in stderr
 
 
 def test_duplicate_test_mains_same_file(rule_runner: RuleRunner) -> None:
@@ -187,20 +198,22 @@ def test_duplicate_test_mains_same_file(rule_runner: RuleRunner) -> None:
         },
     ).digest
 
-    with pytest.raises(ExecutionError) as exc_info:
-        rule_runner.request(
-            GeneratedTestMain,
-            [
-                GenerateTestMainRequest(
-                    input_digest,
-                    FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
-                    FrozenOrderedSet(),
-                    "foo",
-                )
-            ],
-        )
-
-    assert "multiple definitions of TestMain" in str(exc_info.value)
+    result = rule_runner.request(
+        GeneratedTestMain,
+        [
+            GenerateTestMainRequest(
+                input_digest,
+                FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                FrozenOrderedSet(),
+                "foo",
+                Address("foo"),
+            )
+        ],
+    )
+    assert result.failed_exit_code_and_stderr is not None
+    exit_code, stderr = result.failed_exit_code_and_stderr
+    assert exit_code == 1
+    assert "multiple definitions of TestMain" in stderr
 
 
 def test_duplicate_test_mains_different_files(rule_runner: RuleRunner) -> None:
@@ -225,17 +238,19 @@ def test_duplicate_test_mains_different_files(rule_runner: RuleRunner) -> None:
         },
     ).digest
 
-    with pytest.raises(ExecutionError) as exc_info:
-        rule_runner.request(
-            GeneratedTestMain,
-            [
-                GenerateTestMainRequest(
-                    input_digest,
-                    FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
-                    FrozenOrderedSet(),
-                    "foo",
-                )
-            ],
-        )
-
-    assert "multiple definitions of TestMain" in str(exc_info.value)
+    result = rule_runner.request(
+        GeneratedTestMain,
+        [
+            GenerateTestMainRequest(
+                input_digest,
+                FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                FrozenOrderedSet(),
+                "foo",
+                Address("foo"),
+            )
+        ],
+    )
+    assert result.failed_exit_code_and_stderr is not None
+    exit_code, stderr = result.failed_exit_code_and_stderr
+    assert exit_code == 1
+    assert "multiple definitions of TestMain" in stderr

@@ -7,9 +7,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import go_mod, sdk
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -21,12 +26,39 @@ def rule_runner() -> RuleRunner:
         rules=[
             *sdk.rules(),
             *go_mod.rules(),
+            QueryRule(OwningGoMod, [OwningGoModRequest]),
             QueryRule(GoModInfo, [GoModInfoRequest]),
         ],
-        target_types=[GoModTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
+
+
+def test_owning_go_mod(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": "",
+            "f.go": "",
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+            "dir/f.go": "",
+            "dir/BUILD": "go_package()",
+            "dir/subdir/go.mod": "",
+            "dir/subdir/BUILD": "go_mod(name='mod')\ngo_package()",
+            "dir/subdir/f.go": "",
+            "dir/subdir/another/f.go": "",
+            "dir/subdir/another/BUILD": "go_package()",
+        }
+    )
+
+    def assert_owner(pkg: Address, mod: Address) -> None:
+        owner = rule_runner.request(OwningGoMod, [OwningGoModRequest(pkg)])
+        assert owner.address == mod
+
+    assert_owner(Address("", target_name="pkg"), Address("", target_name="mod"))
+    assert_owner(Address("dir"), Address("", target_name="mod"))
+    assert_owner(Address("dir/subdir"), Address("dir/subdir", target_name="mod"))
+    assert_owner(Address("dir/subdir/another"), Address("dir/subdir", target_name="mod"))
 
 
 def test_go_mod_info(rule_runner: RuleRunner) -> None:

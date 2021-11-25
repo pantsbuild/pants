@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from pants.backend.go.target_types import GoFirstPartyPackageSourcesField
+from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -19,7 +19,7 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class GoCheckFieldSet(FieldSet):
-    required_fields = (GoFirstPartyPackageSourcesField,)
+    required_fields = (GoPackageSourcesField,)
 
 
 class GoCheckRequest(CheckRequest):

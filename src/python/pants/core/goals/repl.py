@@ -1,5 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import os
 from abc import ABC
 from dataclasses import dataclass
@@ -12,6 +14,7 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
@@ -79,6 +82,8 @@ class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    append_only_caches: FrozenDict[str, str]
+    run_in_workspace: bool
 
     def __init__(
         self,
@@ -86,10 +91,14 @@ class ReplRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        run_in_workspace: bool = True,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
+        self.append_only_caches = FrozenDict(append_only_caches or {})
+        self.run_in_workspace = run_in_workspace
 
 
 @goal_rule
@@ -126,21 +135,27 @@ async def run_repl(
         )
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
-        )
+        input_digest = request.digest
+        if request.run_in_workspace:
+            workspace.write_digest(
+                request.digest,
+                path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
+                # We don't want to influence whether the InteractiveProcess is able to restart. Because
+                # we're writing into a temp directory, we can safely mark this side_effecting=False.
+                side_effecting=False,
+            )
+            input_digest = EMPTY_DIGEST
+
         env = {**complete_env, **request.extra_env}
         result = await Effect(
             InteractiveProcessResult,
             InteractiveProcess(
                 argv=request.args,
                 env=env,
-                run_in_workspace=True,
+                input_digest=input_digest,
+                run_in_workspace=request.run_in_workspace,
                 restartable=repl_subsystem.restartable,
+                append_only_caches=request.append_only_caches,
             ),
         )
     return Repl(result.exit_code)

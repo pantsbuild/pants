@@ -607,7 +607,7 @@ def test_exports(rule_runner: RuleRunner) -> None:
     # B should depend on C and D, but only export C
     assert rule_runner.request(
         JavaInferredDependencies,
-        [JavaInferredDependenciesAndExportsRequest(target_b[JavaSourceField].address)],
+        [JavaInferredDependenciesAndExportsRequest(target_b[JavaSourceField])],
     ) == JavaInferredDependencies(
         dependencies=FrozenOrderedSet(
             [
@@ -625,7 +625,7 @@ def test_exports(rule_runner: RuleRunner) -> None:
     # A should depend on B, but not B's dependencies or export types
     assert rule_runner.request(
         JavaInferredDependencies,
-        [JavaInferredDependenciesAndExportsRequest(target_a[JavaSourceField].address)],
+        [JavaInferredDependenciesAndExportsRequest(target_a[JavaSourceField])],
     ) == JavaInferredDependencies(
         dependencies=FrozenOrderedSet(
             [
