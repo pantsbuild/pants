@@ -20,7 +20,7 @@ from pkg_resources import Requirement
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
-from pants.backend.python.target_types import MainSpecification
+from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
@@ -169,6 +169,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
+    layout: PexLayout | None
     python: PythonExecutable | None
     requirements: PexRequirements | Lockfile | LockfileContent
     interpreter_constraints: InterpreterConstraints
@@ -185,6 +186,7 @@ class PexRequest(EngineAwareParameter):
         *,
         output_filename: str,
         internal_only: bool,
+        layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
         requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
         interpreter_constraints=InterpreterConstraints(),
@@ -204,6 +206,7 @@ class PexRequest(EngineAwareParameter):
             to end users, such as with the `binary` goal. Typically, instead, the user never
             directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
+        :param layout: The filesystem layout to create the PEX with.
         :param python: A particular PythonExecutable to use, which must match any relevant
             interpreter_constraints.
         :param requirements: The requirements that the PEX should contain.
@@ -223,6 +226,7 @@ class PexRequest(EngineAwareParameter):
         """
         self.output_filename = output_filename
         self.internal_only = internal_only
+        self.layout = layout
         self.python = python
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
@@ -241,6 +245,11 @@ class PexRequest(EngineAwareParameter):
                 "Internal only PEXes can only constrain interpreters with interpreter_constraints."
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
+            )
+        if self.internal_only and self.layout:
+            raise ValueError(
+                "Internal only PEXes have their layout controlled centrally. Given layout "
+                f"{self.layout} for internal only pex request: {self}."
             )
         if self.python and self.platforms:
             raise ValueError(
@@ -509,14 +518,19 @@ async def build_pex(
         ),
     )
 
-    output_files: Iterable[str] | None = None
-    output_directories: Iterable[str] | None = None
     if request.internal_only or is_monolithic_resolve:
         # This is a much friendlier layout for the CAS than the default zipapp.
-        argv.extend(["--layout", "packed"])
-        output_directories = [request.output_filename]
+        layout = PexLayout.PACKED
     else:
+        layout = request.layout or PexLayout.ZIPAPP
+    argv.extend(["--layout", layout.value])
+
+    output_files: Iterable[str] | None = None
+    output_directories: Iterable[str] | None = None
+    if PexLayout.ZIPAPP == layout:
         output_files = [request.output_filename]
+    else:
+        output_directories = [request.output_filename]
 
     process = await Get(
         Process,
