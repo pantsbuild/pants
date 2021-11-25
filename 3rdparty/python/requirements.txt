@@ -1,4 +1,4 @@
-# Note: Adding a third-party dependency is usually frowned upon because it increases the time to install Pants. 
+# Note: Adding a third-party dependency is usually frowned upon because it increases the time to install Pants.
 # This is particularly painful for CI, where the installation of Pants is often slow.
 # Additionally, it increases the surface area of Pants's supply chain for security.
 # Consider pinging us on Slack if you're thinking a new dependency might be needed.
@@ -14,7 +14,7 @@ humbug==0.2.7
 
 ijson==3.1.4
 packaging==21.0
-pex==2.1.54
+pex==2.1.56
 psutil==5.8.0
 pytest>=6.2.4,<6.3  # This should be kept in sync with `pytest.py`.
 PyYAML>=6.0,<7.0
