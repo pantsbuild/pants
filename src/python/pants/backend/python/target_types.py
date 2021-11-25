@@ -437,11 +437,11 @@ class PexEmitWarningsField(TriBoolField):
 class PexResolveLocalPlatformsField(TriBoolField):
     alias = "resolve_local_platforms"
     help = (
-        "Attempt to resolve a local interpreter that matches each of the "
-        f"`{PexPlatformsField.alias}` specified.\n\nIf found, use the interpreter to resolve "
-        "distributions and build any that are only available in source distribution form. If not "
-        "(or if this option is `False`), resolve for each platform by accepting only pre-built "
-        "binary distributions (wheels)."
+        f"For each of the `{PexPlatformsField.alias}` specified, attempt to find a local "
+        "interpreter that matches.\n\nIf a matching interpreter is found, use the interpreter to "
+        "resolve distributions and build any that are only available in source distribution form. "
+        "If no matching interpreter is found (or if this option is `False`), resolve for each "
+        "platform by accepting only pre-built binary distributions (wheels)."
     )
 
     def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
