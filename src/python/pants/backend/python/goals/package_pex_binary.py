@@ -15,6 +15,8 @@ from pants.backend.python.target_types import (
     PexIgnoreErrorsField,
     PexIncludeToolsField,
     PexInheritPathField,
+    PexLayout,
+    PexLayoutField,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
@@ -62,6 +64,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     platforms: PythonPlatformsField
+    layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
     resolve: PythonResolveField
@@ -129,6 +132,7 @@ async def package_pex_binary(
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,
+            layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
             include_local_dists=True,
         ),
