@@ -252,11 +252,7 @@ def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list
 def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     result = maybe_rename_deprecated_fields(
         RenameDeprecatedFieldsRequest("BUILD", tuple(lines), colors_enabled=False),
-        RenamedFieldTypes(
-            {
-                ("target", "deprecated_name"): "new_name",
-            }
-        ),
+        RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
     )
     assert not result.change_descriptions
     assert result.lines == tuple(lines)
@@ -274,7 +270,7 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = maybe_rename_deprecated_fields(
         RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
-        RenamedFieldTypes({("tgt1", "deprecated_name"): "new_name"}),
+        RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )
     assert result.change_descriptions
     assert result.lines == tuple(expected)
