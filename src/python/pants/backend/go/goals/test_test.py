@@ -513,3 +513,36 @@ def test_no_tests(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.skipped
+
+
+def test_compilation_error(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                !!!
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 1
+    assert "failed to parse" in result.stderr
