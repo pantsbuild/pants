@@ -15,6 +15,7 @@ from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
+    PexLayout,
     PythonRequirementsField,
     parse_requirements_file,
 )
@@ -61,6 +62,7 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     internal_only: bool
+    layout: PexLayout | None
     main: MainSpecification | None
     platforms: PexPlatforms
     additional_args: tuple[str, ...]
@@ -83,6 +85,7 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         internal_only: bool,
+        layout: PexLayout | None = None,
         main: MainSpecification | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
@@ -107,6 +110,7 @@ class PexFromTargetsRequest:
             to end users, such as with the `binary` goal. Typically, instead, the user never
             directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
+        :param layout: The filesystem layout to create the PEX with.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or `-c` flag. If
             left off, the Pex will open up as a REPL.
         :param platforms: Which platforms should be supported. Setting this value will cause
@@ -138,6 +142,7 @@ class PexFromTargetsRequest:
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
         self.internal_only = internal_only
+        self.layout = layout
         self.main = main
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
@@ -333,6 +338,7 @@ async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
     return PexRequest(
         output_filename=request.output_filename,
         internal_only=request.internal_only,
+        layout=request.layout,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
