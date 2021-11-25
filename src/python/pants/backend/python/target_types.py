@@ -440,7 +440,7 @@ class PexResolveLocalPlatformsField(TriBoolField):
         f"For each of the `{PexPlatformsField.alias}` specified, attempt to find a local "
         "interpreter that matches.\n\nIf a matching interpreter is found, use the interpreter to "
         "resolve distributions and build any that are only available in source distribution form. "
-        "If no matching interpreter is found (or if this option is `False`), resolve for each "
+        "If no matching interpreter is found (or if this option is `False`), resolve for the "
         "platform by accepting only pre-built binary distributions (wheels)."
     )
 
