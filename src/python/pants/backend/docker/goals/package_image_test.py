@@ -206,8 +206,8 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
 
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
-        r"docker/test:err1: '{bad_template}'\. Unknown placeholder: 'bad_template'\.\n\n"
-        r"You may only reference any of `name`, `directory` or `parent_directory`\."
+        r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
+        r"Try with one of: directory, name, parent_directory\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
@@ -347,8 +347,8 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     err_1 = (
         r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_1: '{unknown_stage}'\.\n\n"
-        r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, "
-        r"interim, stage2, output\."
+        r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, interim, "
+        r"output, stage0, stage2\."
     )
     with pytest.raises(DockerImageTagValueError, match=err_1):
         assert_tags("err_1")
@@ -457,7 +457,25 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_docker_build_args_field(rule_runner: RuleRunner) -> None:
+def test_docker_repository_from_build_arg(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="image", repository="{build_args.REPO}")'}
+    )
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_ARGS": '["REPO=test/image"]',
+        },
+    )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="image"),
+        "Built docker image: test/image:latest",
+    )
+
+
+def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
