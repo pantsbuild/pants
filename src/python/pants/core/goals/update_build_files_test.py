@@ -12,13 +12,16 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.util_rules import pex
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
+    RenameDeprecatedFieldsRequest,
     RenameDeprecatedTargetsRequest,
+    RenamedFieldTypes,
     RenamedTargetTypes,
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
     format_build_file_with_black,
+    maybe_rename_deprecated_fields,
     maybe_rename_deprecated_targets,
     update_build_files,
 )
@@ -222,6 +225,52 @@ def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list
     result = maybe_rename_deprecated_targets(
         RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
         RenamedTargetTypes({"deprecated_name": "new_name"}),
+    )
+    assert result.change_descriptions
+    assert result.lines == tuple(expected)
+
+
+# ------------------------------------------------------------------------------------------
+# Renamed field types fixer
+# ------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "lines",
+    (
+        # Already valid.
+        ["target(new_name='')"],
+        ["target(new_name = 56 ) "],
+        ["target(foo=1, new_name=2)"],
+        ["target(", "new_name", "=3)"],
+        # Unrelated lines.
+        ["", "123", "target()", "name='new_name'"],
+        ["unaffected(deprecated_name='not this target')"],
+        ["target(nested=here(deprecated_name='too deep'))"],
+    ),
+)
+def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
+    result = maybe_rename_deprecated_fields(
+        RenameDeprecatedFieldsRequest("BUILD", tuple(lines), colors_enabled=False),
+        RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
+    )
+    assert not result.change_descriptions
+    assert result.lines == tuple(lines)
+
+
+@pytest.mark.parametrize(
+    "lines,expected",
+    (
+        (["tgt1(deprecated_name='')"], ["tgt1(new_name='')"]),
+        (["tgt1 ( deprecated_name = ' ', ", ")"], ["tgt1 ( new_name = ' ', ", ")"]),
+        (["tgt1(deprecated_name='')  # comment"], ["tgt1(new_name='')  # comment"]),
+        (["tgt1(", "deprecated_name", "=", ")"], ["tgt1(", "new_name", "=", ")"]),
+    ),
+)
+def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
+    result = maybe_rename_deprecated_fields(
+        RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
+        RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )
     assert result.change_descriptions
     assert result.lines == tuple(expected)

@@ -124,6 +124,9 @@ class Field:
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
 
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
+
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         self._check_deprecated(raw_value, address)
@@ -327,37 +330,45 @@ class Target:
             warn_or_error(
                 self.removal_version,
                 entity=f"the {repr(self.alias)} target type",
-                hint=(
-                    f"Using the `{self.alias}` target type for {address}. " f"{self.removal_hint}"
-                ),
+                hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
-
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.field_values = self._calculate_field_values(unhydrated_values, address)
+        self.validate()
 
+    @final
+    def _calculate_field_values(
+        self, unhydrated_values: dict[str, Any], address: Address
+    ) -> FrozenDict[type[Field], Field]:
         field_values = {}
-        aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
+        valid_aliases = set()
+        aliases_to_field_types = {}
+        for field_type in self.field_types:
+            valid_aliases.add(field_type.alias)
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
                 raise InvalidFieldException(
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
-                    f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
+                    f"the target type `{self.alias}`: {sorted(valid_aliases)}.",
                 )
             field_type = aliases_to_field_types[alias]
             field_values[field_type] = field_type(value, address)
+
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
             field_values[field_type] = field_type(None, address)
-        self.field_values = FrozenDict(
+        return FrozenDict(
             sorted(
                 field_values.items(),
                 key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
             )
         )
-
-        self.validate()
 
     @final
     @property
