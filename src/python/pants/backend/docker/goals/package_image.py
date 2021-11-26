@@ -132,9 +132,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
             [<registry>/]<repository-name>[:<tag>]
 
-        Where the `<repository-name>` may have contain any number of separating slashes `/`,
-        depending on the `default_repository` from configuration or the `repository` field
-        on the target `docker_image`.
+        Where the `<repository-name>` may contain any number of separating slashes `/`, depending on
+        the `default_repository` from configuration or the `repository` field on the target
+        `docker_image`.
 
         This method will always return a non-empty tuple.
         """
