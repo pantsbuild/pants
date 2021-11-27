@@ -76,7 +76,7 @@ class DockerBuildContextRequest:
 class DockerBuildContext:
     build_args: DockerBuildArgs
     digest: Digest
-    env: DockerBuildEnvironment
+    build_env: DockerBuildEnvironment
     dockerfile: str
     version_context: DockerVersionContext
 
@@ -85,7 +85,7 @@ class DockerBuildContext:
         cls,
         build_args: DockerBuildArgs,
         digest: Digest,
-        env: DockerBuildEnvironment,
+        build_env: DockerBuildEnvironment,
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
         version_context: dict[str, dict[str, str]] = {}
@@ -101,7 +101,7 @@ class DockerBuildContext:
         # Build args.
         if build_args:
             version_context["build_args"] = {
-                arg_name: arg_value if has_value else env[arg_name]
+                arg_name: arg_value if has_value else build_env[arg_name]
                 for arg_name, has_value, arg_value in [
                     build_arg.partition("=") for build_arg in build_args
                 ]
@@ -111,7 +111,7 @@ class DockerBuildContext:
             build_args=build_args,
             digest=digest,
             dockerfile=dockerfile_info.source,
-            env=env,
+            build_env=build_env,
             version_context=DockerVersionContext.from_dict(version_context),
         )
 
@@ -168,14 +168,16 @@ async def create_docker_build_context(
 
     # Requests for build args and env
     build_args_request = Get(DockerBuildArgs, DockerBuildArgsRequest(docker_image))
-    env_request = Get(DockerBuildEnvironment, DockerBuildEnvironmentRequest(docker_image))
-    context, build_args, env = await MultiGet(context_request, build_args_request, env_request)
+    build_env_request = Get(DockerBuildEnvironment, DockerBuildEnvironmentRequest(docker_image))
+    context, build_args, build_env = await MultiGet(
+        context_request, build_args_request, build_env_request
+    )
 
     return DockerBuildContext.create(
         build_args=build_args,
         digest=context,
         dockerfile_info=dockerfile_info,
-        env=env,
+        build_env=build_env,
     )
 
 

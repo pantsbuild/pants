@@ -78,14 +78,19 @@ def test_docker_build_environment_vars_rule(
         },
     )
     res = rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)])
-    assert res == DockerBuildEnvironment(expected_env_vars)
+    assert res == DockerBuildEnvironment.create(expected_env_vars)
 
 
 def test_missing_build_env_value() -> None:
-    env = DockerBuildEnvironment({})
+    env = DockerBuildEnvironment.create({})
     err = (
         r"The docker environment variable 'NAME' is undefined\. Either add a value for this "
         r"variable to `\[docker]\.env_vars`, or set a value in Pants's own environment\."
     )
     with pytest.raises(DockerBuildEnvironmentError, match=err):
         env["NAME"]
+
+
+def test_missing_optional_build_env_value() -> None:
+    env = DockerBuildEnvironment.create({}, default_value="")
+    assert env["NAME"] == ""

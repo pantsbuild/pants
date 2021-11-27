@@ -73,7 +73,9 @@ def assert_build(
             digest=EMPTY_DIGEST,
             dockerfile_info=DockerfileInfo(digest=EMPTY_DIGEST, source="docker/test/Dockerfile"),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
-            env=rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]),
+            build_env=rule_runner.request(
+                DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]
+            ),
         )
 
     def run_process_mock(process: Process) -> ProcessResult:
