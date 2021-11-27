@@ -20,6 +20,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
+    PexResolveLocalPlatformsField,
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
@@ -64,6 +65,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     platforms: PythonPlatformsField
+    resolve_local_platforms: PexResolveLocalPlatformsField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
@@ -77,6 +79,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
+        if self.resolve_local_platforms.value_or_global_default(pex_binary_defaults) is True:
+            args.append("--resolve-local-platforms")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
         if self.inherit_path.value is not None:
