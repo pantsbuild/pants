@@ -185,10 +185,12 @@ class PexBinaryDefaults(Subsystem):
             type=bool,
             default=False,
             help=(
-                "Whether to resolve a local interpreter that matches each of the "
-                f"`{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` target.\n\n"
-                f"Can be overridden by specifying the `{PexResolveLocalPlatformsField.alias}` "
-                f"parameter of individual `{PexBinary.alias}` targets."
+                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+                "interpreter is found, use the interpreter to resolve distributions and build any "
+                "that are only available in source distribution form. If no matching interpreter "
+                "is found (or if this option is `False`), resolve for the platform by accepting "
+                "only pre-built binary distributions (wheels)."
             ),
         )
 
