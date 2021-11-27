@@ -9,6 +9,7 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
+    DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
     rules,
 )
@@ -78,3 +79,13 @@ def test_docker_build_environment_vars_rule(
     )
     res = rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)])
     assert res == DockerBuildEnvironment(expected_env_vars)
+
+
+def test_missing_build_env_value() -> None:
+    env = DockerBuildEnvironment({})
+    err = (
+        r"The docker environment variable 'NAME' is undefined\. Either add a value for this "
+        r"variable to `\[docker]\.env_vars`, or set a value in Pants's own environment\."
+    )
+    with pytest.raises(DockerBuildEnvironmentError, match=err):
+        env["NAME"]

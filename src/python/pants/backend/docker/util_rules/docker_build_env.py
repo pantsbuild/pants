@@ -16,8 +16,23 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
 
 
+class DockerBuildEnvironmentError(ValueError):
+    @classmethod
+    def from_key_error(
+        cls, e: KeyError, env: DockerBuildEnvironment
+    ) -> DockerBuildEnvironmentError:
+        return cls(
+            f"The docker environment variable {e} is undefined. Either add a value for this "
+            "variable to `[docker].env_vars`, or set a value in Pants's own environment."
+        )
+
+
 class DockerBuildEnvironment(Environment):
-    pass
+    def __getitem__(self, key: str) -> str:
+        try:
+            return super().__getitem__(key)
+        except KeyError as e:
+            raise DockerBuildEnvironmentError.from_key_error(e, self) from e
 
 
 @dataclass(frozen=True)
