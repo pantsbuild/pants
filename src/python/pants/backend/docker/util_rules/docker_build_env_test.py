@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import logging
+from typing import ContextManager
+
 import pytest
 
+from pants.backend.docker.subsystems.docker_options import UndefinedEnvVarBehavior
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_env import (
@@ -14,6 +18,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     rules,
 )
 from pants.engine.addresses import Address
+from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -81,16 +86,44 @@ def test_docker_build_environment_vars_rule(
     assert res == DockerBuildEnvironment.create(expected_env_vars)
 
 
-def test_missing_build_env_value() -> None:
-    env = DockerBuildEnvironment.create({})
-    err = (
-        r"The docker environment variable 'NAME' is undefined\. Either add a value for this "
-        r"variable to `\[docker]\.env_vars`, or set a value in Pants's own environment\."
-    )
-    with pytest.raises(DockerBuildEnvironmentError, match=err):
-        env["NAME"]
-
-
-def test_missing_optional_build_env_value() -> None:
-    env = DockerBuildEnvironment.create({}, default_value="")
-    assert env["NAME"] == ""
+@pytest.mark.parametrize(
+    "behavior, expectation, expect_logged",
+    [
+        (
+            UndefinedEnvVarBehavior.RaiseError,
+            pytest.raises(
+                DockerBuildEnvironmentError,
+                match=(
+                    r"The docker environment variable 'NAME' is undefined\. Either add a value for this "
+                    r"variable to `\[docker]\.env_vars`, or set a value in Pants's own environment\."
+                ),
+            ),
+            None,
+        ),
+        (
+            UndefinedEnvVarBehavior.LogWarning,
+            no_exception(),
+            [
+                (
+                    logging.WARNING,
+                    (
+                        "The Docker environment variable 'NAME' is undefined. Provide a value for it either in "
+                        "`[docker].env_vars` or in Pants's environment to silence this warning."
+                    ),
+                )
+            ],
+        ),
+        (
+            UndefinedEnvVarBehavior.Ignore,
+            no_exception(),
+            None,
+        ),
+    ],
+)
+def test_undefined_env_var_behavior(
+    caplog, behavior: UndefinedEnvVarBehavior, expectation: ContextManager, expect_logged
+) -> None:
+    env = DockerBuildEnvironment.create({}, undefined_env_var_behavior=behavior)
+    with expectation:
+        assert env["NAME"] == ""
+    assert_logged(caplog, expect_logged)
