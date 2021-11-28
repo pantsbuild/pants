@@ -163,7 +163,3 @@ env_logger = "0.5.4"
 
 [build-dependencies]
 pyo3-build-config = "0.15"
-
-[patch.crates-io]
-# TODO: Waiting for release after https://github.com/mitsuhiko/console/pull/93.
-console = { git = "https://github.com/mitsuhiko/console", rev = "3232775295149e6f0aace26d4cfe61013ed3e2d8" }

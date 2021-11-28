@@ -99,7 +99,7 @@ impl ConsoleUI {
     );
     // NB: We render more frequently than we receive new data in order to minimize aliasing where a
     // render might barely miss a data refresh.
-    let draw_target = ProgressDrawTarget::to_term(term, Self::render_rate_hz() * 2);
+    let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
 
     let bars = (0..self.local_parallelism)
@@ -173,7 +173,7 @@ impl ConsoleUI {
 
     for (n, pbar) in instance.bars.iter().enumerate() {
       match Self::get_label_from_heavy_hitters(tasks_to_display, n) {
-        Some(ref label) => pbar.set_message(label),
+        Some(label) => pbar.set_message(label),
         None => pbar.set_message(""),
       }
     }
