@@ -372,12 +372,13 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.14.1"
-source = "git+https://github.com/mitsuhiko/console?rev=3232775295149e6f0aace26d4cfe61013ed3e2d8#3232775295149e6f0aace26d4cfe61013ed3e2d8"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a28b32d32ca44b70c3e4acd7db1babf555fa026e385fb95f18028f88848b3c31"
 dependencies = [
  "encode_unicode",
- "lazy_static",
  "libc",
+ "once_cell",
  "regex",
  "terminal_size",
  "unicode-width",
@@ -1297,8 +1298,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.15.0"
-source = "git+https://github.com/mitsuhiko/indicatif?rev=fa5e3c7ccc877c117f1db88bdaf19c48498d9616#fa5e3c7ccc877c117f1db88bdaf19c48498d9616"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
 dependencies = [
  "console",
  "lazy_static",
