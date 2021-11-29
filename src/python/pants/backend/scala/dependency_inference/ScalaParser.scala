@@ -17,6 +17,7 @@ case class Analysis(
    providedSymbolsEncoded: Vector[String],
    importsByScope: HashMap[String, ArrayBuffer[AnImport]],
    consumedSymbolsByScope: HashMap[String, HashSet[String]],
+   scopes: Vector[String],
 )
 
 case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
@@ -28,6 +29,7 @@ class SourceAnalysisTraverser extends Traverser {
   val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
   val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
+  val scopes = HashSet[String]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -134,6 +136,11 @@ class SourceAnalysisTraverser extends Traverser {
     consumedSymbolsByScope(fullPackageName).add(name)
   }
 
+  def recordScope(name: String): Unit = {
+    val scopeName = (nameParts.toVector ++ Vector(name)).mkString(".")
+    scopes.add(scopeName)
+  }
+
   def visitTemplate(templ: Template, name: String): Unit = {
     templ.inits.foreach(init => apply(init))
     withNamePart(name, () => {
@@ -144,7 +151,9 @@ class SourceAnalysisTraverser extends Traverser {
 
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
-      withNamePart(extractName(ref), () => super.apply(stats))
+      val name = extractName(ref)
+      recordScope(name)
+      withNamePart(name, () => super.apply(stats))
     }
 
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
@@ -283,6 +292,7 @@ class SourceAnalysisTraverser extends Traverser {
       providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
       importsByScope = importsByScope,
       consumedSymbolsByScope = consumedSymbolsByScope,
+      scopes = scopes.toVector,
     )
   }
 }
