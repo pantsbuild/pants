@@ -31,7 +31,7 @@ jobs:
 
         '
     - name: Cargo audit (for security vulnerabilities)
-      run: './cargo install --version 0.13.1 cargo-audit
+      run: './cargo install --version 0.16.0 cargo-audit
 
         ./cargo audit
 
