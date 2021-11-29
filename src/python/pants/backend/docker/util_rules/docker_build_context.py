@@ -94,17 +94,30 @@ class DockerBuildContext:
         for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
             value = {"tag": tag}
             if not version_context:
-                # Refer to the first FROM directive as the "baseimage".
+                # Expose the first (stage0) FROM directive as the "baseimage".
                 version_context["baseimage"] = value
             version_context[stage] = value
 
-        # Build args.
         if build_args:
-            version_context["build_args"] = {
-                arg_name: arg_value if has_value else build_env[arg_name]
+            # Extract default arg values from the parsed Dockerfile.
+            arg_defaults = {
+                def_name: def_value
+                for def_name, has_default, def_value in [
+                    def_arg.partition("=") for def_arg in dockerfile_info.build_args
+                ]
+                if has_default
+            }
+            build_args_context = {
+                arg_name: arg_value
+                if has_value
+                else build_env.get(arg_name, arg_defaults.get(arg_name))
                 for arg_name, has_value, arg_value in [
                     build_arg.partition("=") for build_arg in build_args
                 ]
+            }
+            version_context["build_args"] = {
+                **arg_defaults,
+                **build_args_context,
             }
 
         return cls(

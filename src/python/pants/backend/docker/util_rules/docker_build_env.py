@@ -24,8 +24,8 @@ class DockerBuildEnvironmentError(ValueError):
     @classmethod
     def from_key_error(cls, e: KeyError) -> DockerBuildEnvironmentError:
         return cls(
-            f"The docker environment variable {e} is undefined. Either add a value for this "
-            "variable to `[docker].env_vars`, or set a value in Pants's own environment."
+            f"The Docker environment variable {e} is undefined. You may provide a value for "
+            "this variable either in `[docker].env_vars` or in Pants's own environment."
         )
 
 
@@ -43,21 +43,24 @@ class DockerBuildEnvironment:
         return cls(Environment(env), undefined_env_var_behavior)
 
     def __getitem__(self, key: str) -> str:
+        return self.get(key)
+
+    def get(self, key: str, default: str | None = None) -> str:
+        if default is not None:
+            return self.environment.get(key, default)
         try:
-            if self.undefined_env_var_behavior is UndefinedEnvVarBehavior.RaiseError:
-                return self.environment[key]
-            elif (
-                self.undefined_env_var_behavior is UndefinedEnvVarBehavior.LogWarning
-                and key not in self.environment
-            ):
-                logger.warning(
-                    f"The Docker environment variable {key!r} is undefined. Provide a value for "
-                    "it either in `[docker].env_vars` or in Pants's environment to silence this "
-                    "warning."
-                )
-            return self.environment.get(key, "")
+            return self.environment[key]
         except KeyError as e:
-            raise DockerBuildEnvironmentError.from_key_error(e) from e
+            if self.undefined_env_var_behavior is UndefinedEnvVarBehavior.Ignore:
+                return ""
+
+            err = DockerBuildEnvironmentError.from_key_error(e)
+            if self.undefined_env_var_behavior is UndefinedEnvVarBehavior.LogWarning:
+                logger.warning(str(err))
+                return ""
+
+            assert self.undefined_env_var_behavior is UndefinedEnvVarBehavior.RaiseError
+            raise err from e
 
 
 @dataclass(frozen=True)

@@ -114,7 +114,7 @@ def main(cmd: str, args: list[str]) -> None:
 
         def build_args(self) -> tuple[str, ...]:
             """Return all defined build args, including any default values."""
-            return tuple(cmd.value[0] for cmd in self.get_all("ARG"))
+            return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
 
     for parsed in map(ParsedDockerfile.from_file, args):
         if cmd == "putative-targets":

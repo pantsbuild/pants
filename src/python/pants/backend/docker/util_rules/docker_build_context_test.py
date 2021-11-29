@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any, ContextManager
 
 import pytest
 
@@ -28,6 +29,8 @@ from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
+from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -49,16 +52,22 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
     )
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
 def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
+    *,
     expected_files: list[str],
     expected_version_context: dict[str, dict[str, str]] | None = None,
+    pants_args: list[str] | None = None,
+    runner_options: dict[str, Any] | None = None,
 ) -> None:
+    if runner_options is None:
+        runner_options = {}
+    runner_options.setdefault("env_inherit", set()).update({"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.set_options(pants_args or [], **runner_options)
     context = rule_runner.request(
         DockerBuildContext,
         [
@@ -251,3 +260,104 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "output": {"tag": "1-1"},
         },
     )
+
+
+def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  extra_build_args=[
+                    "base_version",
+                  ]
+                )
+                """
+            ),
+            "src/docker/Dockerfile": dedent(
+                """\
+                ARG base_name=python
+                ARG base_version=3.8
+                FROM ${base_name}:${base_version}
+                ARG NO_DEF
+                ENV opt=${NO_DEF}
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        runner_options={
+            "env": {
+                "base_name": "no-effect",
+                "base_version": "3.9",
+            },
+        },
+        expected_files=["src/docker/Dockerfile"],
+        expected_version_context={
+            "baseimage": {"tag": "${base_version}"},
+            "stage0": {"tag": "${base_version}"},
+            "build_args": {
+                # The base_name should not be affected, as we do not include it as a --build-arg to
+                # `docker build`.
+                "base_name": "python",
+                "base_version": "3.9",
+            },
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "behavior, MY_ARG_VALUE, expect",
+    [
+        ("ignore", None, no_exception()),
+        ("ignore", "my   default", no_exception()),
+        # warning does the same as ignore, but with additional logging, tested else where.
+        (
+            "error",
+            None,
+            pytest.raises(
+                ExecutionError, match=r"The Docker environment variable 'MY_ARG' is undefined\."
+            ),
+        ),
+        ("error", "my default/value", no_exception()),
+    ],
+)
+def test_undefined_env_var_behavior(
+    rule_runner: RuleRunner, behavior: str, MY_ARG_VALUE: str | None, expect: ContextManager
+) -> None:
+    dockerfile_arg_instruction = f"ARG MY_ARG={MY_ARG_VALUE}" if MY_ARG_VALUE is not None else ""
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  extra_build_args=[
+                    "MY_ARG",
+                  ]
+                )
+                """
+            ),
+            "src/docker/Dockerfile": dedent(
+                f"""\
+                FROM python:3.8
+                {dockerfile_arg_instruction}
+                """
+            ),
+        }
+    )
+
+    with expect:
+        assert_build_context(
+            rule_runner,
+            Address("src/docker"),
+            pants_args=[f"--docker-undefined-env-var-behavior={behavior}"],
+            expected_files=["src/docker/Dockerfile"],
+            expected_version_context={
+                "baseimage": {"tag": "3.8"},
+                "stage0": {"tag": "3.8"},
+                "build_args": {"MY_ARG": MY_ARG_VALUE or ""},
+            },
+        )

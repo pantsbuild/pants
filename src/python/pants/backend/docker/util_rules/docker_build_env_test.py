@@ -94,8 +94,9 @@ def test_docker_build_environment_vars_rule(
             pytest.raises(
                 DockerBuildEnvironmentError,
                 match=(
-                    r"The docker environment variable 'NAME' is undefined\. Either add a value for this "
-                    r"variable to `\[docker]\.env_vars`, or set a value in Pants's own environment\."
+                    r"The Docker environment variable 'NAME' is undefined\. You may provide a "
+                    r"value for this variable either in `\[docker]\.env_vars` or in Pants's "
+                    r"own environment\."
                 ),
             ),
             None,
@@ -107,8 +108,9 @@ def test_docker_build_environment_vars_rule(
                 (
                     logging.WARNING,
                     (
-                        "The Docker environment variable 'NAME' is undefined. Provide a value for it either in "
-                        "`[docker].env_vars` or in Pants's environment to silence this warning."
+                        "The Docker environment variable 'NAME' is undefined. You may provide a "
+                        "value for this variable either in `[docker].env_vars` or in Pants's "
+                        "own environment."
                     ),
                 )
             ],
