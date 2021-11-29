@@ -25,6 +25,8 @@ from pants.backend.go.util_rules import (
 )
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
+from pants.core.target_types import FilesGeneratorTarget
+from pants.core.util_rules import source_files
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -43,9 +45,10 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
+            *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -546,3 +549,37 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "failed to parse" in result.stderr
+
+
+def test_files_target_visible_to_test(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": textwrap.dedent(
+                """
+                go_mod(name='mod')
+                go_package(dependencies=[":files"])
+                files(name="files", sources=["testdata/**"])
+                """
+            ),
+            "foo/go.mod": "module foo",
+            "foo/foo_test.go": textwrap.dedent(
+                """
+                package foo
+                import (
+                  "os"
+                  "testing"
+                )
+                func TestFilesAvailable(t *testing.T) {
+                  _, err := os.Stat("testdata/file.txt")
+                  if err != nil {
+                    t.Fatalf("Could not stat testdata/file.txt: %v", err)
+                  }
+                }
+                """
+            ),
+            "foo/testdata/file.txt": "Hello world!\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0

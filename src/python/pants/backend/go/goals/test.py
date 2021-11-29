@@ -21,12 +21,30 @@ from pants.backend.go.util_rules.first_party_pkg import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
+from pants.build_graph.address import Address
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses
+from pants.engine.fs import (
+    EMPTY_FILE_DIGEST,
+    Digest,
+    DigestSubset,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+)
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    SourcesField,
+    Target,
+    Targets,
+    WrappedTarget,
+)
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -121,8 +139,36 @@ def transform_test_args(args: Sequence[str]) -> tuple[str, ...]:
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
-    maybe_pkg_info = await Get(
-        FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)
+    maybe_pkg_info, wrapped_target, test_sources = await MultiGet(
+        Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
+        Get(WrappedTarget, Address, field_set.address),
+        Get(SourceFiles, SourceFilesRequest([field_set.sources])),
+    )
+    target = wrapped_target.target
+    test_sources_dirpath = field_set.address.spec_path
+
+    explicit_dependencies = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(target[Dependencies])
+    )
+
+    # TODO: Consider ignores as well.
+    included_targets = await Get(Targets, Addresses(explicit_dependencies.includes))
+
+    dependency_source_files = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            [tgt[SourcesField] for tgt in included_targets if tgt.has_field(SourcesField)]
+        ),
+    )
+
+    subsetted_dependency_source_files_digest = await Get(
+        Digest,
+        DigestSubset(
+            dependency_source_files.snapshot.digest, PathGlobs([f"{test_sources_dirpath}/**"])
+        ),
+    )
+    stripped_dependency_source_files_digest = await Get(
+        Digest, RemovePrefix(subsetted_dependency_source_files_digest, test_sources_dirpath)
     )
 
     def compilation_failure(exit_code: int, stderr: str) -> TestResult:
@@ -229,12 +275,14 @@ async def run_go_tests(
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
     )
-    input_digest = await Get(Digest, MergeDigests([built_main_pkg.digest, import_config.digest]))
+    linker_input_digest = await Get(
+        Digest, MergeDigests([built_main_pkg.digest, import_config.digest])
+    )
 
     binary = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=input_digest,
+            input_digest=linker_input_digest,
             archives=(main_pkg_a_file_path,),
             import_config_path=import_config.CONFIG_PATH,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
@@ -246,11 +294,15 @@ async def run_go_tests(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
+    input_digest = await Get(
+        Digest, MergeDigests([binary.digest, stripped_dependency_source_files_digest])
+    )
+
     result = await Get(
         FallibleProcessResult,
         Process(
             ["./test_runner", *transform_test_args(go_test_subsystem.args)],
-            input_digest=binary.digest,
+            input_digest=input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
             level=LogLevel.DEBUG,
