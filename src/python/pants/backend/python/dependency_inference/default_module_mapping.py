@@ -73,6 +73,7 @@ DEFAULT_MODULE_MAPPING = {
     "protobuf": ("google.protobuf",),
     "pycrypto": ("Crypto",),
     "pyopenssl": ("OpenSSL",),
+    "pypdf2": ("PyPDF2",),
     "python-dateutil": ("dateutil",),
     "python-docx": ("docx",),
     "python-dotenv": ("dotenv",),
