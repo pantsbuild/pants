@@ -9,6 +9,7 @@ from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
+from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import BashBinary, Process
@@ -89,14 +90,18 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
 
 @rule
 async def setup_go_sdk_process(
-    request: GoSdkProcess, go_sdk_run: GoSdkRunSetup, bash: BashBinary
+    request: GoSdkProcess,
+    go_sdk_run: GoSdkRunSetup,
+    bash: BashBinary,
+    env_vars: SubprocessEnvironmentVars,
 ) -> Process:
     input_digest = await Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest]))
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env={
-            GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+            **env_vars.vars,
             **request.env,
+            GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
         },
         input_digest=input_digest,
         description=request.description,
