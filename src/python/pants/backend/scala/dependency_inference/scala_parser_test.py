@@ -305,3 +305,49 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
     }
+
+
+def test_extract_package_scopes(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": textwrap.dedent(
+                """
+                scala_source(
+                    name="source",
+                    source="Source.scala",
+                )
+                """
+            ),
+            "Source.scala": textwrap.dedent(
+                """
+                package outer
+                package more.than.one.part.at.once
+                package inner
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(address=Address("", target_name="source"))
+
+    source_files = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(
+                (target.get(SourcesField),),
+                for_sources_types=(ScalaSourceField,),
+                enable_codegen=True,
+            )
+        ],
+    )
+
+    analysis = rule_runner.request(
+        ScalaSourceDependencyAnalysis,
+        [source_files],
+    )
+
+    assert sorted(analysis.scopes) == [
+        "outer",
+        "outer.more.than.one.part.at.once",
+        "outer.more.than.one.part.at.once.inner",
+    ]

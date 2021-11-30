@@ -115,6 +115,7 @@ class ScalaSourceDependencyAnalysis:
     provided_symbols_encoded: FrozenOrderedSet[str]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
+    scopes: FrozenOrderedSet[str]
 
     def all_imports(self) -> Iterator[str]:
         # TODO: This might also be an import relative to its scope.
@@ -180,6 +181,7 @@ class ScalaSourceDependencyAnalysis:
                     for key, values in d["consumedSymbolsByScope"].items()
                 }
             ),
+            scopes=FrozenOrderedSet(d["scopes"]),
         )
 
     def to_debug_json_dict(self) -> dict[str, Any]:
@@ -193,6 +195,7 @@ class ScalaSourceDependencyAnalysis:
             "consumed_symbols_by_scope": {
                 k: sorted(list(v)) for k, v in self.consumed_symbols_by_scope.items()
             },
+            "scopes": list(self.scopes),
         }
 
 
