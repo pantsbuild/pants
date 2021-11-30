@@ -31,7 +31,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     ThirdPartyPackageToArtifactMapping,
     find_artifact_mapping,
 )
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping, SymbolNamespace
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     exports: OrderedSet[Address] = OrderedSet()
 
     for typ in types:
-        first_party_matches = dep_map.addresses_for_symbol(typ, {SymbolNamespace.JVM})
+        first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
         if java_infer_subsystem.third_party_imports:
             third_party_matches = find_artifact_mapping(typ, third_party_artifact_mapping)
