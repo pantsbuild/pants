@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems import golang
-from pants.backend.go.subsystems.golang import GoRoot
-from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
+from pants.backend.go.subsystems.golang import GolangSubsystem, GoRoot
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -93,13 +93,16 @@ async def setup_go_sdk_process(
     request: GoSdkProcess,
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
-    env_vars: SubprocessEnvironmentVars,
+    golang_subsystem: GolangSubsystem,
 ) -> Process:
-    input_digest = await Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest]))
+    input_digest, env_vars = await MultiGet(
+        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
+        Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
+    )
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env={
-            **env_vars.vars,
+            **env_vars,
             **request.env,
             GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
         },
