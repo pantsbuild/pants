@@ -26,7 +26,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     ThirdPartyPackageToArtifactMapping,
     find_artifact_mapping,
 )
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping, SymbolNamespace
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,9 @@ async def infer_scala_dependencies_via_source_analysis(
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
-        first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(symbol)
+        first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(
+            symbol, {SymbolNamespace.SCALA, SymbolNamespace.JVM}
+        )
         third_party_matches = find_artifact_mapping(symbol, third_party_artifact_mapping)
         matches = first_party_matches.union(third_party_matches)
         if not matches:

@@ -10,7 +10,11 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
+from pants.jvm.dependency_inference.symbol_mapper import (
+    FirstPartyMappingRequest,
+    SymbolMap,
+    SymbolNamespace,
+)
 from pants.util.logging import LogLevel
 
 
@@ -43,7 +47,9 @@ async def map_first_party_scala_targets_to_symbols(
     symbol_map = SymbolMap()
     for address, analysis in address_and_analysis:
         for symbol in analysis.provided_symbols:
-            symbol_map.add_symbol(symbol, address)
+            symbol_map.add_symbol(symbol, SymbolNamespace.SCALA, address)
+        for symbol in analysis.provided_symbols_encoded:
+            symbol_map.add_symbol(symbol, SymbolNamespace.JVM, address)
 
     return symbol_map
 

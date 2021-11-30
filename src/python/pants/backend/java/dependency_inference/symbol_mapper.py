@@ -12,7 +12,11 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
+from pants.jvm.dependency_inference.symbol_mapper import (
+    FirstPartyMappingRequest,
+    SymbolMap,
+    SymbolNamespace,
+)
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -44,7 +48,7 @@ async def map_first_party_java_targets_to_symbols(
     dep_map = SymbolMap()
     for address, analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
-            dep_map.add_symbol(top_level_type, address=address)
+            dep_map.add_symbol(top_level_type, SymbolNamespace.JVM, address=address)
 
     return dep_map
 

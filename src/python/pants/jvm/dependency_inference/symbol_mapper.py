@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.build_graph.address import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -26,41 +28,56 @@ class JvmFirstPartyPackageMappingException(Exception):
     pass
 
 
+class SymbolNamespace(Enum):
+    """Represents a "namespace" for a symbol, i.e. is the symbol a generic JVM name or did it
+    originate from a particular language (and may be encoded for JVM purposes)."""
+
+    JVM = "jvm"
+    SCALA = "scala"
+
+
 class SymbolMap:
     """A mapping of JVM package names to owning addresses."""
 
     def __init__(self):
-        self._symbol_map: dict[str, set[Address]] = defaultdict(set)
+        self._symbol_map: dict[SymbolNamespace, dict[str, set[Address]]] = defaultdict(
+            lambda: defaultdict(set)
+        )
 
-    def add_symbol(self, symbol: str, address: Address):
+    def add_symbol(self, symbol: str, namespace: SymbolNamespace, address: Address):
         """Declare a single Address as a provider of a symbol."""
-        self._symbol_map[symbol].add(address)
+        self._symbol_map[namespace][symbol].add(address)
 
-    def addresses_for_symbol(self, symbol: str) -> frozenset[Address]:
-        """Returns the set of addresses that provide the passed symbol.
+    def addresses_for_symbol(
+        self, symbol: str, namespaces: set[SymbolNamespace]
+    ) -> frozenset[Address]:
+        """Returns the set of addresses that provide the passed symbol by searching the given symbol
+        namespaces.
 
         :param symbol: a fully-qualified JVM symbol (e.g. `foo.bar.Thing`).
+        :param namespaces: a set of `SymbolNamespace` enum instances for the namespaces to search
         """
-        return frozenset(self._symbol_map[symbol])
+        result: set[Address] = set()
+        for namespace in namespaces:
+            result.update(self._symbol_map[namespace][symbol])
+        return frozenset(result)
 
     def merge(self, other: SymbolMap) -> None:
         """Merge 'other' into this dependency map."""
-        for symbol, addresses in other._symbol_map.items():
-            self._symbol_map[symbol] |= addresses
+        for namespace, addresses_by_symbol in other._symbol_map.items():
+            for symbol, addresses in addresses_by_symbol.items():
+                self._symbol_map[namespace][symbol] |= addresses
 
     def to_json_dict(self):
         return {
             "symbol_map": {
-                sym: [str(addr) for addr in addrs] for sym, addrs in self._symbol_map.items()
+                ns: {ty: [str(addr) for addr in addrs] for ty, addrs in addrs_by_sym}
+                for ns, addrs_by_sym in self._symbol_map.items()
             },
         }
 
     def __repr__(self) -> str:
-        symbol_map = ", ".join(
-            f"{ty}:{', '.join(str(addr) for addr in addrs)}"
-            for ty, addrs in self._symbol_map.items()
-        )
-        return f"SymbolMap(symbol_map={symbol_map})"
+        return f"SymbolMap({json.dumps(self.to_json_dict())})"
 
 
 @union
@@ -111,7 +128,10 @@ async def merge_first_party_module_mappings(
 
     # Check that at least one address declared by each `provides` value actually provides the type:
     for provided_type, provided_addresses in provided_types.items():
-        symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type)
+        # TODO: Add way to specify all scopes for addresses_for_symbol?
+        symbol_addresses = merged_dep_map.addresses_for_symbol(
+            provided_type, {SymbolNamespace.JVM, SymbolNamespace.SCALA}
+        )
         if not provided_addresses.intersection(symbol_addresses):
             raise JvmFirstPartyPackageMappingException(
                 f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "
