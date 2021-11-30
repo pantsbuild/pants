@@ -20,12 +20,14 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
     FirstPartyPkgInfoRequest,
 )
+from pants.core.target_types import ResourcesGeneratorTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
@@ -47,7 +49,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -261,7 +263,16 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
 def test_embeds_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":resources"])
+                resources(
+                  name="resources",
+                  sources=["*.txt"],
+                )
+                """
+            ),
             "go.mod": dedent(
                 """\
                 module go.example.com/foo
@@ -303,6 +314,6 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     )
     assert maybe_info.info is not None
     info = maybe_info.info
-    assert info.embed_patterns == ("grok.txt",)
-    assert info.test_embed_patterns == ("test_grok.txt",)
-    assert info.xtest_embed_patterns == ("xtest_grok.txt",)
+    assert info.embed_config == EmbedConfig({}, {})
+    assert info.test_embed_config == EmbedConfig({}, {})
+    assert info.xtest_embed_config == EmbedConfig({}, {})

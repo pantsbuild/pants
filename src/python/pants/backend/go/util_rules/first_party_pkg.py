@@ -11,6 +11,7 @@ from typing import ClassVar
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
@@ -20,11 +21,18 @@ from pants.backend.go.util_rules.go_mod import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
+from pants.core.target_types import ResourceSourceField
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+)
 from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
 
@@ -77,8 +85,11 @@ class FirstPartyPkgInfo:
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
+    embed_config: EmbedConfig | None
     test_embed_patterns: tuple[str, ...]
+    test_embed_config: EmbedConfig | None
     xtest_embed_patterns: tuple[str, ...]
+    xtest_embed_config: EmbedConfig | None
 
 
 @dataclass(frozen=True)
@@ -129,20 +140,50 @@ async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgInfo:
     owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
-    wrapped_target, import_path_info, go_mod_info = await MultiGet(
+    wrapped_target, import_path_info, go_mod_info, transitive_targets = await MultiGet(
         Get(WrappedTarget, Address, request.address),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
     )
+
+    target = wrapped_target.target
+    pkg_relative_resource_targets = [
+        tgt
+        for tgt in transitive_targets.closure
+        if tgt.has_field(ResourceSourceField)
+        and tgt.address.spec_path.startswith(request.address.spec_path)
+    ]
 
     pkg_sources = await Get(
         HydratedSources,
-        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
+        HydrateSourcesRequest(target[GoPackageSourcesField]),
     )
+
+    hydrated_resources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                tgt[ResourceSourceField],
+                for_sources_types=(ResourceSourceField,),
+                enable_codegen=True,
+            ),
+        )
+        for tgt in pkg_relative_resource_targets
+    )
+
+    sources_digest = await Get(
+        Digest,
+        MergeDigests(
+            [pkg_sources.snapshot.digest, *(src.snapshot.digest for src in hydrated_resources)]
+        ),
+    )
+
     input_digest = await Get(
         Digest,
-        MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
+        MergeDigests([sources_digest, analyzer.digest]),
     )
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -184,7 +225,7 @@ async def compute_first_party_package_info(
         )
 
     info = FirstPartyPkgInfo(
-        digest=pkg_sources.snapshot.digest,
+        digest=sources_digest,
         dir_path=request.address.spec_path,
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
@@ -196,8 +237,11 @@ async def compute_first_party_package_info(
         s_files=tuple(metadata.get("SFiles", [])),
         minimum_go_version=go_mod_info.minimum_go_version,
         embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
+        embed_config=EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {})),
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
+        test_embed_config=EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {})),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+        xtest_embed_config=EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {})),
     )
     return FallibleFirstPartyPkgInfo(info, import_path_info.import_path)
 
@@ -211,7 +255,8 @@ async def setup_analyzer() -> PackageAnalyzerSetup:
         return content
 
     analyer_sources_content = [
-        FileContent(filename, get_file(filename)) for filename in ("analyze_package.go", "read.go")
+        FileContent(filename, get_file(filename))
+        for filename in ("analyze_package.go", "read.go", "embedcfg.go")
     ]
 
     source_digest, import_config = await MultiGet(
