@@ -205,3 +205,27 @@ def test_local_dist() -> None:
         ]
         result = run_pants(args)
         assert result.stdout == "LOCAL DIST\n"
+
+
+def test_run_script_from_3rdparty_dist_issue_13747() -> None:
+    sources = {
+        "src/BUILD": dedent(
+            """\
+            python_requirement(name="cowsay", requirements=["cowsay==4.0"])
+            pex_binary(name="test", script="cowsay", dependencies=[":cowsay"])
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        SAY = "moooo"
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src:test",
+            "--",
+            SAY,
+        ]
+        result = run_pants(args)
+        result.assert_success()
+        assert SAY in result.stdout.strip()
