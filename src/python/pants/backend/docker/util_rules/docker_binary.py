@@ -62,7 +62,9 @@ class DockerBinary(BinaryPath):
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
-    def push_image(self, tags: tuple[str, ...]) -> Process | None:
+    def push_image(
+        self, tags: tuple[str, ...], env: Mapping[str, str] | None = None
+    ) -> Process | None:
         if not tags:
             return None
 
@@ -70,6 +72,7 @@ class DockerBinary(BinaryPath):
             argv=(self.path, "push", *tags),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Pushing docker image {tags[0]}",
+            env=env,
         )
 
 
