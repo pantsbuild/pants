@@ -132,17 +132,20 @@ func computeEmbedConfigs(directory string, pkg *Package) error {
 	// Obtain a list of files in and under the package's directory. These will be embeddable files.
 	// TODO: Support resource targets elsewhere in the repository.
 
+	fmt.Fprintf(os.Stderr, "computeEmbedConfigs(directory=%s)\n", directory)
 	var embedSrcs []string
 	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		fmt.Fprintf(os.Stderr, "path=%s\n", path)
 		embedSrcs = append(embedSrcs, path)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(os.Stderr, "embedSrcs=%v\n", embedSrcs)
 
 	root, err := buildEmbedTree(embedSrcs, []string{directory})
 	if err != nil {
@@ -396,7 +399,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	pkg.XTestEmbedPatterns = cleanStringSet(xtestEmbedsMap)
 
 	// Fill in embedcfg needed for compiler.
-	err = computeEmbedConfigs(directory, pkg)
+	err = computeEmbedConfigs("__resources__", pkg)
 	if err != nil {
 		return pkg, fmt.Errorf("unable to compute embedcfg: %s", err)
 	}

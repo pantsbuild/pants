@@ -157,7 +157,7 @@ func buildEmbedTree(embedSrcs, embedRootDirs []string) (root *embedNode, err err
 			err = fmt.Errorf("building tree of embeddable files in directories %s: %v", strings.Join(embedRootDirs, string(filepath.ListSeparator)), err)
 		}
 	}()
-
+	fmt.Fprintf(os.Stderr, "embedSrcs=%v", embedSrcs)
 	// Add each path to the tree.
 	root = &embedNode{name: "", children: make(map[string]*embedNode)}
 	for _, src := range embedSrcs {

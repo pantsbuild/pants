@@ -312,8 +312,16 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
         FallibleFirstPartyPkgInfo,
         [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
     )
+    print(f"stderr:\n{maybe_info.stderr}")
     assert maybe_info.info is not None
     info = maybe_info.info
-    assert info.embed_config == EmbedConfig({}, {})
-    assert info.test_embed_config == EmbedConfig({}, {})
-    assert info.xtest_embed_config == EmbedConfig({}, {})
+    assert info.embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
+    )
+    assert info.test_embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
+        {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
+    )
+    assert info.xtest_embed_config == EmbedConfig(
+        {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
+    )

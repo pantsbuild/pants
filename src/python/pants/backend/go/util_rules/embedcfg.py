@@ -45,7 +45,7 @@ class EmbedConfig:
 
     def to_embedcfg(self) -> bytes:
         data = {
-            "Patterns": self.patterns,
-            "Files": self.files,
+            "Patterns": dict(self.patterns),
+            "Files": dict(self.files),
         }
         return json.dumps(data).encode("utf-8")

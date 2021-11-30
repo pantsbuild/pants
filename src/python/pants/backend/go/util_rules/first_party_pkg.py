@@ -21,16 +21,28 @@ from pants.backend.go.util_rules.go_mod import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
+    SourcesField,
+    Targets,
     WrappedTarget,
 )
 from pants.util.dirutil import fast_relpath
@@ -140,43 +152,67 @@ async def compute_first_party_package_info(
     request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgInfo:
     owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
-    wrapped_target, import_path_info, go_mod_info, transitive_targets = await MultiGet(
+    wrapped_target, import_path_info, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
     )
-
     target = wrapped_target.target
+
+    # Find resource targets.
+    # TODO: This uses ExplicitlyProvidedDependencies to avoid triggering dependency inference which
+    # causes a rule cycle back to this rule as dependency inference tries to analyze dependent
+    # `go_package` targets. There really needs to be a way to limit `DependenciesRequest` to just
+    # targets meeting certain criteria, which would be resource targets in this case.
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(target[Dependencies])
+    )
+    explicit_deps_targets = await Get(Targets, Addresses(explicit_deps.includes))
+    print(f"explicit_deps_targets={explicit_deps_targets}")
     pkg_relative_resource_targets = [
         tgt
-        for tgt in transitive_targets.closure
-        if tgt.has_field(ResourceSourceField)
+        for tgt in explicit_deps_targets
+        # Note: target expansion is not ocurring?
+        if tgt.has_field(ResourceSourceField) or tgt.has_field(ResourcesGeneratingSourcesField)
+        # TODO: Currently limited to resources directly under package in source tree. Allow any resource and
+        # have paths be relative to the resources' spec_path.
         and tgt.address.spec_path.startswith(request.address.spec_path)
     ]
+    print(f"pkg_relative_resource_targets={pkg_relative_resource_targets}")
 
     pkg_sources = await Get(
         HydratedSources,
         HydrateSourcesRequest(target[GoPackageSourcesField]),
     )
 
-    hydrated_resources = await MultiGet(
+    resources_sources = await MultiGet(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                tgt[ResourceSourceField],
-                for_sources_types=(ResourceSourceField,),
+                tgt[SourcesField],
+                for_sources_types=(
+                    ResourceSourceField,
+                    ResourcesGeneratingSourcesField,
+                ),
                 enable_codegen=True,
             ),
         )
         for tgt in pkg_relative_resource_targets
     )
 
+    original_resources_digest = await Get(
+        Digest, MergeDigests([src.snapshot.digest for src in resources_sources])
+    )
+    stripped_resources_digest = await Get(
+        Digest, RemovePrefix(original_resources_digest, request.address.spec_path)
+    )
+    resources_digest = await Get(Digest, AddPrefix(stripped_resources_digest, "__resources__"))
+    ss = await Get(Snapshot, Digest, resources_digest)
+    print(f"ss.files={ss.files}")
+
     sources_digest = await Get(
         Digest,
-        MergeDigests(
-            [pkg_sources.snapshot.digest, *(src.snapshot.digest for src in hydrated_resources)]
-        ),
+        MergeDigests([pkg_sources.snapshot.digest, resources_digest]),
     )
 
     input_digest = await Get(
@@ -201,6 +237,7 @@ async def compute_first_party_package_info(
             stderr=result.stderr.decode("utf-8"),
         )
 
+    print(f"stdout:\n{result.stdout.decode()}\nstderr:\n{result.stderr.decode()}")
     metadata = json.loads(result.stdout)
     if "Error" in metadata or "InvalidGoFiles" in metadata:
         error = metadata.get("Error", "")
