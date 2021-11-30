@@ -25,7 +25,7 @@ class FirstPartyScalaTargetsMappingRequest(FirstPartyMappingRequest):
 
 
 @rule(desc="Find all Scala targets in project", level=LogLevel.DEBUG)
-def find_all_java_targets(targets: AllTargets) -> AllScalaTargets:
+def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
     return AllScalaTargets(tgt for tgt in targets if tgt.has_field(ScalaSourceField))
 
 
@@ -43,6 +43,8 @@ async def map_first_party_scala_targets_to_symbols(
     symbol_map = SymbolMap()
     for address, analysis in address_and_analysis:
         for symbol in analysis.provided_symbols:
+            symbol_map.add_symbol(symbol, address)
+        for symbol in analysis.provided_symbols_encoded:
             symbol_map.add_symbol(symbol, address)
 
     return symbol_map
