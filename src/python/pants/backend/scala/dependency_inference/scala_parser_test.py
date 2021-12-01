@@ -21,7 +21,7 @@ from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmDependencyLockfile
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -48,7 +48,6 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@logging
 def test_parser_simple(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -304,6 +303,24 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.LambdaTypeArg2",
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
+        "org.pantsbuild.+",
+        "org.pantsbuild.ABaseClass",
+        "org.pantsbuild.AParameterType",
+        "org.pantsbuild.ATrait1",
+        "org.pantsbuild.ATrait2.Nested",
+        "org.pantsbuild.BaseWithConstructor",
+        "org.pantsbuild.Integer",
+        "org.pantsbuild.LambdaReturnType",
+        "org.pantsbuild.LambdaTypeArg1",
+        "org.pantsbuild.LambdaTypeArg2",
+        "org.pantsbuild.OuterObject.NestedVal",
+        "org.pantsbuild.SomeTypeInSecondaryConstructor",
+        "org.pantsbuild.String",
+        "org.pantsbuild.TupleTypeArg1",
+        "org.pantsbuild.TupleTypeArg2",
+        "org.pantsbuild.Unit",
+        "org.pantsbuild.bar",
+        "org.pantsbuild.foo",
     }
 
 
