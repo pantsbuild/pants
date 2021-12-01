@@ -17,6 +17,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
     DockerBuildEnvironmentRequest,
 )
+from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -127,12 +128,12 @@ async def create_docker_build_context(
     # Get all dependencies for the root target.
     root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
 
-    # Get all sources from the root dependencies (i.e. files).
-    file_sources_request = Get(
+    # Get all sources from the root dependencies (i.e. files and shell sources).
+    sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(FileSourceField,),
+            for_sources_types=(FileSourceField, ShellSourceField),
             enable_codegen=True,
         ),
     )
@@ -142,8 +143,8 @@ async def create_docker_build_context(
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    file_sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
-        file_sources_request,
+    sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+        sources_request,
         embedded_pkgs_per_target_request,
         Get(DockerfileInfo, DockerfileInfoRequest(docker_image.address)),
     )
@@ -161,7 +162,7 @@ async def create_docker_build_context(
     logger.debug(f"Packages for Docker image: {packages_str}")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
-    all_digests = (dockerfile_info.digest, file_sources.snapshot.digest, *embedded_pkgs_digest)
+    all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
     context_request = Get(Digest, MergeDigests(d for d in all_digests if d))
