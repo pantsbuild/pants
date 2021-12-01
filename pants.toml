@@ -164,6 +164,8 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 # A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
 # classpath. Consequently, we isolate it to its own lockfile.
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
+# Has the same isolation requirements as `java_parser`.
+scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
 
 [toolchain-setup]
 repo = "pants"
