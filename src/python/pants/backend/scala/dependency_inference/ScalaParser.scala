@@ -1,3 +1,9 @@
+/**
+ * TODO: The dependencies of this class are defined in two places:
+ *   1. `3rdparty/jvm` via import inference.
+ *   2. `SCALA_PARSER_ARTIFACT_REQUIREMENTS`.
+ * See https://github.com/pantsbuild/pants/issues/13754.
+ */
 package org.pantsbuild.backend.scala.dependency_inference
 
 import io.circe._
