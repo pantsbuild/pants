@@ -18,7 +18,7 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -228,7 +228,7 @@ class ProcessExecutionFailure(Exception):
         stderr: bytes,
         process_description: str,
         *,
-        local_cleanup: bool,
+        process_cleanup: bool,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -251,11 +251,9 @@ class ProcessExecutionFailure(Exception):
             "stderr:",
             try_decode(stderr),
         ]
-        if local_cleanup:
+        if process_cleanup:
             err_strings.append(
-                "\n\n"
-                "Use --no-process-execution-local-cleanup to preserve process chroots "
-                "for inspection."
+                "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
             )
         super().__init__("\n".join(err_strings))
 
@@ -275,7 +273,7 @@ def upcast_process(req: Process) -> MultiPlatformProcess:
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
-    global_options: GlobalOptions,
+    process_cleanup: ProcessCleanupOption,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -294,7 +292,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
-        local_cleanup=global_options.options.process_execution_local_cleanup,
+        process_cleanup=process_cleanup.val,
     )
 
 

@@ -37,7 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -280,7 +280,7 @@ async def analyze_scala_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleScalaSourceDependencyAnalysisResult,
-    global_options: GlobalOptions,
+    process_cleanup: ProcessCleanupOption,
 ) -> ScalaSourceDependencyAnalysis:
     # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
@@ -295,7 +295,7 @@ async def resolve_fallible_result_to_analysis(
         fallible_result.process_result.stdout,
         fallible_result.process_result.stderr,
         "Scala source dependency analysis failed.",
-        local_cleanup=global_options.options.process_execution_local_cleanup,
+        process_cleanup=process_cleanup.val,
     )
 
 
