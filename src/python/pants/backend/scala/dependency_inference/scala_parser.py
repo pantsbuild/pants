@@ -130,16 +130,6 @@ class ScalaSourceDependencyAnalysis:
         have been provided by any wildcard import in scope, as well as being declared in the current
         package.
         """
-        # TODO: We compute "the package" as the "shortest scope in the file" to handle the most
-        # common case of consuming a type from within your package. But this doesn't account
-        # for the fact that any of the intermediate scopes might be relevant as well. Solving that
-        # would require resolving the type recursively upward.
-        package = min(
-            (*self.imports_by_scope.keys(), *self.consumed_symbols_by_scope.keys()),
-            key=len,
-            default="",
-        )
-
         # Collect all wildcard imports.
         wildcard_imports_by_scope = {}
         for scope, imports in self.imports_by_scope.items():
@@ -155,9 +145,9 @@ class ScalaSourceDependencyAnalysis:
                 if scope.startswith(s)
             }
             for symbol in consumed_symbols:
-                if package:
-                    yield f"{package}.{symbol}"
-                if not package or "." in symbol:
+                for scope in self.scopes:
+                    yield f"{scope}.{symbol}"
+                if not self.scopes or "." in symbol:
                     # TODO: Similar to #13545: we assume that a symbol containing a dot might already
                     # be fully qualified.
                     yield symbol
