@@ -219,12 +219,18 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert analysis.imports_by_scope == FrozenDict(
         {
             "org.pantsbuild.example.OuterClass": (
-                ScalaImport(name="foo.bar.SomeItem", is_wildcard=False),
+                ScalaImport(name="foo.bar.SomeItem", alias=None, is_wildcard=False),
             ),
             "org.pantsbuild.example": (
-                ScalaImport(name="scala.collection.mutable.ArrayBuffer", is_wildcard=False),
-                ScalaImport(name="scala.collection.mutable.HashMap", is_wildcard=False),
-                ScalaImport(name="java.io", is_wildcard=True),
+                ScalaImport(
+                    name="scala.collection.mutable.ArrayBuffer", alias=None, is_wildcard=False
+                ),
+                ScalaImport(
+                    name="scala.collection.mutable.HashMap",
+                    alias="RenamedHashMap",
+                    is_wildcard=False,
+                ),
+                ScalaImport(name="java.io", alias=None, is_wildcard=True),
             ),
         }
     )
@@ -337,3 +343,33 @@ def test_extract_package_scopes(rule_runner: RuleRunner) -> None:
         "outer.more.than.one.part.at.once",
         "outer.more.than.one.part.at.once.inner",
     ]
+
+
+def test_relative_import(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            import java.io
+            import scala.{io => sio}
+            import nada.{io => _}
+
+            object OuterObject {
+                import org.pantsbuild.{io => pio}
+
+                val i = io.apply()
+                val s = sio.apply()
+                val p = pio.apply()
+            }
+            """
+        ),
+    )
+
+    assert set(analysis.fully_qualified_consumed_symbols()) == {
+        "io.apply",
+        "java.io.apply",
+        "org.pantsbuild.io.apply",
+        "pio.apply",
+        "scala.io.apply",
+        "sio.apply",
+    }
