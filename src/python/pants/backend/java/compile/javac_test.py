@@ -139,7 +139,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+        ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
     # Additionally validate that `check` works.
@@ -186,7 +186,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".ExampleLib.java.lib.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+        ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
     rule_runner.set_options(
@@ -252,7 +252,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     compiled_classfiles0 = rule_runner.request(ClasspathEntry, [request0])
     classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
     assert classpath0.content == {
-        ".ExampleLib.java.lib.jar": {
+        ".ExampleLib.java.lib.javac.jar": {
             "org/pantsbuild/example/lib/ExampleLib.class",
         }
     }
@@ -263,7 +263,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     compiled_classfiles1 = rule_runner.request(ClasspathEntry, [request1])
     classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
     assert classpath1.content == {
-        ".OtherLib.java.lib.jar": {
+        ".OtherLib.java.lib.javac.jar": {
             "org/pantsbuild/example/lib/OtherLib.class",
         }
     }
@@ -347,7 +347,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        "a.A.java.jar": {
+        "a.A.java.javac.jar": {
             "org/pantsbuild/a/A.class",
             "org/pantsbuild/a/C.class",
             "org/pantsbuild/b/B.class",
@@ -437,7 +437,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
         ],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {".Main.java.main.jar": {"org/pantsbuild/main/Main.class"}}
+    assert classpath.content == {".Main.java.main.javac.jar": {"org/pantsbuild/main/Main.class"}}
 
 
 @logging
@@ -508,7 +508,10 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".Main.java.main.jar": {"org/pantsbuild/main/Main.class", "org/pantsbuild/main/Other.class"}
+        ".Main.java.main.javac.jar": {
+            "org/pantsbuild/main/Main.class",
+            "org/pantsbuild/main/Other.class",
+        }
     }
 
 
@@ -554,7 +557,9 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
         ],
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
+    assert classpath.content == {
+        ".Example.java.main.javac.jar": {"org/pantsbuild/example/Example.class"}
+    }
 
 
 @maybe_skip_jdk_test
@@ -688,7 +693,9 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     )
     compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
-    assert classpath.content == {".Example.java.main.jar": {"org/pantsbuild/example/Example.class"}}
+    assert classpath.content == {
+        ".Example.java.main.javac.jar": {"org/pantsbuild/example/Example.class"}
+    }
 
 
 @maybe_skip_jdk_test

@@ -130,7 +130,10 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".ExampleLib.scala.lib.jar": {"META-INF/MANIFEST.MF", "org/pantsbuild/example/lib/C.class"}
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "META-INF/MANIFEST.MF",
+            "org/pantsbuild/example/lib/C.class",
+        }
     }
 
     # Additionally validate that `check` works.
@@ -189,7 +192,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     )
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".Example.scala.main.jar": {
+        ".Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
@@ -288,7 +291,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
     classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
-        ".Example.scala.main.jar": {
+        ".Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",

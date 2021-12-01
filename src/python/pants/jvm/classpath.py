@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Callable, Iterator
@@ -15,6 +16,9 @@ from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
 from pants.jvm.resolve.key import CoursierResolveKey
 
 _USERCP_RELPATH = "__cp"
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -60,20 +64,23 @@ async def classpath(
     coarsened_targets: CoarsenedTargets,
     union_membership: UnionMembership,
 ) -> Classpath:
-    targets = Targets(t for ct in coarsened_targets.closure() for t in ct.members)
+    resolve = await Get(
+        CoursierResolveKey,
+        Targets,
+        Targets(t for ct in coarsened_targets.closure() for t in ct.members),
+    )
 
-    resolve = await Get(CoursierResolveKey, Targets, targets)
-
-    transitive_classpath_entries = await MultiGet(
+    classpath_entries = await MultiGet(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
             ClasspathEntryRequest.for_targets(union_membership, component=t, resolve=resolve),
         )
-        for t in coarsened_targets.closure()
+        for t in coarsened_targets
     )
     merged_transitive_classpath_entries_digest = await Get(
-        Digest, MergeDigests(classfiles.digest for classfiles in transitive_classpath_entries)
+        Digest,
+        MergeDigests(classfiles.digest for classfiles in ClasspathEntry.closure(classpath_entries)),
     )
 
     return Classpath(
