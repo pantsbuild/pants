@@ -164,7 +164,7 @@ async def compile_scala_source(
         ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
     )
 
-    output_file = f"{request.component.representative.address.path_safe_spec}.jar"
+    output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"
     process_result = await Get(
         FallibleProcessResult,
         Process(
