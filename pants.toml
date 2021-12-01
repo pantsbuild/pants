@@ -154,10 +154,16 @@ config = "@build-support/regexes/config.yaml"
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
+[jvm]
+default_resolve = "jvm_testprojects"
+
 [jvm.resolves]
-# TODO: These should move into 3rdparty, as should jvm_artifact definitions.
-exampleapp = "testprojects/src/jvm/org/pantsbuild/example/app/coursier_resolve.lockfile"
-pants_java_parser = "src/python/pants/backend/java/dependency_inference/coursier_resolve.lockfile"
+# A shared resolve for all testproject/example code. Because this is not shipped with Pants
+# binaries, it requires no isolation.
+jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
+# A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
+# classpath. Consequently, we isolate it to its own lockfile.
+java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 
 [toolchain-setup]
 repo = "pants"
