@@ -36,9 +36,9 @@ def assert_paths(
 ) -> None:
     args = []
     if path_from:
-        args += [f"--path-from={path_from}"]
+        args += [f"--paths-from={path_from}"]
     if path_to:
-        args += [f"--path-to={path_to}"]
+        args += [f"--paths-to={path_to}"]
 
     result = rule_runner.run_goal_rule(PathsGoal, args=[*args])
     import sys

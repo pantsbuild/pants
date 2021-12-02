@@ -4,7 +4,7 @@
 import json
 from collections import deque
 from operator import attrgetter
-from typing import Dict, Generator, cast
+from typing import Dict, Generator, List, Optional, cast
 
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
@@ -27,24 +27,25 @@ class PathsSubsystem(LineOriented, GoalSubsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--path-from",
+            "--from",
             type=str,
+            dest="frm",
             help="The path starting address",
         )
 
         register(
-            "--path-to",
+            "--to",
             type=str,
             help="The path end address",
         )
 
     @property
     def path_from(self) -> str:
-        return cast(str, self.options.path_from)
+        return cast(str, self.options.frm)
 
     @property
     def path_to(self) -> str:
-        return cast(str, self.options.path_to)
+        return cast(str, self.options.to)
 
 
 class PathsGoal(Goal):
@@ -53,7 +54,7 @@ class PathsGoal(Goal):
 
 def find_paths_breadth_first(
     adjacency_lists: Dict[Address, Targets], from_target: Address, to_target: Address
-) -> Generator[Addresses, None, None]:
+) -> Generator[List[Address], None, None]:
     """Yields the paths between from_target to to_target if they exist.
 
     The paths are returned ordered by length, shortest first. If there are cycles, it checks visited
@@ -72,7 +73,7 @@ def find_paths_breadth_first(
         target = cur_path[-1]
 
         if len(cur_path) > 1:
-            prev_target = cur_path[-2]
+            prev_target: Optional[Address] = cur_path[-2]
         else:
             prev_target = None
         current_edge = (prev_target, target)
@@ -96,10 +97,10 @@ async def paths(
     path_to = paths_subsystem.path_to
 
     if path_from is None:
-        raise ValueError("Must set a --from-path")
+        raise ValueError("Must set a --paths-from")
 
     if path_to is None:
-        raise ValueError("Must set a --to-path")
+        raise ValueError("Must set a --paths-to")
 
     root, destination = await Get(
         Addresses,
@@ -109,6 +110,7 @@ async def paths(
     transitive_targets = await Get(
         TransitiveTargets, TransitiveTargetsRequest([root], include_special_cased_deps=True)
     )
+
     if not any(destination == dep.address for dep in transitive_targets.dependencies):
         raise ValueError("The destination is not a dependency of the source")
 
