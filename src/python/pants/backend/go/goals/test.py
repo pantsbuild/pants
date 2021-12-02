@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from typing import Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
@@ -65,6 +66,7 @@ TEST_FLAGS = {
 }
 
 
+@dataclass(frozen=True)
 class GoTestFieldSet(TestFieldSet):
     required_fields = (GoPackageSourcesField,)
 

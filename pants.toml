@@ -54,7 +54,7 @@ pants_ignore.add = [
 
 build_ignore.add = [
   # Disable Go targets by default so Pants developers do not need Go installed.
-#  "testprojects/src/go/**",
+  "testprojects/src/go/**",
 ]
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
