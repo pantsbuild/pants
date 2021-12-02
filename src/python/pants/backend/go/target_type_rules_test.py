@@ -10,7 +10,6 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import (
     GenerateTargetsFromGoModRequest,
-    InferGoPackageDependenciesRequest,
     InjectGoBinaryMainDependencyRequest,
 )
 from pants.backend.go.target_types import (
@@ -42,13 +41,11 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     GeneratedTargets,
-    InferredDependencies,
     InjectedDependencies,
     InvalidFieldException,
     InvalidTargetException,
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
-from pants.util.ordered_set import FrozenOrderedSet
 
 # -----------------------------------------------------------------------------------------------
 # Dependency inference
@@ -78,6 +75,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
+    # TODO(#12761): Add tests for ambiguous dependencies.
     rule_runner.write_files(
         {
             "foo/BUILD": "go_mod()",
@@ -86,19 +84,27 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
                     module go.example.com/foo
                     go 1.17
 
-                    require github.com/google/uuid v1.3.0
+                    require (
+                        rsc.io/quote v1.5.2
+                        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c // indirect
+                        rsc.io/sampler v1.3.0 // indirect
+                    )
                     """
             ),
             "foo/go.sum": dedent(
                 """\
-                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
-                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+                golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+                rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+                rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+                rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+                rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
                 """
             ),
             "foo/pkg/foo.go": dedent(
                 """\
                     package pkg
-                    import "github.com/google/uuid"
+                    import "rsc.io/quote"
                     """
             ),
             "foo/pkg/BUILD": "go_package()",
@@ -116,28 +122,27 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
             "foo/bad/BUILD": "go_package()",
         }
     )
-    tgt1 = rule_runner.get_target(Address("foo/cmd"))
-    inferred_deps1 = rule_runner.request(
-        InferredDependencies,
-        [InferGoPackageDependenciesRequest(tgt1[GoPackageSourcesField])],
-    )
-    assert inferred_deps1.dependencies == FrozenOrderedSet([Address("foo/pkg")])
 
-    tgt2 = rule_runner.get_target(Address("foo/pkg"))
-    inferred_deps2 = rule_runner.request(
-        InferredDependencies,
-        [InferGoPackageDependenciesRequest(tgt2[GoPackageSourcesField])],
-    )
-    assert inferred_deps2.dependencies == FrozenOrderedSet(
-        [Address("foo", generated_name="github.com/google/uuid")]
-    )
+    def get_deps(addr: Address) -> set[Address]:
+        tgt = rule_runner.get_target(addr)
+        return set(
+            rule_runner.request(
+                Addresses,
+                [DependenciesRequest(tgt[Dependencies])],
+            )
+        )
 
+    assert get_deps(Address("foo/cmd")) == {Address("foo/pkg")}
+    assert get_deps(Address("foo/pkg")) == {Address("foo", generated_name="rsc.io/quote")}
+    assert get_deps(Address("foo", generated_name="rsc.io/quote")) == {
+        Address("foo", generated_name="rsc.io/sampler")
+    }
+    assert get_deps(Address("foo", generated_name="rsc.io/sampler")) == {
+        Address("foo", generated_name="golang.org/x/text/language")
+    }
+    assert not get_deps(Address("foo", generated_name="golang.org/x/text"))
     # Compilation failures should not blow up Pants.
-    bad_tgt = rule_runner.get_target(Address("foo/bad"))
-    assert not rule_runner.request(
-        InferredDependencies,
-        [InferGoPackageDependenciesRequest(bad_tgt[GoPackageSourcesField])],
-    )
+    assert not get_deps(Address("foo/bad"))
 
 
 # -----------------------------------------------------------------------------------------------

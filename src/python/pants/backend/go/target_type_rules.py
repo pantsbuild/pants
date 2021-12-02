@@ -95,7 +95,6 @@ async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPac
     return ImportPathToPackages(frozen_mapping)
 
 
-# TODO: Use dependency injection. This doesn't actually look at the Sources field.
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoPackageSourcesField
 
@@ -125,8 +124,7 @@ async def infer_go_dependencies(
             continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
-            # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
-            # way of doing disambiguation.
+            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
             logger.warning(
                 f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
@@ -170,8 +168,7 @@ async def inject_go_third_party_package_dependencies(
 
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
-            # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
-            # way of doing disambiguation.
+            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
             logger.warning(
                 f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
