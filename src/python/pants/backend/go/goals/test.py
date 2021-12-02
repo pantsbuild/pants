@@ -27,11 +27,12 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -71,6 +72,7 @@ class GoTestFieldSet(TestFieldSet):
     required_fields = (GoPackageSourcesField,)
 
     sources: GoPackageSourcesField
+    dependencies: Dependencies
     timeout: GoTestTimeoutField
 
     @classmethod
@@ -137,15 +139,16 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
-    maybe_pkg_info = await Get(
-        FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)
+    maybe_pkg_info, dependencies = await MultiGet(
+        Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(field_set.address)),
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
-    def compilation_failure(exit_code: int, stderr: str) -> TestResult:
+    def compilation_failure(exit_code: int, stdout: str | None, stderr: str | None) -> TestResult:
         return TestResult(
             exit_code=exit_code,
-            stdout="",
-            stderr=stderr,
+            stdout=stdout or "",
+            stderr=stderr or "",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
@@ -154,7 +157,7 @@ async def run_go_tests(
 
     if maybe_pkg_info.info is None:
         assert maybe_pkg_info.stderr is not None
-        return compilation_failure(maybe_pkg_info.exit_code, maybe_pkg_info.stderr)
+        return compilation_failure(maybe_pkg_info.exit_code, None, maybe_pkg_info.stderr)
 
     pkg_info = maybe_pkg_info.info
     import_path = pkg_info.import_path
@@ -175,7 +178,8 @@ async def run_go_tests(
     )
 
     if testmain.failed_exit_code_and_stderr is not None:
-        return compilation_failure(*testmain.failed_exit_code_and_stderr)
+        _exit_code, _stderr = testmain.failed_exit_code_and_stderr
+        return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
         return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
@@ -188,7 +192,7 @@ async def run_go_tests(
     if maybe_test_pkg_build_request.request is None:
         assert maybe_test_pkg_build_request.stderr is not None
         return compilation_failure(
-            maybe_test_pkg_build_request.exit_code, maybe_test_pkg_build_request.stderr
+            maybe_test_pkg_build_request.exit_code, None, maybe_test_pkg_build_request.stderr
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
@@ -238,24 +242,46 @@ async def run_go_tests(
     )
     if maybe_built_main_pkg.output is None:
         assert maybe_built_main_pkg.stderr is not None
-        return compilation_failure(maybe_built_main_pkg.exit_code, maybe_built_main_pkg.stderr)
+        return compilation_failure(
+            maybe_built_main_pkg.exit_code, maybe_built_main_pkg.stdout, maybe_built_main_pkg.stderr
+        )
     built_main_pkg = maybe_built_main_pkg.output
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
     )
-    input_digest = await Get(Digest, MergeDigests([built_main_pkg.digest, import_config.digest]))
-
+    linker_input_digest = await Get(
+        Digest, MergeDigests([built_main_pkg.digest, import_config.digest])
+    )
     binary = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=input_digest,
+            input_digest=linker_input_digest,
             archives=(main_pkg_a_file_path,),
             import_config_path=import_config.CONFIG_PATH,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
             description=f"Link Go test binary for {field_set.address}",
         ),
+    )
+
+    # To emulate Go's test runner, we set the working directory to the path of the `go_package`.
+    # This allows tests to open dependencies on `file` targets regardless of where they are
+    # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
+    working_dir = field_set.address.spec_path
+    binary_with_prefix, files_sources = await MultiGet(
+        Get(Digest, AddPrefix(binary.digest, working_dir)),
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                (dep.get(SourcesField) for dep in dependencies),
+                for_sources_types=(FileSourceField,),
+                enable_codegen=True,
+            ),
+        ),
+    )
+    test_input_digest = await Get(
+        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
     )
 
     cache_scope = (
@@ -269,9 +295,10 @@ async def run_go_tests(
                 "./test_runner",
                 *transform_test_args(go_test_subsystem.args, field_set.timeout.value),
             ],
-            input_digest=binary.digest,
+            input_digest=test_input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
+            working_directory=working_dir,
             level=LogLevel.DEBUG,
         ),
     )
