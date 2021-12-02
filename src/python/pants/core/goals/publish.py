@@ -195,15 +195,23 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
         Get(
             TargetRootsToFieldSets,
             TargetRootsToFieldSetsRequest(
-                field_set,
+                PackageFieldSet,
+                goal_description="",
+                # Don't warn/error here because it's already covered by `PublishFieldSet`.
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
+            ),
+        ),
+        Get(
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                PublishFieldSet,
                 goal_description="the `publish` goal",
                 no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
             ),
-        )
-        for field_set in [PackageFieldSet, PublishFieldSet]
+        ),
     )
 
-    # Only keep field sets that both package someething, and have something to publish.
+    # Only keep field sets that both package something, and have something to publish.
     targets = set(target_roots_to_package_field_sets.targets).intersection(
         set(target_roots_to_publish_field_sets.targets)
     )
