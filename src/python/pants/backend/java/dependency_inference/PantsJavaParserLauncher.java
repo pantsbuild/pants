@@ -74,7 +74,12 @@ class CompilationUnitAnalysis {
     public final ArrayList<String> exportTypes;
 }
 
-
+/**
+ * TODO: The dependencies of this class are defined in two places:
+ *   1. `3rdparty/jvm` via import inference.
+ *   2. `java_parser_artifact_requirements`.
+ * See https://github.com/pantsbuild/pants/issues/13754.
+ */
 public class PantsJavaParserLauncher {
     // Unwrap a `Type` and return the identifiers representing the "consumed" types.
     private static List<String> unwrapIdentifiersForType(Type type) {

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -56,11 +57,7 @@ class SymbolMap:
         }
 
     def __repr__(self) -> str:
-        symbol_map = ", ".join(
-            f"{ty}:{', '.join(str(addr) for addr in addrs)}"
-            for ty, addrs in self._symbol_map.items()
-        )
-        return f"SymbolMap(symbol_map={symbol_map})"
+        return f"SymbolMap({json.dumps(self.to_json_dict())})"
 
 
 @union

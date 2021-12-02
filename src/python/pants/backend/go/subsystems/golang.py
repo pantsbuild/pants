@@ -58,6 +58,18 @@ class GolangSubsystem(Subsystem):
                 "Do not include the patch version."
             ),
         )
+        register(
+            "--subprocess-env-vars",
+            type=list,
+            member_type=str,
+            default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+            advanced=True,
+            help=(
+                "Environment variables to set when invoking the `go` tool. "
+                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+                "or just `ENV_VAR` to copy the value from Pants's own environment."
+            ),
+        )
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
@@ -74,6 +86,10 @@ class GolangSubsystem(Subsystem):
     @property
     def expected_version(self) -> str:
         return cast(str, self.options.expected_version)
+
+    @property
+    def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.options.subprocess_env_vars)))
 
 
 @dataclass(frozen=True)

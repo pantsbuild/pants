@@ -226,12 +226,12 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
     )
     rendered_classpath = rule_runner.request(RenderedClasspath, [classpath.content.digest])
     assert rendered_classpath.content == {
-        "__cp/.Example.scala.main.jar": {
+        "__cp/.Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         },
-        "__cp/lib.C.java.jar": {
+        "__cp/lib.C.java.javac.jar": {
             "org/pantsbuild/example/lib/C.class",
         },
     }
@@ -251,5 +251,6 @@ def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
     )
 
     main_address = Address(spec_path="", target_name="main")
+    lib_address = Address(spec_path="lib")
     assert len(expect_single_expanded_coarsened_target(rule_runner, main_address).members) == 2
-    rule_runner.request(Classpath, [Addresses([main_address])])
+    rule_runner.request(Classpath, [Addresses([main_address, lib_address])])
