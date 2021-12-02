@@ -52,7 +52,7 @@ async def compile_java_source(
     union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
-    # Request the component's direct dependency classpath, and additionally any preqrequisite.
+    # Request the component's direct dependency classpath, and additionally any prerequisite.
     classpath_entry_requests = [
         *((request.prerequisite,) if request.prerequisite else ()),
         *(

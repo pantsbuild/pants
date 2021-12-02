@@ -16,7 +16,15 @@ import scala.meta.transversers.Traverser
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
-case class AnImport(name: String, isWildcard: Boolean)
+case class AnImport(
+   // The partially qualified input name for the import, which must be in scope at
+   // the import site.
+   name: String,
+   // An optional single token alias for the import in this scope.
+   alias: Option[String],
+   // True if the import imports all symbols contained within the name.
+   isWildcard: Boolean,
+)
 
 case class Analysis(
    providedSymbols: Vector[String],
@@ -126,12 +134,12 @@ class SourceAnalysisTraverser extends Traverser {
     skipProvidedNames = origSkipProvidedNames
   }
 
-  def recordImport(name: String, isWildcard: Boolean): Unit = {
+  def recordImport(name: String, alias: Option[String], isWildcard: Boolean): Unit = {
     val fullPackageName = nameParts.mkString(".")
     if (!importsByScope.contains(fullPackageName)) {
       importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
     }
-    importsByScope(fullPackageName).append(AnImport(name, isWildcard))
+    importsByScope(fullPackageName).append(AnImport(name, alias, isWildcard))
   }
 
   def recordConsumedSymbol(name: String): Unit = {
@@ -225,9 +233,20 @@ class SourceAnalysisTraverser extends Traverser {
         val baseName = extractName(ref)
         importees.foreach(importee => {
           importee match {
-            case Importee.Wildcard() => recordImport(baseName, true)
-            case Importee.Name(nameNode) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
-            case Importee.Rename(nameNode, _) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
+            case Importee.Wildcard() => recordImport(baseName, None, true)
+            case Importee.Name(nameNode) => {
+              recordImport(s"${baseName}.${extractName(nameNode)}", None, false)
+            }
+            case Importee.Rename(nameNode, aliasNode) => {
+              // If a type is aliased to `_`, it is not brought into scope. We still record
+              // the import though, since compilation will fail if an import is not present.
+              val alias = extractName(aliasNode)
+              recordImport(
+                s"${baseName}.${extractName(nameNode)}",
+                if (alias == "_") None else Some(alias),
+                false,
+              )
+            }
             case _ =>
           }
         })

@@ -29,7 +29,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        preserve_tmpdirs=True,
         rules=[
             *scala_parser.rules(),
             *coursier_fetch_rules(),
@@ -48,19 +47,35 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_parser_simple(rule_runner: RuleRunner) -> None:
+def _analyze(rule_runner: RuleRunner, source: str) -> ScalaSourceDependencyAnalysis:
     rule_runner.write_files(
         {
-            "BUILD": textwrap.dedent(
-                """
-            scala_source(
-                name="simple-source",
-                source="SimpleSource.scala",
+            "BUILD": """scala_source(name="source", source="Source.scala")""",
+            "Source.scala": source,
+        }
+    )
+
+    target = rule_runner.get_target(address=Address("", target_name="source"))
+
+    source_files = rule_runner.request(
+        SourceFiles,
+        [
+            SourceFilesRequest(
+                (target.get(SourcesField),),
+                for_sources_types=(ScalaSourceField,),
+                enable_codegen=True,
             )
+        ],
+    )
+
+    return rule_runner.request(ScalaSourceDependencyAnalysis, [source_files])
+
+
+def test_parser_simple(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
             """
-            ),
-            "SimpleSource.scala": textwrap.dedent(
-                """
             package org.pantsbuild
             package example
 
@@ -124,26 +139,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                }
             }
             """
-            ),
-        }
-    )
-
-    target = rule_runner.get_target(address=Address("", target_name="simple-source"))
-
-    source_files = rule_runner.request(
-        SourceFiles,
-        [
-            SourceFilesRequest(
-                (target.get(SourcesField),),
-                for_sources_types=(ScalaSourceField,),
-                enable_codegen=True,
-            )
-        ],
-    )
-
-    analysis = rule_runner.request(
-        ScalaSourceDependencyAnalysis,
-        [source_files],
+        ),
     )
 
     assert sorted(list(analysis.provided_symbols)) == [
@@ -223,12 +219,18 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert analysis.imports_by_scope == FrozenDict(
         {
             "org.pantsbuild.example.OuterClass": (
-                ScalaImport(name="foo.bar.SomeItem", is_wildcard=False),
+                ScalaImport(name="foo.bar.SomeItem", alias=None, is_wildcard=False),
             ),
             "org.pantsbuild.example": (
-                ScalaImport(name="scala.collection.mutable.ArrayBuffer", is_wildcard=False),
-                ScalaImport(name="scala.collection.mutable.HashMap", is_wildcard=False),
-                ScalaImport(name="java.io", is_wildcard=True),
+                ScalaImport(
+                    name="scala.collection.mutable.ArrayBuffer", alias=None, is_wildcard=False
+                ),
+                ScalaImport(
+                    name="scala.collection.mutable.HashMap",
+                    alias="RenamedHashMap",
+                    is_wildcard=False,
+                ),
+                ScalaImport(name="java.io", alias=None, is_wildcard=True),
             ),
         }
     )
@@ -325,42 +327,15 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
 
 def test_extract_package_scopes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": textwrap.dedent(
-                """
-                scala_source(
-                    name="source",
-                    source="Source.scala",
-                )
-                """
-            ),
-            "Source.scala": textwrap.dedent(
-                """
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
                 package outer
                 package more.than.one.part.at.once
                 package inner
                 """
-            ),
-        }
-    )
-
-    target = rule_runner.get_target(address=Address("", target_name="source"))
-
-    source_files = rule_runner.request(
-        SourceFiles,
-        [
-            SourceFilesRequest(
-                (target.get(SourcesField),),
-                for_sources_types=(ScalaSourceField,),
-                enable_codegen=True,
-            )
-        ],
-    )
-
-    analysis = rule_runner.request(
-        ScalaSourceDependencyAnalysis,
-        [source_files],
+        ),
     )
 
     assert sorted(analysis.scopes) == [
@@ -368,3 +343,33 @@ def test_extract_package_scopes(rule_runner: RuleRunner) -> None:
         "outer.more.than.one.part.at.once",
         "outer.more.than.one.part.at.once.inner",
     ]
+
+
+def test_relative_import(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            import java.io
+            import scala.{io => sio}
+            import nada.{io => _}
+
+            object OuterObject {
+                import org.pantsbuild.{io => pio}
+
+                val i = io.apply()
+                val s = sio.apply()
+                val p = pio.apply()
+            }
+            """
+        ),
+    )
+
+    assert set(analysis.fully_qualified_consumed_symbols()) == {
+        "io.apply",
+        "java.io.apply",
+        "org.pantsbuild.io.apply",
+        "pio.apply",
+        "scala.io.apply",
+        "sio.apply",
+    }
