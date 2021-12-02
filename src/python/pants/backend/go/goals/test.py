@@ -114,12 +114,13 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
             option_value = ""
 
         if arg_name in TEST_FLAGS:
-            no_opt_provided = TEST_FLAGS[arg_name] and option_value == ""
-            if arg_name == "timeout" and timeout_field_value is not None:
+            if arg_name == "timeout":
                 timeout_is_set = True
 
             rewritten_arg = f"{arg[0:start_index]}test.{arg_name}{option_value}"
             result.append(rewritten_arg)
+
+            no_opt_provided = TEST_FLAGS[arg_name] and option_value == ""
             if no_opt_provided:
                 next_arg_is_option_value = True
         else:
