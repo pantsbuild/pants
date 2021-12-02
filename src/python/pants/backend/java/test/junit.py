@@ -118,7 +118,7 @@ async def setup_junit_debug_request(_field_set: JavaTestFieldSet) -> TestDebugRe
 
 
 @rule
-async def generate_ammonite_lockfile_request(
+async def generate_junit_lockfile_request(
     _: JunitTool, junit_tool: JunitTool
 ) -> JvmToolLockfileRequest:
     return JvmToolLockfileRequest.from_tool(junit_tool)
