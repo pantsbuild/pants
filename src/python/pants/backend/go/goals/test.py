@@ -130,11 +130,11 @@ async def run_go_tests(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
-    def compilation_failure(exit_code: int, stdout: str, stderr: str) -> TestResult:
+    def compilation_failure(exit_code: int, stdout: str | None, stderr: str | None) -> TestResult:
         return TestResult(
             exit_code=exit_code,
-            stdout=stdout,
-            stderr=stderr,
+            stdout=stdout or "",
+            stderr=stderr or "",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
@@ -143,7 +143,7 @@ async def run_go_tests(
 
     if maybe_pkg_info.info is None:
         assert maybe_pkg_info.stderr is not None
-        return compilation_failure(maybe_pkg_info.exit_code, "", maybe_pkg_info.stderr)
+        return compilation_failure(maybe_pkg_info.exit_code, None, maybe_pkg_info.stderr)
 
     pkg_info = maybe_pkg_info.info
     import_path = pkg_info.import_path
@@ -165,7 +165,7 @@ async def run_go_tests(
 
     if testmain.failed_exit_code_and_stderr is not None:
         _exit_code, _stderr = testmain.failed_exit_code_and_stderr
-        return compilation_failure(_exit_code, "", _stderr)
+        return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
         return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
@@ -178,7 +178,7 @@ async def run_go_tests(
     if maybe_test_pkg_build_request.request is None:
         assert maybe_test_pkg_build_request.stderr is not None
         return compilation_failure(
-            maybe_test_pkg_build_request.exit_code, "", maybe_test_pkg_build_request.stderr
+            maybe_test_pkg_build_request.exit_code, None, maybe_test_pkg_build_request.stderr
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
