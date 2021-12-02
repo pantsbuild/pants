@@ -11,7 +11,7 @@ use itertools::Itertools;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyString, PyTuple, PyType};
+use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{GlobExpansionConjunction, PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -215,8 +215,14 @@ pub struct PyMergeDigests(pub Vec<Digest>);
 #[pymethods]
 impl PyMergeDigests {
   #[new]
-  fn __new__(digests: Vec<PyDigest>) -> Self {
-    Self(digests.into_iter().map(|py_digest| py_digest.0).collect())
+  fn __new__(digests: &PyAny, py: Python) -> PyResult<Self> {
+    let digests: PyResult<Vec<Digest>> = PyIterator::from_object(py, digests)?
+      .map(|v| {
+        let py_digest = v?.extract::<PyDigest>()?;
+        Ok(py_digest.0)
+      })
+      .collect();
+    Ok(Self(digests?))
   }
 
   fn __hash__(&self) -> u64 {
