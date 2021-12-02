@@ -22,7 +22,7 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, MergeDigests
+from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
@@ -229,18 +229,25 @@ async def run_go_tests(
     import_config = await Get(
         ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
     )
-    input_digest = await Get(Digest, MergeDigests([built_main_pkg.digest, import_config.digest]))
-
+    linker_input_digest = await Get(
+        Digest, MergeDigests([built_main_pkg.digest, import_config.digest])
+    )
     binary = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=input_digest,
+            input_digest=linker_input_digest,
             archives=(main_pkg_a_file_path,),
             import_config_path=import_config.CONFIG_PATH,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
             description=f"Link Go test binary for {field_set.address}",
         ),
     )
+
+    # To emulate Go's test runner, we set the working directory to the path of the `go_package`.
+    # This allows tests to open dependencies on `file` targets regardless of where they are
+    # located.
+    working_dir = field_set.address.spec_path
+    binary_with_prefix = await Get(Digest, AddPrefix(binary.digest, working_dir))
 
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
@@ -250,9 +257,10 @@ async def run_go_tests(
         FallibleProcessResult,
         Process(
             ["./test_runner", *transform_test_args(go_test_subsystem.args)],
-            input_digest=binary.digest,
+            input_digest=binary_with_prefix,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
+            working_directory=working_dir,
             level=LogLevel.DEBUG,
         ),
     )
