@@ -37,13 +37,14 @@ class EmbedConfig:
         self.files = FrozenDict(files)
 
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> EmbedConfig:
-        return cls(
+    def from_json_dict(cls, d: dict[str, Any]) -> EmbedConfig | None:
+        result = cls(
             patterns=FrozenDict(
                 {key: tuple(value) for key, value in d.get("Patterns", {}).items()}
             ),
             files=FrozenDict(d.get("Files", {})),
         )
+        return result if result else None
 
     def to_embedcfg(self) -> bytes:
         data = {
@@ -51,3 +52,6 @@ class EmbedConfig:
             "Files": dict(self.files),
         }
         return json.dumps(data).encode("utf-8")
+
+    def __bool__(self) -> bool:
+        return bool(self.patterns) or bool(self.files)
