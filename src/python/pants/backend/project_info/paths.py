@@ -1,14 +1,15 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 from collections import deque
-from operator import attrgetter
-from typing import Dict, Generator, List, Optional, cast
+from typing import Iterable, cast
 
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
-from pants.engine.goal import Goal, GoalSubsystem, LineOriented
+from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import (
@@ -19,7 +20,7 @@ from pants.engine.target import (
 )
 
 
-class PathsSubsystem(LineOriented, GoalSubsystem):
+class PathsSubsystem(Outputting, GoalSubsystem):
     name = "paths"
     help = "List the paths between two addresses."
 
@@ -53,8 +54,8 @@ class PathsGoal(Goal):
 
 
 def find_paths_breadth_first(
-    adjacency_lists: Dict[Address, Targets], from_target: Address, to_target: Address
-) -> Generator[List[Address], None, None]:
+    adjacency_lists: dict[Address, Targets], from_target: Address, to_target: Address
+) -> Iterable[list[Address]]:
     """Yields the paths between from_target to to_target if they exist.
 
     The paths are returned ordered by length, shortest first. If there are cycles, it checks visited
@@ -73,7 +74,7 @@ def find_paths_breadth_first(
         target = cur_path[-1]
 
         if len(cur_path) > 1:
-            prev_target: Optional[Address] = cur_path[-2]
+            prev_target: Address | None = cur_path[-2]
         else:
             prev_target = None
         current_edge = (prev_target, target)
@@ -111,7 +112,7 @@ async def paths(
         TransitiveTargets, TransitiveTargetsRequest([root], include_special_cased_deps=True)
     )
 
-    if not any(destination == dep.address for dep in transitive_targets.dependencies):
+    if not any(destination == dep.address for dep in transitive_targets.closure):
         raise ValueError("The destination is not a dependency of the source")
 
     adjacent_targets_per_target = await MultiGet(
@@ -122,7 +123,7 @@ async def paths(
         for tgt in transitive_targets.closure
     )
 
-    transitive_targets_closure_addresses = map(attrgetter("address"), transitive_targets.closure)
+    transitive_targets_closure_addresses = (t.address for t in transitive_targets.closure)
     adjacency_lists = dict(zip(transitive_targets_closure_addresses, adjacent_targets_per_target))
 
     spec_paths = []
@@ -130,7 +131,8 @@ async def paths(
         spec_path = [address.spec for address in path]
         spec_paths.append(spec_path)
 
-    console.write_stdout(json.dumps(spec_paths, indent=2))
+    with paths_subsystem.output(console) as write_stdout:
+        write_stdout(json.dumps(spec_paths, indent=2))
 
     return PathsGoal(exit_code=0)
 
