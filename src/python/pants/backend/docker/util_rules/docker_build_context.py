@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -29,11 +30,14 @@ from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    GeneratedSources,
+    GenerateSourcesRequest,
     SourcesField,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -65,6 +69,33 @@ class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
 
     def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
         return DockerVersionContext.from_dict({**self, **other})
+
+
+class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
+    """This is a meta field for the context files generator, to tell the codegen machinery what
+    source fields are good to use."""
+
+
+DockerContextFilesAcceptableInputsField.register(FileSourceField)
+DockerContextFilesAcceptableInputsField.register(ShellSourceField)
+
+
+class DockerContextFilesSourcesField(SourcesField):
+    """This is just a type marker for the codegen machinery."""
+
+
+class GenerateDockerContextFiles(GenerateSourcesRequest):
+    """This translates all files from acceptable Source fields for the docker context using the
+    `codegen` machinery."""
+
+    input = DockerContextFilesAcceptableInputsField
+    output = DockerContextFilesSourcesField
+
+
+@rule
+async def hydrate_input_sources(request: GenerateDockerContextFiles) -> GeneratedSources:
+    # We simply pass the files on, as-is
+    return GeneratedSources(request.protocol_sources)
 
 
 @dataclass(frozen=True)
@@ -128,12 +159,13 @@ async def create_docker_build_context(
     # Get all dependencies for the root target.
     root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
 
-    # Get all sources from the root dependencies (i.e. files and shell sources).
+    # Get all file sources from the root dependencies. That includes any non-file sources that can
+    # be "codegen"ed into a file source.
     sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(FileSourceField, ShellSourceField),
+            for_sources_types=(DockerContextFilesSourcesField,),
             enable_codegen=True,
         ),
     )
@@ -181,4 +213,7 @@ async def create_docker_build_context(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateSourcesRequest, GenerateDockerContextFiles),
+    )
