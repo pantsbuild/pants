@@ -90,6 +90,7 @@ class GenerateDockerContextFiles(GenerateSourcesRequest):
 
     input = DockerContextFilesAcceptableInputsField
     output = DockerContextFilesSourcesField
+    exportable = False
 
 
 @rule
