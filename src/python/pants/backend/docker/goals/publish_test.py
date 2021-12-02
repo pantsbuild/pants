@@ -140,19 +140,27 @@ def test_docker_push_registries(rule_runner: RuleRunner) -> None:
             }
         },
     )
-    assert len(result) == 1
+    assert len(result) == 2
     assert_publish(
         result[0],
-        (
-            "inhouse1.registry/registries/registries:latest",
-            "inhouse2.registry/registries/registries:latest",
-        ),
+        ("inhouse1.registry/registries/registries:latest",),
         None,
         process_assertion(
             argv=(
                 docker.path,
                 "push",
                 "inhouse1.registry/registries/registries:latest",
+            )
+        ),
+    )
+    assert_publish(
+        result[1],
+        ("inhouse2.registry/registries/registries:latest",),
+        None,
+        process_assertion(
+            argv=(
+                docker.path,
+                "push",
                 "inhouse2.registry/registries/registries:latest",
             )
         ),

@@ -20,7 +20,7 @@ from pants.engine.process import BashBinary, FallibleProcessResult, Process, Pro
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import ProcessCleanupOption
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class FallibleJavaSourceDependencyAnalysisResult:
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleJavaSourceDependencyAnalysisResult,
-    global_options: GlobalOptions,
+    process_cleanup: ProcessCleanupOption,
 ) -> JavaSourceDependencyAnalysis:
     # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
@@ -54,7 +54,7 @@ async def resolve_fallible_result_to_analysis(
         fallible_result.process_result.stdout,
         fallible_result.process_result.stderr,
         "Java source dependency analysis failed.",
-        local_cleanup=global_options.options.process_execution_local_cleanup,
+        process_cleanup=process_cleanup.val,
     )
 
 

@@ -201,10 +201,10 @@ class Scheduler:
             shard_count=local_store_options.shard_count,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
-            local_cache=execution_options.process_execution_local_cache,
+            local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
-            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_cleanup=execution_options.process_cleanup,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,

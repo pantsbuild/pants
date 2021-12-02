@@ -37,7 +37,7 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -96,15 +96,17 @@ SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
 @dataclass(frozen=True)
 class ScalaImport:
     name: str
+    alias: str | None
     is_wildcard: bool
 
     @classmethod
     def from_json_dict(cls, data: Mapping[str, Any]):
-        return cls(name=data["name"], is_wildcard=data["isWildcard"])
+        return cls(name=data["name"], alias=data.get("alias"), is_wildcard=data["isWildcard"])
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
+            "alias": self.alias,
             "is_wildcard": self.is_wildcard,
         }
 
@@ -130,29 +132,40 @@ class ScalaSourceDependencyAnalysis:
         have been provided by any wildcard import in scope, as well as being declared in the current
         package.
         """
-        # Collect all wildcard imports.
-        wildcard_imports_by_scope = {}
-        for scope, imports in self.imports_by_scope.items():
-            wildcard_imports = tuple(imp for imp in imports if imp.is_wildcard)
-            if wildcard_imports:
-                wildcard_imports_by_scope[scope] = wildcard_imports
 
-        for scope, consumed_symbols in self.consumed_symbols_by_scope.items():
-            parent_scope_wildcards = {
-                wi
-                for s, wildcard_imports in wildcard_imports_by_scope.items()
-                for wi in wildcard_imports
-                if scope.startswith(s)
-            }
+        def scope_and_parents(scope: str) -> Iterator[str]:
+            while True:
+                yield scope
+                if scope == "":
+                    break
+                scope, _, _ = scope.rpartition(".")
+
+        for consumption_scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+            parent_scopes = tuple(scope_and_parents(consumption_scope))
             for symbol in consumed_symbols:
-                for scope in self.scopes:
-                    yield f"{scope}.{symbol}"
-                if not self.scopes or "." in symbol:
+                symbol_rel_prefix, dot_in_symbol, symbol_rel_suffix = symbol.partition(".")
+                if not self.scopes or dot_in_symbol:
                     # TODO: Similar to #13545: we assume that a symbol containing a dot might already
                     # be fully qualified.
                     yield symbol
-                for wildcard_scope in parent_scope_wildcards:
-                    yield f"{wildcard_scope.name}.{symbol}"
+                for parent_scope in parent_scopes:
+                    if parent_scope in self.scopes:
+                        # A package declaration is a parent of this scope, and any of its symbols
+                        # could be in scope.
+                        yield f"{parent_scope}.{symbol}"
+
+                    for imp in self.imports_by_scope.get(parent_scope, ()):
+                        if imp.is_wildcard:
+                            # There is a wildcard import in a parent scope.
+                            yield f"{imp.name}.{symbol}"
+                        if dot_in_symbol:
+                            # If the parent scope has an import which defines the first token of the
+                            # symbol, then it might be a relative usage of an import.
+                            if imp.alias:
+                                if imp.alias == symbol_rel_prefix:
+                                    yield f"{imp.name}.{symbol_rel_suffix}"
+                            elif imp.name.endswith(f".{symbol_rel_prefix}"):
+                                yield f"{imp.name}.{symbol_rel_suffix}"
 
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
@@ -280,7 +293,7 @@ async def analyze_scala_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleScalaSourceDependencyAnalysisResult,
-    global_options: GlobalOptions,
+    process_cleanup: ProcessCleanupOption,
 ) -> ScalaSourceDependencyAnalysis:
     # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
@@ -295,7 +308,7 @@ async def resolve_fallible_result_to_analysis(
         fallible_result.process_result.stdout,
         fallible_result.process_result.stderr,
         "Scala source dependency analysis failed.",
-        local_cleanup=global_options.options.process_execution_local_cleanup,
+        process_cleanup=process_cleanup.val,
     )
 
 

@@ -569,7 +569,9 @@ async def select_coursier_resolve_for_targets(
         if target.has_field(JvmCompatibleResolveNamesField)
     ]
 
-    any_unspecified_resolves = any(i is None for i in transitive_jvm_resolve_names)
+    any_unspecified_resolves = not transitive_jvm_resolve_names or any(
+        i is None for i in transitive_jvm_resolve_names
+    )
 
     if not default_resolve_name and any_unspecified_resolves:
         raise CoursierError(
