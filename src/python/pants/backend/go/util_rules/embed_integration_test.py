@@ -25,6 +25,7 @@ from pants.backend.go.util_rules import (
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
+from pants.core.util_rules import source_files
 from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 
 
@@ -43,6 +44,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
+            *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget, ResourceTarget],
@@ -123,5 +125,4 @@ def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    print(f"test_result={result}")
     assert result.exit_code == 0

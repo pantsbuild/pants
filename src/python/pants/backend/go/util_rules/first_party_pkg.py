@@ -24,15 +24,7 @@ from pants.build_graph.address import Address
 from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
 from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import (
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    FileContent,
-    MergeDigests,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -168,7 +160,6 @@ async def compute_first_party_package_info(
         ExplicitlyProvidedDependencies, DependenciesRequest(target[Dependencies])
     )
     explicit_deps_targets = await Get(Targets, Addresses(explicit_deps.includes))
-    print(f"explicit_deps_targets={explicit_deps_targets}")
     pkg_relative_resource_targets = [
         tgt
         for tgt in explicit_deps_targets
@@ -178,7 +169,6 @@ async def compute_first_party_package_info(
         # have paths be relative to the resources' spec_path.
         and tgt.address.spec_path.startswith(request.address.spec_path)
     ]
-    print(f"pkg_relative_resource_targets={pkg_relative_resource_targets}")
 
     pkg_sources = await Get(
         HydratedSources,
@@ -207,8 +197,6 @@ async def compute_first_party_package_info(
         Digest, RemovePrefix(original_resources_digest, request.address.spec_path)
     )
     resources_digest = await Get(Digest, AddPrefix(stripped_resources_digest, "__resources__"))
-    ss = await Get(Snapshot, Digest, resources_digest)
-    print(f"ss.files={ss.files}")
 
     sources_digest = await Get(
         Digest,
@@ -237,7 +225,6 @@ async def compute_first_party_package_info(
             stderr=result.stderr.decode("utf-8"),
         )
 
-    print(f"stdout:\n{result.stdout.decode()}\nstderr:\n{result.stderr.decode()}")
     metadata = json.loads(result.stdout)
     if "Error" in metadata or "InvalidGoFiles" in metadata:
         error = metadata.get("Error", "")

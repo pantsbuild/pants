@@ -39,8 +39,10 @@ class EmbedConfig:
     @classmethod
     def from_json_dict(cls, d: dict[str, Any]) -> EmbedConfig:
         return cls(
-            patterns=d["Patterns"],
-            files=d["Files"],
+            patterns=FrozenDict(
+                {key: tuple(value) for key, value in d.get("Patterns", {}).items()}
+            ),
+            files=FrozenDict(d.get("Files", {})),
         )
 
     def to_embedcfg(self) -> bytes:

@@ -29,7 +29,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.core.target_types import ResourcesGeneratorTarget
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
 
@@ -48,6 +48,8 @@ def rule_runner() -> RuleRunner:
             *assembly.rules(),
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
+            QueryRule(Digest, [CreateDigest]),
+            QueryRule(Snapshot, [MergeDigests]),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
     )
@@ -164,7 +166,13 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         assert maybe_info.info is not None
         info = maybe_info.info
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
-        expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{dir_path}/*.go"])])
+        expected_source_digest = rule_runner.request(Digest, [PathGlobs([f"foo/{dir_path}/*.go"])])
+        resource_dir_digest = rule_runner.request(
+            Digest, [CreateDigest([Directory("__resources__")])]
+        )
+        expected_snapshot = rule_runner.request(
+            Snapshot, [MergeDigests([expected_source_digest, resource_dir_digest])]
+        )
         assert actual_snapshot == expected_snapshot
 
         assert info.imports == tuple(imports)
@@ -312,7 +320,6 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
         FallibleFirstPartyPkgInfo,
         [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
     )
-    print(f"stderr:\n{maybe_info.stderr}")
     assert maybe_info.info is not None
     info = maybe_info.info
     assert info.embed_config == EmbedConfig(
