@@ -46,6 +46,16 @@ class JvmArtifactVersionField(StringField):
     )
 
 
+class JvmArtifactUrlField(StringField):
+    alias = "url"
+    required = False
+    help = (
+        "A URL that points to the location of this artifact. If specified, Pants will not fetch this artifact "
+        "from default maven repositories, and instead fetch the artifact from this URL. To use default maven "
+        "repositories, do not set this value."
+    )
+
+
 class JvmArtifactPackagesField(StringSequenceField):
     alias = "packages"
     help = (
@@ -81,6 +91,7 @@ class JvmArtifactFieldSet(FieldSet):
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
+    url: JvmArtifactUrlField
 
     required_fields = (
         JvmArtifactGroupField,
@@ -95,6 +106,7 @@ class JvmArtifact(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *JvmArtifactFieldSet.required_fields,
+        JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
