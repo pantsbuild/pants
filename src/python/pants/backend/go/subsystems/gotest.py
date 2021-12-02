@@ -24,10 +24,7 @@ class GoTestSubsystem(Subsystem):
                 '`--go-test-args="-run TestFoo -v"`.\n\n'
                 "Known Go test options will be transformed into the form expected by the test "
                 "binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to "
-                "learn more about the options supported by Go test binaries.\n\n"
-                "The `-timeout` arg can be used to set a default timeout for each `go_package`, "
-                "e.g. `-timeout=2m`. The default can be overridden for each `go_package` via the "
-                "`test_timeout` field."
+                "learn more about the options supported by Go test binaries."
             ),
         )
 
