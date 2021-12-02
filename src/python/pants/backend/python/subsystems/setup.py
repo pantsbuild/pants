@@ -155,10 +155,14 @@ class PythonSetup(Subsystem):
             default=False,
             type=bool,
             help=(
-                "If enabled, when running binaries, tests and repls Pants will use the entire "
-                "lockfile/constraints file instead of just the relevant subset. This will improve "
-                "performance and reduce cache size, at the expense of caching granularity and "
-                "hermeticity. This option does not affect packaging deployable artifacts, such as "
+                "If enabled, when running binaries, tests, and repls, Pants will use the entire "
+                "lockfile/constraints file instead of just the relevant subset. This can improve "
+                "performance and reduce cache size, but has two consequences: 1) All cached test "
+                "results will be invalidated if any requirement in the lockfile changes, rather "
+                "than just those that depend on the changed requirement. 2) Requirements unneeded "
+                "by a test/run/repl will be present on the sys.path, which might in rare cases "
+                "cause their behavior to change.\n\n"
+                "This option does not affect packaging deployable artifacts, such as "
                 "PEX files, wheels and cloud functions, which will still use just the exact "
                 "subset of requirements needed."
             ),
