@@ -78,11 +78,9 @@ class GoTestFieldSet(TestFieldSet):
 
 def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
     result = []
-    if timeout_field_value is not None:
-        result.append(f"-test.timeout={timeout_field_value}s")
-
     i = 0
     next_arg_is_option_value = False
+    timeout_is_set = False
     while i < len(args):
         arg = args[i]
         i += 1
@@ -116,10 +114,7 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
         if arg_name in TEST_FLAGS:
             no_opt_provided = TEST_FLAGS[arg_name] and option_value == ""
             if arg_name == "timeout" and timeout_field_value is not None:
-                if no_opt_provided:
-                    # Skip the option value.
-                    i += 1
-                continue
+                timeout_is_set = True
 
             rewritten_arg = f"{arg[0:start_index]}test.{arg_name}{option_value}"
             result.append(rewritten_arg)
@@ -127,6 +122,9 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
                 next_arg_is_option_value = True
         else:
             result.append(arg)
+
+    if not timeout_is_set and timeout_field_value is not None:
+        result.append(f"-test.timeout={timeout_field_value}s")
 
     result.extend(args[i:])
     return tuple(result)

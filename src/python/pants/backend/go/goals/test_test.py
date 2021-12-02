@@ -77,13 +77,14 @@ def test_transform_test_args() -> None:
         "1m",
         "-test.v",
     )
-    assert transform_test_args(["-v"], timeout_field_value=100) == ("-test.timeout=100s", "-test.v")
+    assert transform_test_args(["-v"], timeout_field_value=100) == ("-test.v", "-test.timeout=100s")
     assert transform_test_args(["-timeout=1m", "-v"], timeout_field_value=100) == (
-        "-test.timeout=100s",
+        "-test.timeout=1m",
         "-test.v",
     )
     assert transform_test_args(["-timeout", "1m", "-v"], timeout_field_value=100) == (
-        "-test.timeout=100s",
+        "-test.timeout",
+        "1m",
         "-test.v",
     )
 

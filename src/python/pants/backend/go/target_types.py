@@ -133,9 +133,7 @@ class GoTestTimeoutField(IntField):
     alias = "test_timeout"
     help = (
         "A timeout (in seconds) when running this package's tests.\n\n"
-        "You can set a default timeout by setting `-timeout=2m`, for example, in the "
-        "`[go-test].args` option. Otherwise, if this field is not set, the test will never time "
-        "out."
+        "If this field is not set, the test will never time out."
     )
     valid_numbers = ValidNumbers.positive_and_zero
 
