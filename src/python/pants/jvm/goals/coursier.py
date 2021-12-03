@@ -107,7 +107,7 @@ def _coordinate_from_target(tgt: Target) -> Coordinate:
         raise InvalidTargetException(
             f"The `version` field of {tgt.alias} target {tgt.address} must be set."
         )
-        
+
     url = tgt[JvmArtifactUrlField].value
 
     return Coordinate(

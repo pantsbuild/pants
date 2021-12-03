@@ -139,6 +139,8 @@ class Coordinate:
         url = target[JvmArtifactUrlField].value
 
         logger.warning("%s", target)
+        if url and url.startswith("file:/"):
+            raise Exception("Pants does not currently support `file:` URLS")
 
 
         # These are all required, but mypy doesn't think so.
