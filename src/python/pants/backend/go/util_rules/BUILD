@@ -3,4 +3,3 @@
 
 python_sources(dependencies=["src/python/pants/backend/go/go_sources"])
 python_tests(name="tests", timeout=120)
-
