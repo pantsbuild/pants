@@ -1,7 +1,10 @@
 package org.pantsbuild.example.lib;
 
-public class ExampleLib {
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class ExampleLib { 
     public static String hello() {
-        return "Hello, World!";
+        ObjectMapper o = new ObjectMapper();
+        return "Hello, World and frederick";
     }
 }
