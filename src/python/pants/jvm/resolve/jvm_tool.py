@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import UnrecognizedResolveNamesError
-from pants.build_graph.address import Address, AddressInput, AddressInputParseException
+from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -238,12 +238,12 @@ async def generate_jvm_lockfile(
         try:
             address_input = AddressInput.parse(artifact_input)
             candidate_address_inputs.add(address_input)
-        except AddressInputParseException:
+        except Exception:
             bad_artifact_inputs.append(artifact_input)
 
     if bad_artifact_inputs:
         raise ValueError(
-            "The following values could not be parsed as an address nor as a JVM string. "
+            "The following values could not be parsed as an address nor as a JVM coordinate string. "
             f"The problematic inputs supplied to the `--{request.resolve_name}-artifacts option were: "
             f"{', '.join(bad_artifact_inputs)}."
         )
