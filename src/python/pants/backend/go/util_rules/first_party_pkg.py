@@ -273,7 +273,7 @@ async def compute_first_party_package_info(
 @rule
 async def setup_analyzer() -> PackageAnalyzerSetup:
     def get_file(filename: str) -> bytes:
-        content = pkgutil.get_data("pants.backend.go.util_rules", filename)
+        content = pkgutil.get_data("pants.backend.go.go_sources", filename)
         if not content:
             raise AssertionError(f"Unable to find resource for `{filename}`.")
         return content

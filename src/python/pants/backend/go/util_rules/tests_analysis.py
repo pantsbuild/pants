@@ -52,7 +52,7 @@ class AnalyzerSetup:
 
 @rule
 async def setup_analyzer() -> AnalyzerSetup:
-    source_entry_content = pkgutil.get_data("pants.backend.go.util_rules", "generate_testmain.go")
+    source_entry_content = pkgutil.get_data("pants.backend.go.go_sources", "generate_testmain.go")
     if not source_entry_content:
         raise AssertionError("Unable to find resource for `generate_testmain.go`.")
 
