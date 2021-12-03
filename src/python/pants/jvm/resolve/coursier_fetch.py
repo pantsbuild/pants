@@ -139,7 +139,7 @@ class Coordinate:
         url = target[JvmArtifactUrlField].value
 
         if url and url.startswith("file:/"):
-            raise Exception("Pants does not currently support `file:` URLS")
+            raise CoursierError("Pants does not currently support `file:` URLS")
 
         # These are all required, but mypy doesn't think so.
         assert group is not None and artifact is not None and version is not None
@@ -348,7 +348,6 @@ async def coursier_resolve_lockfile(
         return CoursierResolvedLockfile(entries=())
 
     coursier_report_file_name = "coursier_report.json"
-
     process_result = await Get(
         ProcessResult,
         Process(
