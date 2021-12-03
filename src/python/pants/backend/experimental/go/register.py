@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.go import target_type_rules
+from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.goals import check, package_binary, run_binary, tailor, test
 from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt import skip_field as gofmt_skip_field
@@ -50,6 +51,7 @@ def rules():
         *test.rules(),
         *run_binary.rules(),
         *package_binary.rules(),
+        *load_go_binary.rules(),
         # Gofmt
         *fmt.rules(),
         *gofmt_rules(),
