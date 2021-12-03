@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import logging
@@ -15,6 +16,7 @@ from pants.backend.docker.util_rules.docker_build_args import (
 )
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
+    DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
@@ -36,6 +38,10 @@ from pants.engine.target import (
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
+
+
+class DockerBuildContextError(Exception):
+    pass
 
 
 class DockerVersionContextError(ValueError):
@@ -100,25 +106,31 @@ class DockerBuildContext:
 
         if build_args:
             # Extract default arg values from the parsed Dockerfile.
-            arg_defaults = {
+            build_arg_defaults = {
                 def_name: def_value
                 for def_name, has_default, def_value in [
                     def_arg.partition("=") for def_arg in dockerfile_info.build_args
                 ]
                 if has_default
             }
-            build_args_context = {
-                arg_name: arg_value
-                if has_value
-                else build_env.get(arg_name, arg_defaults.get(arg_name))
-                for arg_name, has_value, arg_value in [
-                    build_arg.partition("=") for build_arg in build_args
-                ]
-            }
-            version_context["build_args"] = {
-                **arg_defaults,
-                **build_args_context,
-            }
+            try:
+                version_context["build_args"] = {
+                    arg_name: arg_value
+                    if has_value
+                    else build_env.get(arg_name, build_arg_defaults.get(arg_name))
+                    for arg_name, has_value, arg_value in [
+                        build_arg.partition("=") for build_arg in build_args
+                    ]
+                }
+            except DockerBuildEnvironmentError as e:
+                raise DockerBuildContextError(
+                    f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
+                    "\n\nIf you did not intend to inherit the value for this build arg from the "
+                    "environment, provide a default value where it is defined either in "
+                    "`[docker].build_args` or in the `extra_build_args` field on the target "
+                    "definition. Alternatively, you may also provide a default value on the `ARG` "
+                    "instruction in the `Dockerfile`."
+                ) from e
 
         return cls(
             build_args=build_args,

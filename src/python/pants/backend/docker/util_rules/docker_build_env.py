@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Mapping
 
-from pants.backend.docker.subsystems.docker_options import DockerOptions, UndefinedEnvVarBehavior
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
@@ -32,35 +32,25 @@ class DockerBuildEnvironmentError(ValueError):
 @dataclass(frozen=True)
 class DockerBuildEnvironment:
     environment: Environment
-    undefined_env_var_behavior: UndefinedEnvVarBehavior
 
     @classmethod
     def create(
         cls,
         env: Mapping[str, str],
-        undefined_env_var_behavior: UndefinedEnvVarBehavior = UndefinedEnvVarBehavior.RaiseError,
     ) -> DockerBuildEnvironment:
-        return cls(Environment(env), undefined_env_var_behavior)
+        return cls(Environment(env))
 
     def __getitem__(self, key: str) -> str:
-        return self.get(key)
-
-    def get(self, key: str, default: str | None = None) -> str:
-        if default is not None:
-            return self.environment.get(key, default)
         try:
             return self.environment[key]
         except KeyError as e:
-            if self.undefined_env_var_behavior is UndefinedEnvVarBehavior.Ignore:
-                return ""
+            raise DockerBuildEnvironmentError.from_key_error(e) from e
 
-            err = DockerBuildEnvironmentError.from_key_error(e)
-            if self.undefined_env_var_behavior is UndefinedEnvVarBehavior.LogWarning:
-                logger.warning(str(err))
-                return ""
+    def get(self, key: str, default: str | None = None) -> str:
+        if default is None:
+            return self[key]
 
-            assert self.undefined_env_var_behavior is UndefinedEnvVarBehavior.RaiseError
-            raise err from e
+        return self.environment.get(key, default)
 
 
 @dataclass(frozen=True)
@@ -78,7 +68,7 @@ async def docker_build_environment_vars(
         *docker_options.env_vars,
     )
     env = await Get(Environment, EnvironmentRequest(tuple(env_vars)))
-    return DockerBuildEnvironment.create(env, docker_options.undefined_env_var_behavior)
+    return DockerBuildEnvironment.create(env)
 
 
 def rules():

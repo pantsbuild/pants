@@ -3,22 +3,16 @@
 
 from __future__ import annotations
 
-import logging
-from typing import ContextManager
-
 import pytest
 
-from pants.backend.docker.subsystems.docker_options import UndefinedEnvVarBehavior
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import docker_build_args
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
-    DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
     rules,
 )
 from pants.engine.addresses import Address
-from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -84,48 +78,3 @@ def test_docker_build_environment_vars_rule(
     )
     res = rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)])
     assert res == DockerBuildEnvironment.create(expected_env_vars)
-
-
-@pytest.mark.parametrize(
-    "behavior, expectation, expect_logged",
-    [
-        (
-            UndefinedEnvVarBehavior.RaiseError,
-            pytest.raises(
-                DockerBuildEnvironmentError,
-                match=(
-                    r"The Docker environment variable 'NAME' is undefined\. You may provide a "
-                    r"value for this variable either in `\[docker]\.env_vars` or in Pants's "
-                    r"own environment\."
-                ),
-            ),
-            None,
-        ),
-        (
-            UndefinedEnvVarBehavior.LogWarning,
-            no_exception(),
-            [
-                (
-                    logging.WARNING,
-                    (
-                        "The Docker environment variable 'NAME' is undefined. You may provide a "
-                        "value for this variable either in `[docker].env_vars` or in Pants's "
-                        "own environment."
-                    ),
-                )
-            ],
-        ),
-        (
-            UndefinedEnvVarBehavior.Ignore,
-            no_exception(),
-            None,
-        ),
-    ],
-)
-def test_undefined_env_var_behavior(
-    caplog, behavior: UndefinedEnvVarBehavior, expectation: ContextManager, expect_logged
-) -> None:
-    env = DockerBuildEnvironment.create({}, undefined_env_var_behavior=behavior)
-    with expectation:
-        assert env["NAME"] == ""
-    assert_logged(caplog, expect_logged)

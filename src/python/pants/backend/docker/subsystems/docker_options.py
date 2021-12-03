@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from textwrap import dedent
 from typing import cast
 
@@ -11,15 +10,6 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
-
-
-class UndefinedEnvVarBehavior(Enum):
-    """What action to take in case there is no value for an docker env var in Pants's
-    environment."""
-
-    RaiseError = "error"
-    LogWarning = "warning"
-    Ignore = "ignore"
 
 
 class DockerOptions(Subsystem):
@@ -102,17 +92,6 @@ class DockerOptions(Subsystem):
             ),
         )
 
-        register(
-            "--undefined-env-var-behavior",
-            advanced=True,
-            type=UndefinedEnvVarBehavior,
-            default=UndefinedEnvVarBehavior.RaiseError,
-            help=(
-                "What action to take in case there is no explicit value for an `[docker].env_vars` "
-                "variable, and there is no value to copy from Pants's own environment."
-            ),
-        )
-
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
@@ -120,10 +99,6 @@ class DockerOptions(Subsystem):
     @property
     def env_vars(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.env_vars)))
-
-    @property
-    def undefined_env_var_behavior(self) -> UndefinedEnvVarBehavior:
-        return cast(UndefinedEnvVarBehavior, self.options.undefined_env_var_behavior)
 
     @property
     def default_repository(self) -> str:

@@ -120,6 +120,7 @@ class DockerfileInfoError(Exception):
 
 @dataclass(frozen=True)
 class DockerfileInfo:
+    address: Address
     digest: Digest
     source: str
     putative_target_addresses: tuple[str, ...] = ()
@@ -170,6 +171,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
 
     try:
         return DockerfileInfo(
+            address=request.address,
             digest=sources.snapshot.digest,
             source=dockerfile,
             putative_target_addresses=putative_targets,

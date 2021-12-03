@@ -263,6 +263,8 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
 
 
 def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
+    # Test that only explicitly defined build args in the BUILD file or pants configuraiton use the
+    # environment for its values.
     rule_runner.write_files(
         {
             "src/docker/BUILD": dedent(
@@ -300,9 +302,7 @@ def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
             "baseimage": {"tag": "${base_version}"},
             "stage0": {"tag": "${base_version}"},
             "build_args": {
-                # The base_name should not be affected, as we do not include it as a --build-arg to
-                # `docker build`.
-                "base_name": "python",
+                # `base_name` is not listed here, as it was not an explicitly defined build arg.
                 "base_version": "3.9",
             },
         },
@@ -310,40 +310,70 @@ def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "behavior, MY_ARG_VALUE, expect",
+    "dockerfile_arg_value, extra_build_arg_value, expect",
     [
-        ("ignore", None, no_exception()),
-        ("ignore", "my   default", no_exception()),
-        # warning does the same as ignore, but with additional logging, tested else where.
-        (
-            "error",
+        pytest.param(None, None, no_exception(), id="No args defined"),
+        pytest.param(
             None,
-            pytest.raises(
-                ExecutionError, match=r"The Docker environment variable 'MY_ARG' is undefined\."
-            ),
+            "",
+            pytest.raises(ExecutionError, match=r"variable 'MY_ARG' is undefined"),
+            id="No default value for build arg",
         ),
-        ("error", "my default/value", no_exception()),
+        pytest.param(None, "some default value", no_exception(), id="Default value for build arg"),
+        pytest.param("", None, no_exception(), id="No build arg defined, and ARG without default"),
+        pytest.param(
+            "",
+            "",
+            pytest.raises(ExecutionError, match=r"variable 'MY_ARG' is undefined"),
+            id="No default value from ARG",
+        ),
+        pytest.param(
+            "", "some default value", no_exception(), id="Default value for build arg, ARG present"
+        ),
+        pytest.param(
+            "some default value", None, no_exception(), id="No build arg defined, only ARG"
+        ),
+        pytest.param("some default value", "", no_exception(), id="Default value from ARG"),
+        pytest.param(
+            "some default value",
+            "some other default",
+            no_exception(),
+            id="Default value for build arg, ARG default",
+        ),
     ],
 )
 def test_undefined_env_var_behavior(
-    rule_runner: RuleRunner, behavior: str, MY_ARG_VALUE: str | None, expect: ContextManager
+    rule_runner: RuleRunner,
+    dockerfile_arg_value: str | None,
+    extra_build_arg_value: str | None,
+    expect: ContextManager,
 ) -> None:
-    dockerfile_arg_instruction = f"ARG MY_ARG={MY_ARG_VALUE}" if MY_ARG_VALUE is not None else ""
+    dockerfile_arg = ""
+    if dockerfile_arg_value is not None:
+        dockerfile_arg = "ARG MY_ARG"
+        if dockerfile_arg_value:
+            dockerfile_arg += f"={dockerfile_arg_value}"
+
+    extra_build_args = ""
+    if extra_build_arg_value is not None:
+        extra_build_args = 'extra_build_args=["MY_ARG'
+        if extra_build_arg_value:
+            extra_build_args += f"={extra_build_arg_value}"
+        extra_build_args += '"],'
+
     rule_runner.write_files(
         {
             "src/docker/BUILD": dedent(
-                """\
+                f"""\
                 docker_image(
-                  extra_build_args=[
-                    "MY_ARG",
-                  ]
+                  {extra_build_args}
                 )
                 """
             ),
             "src/docker/Dockerfile": dedent(
                 f"""\
                 FROM python:3.8
-                {dockerfile_arg_instruction}
+                {dockerfile_arg}
                 """
             ),
         }
@@ -353,11 +383,5 @@ def test_undefined_env_var_behavior(
         assert_build_context(
             rule_runner,
             Address("src/docker"),
-            pants_args=[f"--docker-undefined-env-var-behavior={behavior}"],
             expected_files=["src/docker/Dockerfile"],
-            expected_version_context={
-                "baseimage": {"tag": "3.8"},
-                "stage0": {"tag": "3.8"},
-                "build_args": {"MY_ARG": MY_ARG_VALUE or ""},
-            },
         )

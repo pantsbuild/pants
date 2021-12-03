@@ -71,7 +71,9 @@ def assert_build(
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
             digest=EMPTY_DIGEST,
-            dockerfile_info=DockerfileInfo(digest=EMPTY_DIGEST, source="docker/test/Dockerfile"),
+            dockerfile_info=DockerfileInfo(
+                request.address, digest=EMPTY_DIGEST, source="docker/test/Dockerfile"
+            ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
             build_env=rule_runner.request(
                 DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]
