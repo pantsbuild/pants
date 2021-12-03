@@ -81,7 +81,5 @@ def test_go_mod_info(rule_runner: RuleRunner) -> None:
             {"foo/go.mod": go_mod_content, "foo/go.sum": go_sum_content}
         ).digest
     )
-    assert (
-        go_mod_info.stripped_digest
-        == rule_runner.make_snapshot({"go.mod": go_mod_content, "go.sum": go_sum_content}).digest
-    )
+    assert go_mod_info.mod_path == "foo/go.mod"
+    assert go_mod_info.minimum_go_version == "1.17"

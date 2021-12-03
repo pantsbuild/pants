@@ -158,7 +158,9 @@ async def inject_go_third_party_package_dependencies(
     tgt = wrapped_target.target
     pkg_info = await Get(
         ThirdPartyPkgInfo,
-        ThirdPartyPkgInfoRequest(tgt[GoImportPathField].value, go_mod_info.stripped_digest),
+        ThirdPartyPkgInfoRequest(
+            tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
+        ),
     )
 
     inferred_dependencies = []
@@ -200,7 +202,8 @@ async def generate_targets_from_go_mod(
     generator_addr = request.generator.address
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
     all_packages = await Get(
-        AllThirdPartyPackages, AllThirdPartyPackagesRequest(go_mod_info.stripped_digest)
+        AllThirdPartyPackages,
+        AllThirdPartyPackagesRequest(go_mod_info.digest, go_mod_info.mod_path),
     )
 
     def create_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
