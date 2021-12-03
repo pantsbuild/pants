@@ -52,7 +52,7 @@ class JvmArtifactUrlField(StringField):
     help = (
         "A URL that points to the location of this artifact. If specified, Pants will not fetch this artifact "
         "from default maven repositories, and instead fetch the artifact from this URL. To use default maven "
-        "repositories, do not set this value. Note that `file:` URLs are not presently supported."
+        "repositories, do not set this value. \n\nNote that `file:` URLs are not presently supported."
     )
 
 
