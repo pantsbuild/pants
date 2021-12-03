@@ -9,16 +9,21 @@ from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import UnrecognizedResolveNamesError
+from pants.build_graph.address import Address, AddressInput, AddressInputParseException
+from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
+from pants.jvm.goals.coursier import coordinate_from_target
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
     CoursierResolvedLockfile,
 )
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -93,11 +98,8 @@ class JvmToolBase(Subsystem):
         return cast(str, self.options.version)
 
     @property
-    def artifacts(self) -> tuple[Coordinate, ...]:
-        return tuple(
-            Coordinate.from_coord_str(s.replace("%VERSION%", self.version))
-            for s in self.options.artifacts
-        )
+    def artifact_inputs(self) -> tuple[str, ...]:
+        return tuple(s.format(version=self.version) for s in self.options.artifacts)
 
     @property
     def lockfile(self) -> str:
@@ -128,14 +130,14 @@ class JvmToolLockfileSentinel:
 
 @dataclass(frozen=True)
 class JvmToolLockfileRequest:
-    artifacts: FrozenOrderedSet[Coordinate]
+    artifact_inputs: FrozenOrderedSet[str]
     resolve_name: str
     lockfile_dest: str
 
     @classmethod
     def from_tool(cls, tool: JvmToolBase) -> JvmToolLockfileRequest:
         return cls(
-            artifacts=FrozenOrderedSet(tool.artifacts),
+            artifact_inputs=FrozenOrderedSet(tool.artifact_inputs),
             resolve_name=tool.options_scope,
             lockfile_dest=tool.lockfile,
         )
@@ -219,7 +221,52 @@ async def generate_lockfiles_goal(
 async def generate_jvm_lockfile(
     request: JvmToolLockfileRequest,
 ) -> JvmToolLockfile:
-    resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements(request.artifacts))
+    # Separate `artifact_inputs` by whether the strings parse as an `Address` or not.
+    coordinates: set[Coordinate] = set()
+    candidate_address_inputs: set[AddressInput] = set()
+    bad_artifact_inputs = []
+    for artifact_input in request.artifact_inputs:
+        # Try parsing as a `Coordinate` first since otherwise `AddressInput.parse` will try to see if the
+        # group name is a file on disk.
+        if 2 <= artifact_input.count(":") <= 3:
+            try:
+                maybe_coord = Coordinate.from_coord_str(artifact_input)
+                coordinates.add(maybe_coord)
+                continue
+            except Exception:
+                pass
+
+        try:
+            address_input = AddressInput.parse(artifact_input)
+            candidate_address_inputs.add(address_input)
+        except AddressInputParseException:
+            bad_artifact_inputs.append(artifact_input)
+
+    if bad_artifact_inputs:
+        raise ValueError(
+            "The following values could not be parsed as an address nor as a JVM string. "
+            f"The problematic inputs supplied to the `--{request.resolve_name}-artifacts option were: "
+            f"{', '.join(bad_artifact_inputs)}."
+        )
+
+    # Gather coordinates from the provided addresses.
+    addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in candidate_address_inputs)
+    all_supplied_targets = await Get(Targets, Addresses(addresses))
+    other_targets = []
+    for tgt in all_supplied_targets:
+        if JvmArtifactFieldSet.is_applicable(tgt):
+            coordinates.add(coordinate_from_target(tgt))
+        else:
+            other_targets.append(tgt)
+
+    if other_targets:
+        raise ValueError(
+            "The following addresses reference targets that are not `jvm_artifact` targets. "
+            f"Please only supply the addresses of `jvm_artifact` for the `--{request.resolve_name}-artifacts "
+            f"option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}."
+        )
+
+    resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements(coordinates))
     lockfile_content = resolved_lockfile.to_json()
     lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])

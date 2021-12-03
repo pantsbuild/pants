@@ -17,11 +17,15 @@ BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
 BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":#!@?=")
 
 
-class InvalidSpecPath(ValueError):
+class AddressInputParseException(ValueError):
+    """Base class for parse exceptions raised by AddressInput."""
+
+
+class InvalidSpecPath(AddressInputParseException):
     """Indicate an invalid spec path for `Address`."""
 
 
-class InvalidTargetName(ValueError):
+class InvalidTargetName(AddressInputParseException):
     """Indicate an invalid target name for `Address`."""
 
 

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from itertools import groupby
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -43,9 +42,7 @@ from pants.jvm.target_types import (
     JvmArtifactGroupField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
-    JvmRequirementsField,
 )
-from pants.util.logging import LogLevel
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
@@ -68,27 +65,7 @@ class CoursierResolve(Goal):
     subsystem_cls = CoursierResolveSubsystem
 
 
-@dataclass(frozen=True)
-class GatherArtifactRequirementsRequest:
-    """Gather the coordinate requirements from a JarRequirementsField."""
-
-    requirements: JvmRequirementsField
-
-
-@rule(level=LogLevel.DEBUG)
-async def gather_artifact_requirements(
-    request: GatherArtifactRequirementsRequest,
-) -> ArtifactRequirements:
-
-    requirements_addresses = await Get(
-        Addresses, UnparsedAddressInputs, request.requirements.to_unparsed_address_inputs()
-    )
-    requirements_targets = await Get(Targets, Addresses, requirements_addresses)
-
-    return ArtifactRequirements(_coordinate_from_target(tgt) for tgt in requirements_targets)
-
-
-def _coordinate_from_target(tgt: Target) -> Coordinate:
+def coordinate_from_target(tgt: Target) -> Coordinate:
     group = tgt[JvmArtifactGroupField].value
     if not group:
         raise InvalidTargetException(
@@ -199,7 +176,7 @@ async def coursier_generate_lockfile(
     ]
 
     artifact_requirements = ArtifactRequirements(
-        [_coordinate_from_target(tgt) for tgt in resolvable_dependencies]
+        [coordinate_from_target(tgt) for tgt in resolvable_dependencies]
     )
 
     resolved_lockfile = await Get(

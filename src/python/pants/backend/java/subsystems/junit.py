@@ -12,8 +12,8 @@ class JUnit(JvmToolBase):
     default_version = "5.7.2"
     default_artifacts = [
         "org.junit.platform:junit-platform-console:1.7.2",
-        "org.junit.jupiter:junit-jupiter-engine:%VERSION%",
-        "org.junit.vintage:junit-vintage-engine:%VERSION%",
+        "org.junit.jupiter:junit-jupiter-engine:{version}",
+        "org.junit.vintage:junit-vintage-engine:{version}",
     ]
     default_lockfile_resource = ("pants.backend.java.test", "junit.default.lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/java/test/junit.default.lockfile.txt"
