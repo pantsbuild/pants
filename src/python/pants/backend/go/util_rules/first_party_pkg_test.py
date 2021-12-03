@@ -20,14 +20,16 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
     FirstPartyPkgInfoRequest,
 )
+from pants.core.target_types import ResourcesGeneratorTarget
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
 
@@ -46,8 +48,10 @@ def rule_runner() -> RuleRunner:
             *assembly.rules(),
             QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
+            QueryRule(Digest, [CreateDigest]),
+            QueryRule(Snapshot, [MergeDigests]),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -162,7 +166,13 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         assert maybe_info.info is not None
         info = maybe_info.info
         actual_snapshot = rule_runner.request(Snapshot, [info.digest])
-        expected_snapshot = rule_runner.request(Snapshot, [PathGlobs([f"foo/{dir_path}/*.go"])])
+        expected_source_digest = rule_runner.request(Digest, [PathGlobs([f"foo/{dir_path}/*.go"])])
+        resource_dir_digest = rule_runner.request(
+            Digest, [CreateDigest([Directory("__resources__")])]
+        )
+        expected_snapshot = rule_runner.request(
+            Snapshot, [MergeDigests([expected_source_digest, resource_dir_digest])]
+        )
         assert actual_snapshot == expected_snapshot
 
         assert info.imports == tuple(imports)
@@ -261,7 +271,16 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
 def test_embeds_supported(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":resources"])
+                resources(
+                  name="resources",
+                  sources=["*.txt"],
+                )
+                """
+            ),
             "go.mod": dedent(
                 """\
                 module go.example.com/foo
@@ -303,6 +322,13 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     )
     assert maybe_info.info is not None
     info = maybe_info.info
-    assert info.embed_patterns == ("grok.txt",)
-    assert info.test_embed_patterns == ("test_grok.txt",)
-    assert info.xtest_embed_patterns == ("xtest_grok.txt",)
+    assert info.embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
+    )
+    assert info.test_embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
+        {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
+    )
+    assert info.xtest_embed_config == EmbedConfig(
+        {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
+    )

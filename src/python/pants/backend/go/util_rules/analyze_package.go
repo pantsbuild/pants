@@ -26,6 +26,11 @@ import (
 	"strings"
 )
 
+type EmbedCfg struct {
+	Patterns map[string][]string
+	Files    map[string]string
+}
+
 // Package represents the results of analyzing a Go package.
 type Package struct {
 	Name string // package name
@@ -60,9 +65,12 @@ type Package struct {
 	//	//go:embed a* b.c
 	// then the list will contain those two strings as separate entries.
 	// (See package embed for more details about //go:embed.)
-	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
-	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
-	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
+	EmbedPatterns      []string  `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	EmbedConfig        *EmbedCfg `json:",omitempty"` // files matching the EmbedPatterns
+	TestEmbedPatterns  []string  `json:",omitempty"` // patterns from TestGoFiles
+	TestEmbedConfig    *EmbedCfg `json:",omitempty"` // files matching the TestEmbedPatterns
+	XTestEmbedPatterns []string  `json:",omitempty"` // patterns from XTestGoFiles
+	XTestEmbedConfig   *EmbedCfg `json:",omitempty"` // files matching the XTestEmbedPatterns
 
 	// Error information. This differs from how `go list` reports errors.
 	InvalidGoFiles map[string]string `json:",omitempty"`
@@ -118,6 +126,101 @@ func cleanStringSet(valuesMap map[string]bool) []string {
 	}
 	sort.Strings(values)
 	return values
+}
+
+func computeEmbedConfigs(directory string, pkg *Package) error {
+	// Obtain a list of files in and under the package's directory. These will be embeddable files.
+	// TODO: Support resource targets elsewhere in the repository.
+
+	fmt.Fprintf(os.Stderr, "computeEmbedConfigs(directory=%s)\n", directory)
+	var embedSrcs []string
+	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "path=%s\n", path)
+		embedSrcs = append(embedSrcs, path)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "embedSrcs=%v\n", embedSrcs)
+
+	root, err := buildEmbedTree(embedSrcs, []string{directory})
+	if err != nil {
+		return err
+	}
+
+	if len(pkg.EmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range pkg.EmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		pkg.EmbedConfig = embedCfg
+	}
+
+	if len(pkg.TestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+		if pkg.EmbedConfig != nil {
+			for key, value := range pkg.EmbedConfig.Patterns {
+				embedCfg.Patterns[key] = value
+			}
+			for key, value := range pkg.EmbedConfig.Files {
+				embedCfg.Files[key] = value
+			}
+		}
+
+		for _, pattern := range pkg.TestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		pkg.TestEmbedConfig = embedCfg
+	}
+
+	if len(pkg.XTestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range pkg.XTestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		pkg.XTestEmbedConfig = embedCfg
+	}
+
+	return nil
 }
 
 func analyzePackage(directory string, buildContext *build.Context) (*Package, error) {
@@ -294,6 +397,12 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	pkg.EmbedPatterns = cleanStringSet(embedsMap)
 	pkg.TestEmbedPatterns = cleanStringSet(testEmbedsMap)
 	pkg.XTestEmbedPatterns = cleanStringSet(xtestEmbedsMap)
+
+	// Fill in embedcfg needed for compiler.
+	err = computeEmbedConfigs("__resources__", pkg)
+	if err != nil {
+		return pkg, fmt.Errorf("unable to compute embedcfg: %s", err)
+	}
 
 	// add the .S/.sx files only if we are using cgo
 	// (which means gcc will compile them).

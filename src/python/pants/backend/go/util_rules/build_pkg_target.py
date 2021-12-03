@@ -15,6 +15,7 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgInfo,
     FirstPartyPkgInfoRequest,
@@ -51,6 +52,7 @@ async def setup_build_go_package_target_request(
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
 
+    embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_info = await Get(
             FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
@@ -70,11 +72,13 @@ async def setup_build_go_package_target_request(
         minimum_go_version = _first_party_pkg_info.minimum_go_version
 
         go_file_names = _first_party_pkg_info.go_files
+        embed_config = _first_party_pkg_info.embed_config
         if request.for_tests:
             # TODO: Build the test sources separately and link the two object files into the package archive?
             # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
             #   need to do something similar?
             go_file_names += _first_party_pkg_info.test_files
+            embed_config = _first_party_pkg_info.test_embed_config
         s_file_names = _first_party_pkg_info.s_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
@@ -135,6 +139,7 @@ async def setup_build_go_package_target_request(
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,
+        embed_config=embed_config,
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 

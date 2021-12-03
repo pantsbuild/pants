@@ -224,6 +224,7 @@ async def run_go_tests(
             s_file_names=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_info.minimum_go_version,
+            embed_config=pkg_info.xtest_embed_config,
         )
         main_direct_deps.append(xtest_pkg_build_request)
 

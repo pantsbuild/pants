@@ -11,6 +11,7 @@ from typing import ClassVar
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
@@ -20,11 +21,22 @@ from pants.backend.go.util_rules.go_mod import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
+from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Targets,
+    WrappedTarget,
+)
 from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
 
@@ -77,8 +89,11 @@ class FirstPartyPkgInfo:
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
+    embed_config: EmbedConfig | None
     test_embed_patterns: tuple[str, ...]
+    test_embed_config: EmbedConfig | None
     xtest_embed_patterns: tuple[str, ...]
+    xtest_embed_config: EmbedConfig | None
 
 
 @dataclass(frozen=True)
@@ -134,15 +149,65 @@ async def compute_first_party_package_info(
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
     )
+    target = wrapped_target.target
+
+    # Find resource targets.
+    # TODO: This uses ExplicitlyProvidedDependencies to avoid triggering dependency inference which
+    # causes a rule cycle back to this rule as dependency inference tries to analyze dependent
+    # `go_package` targets. There really needs to be a way to limit `DependenciesRequest` to just
+    # targets meeting certain criteria, which would be resource targets in this case.
+    explicit_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(target[Dependencies])
+    )
+    explicit_deps_targets = await Get(Targets, Addresses(explicit_deps.includes))
+    pkg_relative_resource_targets = [
+        tgt
+        for tgt in explicit_deps_targets
+        # Note: target expansion is not ocurring?
+        if tgt.has_field(ResourceSourceField) or tgt.has_field(ResourcesGeneratingSourcesField)
+        # TODO: Currently limited to resources directly under package in source tree. Allow any resource and
+        # have paths be relative to the resources' spec_path.
+        and tgt.address.spec_path.startswith(request.address.spec_path)
+    ]
 
     pkg_sources = await Get(
         HydratedSources,
-        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
+        HydrateSourcesRequest(target[GoPackageSourcesField]),
     )
+
+    resources_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                tgt[SourcesField],
+                for_sources_types=(
+                    ResourceSourceField,
+                    ResourcesGeneratingSourcesField,
+                ),
+                enable_codegen=True,
+            ),
+        )
+        for tgt in pkg_relative_resource_targets
+    )
+
+    original_resources_digest = await Get(
+        Digest, MergeDigests([src.snapshot.digest for src in resources_sources])
+    )
+    stripped_resources_digest = await Get(
+        Digest, RemovePrefix(original_resources_digest, request.address.spec_path)
+    )
+    resources_digest = await Get(Digest, AddPrefix(stripped_resources_digest, "__resources__"))
+
+    sources_digest = await Get(
+        Digest,
+        MergeDigests([pkg_sources.snapshot.digest, resources_digest]),
+    )
+
     input_digest = await Get(
         Digest,
-        MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
+        MergeDigests([sources_digest, analyzer.digest]),
     )
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -184,7 +249,7 @@ async def compute_first_party_package_info(
         )
 
     info = FirstPartyPkgInfo(
-        digest=pkg_sources.snapshot.digest,
+        digest=sources_digest,
         dir_path=request.address.spec_path,
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
@@ -196,8 +261,11 @@ async def compute_first_party_package_info(
         s_files=tuple(metadata.get("SFiles", [])),
         minimum_go_version=go_mod_info.minimum_go_version,
         embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
+        embed_config=EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {})),
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
+        test_embed_config=EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {})),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+        xtest_embed_config=EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {})),
     )
     return FallibleFirstPartyPkgInfo(info, import_path_info.import_path)
 
@@ -211,7 +279,8 @@ async def setup_analyzer() -> PackageAnalyzerSetup:
         return content
 
     analyer_sources_content = [
-        FileContent(filename, get_file(filename)) for filename in ("analyze_package.go", "read.go")
+        FileContent(filename, get_file(filename))
+        for filename in ("analyze_package.go", "read.go", "embedcfg.go")
     ]
 
     source_digest, import_config = await MultiGet(
