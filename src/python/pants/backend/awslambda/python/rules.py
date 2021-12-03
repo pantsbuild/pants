@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import sys
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
@@ -54,6 +55,14 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
+
+    if sys.platform == "darwin":
+        logger.warning(
+            "Building lambdas on macOS is not recommended. Lambdas must be built for Linux "
+            "and it is difficult to ensure that all transitive requirements have "
+            "prebuilt linux wheels."
+        )
+
     output_filename = field_set.output_path.value_or_default(
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",

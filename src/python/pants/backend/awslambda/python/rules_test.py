@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import sys
 from io import BytesIO
 from textwrap import dedent
 from zipfile import ZipFile
@@ -72,7 +73,9 @@ def create_python_awslambda(
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
-def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_create_hello_world_lambda(
+    rule_runner: RuleRunner, major_minor_interpreter: str, caplog
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -105,6 +108,8 @@ def test_create_hello_world_lambda(rule_runner: RuleRunner, major_minor_interpre
     names = set(zipfile.namelist())
     assert "lambdex_handler.py" in names
     assert "foo/bar/hello_world.py" in names
+    if sys.platform == "darwin":
+        assert "Building lambdas on macOS is not recommended." in caplog.text
 
 
 def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
