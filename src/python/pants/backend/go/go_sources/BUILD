@@ -1,4 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-resources(sources=["*.go", "!gentestflags.go"])
+python_source(name="init", source="__init__.py")
+resources(sources=["*.go", "!gentestflags.go"], dependencies=[":init"])
