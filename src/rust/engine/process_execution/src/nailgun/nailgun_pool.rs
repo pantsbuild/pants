@@ -95,27 +95,39 @@ impl NailgunPool {
   ) -> Result<BorrowedNailgunProcess, String> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
-    let mut processes = self.processes.lock().await;
+    let mut process_ref = {
+      let mut processes = self.processes.lock().await;
 
-    // Start by seeing whether there are any idle processes with a matching fingerprint.
-    if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
-      return Ok(BorrowedNailgunProcess::new(process));
-    }
+      // Start by seeing whether there are any idle processes with a matching fingerprint.
+      if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
+        return Ok(BorrowedNailgunProcess::new(process));
+      }
 
-    // There wasn't a matching, valid, available process. We need to start one.
-    if processes.len() >= self.size {
-      // Find the oldest idle non-matching process and remove it.
-      let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
-        // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
-        // should be impossible.
-        "No idle slots in nailgun pool.".to_owned()
-      })?;
+      // There wasn't a matching, valid, available process. We need to start one.
+      if processes.len() >= self.size {
+        // Find the oldest idle non-matching process and remove it.
+        let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
+          // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
+          // should be impossible.
+          "No idle slots in nailgun pool.".to_owned()
+        })?;
 
-      processes.swap_remove(idx);
-    }
+        processes.swap_remove(idx);
+      }
 
-    // Start the new process.
-    let process = Arc::new(Mutex::new(Some(
+      // Add a new entry for the process, and immediately acquire its mutex, but wait to spawn it
+      // until we're outside the pool's mutex.
+      let process = Arc::new(Mutex::new(None));
+      processes.push(PoolEntry {
+        fingerprint: requested_fingerprint.clone(),
+        last_used: Instant::now(),
+        process: process.clone(),
+      });
+      process.lock_arc().await
+    };
+
+    // Now that we're outside the pool's mutex, spawn and return the process.
+    *process_ref = Some(
       NailgunProcess::start_new(
         name.clone(),
         server_process,
@@ -124,17 +136,12 @@ impl NailgunPool {
         &self.store,
         self.executor.clone(),
         &self.named_caches,
-        requested_fingerprint.clone(),
+        requested_fingerprint,
       )
       .await?,
-    )));
-    processes.push(PoolEntry {
-      fingerprint: requested_fingerprint,
-      last_used: Instant::now(),
-      process: process.clone(),
-    });
+    );
 
-    Ok(BorrowedNailgunProcess::new(process.lock_arc().await))
+    Ok(BorrowedNailgunProcess::new(process_ref))
   }
 
   ///
