@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
 from textwrap import dedent
 from typing import Dict, List, Union
 
@@ -65,7 +64,7 @@ def test_flatten_shlexed_list() -> None:
     ]
 
 
-class CustomTypesTest(unittest.TestCase):
+class TestCustomTypes:
     def assert_list_parsed(self, s: str, *, expected: ParsedList) -> None:
         assert expected == ListValueComponent.create(s).val
 
@@ -150,8 +149,10 @@ class CustomTypesTest(unittest.TestCase):
         self.assert_split_list("+1,2],-[3,4", expected=["+1,2]", "-[3,4"])
         self.assert_split_list("+(1,2],-[3,4)", expected=["+(1,2]", "-[3,4)"])
 
-    # The heuristic list modifier expression splitter cannot handle certain very unlikely cases.
-    @unittest.expectedFailure
+    #
+    @pytest.mark.xfail(
+        reason="The heuristic list modifier expression splitter cannot handle certain very unlikely cases."
+    )
     def test_split_unlikely_list_modifier_expression(self) -> None:
         # Example of the kind of (unlikely) values that will defeat our heuristic, regex-based
         # splitter of list modifier expressions.
