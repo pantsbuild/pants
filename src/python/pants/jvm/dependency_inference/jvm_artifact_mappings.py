@@ -4,6 +4,7 @@ from __future__ import annotations
 
 JVM_ARTIFACT_MAPPINGS = {
     "aQute.bnd.**": "biz.aQute:bnd",
+    "com.fasterxml.jackson.databind.**": "com.fasterxml.jackson.core:jackson-databind",
     "com.google.common.collect.**": "com.google.guava:guava",
     "com.google.common.testing.**": "com.google.guava:guava-testlib",
     "com.google.common.truth.**": "com.google.truth:truth",
