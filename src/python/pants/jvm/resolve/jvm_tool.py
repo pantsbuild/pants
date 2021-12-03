@@ -29,7 +29,6 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
-NO_TOOL_LOCKFILE = "<none>"
 
 
 logger = logging.getLogger(__name__)
@@ -59,8 +58,9 @@ class JvmToolBase(Subsystem):
             advanced=True,
             default=cls.default_version,
             help=(
-                "Version string for the tool. This will be substituted for any unspecified version in "
-                "the --artifacts value."
+                "Version string for the tool. This is available for substitution in the "
+                f"`[{cls.options_scope}].artifacts` option by including the string "
+                "`{version}`."
             ),
         )
         register(
@@ -70,8 +70,10 @@ class JvmToolBase(Subsystem):
             advanced=True,
             default=cls.default_artifacts,
             help=(
-                "Artifact requirements for this tool using colon-separated form for the Maven coordinates. "
-                "The string %VERSION% version will be substituted with the --version value."
+                "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
+                "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
+                "For Maven coordinates, the string `{version}` version will be substituted with the value of the "
+                f"`[{cls.options_scope}].version` option."
             ),
         )
         register(
@@ -84,9 +86,6 @@ class JvmToolBase(Subsystem):
                 f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
                 "Pants, so long as you have not changed the `--version` option. "
                 f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We "
-                f"do not recommend this, though, as lockfiles are essential for reproducible "
-                f"builds.\n\n"
                 "To use a custom lockfile, set this option to a file path relative to the "
                 f"build root, then run `./pants jvm-generate-lockfiles "
                 f"--resolve={cls.options_scope}`.\n\n"
@@ -166,9 +165,9 @@ class GenerateJvmLockfilesSubsystem(GoalSubsystem):
             help=(
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for tool lockfiles which are "
-                "the options scope for that tool such as `junit-tool`.\n\n"
-                "For example, you can run `./pants generate-lockfiles --resolve=junit-tool "
-                "to only generate lockfiles for that tool.\n\n"
+                "the options scope for that tool such as `junit`.\n\n"
+                "For example, you can run `./pants generate-lockfiles --resolve=junit "
+                "to only generate lockfiles for the `junit` tool.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
                 "possible values.\n\n"
                 "If not specified, Pants will generate lockfiles for all resolves."
@@ -313,7 +312,7 @@ def filter_tool_lockfile_requests(
 ) -> list[JvmToolLockfileRequest]:
     result = []
     for req in specified_requests:
-        if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
+        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
             result.append(req)
             continue
         if resolve_specified:

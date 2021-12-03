@@ -56,7 +56,6 @@ def test_filter_tool_lockfile_requests() -> None:
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
-    # disabled_tool = create_request("none", lockfile_dest=NO_TOOL_LOCKFILE)
     default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
 
     def assert_filtered(
@@ -74,13 +73,6 @@ def test_filter_tool_lockfile_requests() -> None:
 
     assert_filtered(None, resolve_specified=False)
     assert_filtered(None, resolve_specified=True)
-
-    # assert_filtered(disabled_tool, resolve_specified=False)
-    # with pytest.raises(ValueError) as exc:
-    #     assert_filtered(disabled_tool, resolve_specified=True)
-    # assert f"`[{disabled_tool.resolve_name}].lockfile` is set to `{NO_TOOL_LOCKFILE}`" in str(
-    #     exc.value
-    # )
 
     assert_filtered(default_tool, resolve_specified=False)
     with pytest.raises(ValueError) as exc:
