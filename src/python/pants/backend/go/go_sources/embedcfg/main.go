@@ -13,12 +13,30 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+type Patterns struct {
+	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
+	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
+}
+
+type EmbedCfg struct {
+	Patterns map[string][]string
+	Files    map[string]string
+}
+
+type EmbedConfigs struct {
+	EmbedConfig      *EmbedCfg `json:",omitempty"` // files matching the EmbedPatterns
+	TestEmbedConfig  *EmbedCfg `json:",omitempty"` // files matching the TestEmbedPatterns
+	XTestEmbedConfig *EmbedCfg `json:",omitempty"` // files matching the XTestEmbedPatterns
+}
 
 // findInRootDirs returns a string from rootDirs which is a parent of the
 // file path p. If there is no such string, findInRootDirs returns "".
@@ -282,4 +300,105 @@ func fsValidPath(name string) bool {
 		}
 		name = name[i+1:]
 	}
+}
+
+func computeEmbedConfigs(patterns *Patterns) (*EmbedConfigs, error) {
+	// Obtain a list of files in and under the package's directory. These will be embeddable files.
+	// TODO: Support resource targets elsewhere in the repository.
+
+	configs := &EmbedConfigs{}
+
+	var embedSrcs []string
+	err := filepath.WalkDir("__resources__", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "path=%s\n", path)
+		embedSrcs = append(embedSrcs, path)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(os.Stderr, "embedSrcs=%v\n", embedSrcs)
+
+	root, err := buildEmbedTree(embedSrcs, []string{"__resources__"})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(patterns.EmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range patterns.EmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.EmbedConfig = embedCfg
+	}
+
+	if len(patterns.TestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+		if configs.EmbedConfig != nil {
+			for key, value := range configs.EmbedConfig.Patterns {
+				embedCfg.Patterns[key] = value
+			}
+			for key, value := range configs.EmbedConfig.Files {
+				embedCfg.Files[key] = value
+			}
+		}
+
+		for _, pattern := range patterns.TestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.TestEmbedConfig = embedCfg
+	}
+
+	if len(patterns.XTestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range patterns.XTestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.XTestEmbedConfig = embedCfg
+	}
+
+	return configs, nil
+}
+
+func main() {
+    // TODO: call computeEmbedConfigs. json.Marshal its output, and read its input from a file.
+	os.Exit(0)
 }

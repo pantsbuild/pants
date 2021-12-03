@@ -158,20 +158,16 @@ async def compute_first_party_package_import_path(
 async def analyze_first_party_package(
     request: FirstPartyPkgAnalysisRequest,
 ) -> FallibleFirstPartyPkgAnalysis:
-    analyzer, owning_go_mod = await MultiGet(
+    analyzer, wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(
             LoadedGoBinary,
-            LoadedGoBinaryRequest(
-                "analyze_package", ("main.go", "embedcfg.go", "read.go"), "./package_analyzer"
-            ),
+            LoadedGoBinaryRequest("analyze_package", ("main.go", "read.go"), "./package_analyzer"),
         ),
-        Get(OwningGoMod, OwningGoModRequest(request.address)),
-    )
-    wrapped_target, import_path_info, go_mod_info = await MultiGet(
         Get(WrappedTarget, Address, request.address),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
-        Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
+        Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
 
     pkg_sources = await Get(
         HydratedSources,
@@ -241,7 +237,8 @@ async def analyze_first_party_package(
 async def setup_first_party_pkg_digest(
     request: FirstPartyPkgDigestRequest,
 ) -> FallibleFirstPartyPkgDigest:
-    wrapped_target, maybe_analysis = await MultiGet(
+    embedder, wrapped_target, maybe_analysis = await MultiGet(
+        Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
         Get(WrappedTarget, Address, request.address),
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
     )
