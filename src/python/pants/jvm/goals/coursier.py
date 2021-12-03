@@ -187,7 +187,7 @@ async def coursier_generate_lockfile(
     # This task finds all of the sources that depend on this lockfile, and then resolves
     # a lockfile that satisfies all of their `jvm_artifact` dependencies.
 
-    targets = targets_by_resolve_name.targets_by_resolve_name[request.resolve]
+    targets = targets_by_resolve_name.targets_by_resolve_name.get(request.resolve, ())
 
     # Find JVM artifacts in the dependency tree of the targets that depend on this lockfile.
     # These artifacts constitute the requirements that will be resolved for this lockfile.

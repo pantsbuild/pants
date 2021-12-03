@@ -48,6 +48,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -157,6 +158,13 @@ class PexFromTargetsRequest:
         self.direct_deps_only = direct_deps_only
         self.description = description
 
+    def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
+        return InterpreterConstraintsRequest(
+            addresses=self.addresses,
+            hardcoded_interpreter_constraints=self.hardcoded_interpreter_constraints,
+            direct_deps_only=self.direct_deps_only,
+        )
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -236,14 +244,45 @@ async def interpreter_constraints_for_targets(
     return interpreter_constraints
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class _RepositoryPexRequest:
-    requirements: PexRequirements
+    addresses: Addresses
+    hardcoded_interpreter_constraints: InterpreterConstraints | None
+    direct_deps_only: bool
     platforms: PexPlatforms
-    interpreter_constraints: InterpreterConstraints
     internal_only: bool
     resolve_and_lockfile: tuple[str, str] | None
     additional_lockfile_args: tuple[str, ...]
+    additional_requirements: tuple[str, ...]
+
+    def __init__(
+        self,
+        addresses: Iterable[Address],
+        *,
+        internal_only: bool,
+        hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
+        direct_deps_only: bool = False,
+        platforms: PexPlatforms = PexPlatforms(),
+        resolve_and_lockfile: tuple[str, str] | None = None,
+        additional_lockfile_args: tuple[str, ...] = (),
+        additional_requirements: tuple[str, ...] = (),
+    ) -> None:
+        self.addresses = Addresses(addresses)
+        self.internal_only = internal_only
+        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
+        self.direct_deps_only = direct_deps_only
+        self.platforms = platforms
+        self.resolve_and_lockfile = resolve_and_lockfile
+        self.additional_lockfile_args = additional_lockfile_args
+        self.additional_requirements = additional_requirements
+
+    def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
+        return InterpreterConstraintsRequest(
+            addresses=self.addresses,
+            hardcoded_interpreter_constraints=self.hardcoded_interpreter_constraints,
+            direct_deps_only=self.direct_deps_only,
+        )
 
 
 @dataclass(frozen=True)
@@ -255,11 +294,8 @@ class _ConstraintsRepositoryPexRequest:
 async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
     interpreter_constraints = await Get(
         InterpreterConstraints,
-        InterpreterConstraintsRequest(
-            request.addresses,
-            hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-            direct_deps_only=request.direct_deps_only,
-        ),
+        InterpreterConstraintsRequest,
+        request.to_interpreter_constraints_request(),
     )
 
     relevant_targets = await Get(
@@ -325,12 +361,14 @@ async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
         repository_pex = await Get(
             OptionalPex,
             _RepositoryPexRequest(
-                requirements,
-                request.platforms,
-                interpreter_constraints,
-                request.internal_only,
-                request.resolve_and_lockfile,
-                request.additional_lockfile_args,
+                request.addresses,
+                hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
+                direct_deps_only=request.direct_deps_only,
+                platforms=request.platforms,
+                internal_only=request.internal_only,
+                resolve_and_lockfile=request.resolve_and_lockfile,
+                additional_lockfile_args=request.additional_lockfile_args,
+                additional_requirements=request.additional_requirements,
             ),
         )
         requirements = dataclasses.replace(requirements, repository_pex=repository_pex.maybe_pex)
@@ -354,6 +392,13 @@ async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
 async def get_repository_pex(
     request: _RepositoryPexRequest, python_setup: PythonSetup
 ) -> OptionalPexRequest:
+
+    interpreter_constraints = await Get(
+        InterpreterConstraints,
+        InterpreterConstraintsRequest,
+        request.to_interpreter_constraints_request(),
+    )
+
     repository_pex_request: PexRequest | None = None
     if python_setup.requirement_constraints:
         constraints_repository_pex_request = await Get(
@@ -385,7 +430,7 @@ async def get_repository_pex(
                 lockfile_hex_digest=None,
                 req_strings=None,
             ),
-            interpreter_constraints=request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,
         )
@@ -396,13 +441,13 @@ async def get_repository_pex(
             internal_only=request.internal_only,
             requirements=Lockfile(
                 file_path=python_setup.lockfile,
-                file_path_description_of_origin=("the option `[python].experimental_lockfile`"),
+                file_path_description_of_origin="the option `[python].experimental_lockfile`",
                 # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
                 # are supported.
                 lockfile_hex_digest=None,
                 req_strings=None,
             ),
-            interpreter_constraints=request.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,
         )
@@ -436,6 +481,21 @@ async def _setup_constraints_repository_pex(
         )
     )
 
+    relevant_targets = await Get(
+        _RelevantTargets,
+        _RelevantTargetsRequest(request.addresses, direct_deps_only=request.direct_deps_only),
+    )
+
+    requirements = PexRequirements.create_from_requirement_fields(
+        (
+            tgt[PythonRequirementsField]
+            for tgt in relevant_targets.targets
+            if tgt.has_field(PythonRequirementsField)
+        ),
+        additional_requirements=request.additional_requirements,
+        apply_constraints=True,
+    )
+
     # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
     # packaging canonicalize for us.
     # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
@@ -443,7 +503,7 @@ async def _setup_constraints_repository_pex(
     name_reqs = set()  # E.g., foobar>=1.2.3
     name_req_projects = set()
 
-    for req_str in request.requirements.req_strings:
+    for req_str in requirements.req_strings:
         req = PipRequirement.parse(req_str)
         if req.url:
             url_reqs.add(req)
@@ -465,6 +525,12 @@ async def _setup_constraints_repository_pex(
         )
         return OptionalPexRequest(None)
 
+    interpreter_constraints = await Get(
+        InterpreterConstraints,
+        InterpreterConstraintsRequest,
+        request.to_interpreter_constraints_request(),
+    )
+
     # To get a full set of requirements we must add the URL requirements to the
     # constraints file, since the latter cannot contain URL requirements.
     # NB: We can only add the URL requirements we know about here, i.e., those that
@@ -484,7 +550,7 @@ async def _setup_constraints_repository_pex(
             # TODO: See PexRequirements docs.
             is_all_constraints_resolve=True,
         ),
-        interpreter_constraints=request.interpreter_constraints,
+        interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         additional_args=request.additional_lockfile_args,
     )
@@ -517,15 +583,34 @@ class RequirementsPexRequest:
 
 
 @rule
-async def get_requirements_pex(request: RequirementsPexRequest) -> PexRequest:
+async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSetup) -> PexRequest:
+    if setup.run_against_entire_lockfile and request.internal_only:
+        opt_pex_request = await Get(
+            OptionalPexRequest,
+            _RepositoryPexRequest(
+                addresses=sorted(request.addresses),
+                internal_only=request.internal_only,
+                hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
+                direct_deps_only=request.direct_deps_only,
+                resolve_and_lockfile=request.resolve_and_lockfile,
+            ),
+        )
+        if opt_pex_request.maybe_pex_request is None:
+            raise ValueError(
+                "[python].run_against_entire_lockfile was set, but could not find a "
+                "lockfile or constraints file for this target set. See "
+                f"{doc_url('python-third-party-dependencies')} for details."
+            )
+        return opt_pex_request.maybe_pex_request
+
     pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest(
             addresses=sorted(request.addresses),
             output_filename="requirements.pex",
+            internal_only=request.internal_only,
             include_source_files=False,
             hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-            internal_only=request.internal_only,
             direct_deps_only=request.direct_deps_only,
             resolve_and_lockfile=request.resolve_and_lockfile,
         ),

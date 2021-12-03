@@ -214,3 +214,37 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     assert rule_runner.request(
         InferredDependencies, [InferScalaSourceDependencies(target_c[ScalaSourceField])]
     ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.scala")])
+
+
+def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "scala_sources()",
+            "foo/A.scala": dedent(
+                """\
+                package org.pantsbuild.outer
+                package intermediate
+
+                object A {
+                  def main(args: Array[String]): Unit = {
+                    println(B.Foo)
+                  }
+                }
+                """
+            ),
+            "bar/BUILD": "scala_sources()",
+            "bar/B.scala": dedent(
+                """\
+                package org.pantsbuild.outer
+                object B {
+                  val Foo = 3
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", relative_file_path="A.scala"))
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])

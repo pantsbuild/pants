@@ -9,7 +9,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
-from logging import Formatter, LogRecord, StreamHandler
+from logging import Formatter, Handler, LogRecord
 from pathlib import PurePath
 from typing import Iterator
 
@@ -28,7 +28,7 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-class _NativeHandler(StreamHandler):
+class _NativeHandler(Handler):
     """This class is installed as a Python logging module handler (using the logging.addHandler
     method) and proxies logs to the Rust logging infrastructure."""
 

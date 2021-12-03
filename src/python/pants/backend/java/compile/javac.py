@@ -52,7 +52,7 @@ async def compile_java_source(
     union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
-    # Request the component's direct dependency classpath, and additionally any preqrequisite.
+    # Request the component's direct dependency classpath, and additionally any prerequisite.
     classpath_entry_requests = [
         *((request.prerequisite,) if request.prerequisite else ()),
         *(
@@ -205,7 +205,7 @@ async def compile_java_source(
     # invoking via a `bash` wrapper (since the trailing portion of the command is executed by
     # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
     output_snapshot = await Get(Snapshot, Digest, compile_result.output_digest)
-    output_file = f"{request.component.representative.address.path_safe_spec}.jar"
+    output_file = f"{request.component.representative.address.path_safe_spec}.javac.jar"
     if output_snapshot.files:
         jar_result = await Get(
             ProcessResult,

@@ -1,3 +1,9 @@
+/**
+ * TODO: The dependencies of this class are defined in two places:
+ *   1. `3rdparty/jvm` via import inference.
+ *   2. `SCALA_PARSER_ARTIFACT_REQUIREMENTS`.
+ * See https://github.com/pantsbuild/pants/issues/13754.
+ */
 package org.pantsbuild.backend.scala.dependency_inference
 
 import io.circe._
@@ -10,13 +16,22 @@ import scala.meta.transversers.Traverser
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
-case class AnImport(name: String, isWildcard: Boolean)
+case class AnImport(
+   // The partially qualified input name for the import, which must be in scope at
+   // the import site.
+   name: String,
+   // An optional single token alias for the import in this scope.
+   alias: Option[String],
+   // True if the import imports all symbols contained within the name.
+   isWildcard: Boolean,
+)
 
 case class Analysis(
    providedSymbols: Vector[String],
    providedSymbolsEncoded: Vector[String],
    importsByScope: HashMap[String, ArrayBuffer[AnImport]],
    consumedSymbolsByScope: HashMap[String, HashSet[String]],
+   scopes: Vector[String],
 )
 
 case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
@@ -28,6 +43,7 @@ class SourceAnalysisTraverser extends Traverser {
   val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
   val consumedSymbolsByScope = HashMap[String, HashSet[String]]()
+  val scopes = HashSet[String]()
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
@@ -118,12 +134,12 @@ class SourceAnalysisTraverser extends Traverser {
     skipProvidedNames = origSkipProvidedNames
   }
 
-  def recordImport(name: String, isWildcard: Boolean): Unit = {
+  def recordImport(name: String, alias: Option[String], isWildcard: Boolean): Unit = {
     val fullPackageName = nameParts.mkString(".")
     if (!importsByScope.contains(fullPackageName)) {
       importsByScope(fullPackageName) = ArrayBuffer[AnImport]()
     }
-    importsByScope(fullPackageName).append(AnImport(name, isWildcard))
+    importsByScope(fullPackageName).append(AnImport(name, alias, isWildcard))
   }
 
   def recordConsumedSymbol(name: String): Unit = {
@@ -132,6 +148,11 @@ class SourceAnalysisTraverser extends Traverser {
       consumedSymbolsByScope(fullPackageName) = HashSet[String]()
     }
     consumedSymbolsByScope(fullPackageName).add(name)
+  }
+
+  def recordScope(name: String): Unit = {
+    val scopeName = (nameParts.toVector ++ Vector(name)).mkString(".")
+    scopes.add(scopeName)
   }
 
   def visitTemplate(templ: Template, name: String): Unit = {
@@ -144,7 +165,9 @@ class SourceAnalysisTraverser extends Traverser {
 
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
-      withNamePart(extractName(ref), () => super.apply(stats))
+      val name = extractName(ref)
+      recordScope(name)
+      withNamePart(name, () => super.apply(stats))
     }
 
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
@@ -210,9 +233,20 @@ class SourceAnalysisTraverser extends Traverser {
         val baseName = extractName(ref)
         importees.foreach(importee => {
           importee match {
-            case Importee.Wildcard() => recordImport(baseName, true)
-            case Importee.Name(nameNode) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
-            case Importee.Rename(nameNode, _) => recordImport(s"${baseName}.${extractName(nameNode)}", false)
+            case Importee.Wildcard() => recordImport(baseName, None, true)
+            case Importee.Name(nameNode) => {
+              recordImport(s"${baseName}.${extractName(nameNode)}", None, false)
+            }
+            case Importee.Rename(nameNode, aliasNode) => {
+              // If a type is aliased to `_`, it is not brought into scope. We still record
+              // the import though, since compilation will fail if an import is not present.
+              val alias = extractName(aliasNode)
+              recordImport(
+                s"${baseName}.${extractName(nameNode)}",
+                if (alias == "_") None else Some(alias),
+                false,
+              )
+            }
             case _ =>
           }
         })
@@ -283,6 +317,7 @@ class SourceAnalysisTraverser extends Traverser {
       providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
       importsByScope = importsByScope,
       consumedSymbolsByScope = consumedSymbolsByScope,
+      scopes = scopes.toVector,
     )
   }
 }
