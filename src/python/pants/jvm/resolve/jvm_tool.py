@@ -40,9 +40,6 @@ class JvmToolBase(Subsystem):
     # artifact version if it has not been specified for a particular requirement. (Subclasses must set.)
     default_artifacts: ClassVar[Sequence[str]]
 
-    # Default extra requirements for the tool. (Subclasses do not need to override.)
-    default_extra_artifacts: ClassVar[Sequence[str]] = []
-
     # Default resource for the tool's lockfile. (Subclasses must set.)
     default_lockfile_resource: ClassVar[tuple[str, str]]
 
@@ -73,40 +70,21 @@ class JvmToolBase(Subsystem):
             ),
         )
         register(
-            "--extra-artifacts",
-            type=list,
-            member_type=str,
-            advanced=True,
-            default=cls.default_extra_artifacts,
-            help="Any additional artifact requirement strings to use with the tool. This is useful if the "
-            "tool allows you to install plugins or if you need to constrain a dependency to "
-            "a certain version.",
-        )
-        register(
             "--lockfile",
             type=str,
             default=cls.default_lockfile_path,
             advanced=True,
-            # TODO: Fix up the help text to not be Python-focused.
             help=(
                 "Path to a lockfile used for installing the tool.\n\n"
                 f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
-                "Pants, so long as you have not changed the `--version` and "
-                "`--extra-requirements` options, and the tool's interpreter constraints are "
-                "compatible with the default. Pants will error or warn if the lockfile is not "
-                "compatible (controlled by `[python].invalid_lockfile_behavior`). See "
-                f"{cls.default_lockfile_url} for the default lockfile contents.\n\n"
+                "Pants, so long as you have not changed the `--version` option. "
+                f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
                 f"Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We "
                 f"do not recommend this, though, as lockfiles are essential for reproducible "
                 f"builds.\n\n"
                 "To use a custom lockfile, set this option to a file path relative to the "
-                f"build root, then run `./pants generate-lockfiles "
+                f"build root, then run `./pants jvm-generate-lockfiles "
                 f"--resolve={cls.options_scope}`.\n\n"
-                "Lockfile generation currently does not wire up the `[python-repos]` options. "
-                "If lockfile generation fails, you can manually generate a lockfile, such as "
-                "by using pip-compile or `pip freeze`. Set this option to the path to your "
-                "manually generated lockfile. When manually maintaining lockfiles, set "
-                "`[python].invalid_lockfile_behavior = 'ignore'`."
             ),
         )
 
@@ -120,10 +98,6 @@ class JvmToolBase(Subsystem):
             Coordinate.from_coord_str(s.replace("%VERSION%", self.version))
             for s in self.options.artifacts
         )
-
-    @property
-    def extra_artifacts(self) -> tuple[Coordinate, ...]:
-        return tuple(Coordinate.from_coord_str(s) for s in self.options.extra_artifacts)
 
     @property
     def lockfile(self) -> str:
@@ -161,7 +135,7 @@ class JvmToolLockfileRequest:
     @classmethod
     def from_tool(cls, tool: JvmToolBase) -> JvmToolLockfileRequest:
         return cls(
-            artifacts=FrozenOrderedSet((*tool.artifacts, *tool.extra_artifacts)),
+            artifacts=FrozenOrderedSet(tool.artifacts),
             resolve_name=tool.options_scope,
             lockfile_dest=tool.lockfile,
         )
