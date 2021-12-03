@@ -41,6 +41,7 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
+    JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
     JvmRequirementsField,
@@ -107,10 +108,13 @@ def _coordinate_from_target(tgt: Target) -> Coordinate:
             f"The `version` field of {tgt.alias} target {tgt.address} must be set."
         )
 
+    url = tgt[JvmArtifactUrlField].value
+
     return Coordinate(
         group=group,
         artifact=artifact,
         version=version,
+        url=url,
     )
 
 

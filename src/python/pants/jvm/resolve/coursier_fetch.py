@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Iterable, Iterator
+from urllib.parse import quote_plus as url_quote_plus
+from urllib.parse import unquote as url_unquote
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -43,6 +45,7 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
+    JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
     JvmLockfileSources,
@@ -71,6 +74,7 @@ class Coordinate:
     artifact: str
     version: str
     packaging: str = "jar"
+    url: str | None = None
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
     strict: bool = True
@@ -81,31 +85,45 @@ class Coordinate:
             group=data["group"],
             artifact=data["artifact"],
             version=data["version"],
+            url=data.get("url", None),
             packaging=data.get("packaging", "jar"),
         )
 
     def to_json_dict(self) -> dict:
-        return {
+        ret = {
             "group": self.group,
             "artifact": self.artifact,
             "version": self.version,
             "packaging": self.packaging,
         }
+        if self.url:
+            ret["url"] = self.url
+        return ret
 
     @classmethod
     def from_coord_str(cls, s: str) -> Coordinate:
+        # if there's a `url=` part, capture the URL after it (otherwise a no-op):
+        s, _, quoted_url = s.partition(",url=")
+        url = url_unquote(quoted_url)  # no effect if `quoted_url` is empty
+
         parts = s.split(":")
         return cls(
             group=parts[0],
             artifact=parts[1],
             version=parts[2],
             packaging=parts[3] if len(parts) == 4 else "jar",
+            url=url if url else None,
         )
 
     def to_coord_str(self, versioned: bool = True) -> str:
+        unversioned = f"{self.group}:{self.artifact}"
+        version_suffix = ""
+        url_suffix = ""
         if versioned:
-            return f"{self.group}:{self.artifact}:{self.version}"
-        return f"{self.group}:{self.artifact}"
+            version_suffix = f":{self.version}"
+        if self.url:
+            url_suffix = f",url={url_quote_plus(self.url)}"
+        return f"{unversioned}{version_suffix}{url_suffix}"
 
     @staticmethod
     def from_jvm_artifact_target(target: Target) -> Coordinate:
@@ -118,10 +136,14 @@ class Coordinate:
         group = target[JvmArtifactGroupField].value
         artifact = target[JvmArtifactArtifactField].value
         version = target[JvmArtifactVersionField].value
+        url = target[JvmArtifactUrlField].value
+
+        if url and url.startswith("file:/"):
+            raise CoursierError("Pants does not currently support `file:` URLS")
 
         # These are all required, but mypy doesn't think so.
         assert group is not None and artifact is not None and version is not None
-        return Coordinate(group=group, artifact=artifact, version=version)
+        return Coordinate(group=group, artifact=artifact, version=version, url=url)
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
