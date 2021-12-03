@@ -44,7 +44,8 @@ logger = logging.getLogger(__name__)
 class FirstPartyPkgImportPath:
     """The derived import path of a first party package, based on its owning go.mod.
 
-    Use `FirstPartyPkgInfo` instead for more detailed information like parsed imports.
+    Use `FirstPartyPkgAnalysis` instead for more detailed information like parsed imports. Use
+    `FirstPartyPkgDigest` for source files and embed config.
     """
 
     import_path: str
@@ -60,18 +61,17 @@ class FirstPartyPkgImportPathRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class FirstPartyPkgInfo:
-    """All the info and digest needed to build a first-party Go package.
+class FirstPartyPkgAnalysis:
+    """All the metadata for a first-party Go package.
 
-    The digest does not strip its source files; `dir_path` is relative to the build root.
+    `dir_path` is relative to the build root.
 
-    Use `FirstPartyPkgImportPath` if you only need the derived import path.
+    Use `FirstPartyPkgImportPath` if you only need the derived import path. Use
+    `FirstPartyPkgDigest` for the source files and embed config.
     """
 
-    digest: Digest
-    dir_path: str
-
     import_path: str
+    dir_path: str
 
     imports: tuple[str, ...]
     test_imports: tuple[str, ...]
@@ -86,25 +86,28 @@ class FirstPartyPkgInfo:
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
-    embed_config: EmbedConfig | None
     test_embed_patterns: tuple[str, ...]
-    test_embed_config: EmbedConfig | None
     xtest_embed_patterns: tuple[str, ...]
+
+    # TODO: move to a new class
+    digest: Digest
+    embed_config: EmbedConfig | None
+    test_embed_config: EmbedConfig | None
     xtest_embed_config: EmbedConfig | None
 
 
 @dataclass(frozen=True)
-class FallibleFirstPartyPkgInfo:
-    """Info needed to build a first-party Go package, but fallible if `go list` failed."""
+class FallibleFirstPartyPkgAnalysis:
+    """Metadata for a Go package, but fallible if our analysis failed."""
 
-    info: FirstPartyPkgInfo | None
+    analysis: FirstPartyPkgAnalysis | None
     import_path: str
     exit_code: int = 0
     stderr: str | None = None
 
 
 @dataclass(frozen=True)
-class FirstPartyPkgInfoRequest(EngineAwareParameter):
+class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
 
     def debug_hint(self) -> str:
@@ -131,9 +134,9 @@ async def compute_first_party_package_import_path(
 
 
 @rule
-async def compute_first_party_package_info(
-    request: FirstPartyPkgInfoRequest,
-) -> FallibleFirstPartyPkgInfo:
+async def analyze_first_party_package(
+    request: FirstPartyPkgAnalysisRequest,
+) -> FallibleFirstPartyPkgAnalysis:
     analyzer, owning_go_mod = await MultiGet(
         Get(
             LoadedGoBinary,
@@ -217,8 +220,8 @@ async def compute_first_party_package_info(
         ),
     )
     if result.exit_code != 0:
-        return FallibleFirstPartyPkgInfo(
-            info=None,
+        return FallibleFirstPartyPkgAnalysis(
+            analysis=None,
             import_path=import_path_info.import_path,
             exit_code=result.exit_code,
             stderr=result.stderr.decode("utf-8"),
@@ -235,8 +238,8 @@ async def compute_first_party_package_info(
                 for filename, error in metadata.get("InvalidGoFiles", {}).items()
             )
             error += "\n"
-        return FallibleFirstPartyPkgInfo(
-            info=None, import_path=import_path_info.import_path, exit_code=1, stderr=error
+        return FallibleFirstPartyPkgAnalysis(
+            analysis=None, import_path=import_path_info.import_path, exit_code=1, stderr=error
         )
 
     if "CgoFiles" in metadata:
@@ -247,8 +250,7 @@ async def compute_first_party_package_info(
             "prioritize adding support."
         )
 
-    info = FirstPartyPkgInfo(
-        digest=sources_digest,
+    analysis = FirstPartyPkgAnalysis(
         dir_path=request.address.spec_path,
         import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
@@ -260,13 +262,15 @@ async def compute_first_party_package_info(
         s_files=tuple(metadata.get("SFiles", [])),
         minimum_go_version=go_mod_info.minimum_go_version,
         embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
-        embed_config=EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {})),
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
-        test_embed_config=EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {})),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+        # TODO: remove
+        digest=sources_digest,
+        embed_config=EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {})),
+        test_embed_config=EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {})),
         xtest_embed_config=EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {})),
     )
-    return FallibleFirstPartyPkgInfo(info, import_path_info.import_path)
+    return FallibleFirstPartyPkgAnalysis(analysis, import_path_info.import_path)
 
 
 def rules():

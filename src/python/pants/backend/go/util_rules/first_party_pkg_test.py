@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os.path
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -22,10 +21,10 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgInfo,
+    FallibleFirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
-    FirstPartyPkgInfoRequest,
 )
 from pants.core.target_types import ResourcesGeneratorTarget
 from pants.engine.addresses import Address
@@ -46,9 +45,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            QueryRule(FallibleFirstPartyPkgInfo, [FirstPartyPkgInfoRequest]),
+            QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
-            QueryRule(Digest, [CreateDigest]),
             QueryRule(Snapshot, [MergeDigests]),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
@@ -83,7 +81,7 @@ def test_import_path(rule_runner: RuleRunner, mod_dir: str) -> None:
     assert info.dir_path_rel_to_gomod == "dir"
 
 
-def test_package_info(rule_runner: RuleRunner) -> None:
+def test_package_analysis(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "go_mod()\n",
@@ -146,7 +144,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def assert_info(
+    def assert_analysis(
         dir_path: str,
         *,
         imports: list[str],
@@ -155,17 +153,14 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         go_files: list[str],
         test_files: list[str],
         xtest_files: list[str],
-        embed_patterns: Iterable[str] = (),
-        test_embed_patterns: Iterable[str] = (),
-        xtest_embed_patterns: Iterable[str] = (),
     ) -> None:
-        maybe_info = rule_runner.request(
-            FallibleFirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address(os.path.join("foo", dir_path)))],
+        maybe_analysis = rule_runner.request(
+            FallibleFirstPartyPkgAnalysis,
+            [FirstPartyPkgAnalysisRequest(Address(os.path.join("foo", dir_path)))],
         )
-        assert maybe_info.info is not None
-        info = maybe_info.info
-        actual_snapshot = rule_runner.request(Snapshot, [info.digest])
+        assert maybe_analysis.analysis is not None
+        analysis = maybe_analysis.analysis
+        actual_snapshot = rule_runner.request(Snapshot, [analysis.digest])
         expected_source_digest = rule_runner.request(Digest, [PathGlobs([f"foo/{dir_path}/*.go"])])
         resource_dir_digest = rule_runner.request(
             Digest, [CreateDigest([Directory("__resources__")])]
@@ -175,21 +170,21 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         )
         assert actual_snapshot == expected_snapshot
 
-        assert info.imports == tuple(imports)
-        assert info.test_imports == tuple(test_imports)
-        assert info.xtest_imports == tuple(xtest_imports)
-        assert info.go_files == tuple(go_files)
-        assert info.test_files == tuple(test_files)
-        assert info.xtest_files == tuple(xtest_files)
-        assert not info.s_files
+        assert analysis.imports == tuple(imports)
+        assert analysis.test_imports == tuple(test_imports)
+        assert analysis.xtest_imports == tuple(xtest_imports)
+        assert analysis.go_files == tuple(go_files)
+        assert analysis.test_files == tuple(test_files)
+        assert analysis.xtest_files == tuple(xtest_files)
+        assert not analysis.s_files
 
-        assert info.minimum_go_version == "1.16"
+        assert analysis.minimum_go_version == "1.16"
 
-        assert info.embed_patterns == tuple(embed_patterns)
-        assert info.test_embed_patterns == tuple(test_embed_patterns)
-        assert info.xtest_embed_patterns == tuple(xtest_embed_patterns)
+        assert analysis.embed_patterns == ()
+        assert analysis.test_embed_patterns == ()
+        assert analysis.xtest_embed_patterns == ()
 
-    assert_info(
+    assert_analysis(
         "pkg",
         imports=["github.com/google/uuid", "rsc.io/quote"],
         test_imports=[],
@@ -198,7 +193,7 @@ def test_package_info(rule_runner: RuleRunner) -> None:
         test_files=[],
         xtest_files=[],
     )
-    assert_info(
+    assert_analysis(
         "cmd",
         imports=["fmt", "go.example.com/foo/pkg"],
         test_imports=["testing"],
@@ -222,13 +217,13 @@ def test_invalid_package(rule_runner) -> None:
             "bad.go": "invalid!!!",
         }
     )
-    maybe_info = rule_runner.request(
-        FallibleFirstPartyPkgInfo,
-        [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
     )
-    assert maybe_info.info is None
-    assert maybe_info.exit_code == 1
-    assert "bad.go:1:1: expected 'package', found invalid\n" in maybe_info.stderr
+    assert maybe_analysis.analysis is None
+    assert maybe_analysis.exit_code == 1
+    assert "bad.go:1:1: expected 'package', found invalid\n" in maybe_analysis.stderr
 
 
 @pytest.mark.xfail(reason="cgo is ignored")
@@ -263,8 +258,8 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     )
     with engine_error(NotImplementedError):
         rule_runner.request(
-            FallibleFirstPartyPkgInfo,
-            [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
+            FallibleFirstPartyPkgAnalysis,
+            [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
         )
 
 
@@ -316,19 +311,22 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    maybe_info = rule_runner.request(
-        FallibleFirstPartyPkgInfo,
-        [FirstPartyPkgInfoRequest(Address("", target_name="pkg"))],
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
     )
-    assert maybe_info.info is not None
-    info = maybe_info.info
-    assert info.embed_config == EmbedConfig(
+    assert maybe_analysis.analysis is not None
+    analysis = maybe_analysis.analysis
+    assert analysis.embed_patterns == ("grok.txt",)
+    assert analysis.test_embed_patterns == ("test_grok.txt",)
+    assert analysis.xtest_embed_patterns == ("xtest_grok.txt",)
+    assert analysis.embed_config == EmbedConfig(
         {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
     )
-    assert info.test_embed_config == EmbedConfig(
+    assert analysis.test_embed_config == EmbedConfig(
         {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
         {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
     )
-    assert info.xtest_embed_config == EmbedConfig(
+    assert analysis.xtest_embed_config == EmbedConfig(
         {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
     )

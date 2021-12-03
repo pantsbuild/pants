@@ -17,8 +17,8 @@ from pants.backend.go.util_rules.build_pkg import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgInfo,
-    FirstPartyPkgInfoRequest,
+    FallibleFirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.third_party_pkg import ThirdPartyPkgInfo, ThirdPartyPkgInfoRequest
@@ -54,32 +54,32 @@ async def setup_build_go_package_target_request(
 
     embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
-        _maybe_first_party_pkg_info = await Get(
-            FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(target.address)
+        _maybe_first_party_pkg_analysis = await Get(
+            FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(target.address)
         )
-        if _maybe_first_party_pkg_info.info is None:
+        if _maybe_first_party_pkg_analysis.analysis is None:
             return FallibleBuildGoPackageRequest(
                 None,
-                _maybe_first_party_pkg_info.import_path,
-                exit_code=_maybe_first_party_pkg_info.exit_code,
-                stderr=_maybe_first_party_pkg_info.stderr,
+                _maybe_first_party_pkg_analysis.import_path,
+                exit_code=_maybe_first_party_pkg_analysis.exit_code,
+                stderr=_maybe_first_party_pkg_analysis.stderr,
             )
-        _first_party_pkg_info = _maybe_first_party_pkg_info.info
+        _first_party_pkg_analysis = _maybe_first_party_pkg_analysis.analysis
 
-        digest = _first_party_pkg_info.digest
-        import_path = _first_party_pkg_info.import_path
-        dir_path = _first_party_pkg_info.dir_path
-        minimum_go_version = _first_party_pkg_info.minimum_go_version
+        digest = _first_party_pkg_analysis.digest
+        import_path = _first_party_pkg_analysis.import_path
+        dir_path = _first_party_pkg_analysis.dir_path
+        minimum_go_version = _first_party_pkg_analysis.minimum_go_version
 
-        go_file_names = _first_party_pkg_info.go_files
-        embed_config = _first_party_pkg_info.embed_config
+        go_file_names = _first_party_pkg_analysis.go_files
+        embed_config = _first_party_pkg_analysis.embed_config
         if request.for_tests:
             # TODO: Build the test sources separately and link the two object files into the package archive?
             # TODO: The `go` tool changes the displayed import path for the package when it has test files. Do we
             #   need to do something similar?
-            go_file_names += _first_party_pkg_info.test_files
-            embed_config = _first_party_pkg_info.test_embed_config
-        s_file_names = _first_party_pkg_info.s_files
+            go_file_names += _first_party_pkg_analysis.test_files
+            embed_config = _first_party_pkg_analysis.test_embed_config
+        s_file_names = _first_party_pkg_analysis.s_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
         import_path = target[GoImportPathField].value
