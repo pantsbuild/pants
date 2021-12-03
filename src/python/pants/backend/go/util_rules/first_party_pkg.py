@@ -18,8 +18,9 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.build_graph.address import Address
-from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
-from pants.engine.addresses import Addresses
+from pants.core.target_types import ResourceSourceField
+from pants.core.util_rules import source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
@@ -27,7 +28,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -89,12 +89,6 @@ class FirstPartyPkgAnalysis:
     test_embed_patterns: tuple[str, ...]
     xtest_embed_patterns: tuple[str, ...]
 
-    # TODO: move to a new class
-    digest: Digest
-    embed_config: EmbedConfig | None
-    test_embed_config: EmbedConfig | None
-    xtest_embed_config: EmbedConfig | None
-
 
 @dataclass(frozen=True)
 class FallibleFirstPartyPkgAnalysis:
@@ -108,6 +102,33 @@ class FallibleFirstPartyPkgAnalysis:
 
 @dataclass(frozen=True)
 class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgDigest:
+    """The source files needed to build the package."""
+
+    digest: Digest
+    embed_config: EmbedConfig | None
+    test_embed_config: EmbedConfig | None
+    xtest_embed_config: EmbedConfig | None
+
+
+@dataclass(frozen=True)
+class FallibleFirstPartyPkgDigest:
+    """The source files for a Go package, but fallible if embed preparation failed."""
+
+    pkg_digest: FirstPartyPkgDigest | None
+    exit_code: int = 0
+    stderr: str | None = None
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgDigestRequest(EngineAwareParameter):
     address: Address
 
     def debug_hint(self) -> str:
@@ -151,65 +172,13 @@ async def analyze_first_party_package(
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(GoModInfo, GoModInfoRequest(owning_go_mod.address)),
     )
-    target = wrapped_target.target
-
-    # Find resource targets.
-    # TODO: This uses ExplicitlyProvidedDependencies to avoid triggering dependency inference which
-    # causes a rule cycle back to this rule as dependency inference tries to analyze dependent
-    # `go_package` targets. There really needs to be a way to limit `DependenciesRequest` to just
-    # targets meeting certain criteria, which would be resource targets in this case.
-    explicit_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(target[Dependencies])
-    )
-    explicit_deps_targets = await Get(Targets, Addresses(explicit_deps.includes))
-    pkg_relative_resource_targets = [
-        tgt
-        for tgt in explicit_deps_targets
-        # Note: target expansion is not ocurring?
-        if tgt.has_field(ResourceSourceField) or tgt.has_field(ResourcesGeneratingSourcesField)
-        # TODO: Currently limited to resources directly under package in source tree. Allow any resource and
-        # have paths be relative to the resources' spec_path.
-        and tgt.address.spec_path.startswith(request.address.spec_path)
-    ]
 
     pkg_sources = await Get(
         HydratedSources,
-        HydrateSourcesRequest(target[GoPackageSourcesField]),
+        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
     )
 
-    resources_sources = await MultiGet(
-        Get(
-            HydratedSources,
-            HydrateSourcesRequest(
-                tgt[SourcesField],
-                for_sources_types=(
-                    ResourceSourceField,
-                    ResourcesGeneratingSourcesField,
-                ),
-                enable_codegen=True,
-            ),
-        )
-        for tgt in pkg_relative_resource_targets
-    )
-
-    original_resources_digest = await Get(
-        Digest, MergeDigests([src.snapshot.digest for src in resources_sources])
-    )
-    stripped_resources_digest = await Get(
-        Digest, RemovePrefix(original_resources_digest, request.address.spec_path)
-    )
-    resources_digest = await Get(Digest, AddPrefix(stripped_resources_digest, "__resources__"))
-
-    sources_digest = await Get(
-        Digest,
-        MergeDigests([pkg_sources.snapshot.digest, resources_digest]),
-    )
-
-    input_digest = await Get(
-        Digest,
-        MergeDigests([sources_digest, analyzer.digest]),
-    )
-
+    input_digest = await Get(Digest, MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]))
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -264,14 +233,61 @@ async def analyze_first_party_package(
         embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
-        # TODO: remove
-        digest=sources_digest,
-        embed_config=EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {})),
-        test_embed_config=EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {})),
-        xtest_embed_config=EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {})),
     )
     return FallibleFirstPartyPkgAnalysis(analysis, import_path_info.import_path)
 
 
+@rule
+async def setup_first_party_pkg_digest(
+    request: FirstPartyPkgDigestRequest,
+) -> FallibleFirstPartyPkgDigest:
+    wrapped_target, maybe_analysis = await MultiGet(
+        Get(WrappedTarget, Address, request.address),
+        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
+    )
+    if maybe_analysis.analysis is None:
+        return FallibleFirstPartyPkgDigest(
+            pkg_digest=None, exit_code=maybe_analysis.exit_code, stderr=maybe_analysis.stderr
+        )
+    analysis = maybe_analysis.analysis
+
+    tgt = wrapped_target.target
+    pkg_sources = await Get(HydratedSources, HydrateSourcesRequest(tgt[GoPackageSourcesField]))
+    digest = pkg_sources.snapshot.digest
+
+    # TODO(#13795): Error if you depend on resources without corresponding embed patterns?
+    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
+        dependencies = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
+        resources_sources = await Get(
+            SourceFiles,
+            SourceFilesRequest(
+                (
+                    t.get(SourcesField)
+                    for t in dependencies
+                    # You can only embed resources located at or below the directory of the
+                    # `go_package`. This is a restriction from Go.
+                    # TODO(#13795): Error if you depend on resources above the go_package?
+                    if t.address.spec_path.startswith(request.address.spec_path)
+                ),
+                for_sources_types=(ResourceSourceField,),
+                # TODO: Switch to True. We need to be confident though that the generated files
+                #  are located below the go_package.
+                enable_codegen=False,
+            ),
+        )
+        resources_digest = await Get(
+            Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
+        )
+        resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
+        # TODO: Run Go program to create EmbedConfig.
+        digest = await Get(Digest, MergeDigests((digest, resources_digest)))
+
+    return FallibleFirstPartyPkgDigest(
+        FirstPartyPkgDigest(
+            digest, embed_config=None, test_embed_config=None, xtest_embed_config=None
+        )
+    )
+
+
 def rules():
-    return (*collect_rules(), *load_go_binary.rules())
+    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules())

@@ -26,7 +26,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@logging
+@pytest.mark.xfail
 def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

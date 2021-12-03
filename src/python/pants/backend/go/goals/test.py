@@ -21,7 +21,9 @@ from pants.backend.go.util_rules.build_pkg import (
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
+    FallibleFirstPartyPkgDigest,
     FirstPartyPkgAnalysisRequest,
+    FirstPartyPkgDigestRequest,
 )
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
@@ -139,8 +141,9 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 async def run_go_tests(
     field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
 ) -> TestResult:
-    maybe_pkg_analysis, dependencies = await MultiGet(
+    maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
+        Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
         Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
@@ -158,14 +161,18 @@ async def run_go_tests(
     if maybe_pkg_analysis.analysis is None:
         assert maybe_pkg_analysis.stderr is not None
         return compilation_failure(maybe_pkg_analysis.exit_code, None, maybe_pkg_analysis.stderr)
+    if maybe_pkg_digest.pkg_digest is None:
+        assert maybe_pkg_digest.stderr is not None
+        return compilation_failure(maybe_pkg_digest.exit_code, None, maybe_pkg_digest.stderr)
 
     pkg_analysis = maybe_pkg_analysis.analysis
+    pkg_digest = maybe_pkg_digest.pkg_digest
     import_path = pkg_analysis.import_path
 
     testmain = await Get(
         GeneratedTestMain,
         GenerateTestMainRequest(
-            pkg_analysis.digest,
+            pkg_digest.digest,
             FrozenOrderedSet(
                 os.path.join(".", pkg_analysis.dir_path, name) for name in pkg_analysis.test_files
             ),
@@ -218,13 +225,13 @@ async def run_go_tests(
 
         xtest_pkg_build_request = BuildGoPackageRequest(
             import_path=f"{import_path}_test",
-            digest=pkg_analysis.digest,
+            digest=pkg_digest.digest,
             dir_path=pkg_analysis.dir_path,
             go_file_names=pkg_analysis.xtest_files,
             s_file_names=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_analysis.minimum_go_version,
-            embed_config=pkg_analysis.xtest_embed_config,
+            embed_config=pkg_digest.xtest_embed_config,
         )
         main_direct_deps.append(xtest_pkg_build_request)
 

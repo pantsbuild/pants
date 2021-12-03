@@ -399,10 +399,11 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	pkg.XTestEmbedPatterns = cleanStringSet(xtestEmbedsMap)
 
 	// Fill in embedcfg needed for compiler.
-	err = computeEmbedConfigs("__resources__", pkg)
-	if err != nil {
-		return pkg, fmt.Errorf("unable to compute embedcfg: %s", err)
-	}
+	// TOOD: Move embed config to a separate program.
+// 	err = computeEmbedConfigs("__resources__", pkg)
+// 	if err != nil {
+// 		return pkg, fmt.Errorf("unable to compute embedcfg: %s", err)
+// 	}
 
 	// add the .S/.sx files only if we are using cgo
 	// (which means gcc will compile them).
