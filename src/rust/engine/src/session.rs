@@ -85,7 +85,7 @@ struct SessionState {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
+  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, PyObject>>,
 }
 
 ///
@@ -227,7 +227,7 @@ impl Session {
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
   where
-    F: FnOnce(&mut HashMap<UserMetadataPyValue, Value>) -> T,
+    F: FnOnce(&mut HashMap<UserMetadataPyValue, PyObject>) -> T,
   {
     f(&mut self.state.workunit_metadata_map.write())
   }
