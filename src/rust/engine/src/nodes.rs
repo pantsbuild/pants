@@ -16,7 +16,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{Py, PyAny, Python};
-use pyo3::IntoPy;
+use pyo3::{IntoPy, PyObject};
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -213,11 +213,18 @@ impl Select {
                 .collect::<Vec<_>>(),
             )
             .await?;
+            let args = Python::with_gil(|py| {
+              values
+                .into_iter()
+                .map(|val| val.consume_into_py_object(py))
+                .collect()
+            });
             context
               .core
               .intrinsics
-              .run(intrinsic, context.clone(), values)
+              .run(intrinsic, context.clone(), args)
               .await
+              .map(Value::new)
           }
         }
       }
@@ -584,7 +591,7 @@ impl Paths {
       .await
   }
 
-  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
+  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<PyObject, String> {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in item.iter() {
@@ -597,14 +604,17 @@ impl Paths {
         }
       }
     }
-    Ok(externs::unsafe_call(
-      py,
-      core.types.paths,
-      &[
-        externs::store_tuple(py, files),
-        externs::store_tuple(py, dirs),
-      ],
-    ))
+    Ok(
+      externs::unsafe_call(
+        py,
+        core.types.paths,
+        &[
+          externs::store_tuple(py, files),
+          externs::store_tuple(py, dirs),
+        ],
+      )
+      .consume_into_py_object(py),
+    )
   }
 }
 
@@ -726,20 +736,20 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<PyObject, String> {
     let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
-    Ok(Value::new(py_digest.into_py(py)))
+    Ok(py_digest.into_py(py))
   }
 
-  pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+  pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<PyObject, String> {
     let py_file_digest =
       Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{}", e))?;
-    Ok(Value::new(py_file_digest.into_py(py)))
+    Ok(py_file_digest.into_py(py))
   }
 
-  pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
+  pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<PyObject, String> {
     let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{}", e))?;
-    Ok(Value::new(py_snapshot.into_py(py)))
+    Ok(py_snapshot.into_py(py))
   }
 
   fn store_path(py: Python, item: &Path) -> Result<Value, String> {
@@ -776,7 +786,7 @@ impl Snapshot {
       types.file_entry,
       &[
         Self::store_path(py, &item.path)?,
-        Self::store_file_digest(py, item.digest)?,
+        Value::new(Self::store_file_digest(py, item.digest)?),
         externs::store_bool(py, item.is_executable),
       ],
     ))
@@ -798,23 +808,26 @@ impl Snapshot {
     py: Python,
     context: &Context,
     item: &[FileContent],
-  ) -> Result<Value, String> {
+  ) -> Result<PyObject, String> {
     let entries = item
       .iter()
       .map(|e| Self::store_file_content(py, &context.core.types, e))
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(externs::unsafe_call(
-      py,
-      context.core.types.digest_contents,
-      &[externs::store_tuple(py, entries)],
-    ))
+    Ok(
+      externs::unsafe_call(
+        py,
+        context.core.types.digest_contents,
+        &[externs::store_tuple(py, entries)],
+      )
+      .consume_into_py_object(py),
+    )
   }
 
   pub fn store_digest_entries(
     py: Python,
     context: &Context,
     item: &[DigestEntry],
-  ) -> Result<Value, String> {
+  ) -> Result<PyObject, String> {
     let entries = item
       .iter()
       .map(|digest_entry| match digest_entry {
@@ -826,11 +839,14 @@ impl Snapshot {
         }
       })
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(externs::unsafe_call(
-      py,
-      context.core.types.digest_entries,
-      &[externs::store_tuple(py, entries)],
-    ))
+    Ok(
+      externs::unsafe_call(
+        py,
+        context.core.types.digest_entries,
+        &[externs::store_tuple(py, entries)],
+      )
+      .consume_into_py_object(py),
+    )
   }
 }
 

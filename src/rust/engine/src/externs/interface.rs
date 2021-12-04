@@ -730,7 +730,7 @@ async fn workunit_to_py_value(
     let gil = Python::acquire_gil();
     artifact_entries.push((
       externs::store_utf8(gil.python(), artifact_name.as_str()),
-      py_val,
+      Value::new(py_val),
     ))
   }
 
@@ -769,14 +769,20 @@ async fn workunit_to_py_value(
   if let Some(stdout_digest) = workunit.metadata.stdout {
     artifact_entries.push((
       externs::store_utf8(py, "stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, stdout_digest).map_err(PyException::new_err)?,
+      Value::new(
+        crate::nodes::Snapshot::store_file_digest(py, stdout_digest)
+          .map_err(PyException::new_err)?,
+      ),
     ));
   }
 
   if let Some(stderr_digest) = workunit.metadata.stderr {
     artifact_entries.push((
       externs::store_utf8(py, "stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, stderr_digest).map_err(PyException::new_err)?,
+      Value::new(
+        crate::nodes::Snapshot::store_file_digest(py, stderr_digest)
+          .map_err(PyException::new_err)?,
+      ),
     ));
   }
 
@@ -864,7 +870,6 @@ fn session_run_interactive_process(
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
-  let interactive_process: Value = interactive_process.into();
   py.allow_threads(|| {
     core.executor.clone().block_on(nodes::maybe_side_effecting(
       true,
@@ -879,7 +884,6 @@ fn session_run_interactive_process(
       ),
     ))
   })
-  .map(|v| v.into())
   .map_err(|e| PyException::new_err(e.to_string()))
 }
 

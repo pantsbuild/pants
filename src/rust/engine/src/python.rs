@@ -258,6 +258,10 @@ impl Key {
     &self.type_id
   }
 
+  pub fn from_pyobject(obj: PyObject) -> PyResult<Key> {
+    Python::with_gil(|py| externs::INTERNS.key_insert(py, obj))
+  }
+
   pub fn from_value(val: Value) -> PyResult<Key> {
     let gil = Python::acquire_gil();
     let py = gil.python();
