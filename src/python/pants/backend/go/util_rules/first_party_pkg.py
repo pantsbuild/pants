@@ -22,7 +22,7 @@ from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -189,7 +189,7 @@ async def analyze_first_party_package(
             analysis=None,
             import_path=import_path_info.import_path,
             exit_code=result.exit_code,
-            stderr=result.stderr.decode("utf-8"),
+            stderr=result.stdout.decode("utf-8"),
         )
 
     metadata = json.loads(result.stdout)
@@ -250,7 +250,11 @@ async def setup_first_party_pkg_digest(
 
     tgt = wrapped_target.target
     pkg_sources = await Get(HydratedSources, HydrateSourcesRequest(tgt[GoPackageSourcesField]))
-    digest = pkg_sources.snapshot.digest
+    sources_digest = pkg_sources.snapshot.digest
+
+    embed_config = None
+    test_embed_config = None
+    xtest_embed_config = None
 
     # TODO(#13795): Error if you depend on resources without corresponding embed patterns?
     if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
@@ -276,12 +280,46 @@ async def setup_first_party_pkg_digest(
             Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
         )
         resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
-        # TODO: Run Go program to create EmbedConfig.
-        digest = await Get(Digest, MergeDigests((digest, resources_digest)))
+        sources_digest = await Get(Digest, MergeDigests((sources_digest, resources_digest)))
+
+        patterns_json = {
+            "EmbedPatterns": analysis.embed_patterns,
+            "TestEmbedPatterns": analysis.test_embed_patterns,
+            "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+        }
+        patterns_json_digest = await Get(
+            Digest,
+            CreateDigest([FileContent("patterns.json", json.dumps(patterns_json).encode("utf-8"))]),
+        )
+        input_digest = await Get(
+            Digest, MergeDigests((sources_digest, patterns_json_digest, embedder.digest))
+        )
+        embed_result = await Get(
+            FallibleProcessResult,
+            Process(
+                ("./embedder", "patterns.json"),
+                input_digest=input_digest,
+                description=f"Create embed mapping for {request.address}",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        if embed_result.exit_code != 0:
+            return FallibleFirstPartyPkgDigest(
+                pkg_digest=None,
+                exit_code=embed_result.exit_code,
+                stderr=embed_result.stdout.decode("utf-8"),
+            )
+        metadata = json.loads(embed_result.stdout)
+        embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+        test_embed_config = EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {}))
+        xtest_embed_config = EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {}))
 
     return FallibleFirstPartyPkgDigest(
         FirstPartyPkgDigest(
-            digest, embed_config=None, test_embed_config=None, xtest_embed_config=None
+            sources_digest,
+            embed_config=embed_config,
+            test_embed_config=test_embed_config,
+            xtest_embed_config=xtest_embed_config,
         )
     )
 

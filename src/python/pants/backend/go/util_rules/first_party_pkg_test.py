@@ -19,6 +19,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
@@ -354,17 +355,16 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     )
     assert actual_snapshot == expected_snapshot
 
-    # TODO: fix this.
-    # assert pkg_digest.embed_config == EmbedConfig(
-    #     {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
-    # )
-    # assert pkg_digest.test_embed_config == EmbedConfig(
-    #     {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
-    #     {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
-    # )
-    # assert pkg_digest.xtest_embed_config == EmbedConfig(
-    #     {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
-    # )
+    assert pkg_digest.embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
+    )
+    assert pkg_digest.test_embed_config == EmbedConfig(
+        {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
+        {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
+    )
+    assert pkg_digest.xtest_embed_config == EmbedConfig(
+        {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
+    )
 
 
 @pytest.mark.xfail

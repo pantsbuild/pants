@@ -11,9 +11,11 @@
 package main
 
 import (
+    "encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -175,7 +177,6 @@ func buildEmbedTree(embedSrcs, embedRootDirs []string) (root *embedNode, err err
 			err = fmt.Errorf("building tree of embeddable files in directories %s: %v", strings.Join(embedRootDirs, string(filepath.ListSeparator)), err)
 		}
 	}()
-	fmt.Fprintf(os.Stderr, "embedSrcs=%v", embedSrcs)
 	// Add each path to the tree.
 	root = &embedNode{name: "", children: make(map[string]*embedNode)}
 	for _, src := range embedSrcs {
@@ -302,27 +303,25 @@ func fsValidPath(name string) bool {
 	}
 }
 
-func computeEmbedConfigs(patterns *Patterns) (*EmbedConfigs, error) {
+func computeEmbedConfigs(directory string, patterns *Patterns) (*EmbedConfigs, error) {
 	// Obtain a list of files in and under the package's directory. These will be embeddable files.
 	// TODO: Support resource targets elsewhere in the repository.
 
 	configs := &EmbedConfigs{}
 
 	var embedSrcs []string
-	err := filepath.WalkDir("__resources__", func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stderr, "path=%s\n", path)
 		embedSrcs = append(embedSrcs, path)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "embedSrcs=%v\n", embedSrcs)
 
-	root, err := buildEmbedTree(embedSrcs, []string{"__resources__"})
+	root, err := buildEmbedTree(embedSrcs, []string{directory})
 	if err != nil {
 		return nil, err
 	}
@@ -399,6 +398,34 @@ func computeEmbedConfigs(patterns *Patterns) (*EmbedConfigs, error) {
 }
 
 func main() {
-    // TODO: call computeEmbedConfigs. json.Marshal its output, and read its input from a file.
+	data, err := ioutil.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to open input JSON: %s\"}", err)
+		os.Exit(1)
+	}
+
+	var patterns Patterns
+	err = json.Unmarshal(data, &patterns)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to deserialize JSON: %s\"}", err)
+		os.Exit(1)
+	}
+
+	result, err := computeEmbedConfigs("__resources__", &patterns)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to find embedded resources: %s\"}", err)
+		os.Exit(1)
+	}
+
+	outputBytes, err := json.Marshal(result)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to encode embed config: %s\"}", err)
+		os.Exit(1)
+	}
+	_, err = os.Stdout.Write(outputBytes)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to write embed config: %s\"}", err)
+		os.Exit(1)
+	}
 	os.Exit(0)
 }

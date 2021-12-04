@@ -24,7 +24,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
-from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
+from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -47,24 +47,22 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget, ResourceTarget],
+        target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
 
 
-@pytest.mark.xfail
 def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """
                 go_mod(name='mod')
-                go_package(name='pkg', dependencies=[":resources"])
-                resources(
-                  name="resources",
-                  sources=["*.txt"],
-                )
+                go_package(name='pkg', dependencies=[":grok", ":test_grok", ":xtest_grok"])
+                resource(name='grok', source='grok.txt')
+                resource(name='test_grok', source='test_grok.txt')
+                resource(name='xtest_grok', source='xtest_grok.txt')
                 """
             ),
             "go.mod": dedent(
