@@ -370,4 +370,34 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
 @pytest.mark.xfail
 def test_missing_embeds(rule_runner: RuleRunner) -> None:
     """Failing to set up embeds should not crash Pants."""
-    raise NotImplementedError()
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg')
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "foo.go": dedent(
+                """\
+                package foo
+                import _ "embed"
+                //go:embed fake.txt
+                var message
+                """
+            ),
+        }
+    )
+    maybe_digest = rule_runner.request(
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(Address("", target_name="pkg"))],
+    )
+    assert maybe_digest.pkg_digest is None
+    assert maybe_digest.exit_code == 1
+    assert "Failed to find embedded resources: could not embed grok.txt" in maybe_digest.stderr
