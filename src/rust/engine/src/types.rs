@@ -21,7 +21,7 @@ pub struct Types {
   pub digest_subset: TypeId,
   pub download_file: TypeId,
   pub platform: TypeId,
-  pub multi_platform_process: TypeId,
+  pub process: TypeId,
   pub process_result: TypeId,
   pub process_result_metadata: TypeId,
   pub coroutine: TypeId,

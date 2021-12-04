@@ -11,8 +11,8 @@ use crate::context::Context;
 use crate::externs;
 use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
-  NodeResult, Paths, RunId, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
+  RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -113,9 +113,9 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.process_result,
-        inputs: vec![types.multi_platform_process, types.platform],
+        inputs: vec![types.process],
       },
-      Box::new(multi_platform_process_request_to_process_result),
+      Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
       Intrinsic {
@@ -166,14 +166,14 @@ impl Intrinsics {
   }
 }
 
-fn multi_platform_process_request_to_process_result(
+fn process_request_to_process_result(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let process_request = Python::with_gil(|py| {
       let py_process = (*args[0]).as_ref(py);
-      MultiPlatformExecuteProcess::lift(py_process).map_err(|str| {
+      ExecuteProcess::lift(py_process).map_err(|str| {
         throw(format!(
           "Error lifting MultiPlatformExecuteProcess: {}",
           str

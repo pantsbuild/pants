@@ -23,8 +23,8 @@ use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, Process, ProcessCacheScope, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessMetadata,
 };
 use std::any::type_name;
 use std::io::Cursor;
@@ -1996,11 +1996,11 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-pub fn echo_foo_request() -> MultiPlatformProcess {
+pub fn echo_foo_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
   req.timeout = Some(Duration::from_millis(5000));
   req.description = "echo a foo".to_string();
-  req.into()
+  req
 }
 
 pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
@@ -2176,7 +2176,7 @@ fn make_precondition_failure_status(
 }
 
 pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
-  request: MultiPlatformProcess,
+  request: Process,
   command_runner: R,
   store: Store,
 ) -> Result<RemoteTestResult, String> {
@@ -2225,10 +2225,7 @@ fn create_command_runner(
   (command_runner, store)
 }
 
-async fn run_command_remote(
-  address: String,
-  request: MultiPlatformProcess,
-) -> Result<RemoteTestResult, String> {
+async fn run_command_remote(address: String, request: Process) -> Result<RemoteTestResult, String> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2367,20 +2364,20 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
+pub(crate) fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.input_files = TestDirectory::containing_roland().digest();
   process.timeout = one_second();
   process.description = "cat a roland".to_string();
-  process.into()
+  process
 }
 
-pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
+pub(crate) fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
   req.timeout = one_second();
   req.description = "unleash a roaring meow".to_string();
-  req.into()
+  req
 }
 
 pub(crate) fn assert_cancellation_requests(

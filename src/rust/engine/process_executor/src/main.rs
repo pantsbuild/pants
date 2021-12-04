@@ -331,11 +331,7 @@ async fn main() {
     workunit_store.clone(),
     "process_executor".to_owned(),
     WorkunitMetadata::default(),
-    |workunit| async move {
-      runner
-        .run(Context::default(), workunit, request.into())
-        .await
-    }
+    |workunit| async move { runner.run(Context::default(), workunit, request).await }
   )
   .await
   .expect("Error executing");

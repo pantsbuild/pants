@@ -53,7 +53,7 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
-    MultiPlatformProcess,
+    Process,
     ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
@@ -156,7 +156,7 @@ class Scheduler:
             digest_subset=DigestSubset,
             download_file=DownloadFile,
             platform=Platform,
-            multi_platform_process=MultiPlatformProcess,
+            process=Process,
             process_result=FallibleProcessResult,
             process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,

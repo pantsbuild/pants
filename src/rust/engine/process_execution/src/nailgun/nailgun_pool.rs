@@ -19,7 +19,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{Context, MultiPlatformProcess, NamedCaches, Process, ProcessMetadata};
+use crate::{Context, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -397,10 +397,7 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
   pub fn new(name: String, nailgun_req: &Process) -> Result<Self, String> {
-    let nailgun_req_digest = crate::digest(
-      MultiPlatformProcess::from(nailgun_req.clone()),
-      &ProcessMetadata::default(),
-    );
+    let nailgun_req_digest = crate::digest(nailgun_req, &ProcessMetadata::default());
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,

@@ -792,7 +792,7 @@ def test_process_digests_on_streaming_workunits(
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-    process_workunit = next(item for item in finished if item["name"] == "multi_platform_process")
+    process_workunit = next(item for item in finished if item["name"] == "process")
     assert process_workunit is not None
     stdout_digest = process_workunit["artifacts"]["stdout_digest"]
     stderr_digest = process_workunit["artifacts"]["stderr_digest"]
@@ -820,7 +820,7 @@ def test_process_digests_on_streaming_workunits(
 
     assert tracker.finished
     finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-    process_workunit = next(item for item in finished if item["name"] == "multi_platform_process")
+    process_workunit = next(item for item in finished if item["name"] == "process")
 
     assert process_workunit is not None
     stdout_digest = process_workunit["artifacts"]["stdout_digest"]
