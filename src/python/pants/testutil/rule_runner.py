@@ -17,6 +17,7 @@ from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -413,6 +414,14 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
+    @deprecated(
+        "2.10.0.dev0",
+        """Use `RuleRunner.write_files({"path/to/file": "file contents"})` instead of
+        `RuleRunner.create_files("path/to", ["file"])`.
+
+        This allows creating all files with specific content in one call.
+        """,
+    )
     def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
