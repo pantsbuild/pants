@@ -4,7 +4,6 @@
 use crate::context::Context;
 use crate::externs;
 use crate::nodes::{lift_directory_digest, lift_file_digest};
-use crate::python::Value;
 
 use crate::externs::fs::PyFileDigest;
 use pyo3::prelude::*;
@@ -121,7 +120,7 @@ fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataI
     let py_value_handle = UserMetadataPyValue::new();
     let umi = UserMetadataItem::PyValue(py_value_handle.clone());
     context.session.with_metadata_map(|map| {
-      map.insert(py_value_handle.clone(), Value::new(value.into_py(obj.py())));
+      map.insert(py_value_handle.clone(), value.into());
     });
     output.push((key, umi));
   }

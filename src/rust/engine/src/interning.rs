@@ -6,10 +6,10 @@ use std::hash;
 use std::sync::atomic;
 
 use parking_lot::{Mutex, RwLock};
-use pyo3::prelude::{PyResult, Python};
+use pyo3::prelude::*;
 
 use crate::externs;
-use crate::python::{Fnv, Key, Value};
+use crate::python::{Fnv, Key};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -42,7 +42,7 @@ use crate::python::{Fnv, Key, Value};
 #[derive(Default)]
 pub struct Interns {
   forward_keys: Mutex<HashMap<InternKey, Key, Fnv>>,
-  reverse_keys: RwLock<HashMap<Key, Value, Fnv>>,
+  reverse_keys: RwLock<HashMap<Key, PyObject, Fnv>>,
   id_generator: atomic::AtomicU64,
 }
 
@@ -51,10 +51,13 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn key_insert(&self, py: Python, v: Value) -> PyResult<Key> {
+  pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
     let (intern_key, type_id) = {
-      let obj = (*v).as_ref(py);
-      (InternKey(obj.hash()?, v.clone()), obj.get_type().into())
+      let obj = v.as_ref(py);
+      (
+        InternKey(obj.hash()?, v.clone_ref(py)),
+        obj.get_type().into(),
+      )
     };
 
     py.allow_threads(|| {
@@ -72,7 +75,7 @@ impl Interns {
     })
   }
 
-  pub fn key_get(&self, k: &Key) -> Value {
+  pub fn key_get(&self, k: &Key) -> PyObject {
     // NB: We do not need to acquire+release the GIL before getting a Value for a Key, because
     // neither `Key::eq` nor `Value::clone` acquire the GIL.
     self.reverse_keys.read().get(k).cloned().unwrap_or_else(|| {
@@ -93,13 +96,13 @@ impl Interns {
   }
 }
 
-struct InternKey(isize, Value);
+struct InternKey(isize, PyObject);
 
 impl Eq for InternKey {}
 
 impl PartialEq for InternKey {
   fn eq(&self, other: &InternKey) -> bool {
-    Python::with_gil(|py| externs::equals((*self.1).as_ref(py), (*other.1).as_ref(py)))
+    Python::with_gil(|py| externs::equals(self.1.as_ref(py), other.1.as_ref(py)))
   }
 }
 
