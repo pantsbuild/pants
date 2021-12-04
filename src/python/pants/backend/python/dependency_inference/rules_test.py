@@ -126,24 +126,25 @@ def test_infer_python_imports(caplog) -> None:
     # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but not warn
     # on the disambiguated one and should infer a dep.
     caplog.clear()
-    rule_runner.create_files("src/python/ambiguous", ["dep.py", "disambiguated_via_ignores.py"])
-    rule_runner.create_file(
-        "src/python/ambiguous/main.py",
-        "import ambiguous.dep\nimport ambiguous.disambiguated_via_ignores\n",
-    )
-    rule_runner.add_to_build_file(
-        "src/python/ambiguous",
-        dedent(
-            """\
-            python_sources(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
-            python_sources(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
-            python_sources(
-                name='main',
-                sources=['main.py'],
-                dependencies=['!./disambiguated_via_ignores.py:dep2'],
-            )
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/python/ambiguous/dep.py": "",
+            "src/python/ambiguous/disambiguated_via_ignores.py": "",
+            "src/python/ambiguous/main.py": (
+                "import ambiguous.dep\nimport ambiguous.disambiguated_via_ignores\n"
+            ),
+            "src/python/ambiguous/BUILD": dedent(
+                """\
+                python_sources(name='dep1', sources=['dep.py', 'disambiguated_via_ignores.py'])
+                python_sources(name='dep2', sources=['dep.py', 'disambiguated_via_ignores.py'])
+                python_sources(
+                    name='main',
+                    sources=['main.py'],
+                    dependencies=['!./disambiguated_via_ignores.py:dep2'],
+                )
+                """
+            ),
+        }
     )
     assert run_dep_inference(
         Address("src/python/ambiguous", target_name="main", relative_file_path="main.py")

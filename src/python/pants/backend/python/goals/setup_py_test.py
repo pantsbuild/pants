@@ -451,49 +451,51 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
 
 
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
-    chroot_rule_runner.create_files("src/python/invalid_binary", ["app1.py", "app2.py"])
-    chroot_rule_runner.add_to_build_file(
-        "src/python/invalid_binary",
-        textwrap.dedent(
-            """
-            python_sources(name='not_a_binary', sources=[])
-            pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
-            pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
-            python_distribution(
-                name='invalid_bin1',
-                provides=setup_py(
-                    name='invalid_bin1', version='1.1.1'
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "foo": ":not_a_binary",
+    chroot_rule_runner.write_files(
+        {
+            "src/python/invalid_binary/app1.py": "",
+            "src/python/invalid_binary/app2.py": "",
+            "src/python/invalid_binary/BUILD": textwrap.dedent(
+                """\
+                python_sources(name='not_a_binary', sources=[])
+                pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
+                pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
+                python_distribution(
+                    name='invalid_bin1',
+                    provides=setup_py(
+                        name='invalid_bin1', version='1.1.1'
+                    ),
+                    entry_points={
+                        "console_scripts":{
+                            "foo": ":not_a_binary",
+                        },
                     },
-                },
-            )
-            python_distribution(
-                name='invalid_bin2',
-                provides=setup_py(
-                    name='invalid_bin2', version='1.1.1'
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "foo": ":invalid_entrypoint_unowned1",
+                )
+                python_distribution(
+                    name='invalid_bin2',
+                    provides=setup_py(
+                        name='invalid_bin2', version='1.1.1'
+                    ),
+                    entry_points={
+                        "console_scripts":{
+                            "foo": ":invalid_entrypoint_unowned1",
+                        },
                     },
-                },
-            )
-            python_distribution(
-                name='invalid_bin3',
-                provides=setup_py(
-                    name='invalid_bin3', version='1.1.1'
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "foo": ":invalid_entrypoint_unowned2",
+                )
+                python_distribution(
+                    name='invalid_bin3',
+                    provides=setup_py(
+                        name='invalid_bin3', version='1.1.1'
+                    ),
+                    entry_points={
+                        "console_scripts":{
+                            "foo": ":invalid_entrypoint_unowned2",
+                        },
                     },
-                },
-            )
-            """
-        ),
+                )
+                """
+            ),
+        }
     )
 
     assert_chroot_error(
