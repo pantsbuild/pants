@@ -263,19 +263,22 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
 
 
 def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "src/docker",
-        dedent(
-            """\
-            docker_image(dependencies=[":entrypoint", ":shell"])
-            shell_source(name="entrypoint", source="entrypoint.sh")
-            shell_sources(name="shell", sources=["scripts/**/*.sh"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(dependencies=[":entrypoint", ":shell"])
+                shell_source(name="entrypoint", source="entrypoint.sh")
+                shell_sources(name="shell", sources=["scripts/**/*.sh"])
+                """
+            ),
+            "src/docker/Dockerfile": "FROM base",
+            "src/docker/entrypoint.sh": "",
+            "src/docker/scripts/s01.sh": "",
+            "src/docker/scripts/s02.sh": "",
+            "src/docker/scripts/random.file": "",
+        }
     )
-    rule_runner.create_files("src/docker", ["Dockerfile", "entrypoint.sh"])
-    rule_runner.create_files("src/docker/scripts", ["s01.sh", "s02.sh", "random.file"])
-
     assert_build_context(
         rule_runner,
         Address("src/docker"),
