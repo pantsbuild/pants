@@ -145,18 +145,19 @@ async def compile_scala_source(
         Digest, AddPrefix(merged_transitive_dependency_classpath_entries_digest, usercp)
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                prefixed_transitive_dependency_classpath_digest,
-                tool_classpath.digest,
-                jdk_setup.digest,
-                *(
-                    sources.snapshot.digest
-                    for _, sources in component_members_and_scala_source_files
-                ),
-            )
+    merged_tool_digest, merged_input_digest = await MultiGet(
+        Get(Digest, MergeDigests((tool_classpath.digest, jdk_setup.digest))),
+        Get(
+            Digest,
+            MergeDigests(
+                (
+                    prefixed_transitive_dependency_classpath_digest,
+                    *(
+                        sources.snapshot.digest
+                        for _, sources in component_members_and_scala_source_files
+                    ),
+                )
+            ),
         ),
     )
 
@@ -183,8 +184,8 @@ async def compile_scala_source(
                     )
                 ),
             ],
-            input_digest=merged_digest,
-            use_nailgun=jdk_setup.digest,
+            input_digest=merged_input_digest,
+            use_nailgun=merged_tool_digest,
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
