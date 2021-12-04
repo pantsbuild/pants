@@ -74,7 +74,7 @@ def check_field_names(console: Console) -> int:
 
         seen.add(class_name)
         console.print_stderr(f"Rename field class {module}.{class_name} => {class_name}Field")
-        console.print_stdout(f"s/{class_name}/{class_name}Field/g")
+        console.print_stdout(f"s/\\b{class_name}\\b/{class_name}Field/g")
         exit_code = 1
 
     return exit_code
