@@ -360,7 +360,7 @@ impl PySession {
           core,
           should_render_ui,
           build_id,
-          session_values.into(),
+          session_values,
           cancellation_latch,
         )
       })
