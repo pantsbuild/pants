@@ -302,7 +302,7 @@ impl Get {
       output: TypeId::new(get.product.as_ref(py)),
       input_type: TypeId::new(get.declared_subject.as_ref(py)),
       input: INTERNS
-        .key_insert(py, get.subject.clone_ref(py).into())
+        .key_insert(py, get.subject.clone_ref(py))
         .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
     })
   }

@@ -260,11 +260,12 @@ impl Key {
 
   pub fn from_value(val: Value) -> PyResult<Key> {
     let gil = Python::acquire_gil();
-    externs::INTERNS.key_insert(gil.python(), val)
+    let py = gil.python();
+    externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
   }
 
   pub fn to_value(&self) -> Value {
-    externs::INTERNS.key_get(self)
+    Value::new(externs::INTERNS.key_get(self))
   }
 }
 
