@@ -91,10 +91,13 @@ build_file_header = """\
 """
 ignore_paths = [
   "build-support/migration-support/BUILD",
-  "src/python/pants/backend/go/go_sources/BUILD",
 ]
 ignore_adding_targets = [
   "src/python/pants:__main__",
+  "src/python/pants/backend/go/go_sources:bin",
+  "src/python/pants/backend/go/go_sources:go_sources0",
+  "src/python/pants/backend/go/go_sources/analyze_package:bin",
+  "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
   "src/python/pants/backend/python/dependency_inference:import_parser",
   "src/python/pants/backend/terraform:hcl2_parser0",

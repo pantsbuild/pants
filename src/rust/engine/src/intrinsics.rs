@@ -9,10 +9,10 @@ use std::time::Duration;
 
 use crate::context::Context;
 use crate::externs;
-use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyRemovePrefix};
+use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
-  NodeResult, Paths, RunId, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
+  RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -24,7 +24,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
 use process_execution::{CacheDest, CacheName, ManagedChild, NamedCaches};
-use pyo3::{PyAny, PyRef, Python};
+use pyo3::{PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -113,9 +113,9 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.process_result,
-        inputs: vec![types.multi_platform_process, types.platform],
+        inputs: vec![types.process],
       },
-      Box::new(multi_platform_process_request_to_process_result),
+      Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
       Intrinsic {
@@ -166,14 +166,14 @@ impl Intrinsics {
   }
 }
 
-fn multi_platform_process_request_to_process_result(
+fn process_request_to_process_result(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let process_request = Python::with_gil(|py| {
       let py_process = (*args[0]).as_ref(py);
-      MultiPlatformExecuteProcess::lift(py_process).map_err(|str| {
+      ExecuteProcess::lift(py_process).map_err(|str| {
         throw(format!(
           "Error lifting MultiPlatformExecuteProcess: {}",
           str
@@ -374,16 +374,15 @@ fn merge_digests_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let digests: Result<Vec<hashing::Digest>, String> = Python::with_gil(|py| {
-      let py_merge_digests = (*args[0]).as_ref(py);
-      externs::getattr::<Vec<&PyAny>>(py_merge_digests, "digests")
-        .unwrap()
-        .into_iter()
-        .map(|val| lift_directory_digest(val))
-        .collect()
-    });
+    let digests = Python::with_gil(|py| {
+      (*args[0])
+        .as_ref(py)
+        .extract::<PyRef<PyMergeDigests>>()
+        .map(|py_merge_digests| py_merge_digests.0.clone())
+        .map_err(|e| throw(format!("{}", e)))
+    })?;
     let digest = store
-      .merge(digests.map_err(throw)?)
+      .merge(digests)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();

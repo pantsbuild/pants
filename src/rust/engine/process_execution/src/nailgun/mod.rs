@@ -13,9 +13,7 @@ use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::local::{CapturedWorkdir, ChildOutput};
-use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-};
+use crate::{Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process};
 
 #[cfg(test)]
 pub mod tests;
@@ -122,15 +120,13 @@ impl super::CommandRunner for CommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let original_request = self.extract_compatible_request(&req).unwrap();
-
-    if original_request.use_nailgun == hashing::EMPTY_DIGEST {
+    if req.use_nailgun == hashing::EMPTY_DIGEST {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;
     }
-    debug!("Running request under nailgun:\n {:?}", &original_request);
+    debug!("Running request under nailgun:\n {:?}", req);
 
     in_workunit!(
       context.workunit_store.clone(),
@@ -138,8 +134,8 @@ impl super::CommandRunner for CommandRunner {
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
         // renders at the Process's level.
-        level: original_request.level,
-        desc: Some(original_request.description.clone()),
+        level: req.level,
+        desc: Some(req.description.clone()),
         ..WorkunitMetadata::default()
       },
       |workunit| async move {
@@ -150,11 +146,11 @@ impl super::CommandRunner for CommandRunner {
           nailgun_args,
           client_main_class,
           ..
-        } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
+        } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
         let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
 
         let nailgun_req =
-          construct_nailgun_server_request(&nailgun_name, nailgun_args, original_request.clone());
+          construct_nailgun_server_request(&nailgun_name, nailgun_args, req.clone());
         trace!("Running request under nailgun:\n {:#?}", &nailgun_req);
 
         // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
@@ -166,7 +162,7 @@ impl super::CommandRunner for CommandRunner {
 
         let res = self
           .run_and_capture_workdir(
-            original_request,
+            req,
             context,
             self.inner.store.clone(),
             self.executor.clone(),
@@ -184,11 +180,6 @@ impl super::CommandRunner for CommandRunner {
       }
     )
     .await
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    // Request compatibility should be the same as for the local runner, so we just delegate this.
-    self.inner.extract_compatible_request(req)
   }
 }
 

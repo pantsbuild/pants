@@ -14,12 +14,8 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    ArtifactRequirements,
-    Coordinate,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -30,6 +26,10 @@ class JavaTestFieldSet(TestFieldSet):
     required_fields = (JavaTestSourceField,)
 
     sources: JavaTestSourceField
+
+
+class JunitToolLockfileSentinel(JvmToolLockfileSentinel):
+    options_scope = JUnit.options_scope
 
 
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
@@ -45,27 +45,7 @@ async def run_junit_test(
         MaterializedClasspath,
         MaterializedClasspathRequest(
             prefix="__thirdpartycp",
-            artifact_requirements=(
-                ArtifactRequirements(
-                    [
-                        Coordinate(
-                            group="org.junit.platform",
-                            artifact="junit-platform-console",
-                            version="1.7.2",
-                        ),
-                        Coordinate(
-                            group="org.junit.jupiter",
-                            artifact="junit-jupiter-engine",
-                            version="5.7.2",
-                        ),
-                        Coordinate(
-                            group="org.junit.vintage",
-                            artifact="junit-vintage-engine",
-                            version="5.7.2",
-                        ),
-                    ]
-                ),
-            ),
+            lockfiles=(junit.resolved_lockfile(),),
         ),
     )
     merged_digest = await Get(
@@ -120,8 +100,14 @@ async def setup_junit_debug_request(_field_set: JavaTestFieldSet) -> TestDebugRe
     raise NotImplementedError("TestDebugResult is not implemented for JUnit (yet?).")
 
 
+@rule
+async def generate_junit_lockfile_request(junit: JUnit) -> JvmToolLockfileRequest:
+    return JvmToolLockfileRequest.from_tool(junit)
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(TestFieldSet, JavaTestFieldSet),
+        UnionRule(JvmToolLockfileSentinel, JunitToolLockfileSentinel),
     ]

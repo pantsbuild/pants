@@ -51,13 +51,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.platform import Platform
-from pants.engine.process import (
-    BashBinary,
-    MultiPlatformProcess,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
-)
+from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -544,10 +538,12 @@ async def build_pex(
         ),
     )
 
+    process = dataclasses.replace(process, platform=platform)
+
     # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
     # without cross-building, we specify that our PEX command should be run on the current local
     # platform.
-    result = await Get(ProcessResult, MultiPlatformProcess({platform: process}))
+    result = await Get(ProcessResult, Process, process)
 
     if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()

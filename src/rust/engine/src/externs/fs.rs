@@ -11,7 +11,7 @@ use itertools::Itertools;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyString, PyTuple, PyType};
+use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{GlobExpansionConjunction, PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -21,6 +21,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
   m.add_class::<PyFileDigest>()?;
   m.add_class::<PySnapshot>()?;
+  m.add_class::<PyMergeDigests>()?;
   m.add_class::<PyAddPrefix>()?;
   m.add_class::<PyRemovePrefix>()?;
 
@@ -204,6 +205,47 @@ impl PySnapshot {
       .map(|ps| PyString::new(py, ps))
       .collect::<Vec<_>>();
     PyTuple::new(py, dirs)
+  }
+}
+
+#[pyclass]
+#[derive(Debug, PartialEq)]
+pub struct PyMergeDigests(pub Vec<Digest>);
+
+#[pymethods]
+impl PyMergeDigests {
+  #[new]
+  fn __new__(digests: &PyAny, py: Python) -> PyResult<Self> {
+    let digests: PyResult<Vec<Digest>> = PyIterator::from_object(py, digests)?
+      .map(|v| {
+        let py_digest = v?.extract::<PyDigest>()?;
+        Ok(py_digest.0)
+      })
+      .collect();
+    Ok(Self(digests?))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let digests = self
+      .0
+      .iter()
+      .map(|d| format!("{}", PyDigest(*d)))
+      .join(", ");
+    format!("MergeDigests([{}])", digests)
+  }
+
+  fn __richcmp__(&self, other: &PyMergeDigests, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
   }
 }
 

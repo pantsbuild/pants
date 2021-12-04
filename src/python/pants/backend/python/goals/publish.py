@@ -27,12 +27,22 @@ from pants.option.global_options import GlobalOptions
 logger = logging.getLogger(__name__)
 
 
-class PyPiRepositories(StringSequenceField):
-    alias = "pypi_repositories"
-    help = "List of PyPi repositories to publish the target package to."
+class PythonRepositoriesField(StringSequenceField):
+    alias = "repositories"
+    help = (
+        "List of URL addresses or Twine repository aliases where to publish the Python package.\n\n"
+        "Twine is used for publishing Python packages, so the address to any kind of repository "
+        "that Twine supports may be used here.\n\n"
+        "Aliases are prefixed with `@` to refer to a config section in your Twine configuration, "
+        "such as a `.pypirc` file. Use `@pypi` to upload to the public PyPi repository, which is "
+        "the default when using Twine directly."
+    )
 
     # Twine uploads to 'pypi' by default, but we don't set default to ["@pypi"] here to make it
     # explicit in the BUILD file when a package is meant for public distribution.
+
+    deprecated_alias = "pypi_repositories"
+    deprecated_alias_removal_version = "2.10.0.dev0"
 
 
 class SkipTwineUploadField(BoolField):
@@ -41,16 +51,16 @@ class SkipTwineUploadField(BoolField):
     help = "If true, don't publish this target's packages using Twine."
 
 
-class PublishToPyPiRequest(PublishRequest):
+class PublishPythonPackageRequest(PublishRequest):
     pass
 
 
 @dataclass(frozen=True)
-class PublishToPyPiFieldSet(PublishFieldSet):
-    publish_request_type = PublishToPyPiRequest
-    required_fields = (PyPiRepositories,)
+class PublishPythonPackageFieldSet(PublishFieldSet):
+    publish_request_type = PublishPythonPackageRequest
+    required_fields = (PythonRepositoriesField,)
 
-    repositories: PyPiRepositories
+    repositories: PythonRepositoriesField
     skip_twine: SkipTwineUploadField
 
     def get_output_data(self) -> PublishOutputData:
@@ -66,7 +76,7 @@ class PublishToPyPiFieldSet(PublishFieldSet):
     #
     # @classmethod
     # def opt_out(cls, tgt: Target) -> bool:
-    #     return not tgt[PyPiRepositories].value
+    #     return not tgt[PythonRepositoriesField].value
 
 
 def twine_upload_args(
@@ -125,7 +135,9 @@ def twine_env(env: Environment, repo: str) -> Environment:
 
 @rule
 async def twine_upload(
-    request: PublishToPyPiRequest, twine_subsystem: TwineSubsystem, global_options: GlobalOptions
+    request: PublishPythonPackageRequest,
+    twine_subsystem: TwineSubsystem,
+    global_options: GlobalOptions,
 ) -> PublishProcesses:
     dists = tuple(
         artifact.relpath
@@ -213,7 +225,7 @@ async def twine_upload(
 def rules():
     return (
         *collect_rules(),
-        *PublishToPyPiFieldSet.rules(),
-        PythonDistribution.register_plugin_field(PyPiRepositories),
+        *PublishPythonPackageFieldSet.rules(),
+        PythonDistribution.register_plugin_field(PythonRepositoriesField),
         PythonDistribution.register_plugin_field(SkipTwineUploadField),
     )
