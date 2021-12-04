@@ -100,7 +100,7 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   platform: Platform,
   store: Store,
-  headers: BTreeMap<String, String>,
+  _headers: BTreeMap<String, String>,
   execution_client: Arc<ExecutionClient<LayeredService>>,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
@@ -172,7 +172,7 @@ impl CommandRunner {
 
     let command_runner = CommandRunner {
       metadata,
-      headers,
+      _headers: headers,
       execution_client,
       action_cache_client,
       store,
