@@ -6,7 +6,9 @@ backends.
 
 Usage:
 
-    $ ./pants --backend-packages=pants.backend.plugin_development check-names
+    $ ./pants --backend-packages=pants.backend.plugin_development check-names > renames
+    $ find src/python -name \*.py | xargs sed -i "" -f renames
+
 
 Implemented checks:
 
@@ -35,17 +37,17 @@ class CheckNames(Goal):
 
 @goal_rule
 async def check_names(console: Console, subsystem: CheckNamesSubsystem) -> CheckNames:
-    console.print_stdout("Checking field class names...")
+    console.print_stderr("Checking field class names...")
     exit_code = check_field_names(console)
 
     if exit_code == 0:
         sigil = console.sigil_succeeded()
-        status = "all checks passed"
+        status = "All checks passed"
     else:
         sigil = console.sigil_failed()
-        status = "some checks failed"
+        status = "Some checks failed"
 
-    console.print_stdout(f"\n{sigil} {status}.")
+    console.print_stderr(f"\n{sigil} {status}.")
     return CheckNames(exit_code)
 
 
@@ -63,10 +65,16 @@ def get_subclasses_name_does_not_end_with(
 
 def check_field_names(console: Console) -> int:
     exit_code = 0
+    seen = set()
     for class_name, module in get_subclasses_name_does_not_end_with(
         Field, "Field", "Base", "Mixin"
     ):
-        console.print_stdout(f"Rename field class {module}.{class_name} => {class_name}Field")
+        if class_name in seen:
+            continue
+
+        seen.add(class_name)
+        console.print_stderr(f"Rename field class {module}.{class_name} => {class_name}Field")
+        console.print_stdout(f"s/{class_name}/{class_name}Field/g")
         exit_code = 1
 
     return exit_code
