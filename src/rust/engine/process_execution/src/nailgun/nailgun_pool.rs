@@ -1,6 +1,8 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashSet;
+use std::ffi::OsString;
 use std::io::{self, BufRead, Read};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::process::ExitStatusExt;
@@ -10,6 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
+use futures::future;
 use hashing::Fingerprint;
 use lazy_static::lazy_static;
 use log::{debug, info};
@@ -253,6 +256,7 @@ pub struct NailgunProcess {
   pub name: String,
   fingerprint: NailgunProcessFingerprint,
   workdir: TempDir,
+  workdir_include_names: HashSet<OsString>,
   port: Port,
   executor: task_executor::Executor,
   handle: std::process::Child,
@@ -316,18 +320,21 @@ impl NailgunProcess {
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
+    // Prepare the workdir, and then list it to identify the base set of names which should be
+    // preserved across runs. TODO: This is less efficient than computing the set of names
+    // directly from the Process (or returning them from `prepare_workdir`), but it's also much
+    // simpler.
     prepare_workdir(
       workdir.path().to_owned(),
       &startup_options,
+      startup_options.input_digests.use_nailgun,
       context.clone(),
       store.clone(),
       executor.clone(),
       named_caches,
     )
     .await?;
-    store
-      .materialize_directory(workdir.path().to_owned(), startup_options.input_files)
-      .await?;
+    let workdir_include_names = list_workdir(workdir.path()).await?;
 
     let cmd = startup_options.argv[0].clone();
     // TODO: This is an expensive operation, and thus we info! it.
@@ -360,13 +367,11 @@ impl NailgunProcess {
       port
     );
 
-    // Now that we've started it, clear its directory before the first client can access it.
-    clear_workdir(workdir.path(), &executor).await?;
-
     Ok(NailgunProcess {
       port,
       fingerprint: nailgun_server_fingerprint,
       workdir,
+      workdir_include_names,
       name,
       executor,
       handle: child,
@@ -446,7 +451,12 @@ impl BorrowedNailgunProcess {
       .as_ref()
       .unwrap();
 
-    clear_workdir(process.workdir.path(), &process.executor).await?;
+    clear_workdir(
+      &process.executor,
+      process.workdir.path(),
+      &process.workdir_include_names,
+    )
+    .await?;
 
     // Once we've successfully cleaned up, remove the process.
     let _ = self.0.take();
@@ -467,7 +477,11 @@ impl Drop for BorrowedNailgunProcess {
   }
 }
 
-async fn clear_workdir(workdir: &Path, executor: &Executor) -> Result<(), String> {
+async fn clear_workdir(
+  executor: &Executor,
+  workdir: &Path,
+  exclude_names: &HashSet<OsString>,
+) -> Result<(), String> {
   // Move all content into a temporary directory.
   let garbage_dir = tempfile::Builder::new()
     .prefix("process-execution")
@@ -478,30 +492,41 @@ async fn clear_workdir(workdir: &Path, executor: &Executor) -> Result<(), String
         err
       )
     })?;
-  let mut dir_entries = tokio::fs::read_dir(workdir)
-    .await
-    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
-  while let Some(dir_entry) = dir_entries
-    .next_entry()
-    .await
-    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
-  {
-    tokio::fs::rename(
-      dir_entry.path(),
-      garbage_dir.path().join(dir_entry.file_name()),
-    )
-    .await
-    .map_err(|e| {
-      format!(
-        "Failed to move {} to garbage: {}",
-        dir_entry.path().display(),
-        e
-      )
-    })?;
-  }
+  let moves = list_workdir(workdir)
+    .await?
+    .into_iter()
+    .filter(|n| !exclude_names.contains(n))
+    .map(|name| async {
+      tokio::fs::rename(workdir.join(&name), garbage_dir.path().join(&name))
+        .await
+        .map_err(|e| {
+          format!(
+            "Failed to move {} to garbage: {}",
+            workdir.join(name).display(),
+            e
+          )
+        })
+    })
+    .collect::<Vec<_>>();
+  future::try_join_all(moves).await?;
 
   // And drop it in the background.
   let _ = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
 
   Ok(())
+}
+
+async fn list_workdir(workdir: &Path) -> Result<HashSet<OsString>, String> {
+  let mut dir_entries = tokio::fs::read_dir(workdir)
+    .await
+    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
+  let mut names = HashSet::new();
+  while let Some(dir_entry) = dir_entries
+    .next_entry()
+    .await
+    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
+  {
+    names.insert(dir_entry.file_name());
+  }
+  Ok(names)
 }

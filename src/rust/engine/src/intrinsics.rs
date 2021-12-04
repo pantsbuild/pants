@@ -168,18 +168,12 @@ impl Intrinsics {
 
 fn process_request_to_process_result(
   context: Context,
-  args: Vec<Value>,
+  mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_request = Python::with_gil(|py| {
-      let py_process = (*args[0]).as_ref(py);
-      ExecuteProcess::lift(py_process).map_err(|str| {
-        throw(format!(
-          "Error lifting MultiPlatformExecuteProcess: {}",
-          str
-        ))
-      })
-    })?;
+    let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
+      .map_err(|e| throw(format!("Error lifting MultiPlatformExecuteProcess: {}", e)))
+      .await?;
 
     let result = context.get(process_request).await?.0;
 

@@ -791,7 +791,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_files),
+      Some(request.input_digests.complete),
     )
     .await?;
 
@@ -1030,7 +1030,7 @@ pub fn make_execute_request(
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_files).into()),
+    input_root_digest: Some((&req.input_digests.complete).into()),
     ..remexec::Action::default()
   };
 

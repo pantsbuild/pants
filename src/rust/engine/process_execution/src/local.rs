@@ -282,6 +282,18 @@ impl super::CommandRunner for CommandRunner {
           }
         };
 
+        // Prepare the workdir.
+        let exclusive_spawn = prepare_workdir(
+          workdir_path.clone(),
+          &req,
+          req.input_digests.complete,
+          context.clone(),
+          self.store.clone(),
+          self.executor.clone(),
+          self.named_caches(),
+        )
+        .await?;
+
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
         let res = self
           .run_and_capture_workdir(
@@ -291,6 +303,7 @@ impl super::CommandRunner for CommandRunner {
             self.executor.clone(),
             workdir_path.clone(),
             (),
+            exclusive_spawn,
             self.platform(),
           )
           .map_err(|msg| {
@@ -453,20 +466,10 @@ pub trait CapturedWorkdir {
     executor: task_executor::Executor,
     workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
+    exclusive_spawn: bool,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
-
-    // Prepare the workdir.
-    let exclusive_spawn = prepare_workdir(
-      workdir_path.clone(),
-      &req,
-      context.clone(),
-      store.clone(),
-      executor.clone(),
-      self.named_caches(),
-    )
-    .await?;
 
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
@@ -602,6 +605,7 @@ pub trait CapturedWorkdir {
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
+  input_digest: hashing::Digest,
   context: Context,
   store: Store,
   executor: task_executor::Executor,
@@ -627,7 +631,6 @@ pub async fn prepare_workdir(
   // non-determinism when paths overlap.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
-  let input_files = req.input_files;
   in_workunit!(
     context.workunit_store.clone(),
     "setup_sandbox".to_owned(),
@@ -637,7 +640,7 @@ pub async fn prepare_workdir(
     },
     |_workunit| async move {
       store2
-        .materialize_directory(workdir_path_2, input_files)
+        .materialize_directory(workdir_path_2, input_digest)
         .await
     },
   )
