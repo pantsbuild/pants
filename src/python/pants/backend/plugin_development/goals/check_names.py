@@ -7,7 +7,7 @@ backends.
 Usage:
 
     $ ./pants --backend-packages=pants.backend.plugin_development check-names > renames
-    $ find src/python -name \*.py | xargs sed -i "" -f renames
+    $ find src/python -name \\*.py | xargs sed -i "" -f renames
 
 
 Implemented checks:
