@@ -231,10 +231,10 @@ pub fn generator_send(
 
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
-pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
+pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> PyObject {
   let py_type = type_id.as_py_type(py);
   call_function(py_type, args)
-    .map(|obj| Value::new(obj.into_py(py)))
+    .map(|obj| obj.into_py(py))
     .unwrap_or_else(|e| {
       panic!(
         "Core type constructor `{}` failed: {:?}",

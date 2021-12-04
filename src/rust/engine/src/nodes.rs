@@ -604,17 +604,14 @@ impl Paths {
         }
       }
     }
-    Ok(
-      externs::unsafe_call(
-        py,
-        core.types.paths,
-        &[
-          externs::store_tuple(py, files),
-          externs::store_tuple(py, dirs),
-        ],
-      )
-      .consume_into_py_object(py),
-    )
+    Ok(externs::unsafe_call(
+      py,
+      core.types.paths,
+      &[
+        externs::store_tuple(py, files),
+        externs::store_tuple(py, dirs),
+      ],
+    ))
   }
 }
 
@@ -675,11 +672,11 @@ impl WrappedNode for RunId {
   ) -> NodeResult<Value> {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    Ok(externs::unsafe_call(
+    Ok(Value::new(externs::unsafe_call(
       py,
       context.core.types.run_id,
       &[externs::store_u64(py, context.session.run_id().0 as u64)],
-    ))
+    )))
   }
 }
 
@@ -764,7 +761,7 @@ impl Snapshot {
     py: Python,
     types: &crate::types::Types,
     item: &FileContent,
-  ) -> Result<Value, String> {
+  ) -> Result<PyObject, String> {
     Ok(externs::unsafe_call(
       py,
       types.file_content,
@@ -780,7 +777,7 @@ impl Snapshot {
     py: Python,
     types: &crate::types::Types,
     item: &FileEntry,
-  ) -> Result<Value, String> {
+  ) -> Result<PyObject, String> {
     Ok(externs::unsafe_call(
       py,
       types.file_entry,
@@ -796,7 +793,7 @@ impl Snapshot {
     py: Python,
     types: &crate::types::Types,
     path: &Path,
-  ) -> Result<Value, String> {
+  ) -> Result<PyObject, String> {
     Ok(externs::unsafe_call(
       py,
       types.directory,
@@ -811,16 +808,13 @@ impl Snapshot {
   ) -> Result<PyObject, String> {
     let entries = item
       .iter()
-      .map(|e| Self::store_file_content(py, &context.core.types, e))
+      .map(|e| Self::store_file_content(py, &context.core.types, e).map(Value::new))
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(
-      externs::unsafe_call(
-        py,
-        context.core.types.digest_contents,
-        &[externs::store_tuple(py, entries)],
-      )
-      .consume_into_py_object(py),
-    )
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.digest_contents,
+      &[externs::store_tuple(py, entries)],
+    ))
   }
 
   pub fn store_digest_entries(
@@ -832,21 +826,18 @@ impl Snapshot {
       .iter()
       .map(|digest_entry| match digest_entry {
         DigestEntry::File(file_entry) => {
-          Self::store_file_entry(py, &context.core.types, file_entry)
+          Self::store_file_entry(py, &context.core.types, file_entry).map(Value::new)
         }
         DigestEntry::EmptyDirectory(path) => {
-          Self::store_empty_directory(py, &context.core.types, path)
+          Self::store_empty_directory(py, &context.core.types, path).map(Value::new)
         }
       })
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(
-      externs::unsafe_call(
-        py,
-        context.core.types.digest_entries,
-        &[externs::store_tuple(py, entries)],
-      )
-      .consume_into_py_object(py),
-    )
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.digest_entries,
+      &[externs::store_tuple(py, entries)],
+    ))
   }
 }
 

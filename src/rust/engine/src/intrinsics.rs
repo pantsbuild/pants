@@ -214,39 +214,36 @@ fn process_request_to_process_result(
     let platform_name: String = result.platform.into();
     let gil = Python::acquire_gil();
     let py = gil.python();
-    Ok(
-      externs::unsafe_call(
-        py,
-        context.core.types.process_result,
-        &[
-          externs::store_bytes(py, &stdout_bytes),
-          Value::new(Snapshot::store_file_digest(py, result.stdout_digest).map_err(throw)?),
-          externs::store_bytes(py, &stderr_bytes),
-          Value::new(Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?),
-          externs::store_i64(py, result.exit_code.into()),
-          Value::new(Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?),
-          externs::unsafe_call(
-            py,
-            context.core.types.platform,
-            &[externs::store_utf8(py, &platform_name)],
-          ),
-          externs::unsafe_call(
-            py,
-            context.core.types.process_result_metadata,
-            &[
-              result
-                .metadata
-                .total_elapsed
-                .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
-                .unwrap_or_else(|| Value::from(py.None())),
-              externs::store_utf8(py, result.metadata.source.into()),
-              externs::store_u64(py, result.metadata.source_run_id.0.into()),
-            ],
-          ),
-        ],
-      )
-      .consume_into_py_object(py),
-    )
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.process_result,
+      &[
+        externs::store_bytes(py, &stdout_bytes),
+        Value::new(Snapshot::store_file_digest(py, result.stdout_digest).map_err(throw)?),
+        externs::store_bytes(py, &stderr_bytes),
+        Value::new(Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?),
+        externs::store_i64(py, result.exit_code.into()),
+        Value::new(Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?),
+        Value::new(externs::unsafe_call(
+          py,
+          context.core.types.platform,
+          &[externs::store_utf8(py, &platform_name)],
+        )),
+        Value::new(externs::unsafe_call(
+          py,
+          context.core.types.process_result_metadata,
+          &[
+            result
+              .metadata
+              .total_elapsed
+              .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
+              .unwrap_or_else(|| Value::from(py.None())),
+            externs::store_utf8(py, result.metadata.source.into()),
+            externs::store_u64(py, result.metadata.source_run_id.0.into()),
+          ],
+        )),
+      ],
+    ))
   }
   .boxed()
 }
@@ -751,7 +748,7 @@ fn interactive_process(
         py,
         interactive_process_result,
         &[externs::store_i64(py, i64::from(code))],
-      ).consume_into_py_object(py)
+      )
     };
     Ok(result)
   }.boxed()
