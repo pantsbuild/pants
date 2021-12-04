@@ -1012,13 +1012,10 @@ impl Store {
     let res = async move {
       let write_result = store
         .load_file_bytes_with(digest, move |bytes| {
-          if destination.exists() {
-            std::fs::remove_file(&destination)
-              .map_err(|e| format!("Failed to overwrite {}: {:?}", destination.display(), e))?;
-          }
           let mut f = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .mode(if is_executable { 0o755 } else { 0o644 })
             .open(&destination)
             .map_err(|e| {
