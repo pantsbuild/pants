@@ -262,7 +262,38 @@ pub struct NailgunProcess {
   handle: std::process::Child,
 }
 
-fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
+/// Spawn a nailgun process, and read its port from stdout.
+///
+/// NB: Uses blocking APIs, so should be backgrounded on an executor.
+fn spawn_and_read_port(
+  process: Process,
+  workdir: PathBuf,
+) -> Result<(std::process::Child, Port), String> {
+  let cmd = process.argv[0].clone();
+  // TODO: This is an expensive operation, and thus we info! it.
+  //       If it becomes annoying, we can downgrade the logging to just debug!
+  info!(
+    "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {}",
+    cmd,
+    &process.argv[1..],
+    workdir.display()
+  );
+
+  let mut child = std::process::Command::new(&cmd)
+    .args(&process.argv[1..])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .env_clear()
+    .envs(&process.env)
+    .current_dir(&workdir)
+    .spawn()
+    .map_err(|e| {
+      format!(
+        "Failed to create child handle with cmd: {} options {:#?}: {}",
+        &cmd, &process, e
+      )
+    })?;
+
   let stdout = child
     .stdout
     .as_mut()
@@ -295,13 +326,15 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
   }
   let port_line = port_line?;
 
-  let port = &NAILGUN_PORT_REGEX
+  let port_str = &NAILGUN_PORT_REGEX
     .captures_iter(&port_line)
     .next()
     .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{:?}", port_line))?[1];
-  port
+  let port = port_str
     .parse::<Port>()
-    .map_err(|e| format!("Error parsing port {}! {}", &port, e))
+    .map_err(|e| format!("Error parsing port {}! {}", port_str, e))?;
+
+  Ok((child, port))
 }
 
 impl NailgunProcess {
@@ -336,31 +369,13 @@ impl NailgunProcess {
     .await?;
     let workdir_include_names = list_workdir(workdir.path()).await?;
 
-    let cmd = startup_options.argv[0].clone();
-    // TODO: This is an expensive operation, and thus we info! it.
-    //       If it becomes annoying, we can downgrade the logging to just debug!
-    info!(
-      "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {:?}",
-      cmd,
-      &startup_options.argv[1..],
-      workdir.path()
-    );
-    let mut child = std::process::Command::new(&cmd)
-      .args(&startup_options.argv[1..])
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .env_clear()
-      .envs(&startup_options.env)
-      .current_dir(&workdir)
-      .spawn()
-      .map_err(|e| {
-        format!(
-          "Failed to create child handle with cmd: {} options {:#?}: {}",
-          &cmd, &startup_options, e
-        )
-      })?;
-
-    let port = read_port(&mut child)?;
+    // Spawn the process and read its port from stdout.
+    let (child, port) = executor
+      .spawn_blocking({
+        let workdir = workdir.path().to_owned();
+        move || spawn_and_read_port(startup_options, workdir)
+      })
+      .await?;
     debug!(
       "Created nailgun server process with pid {} and port {}",
       child.id(),
