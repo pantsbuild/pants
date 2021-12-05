@@ -170,6 +170,12 @@ class SourceAnalysisTraverser extends Traverser {
       withNamePart(name, () => super.apply(stats))
     }
 
+    case Pkg.Object(_mods, nameNode, templ) => {
+      val name = extractName(nameNode)
+      recordScope(name)
+      visitTemplate(templ, name)
+    }
+
     case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)

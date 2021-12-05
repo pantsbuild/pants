@@ -373,3 +373,18 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
         "scala.io.apply",
         "sio.apply",
     }
+
+
+def test_package_object(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            package object bar {
+              val Hello = "World"
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.provided_symbols) == ["foo.bar.Hello"]
