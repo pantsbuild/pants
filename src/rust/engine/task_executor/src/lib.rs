@@ -40,7 +40,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct Executor {
-  runtime: Option<Arc<Runtime>>,
+  _runtime: Option<Arc<Runtime>>,
   handle: Handle,
 }
 
@@ -56,7 +56,7 @@ impl Executor {
   ///
   pub fn new() -> Executor {
     Executor {
-      runtime: None,
+      _runtime: None,
       handle: Handle::current(),
     }
   }
@@ -73,7 +73,7 @@ impl Executor {
     let global = GLOBAL_EXECUTOR.load();
     if let Some(ref runtime) = *global {
       return Ok(Executor {
-        runtime: Some(runtime.clone()),
+        _runtime: Some(runtime.clone()),
         handle: runtime.handle().clone(),
       });
     }
