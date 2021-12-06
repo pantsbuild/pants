@@ -43,52 +43,44 @@ def test_infer_python_imports(caplog) -> None:
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
-    rule_runner.add_to_build_file(
-        "3rdparty/python",
-        dedent(
-            """\
-            python_requirement(
-              name='Django',
-              requirements=['Django==1.21'],
-            )
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "3rdparty/python/BUILD": dedent(
+                """\
+                python_requirement(
+                  name='Django',
+                  requirements=['Django==1.21'],
+                )
+                """
+            ),
+            # If there's a `.py` and `.pyi` file for the same module, we should infer a dependency on both.
+            "src/python/str_import/subdir/f.py": "",
+            "src/python/str_import/subdir/f.pyi": "",
+            "src/python/str_import/subdir/BUILD": "python_sources()",
+            "src/python/util/dep.py": "",
+            "src/python/util/BUILD": "python_sources()",
+            "src/python/app.py": dedent(
+                """\
+                import django
+                import unrecognized.module
+
+                from util.dep import Demo
+                from util import dep
+                """
+            ),
+            "src/python/f2.py": dedent(
+                """\
+                import typing
+                # Import from another file in the same target.
+                from app import main
+
+                # Dynamic string import.
+                importlib.import_module('str_import.subdir.f')
+                """
+            ),
+            "src/python/BUILD": "python_sources()",
+        }
     )
-
-    # If there's a `.py` and `.pyi` file for the same module, we should infer a dependency on both.
-    rule_runner.create_file("src/python/str_import/subdir/f.py")
-    rule_runner.create_file("src/python/str_import/subdir/f.pyi")
-    rule_runner.add_to_build_file("src/python/str_import/subdir", "python_sources()")
-
-    rule_runner.create_file("src/python/util/dep.py")
-    rule_runner.add_to_build_file("src/python/util", "python_sources()")
-
-    rule_runner.create_file(
-        "src/python/app.py",
-        dedent(
-            """\
-            import django
-            import unrecognized.module
-
-            from util.dep import Demo
-            from util import dep
-            """
-        ),
-    )
-    rule_runner.create_file(
-        "src/python/f2.py",
-        dedent(
-            """\
-            import typing
-            # Import from another file in the same target.
-            from app import main
-
-            # Dynamic string import.
-            importlib.import_module('str_import.subdir.f')
-            """
-        ),
-    )
-    rule_runner.add_to_build_file("src/python", "python_sources()")
 
     def run_dep_inference(
         address: Address, *, enable_string_imports: bool = False
@@ -183,15 +175,17 @@ def test_infer_python_inits() -> None:
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
-    rule_runner.create_file("src/python/root/__init__.py")
-    rule_runner.add_to_build_file("src/python/root", "python_sources()")
-
-    rule_runner.create_file("src/python/root/mid/__init__.py")
-    rule_runner.add_to_build_file("src/python/root/mid", "python_sources()")
-
-    rule_runner.create_file("src/python/root/mid/leaf/__init__.py")
-    rule_runner.create_file("src/python/root/mid/leaf/f.py")
-    rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_sources()")
+    rule_runner.write_files(
+        {
+            "src/python/root/__init__.py": "",
+            "src/python/root/BUILD": "python_sources()",
+            "src/python/root/mid/__init__.py": "",
+            "src/python/root/mid/BUILD": "python_sources()",
+            "src/python/root/mid/leaf/__init__.py": "",
+            "src/python/root/mid/leaf/f.py": "",
+            "src/python/root/mid/leaf/BUILD": "python_sources()",
+        }
+    )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address)
@@ -227,16 +221,16 @@ def test_infer_python_conftests() -> None:
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
-    rule_runner.create_file("src/python/root/conftest.py")
-    rule_runner.add_to_build_file("src/python/root", "python_test_utils()")
-
-    rule_runner.create_file("src/python/root/mid/conftest.py")
-    rule_runner.add_to_build_file("src/python/root/mid", "python_test_utils()")
-
-    rule_runner.create_file("src/python/root/mid/leaf/conftest.py")
-    rule_runner.create_file("src/python/root/mid/leaf/this_is_a_test.py")
-    rule_runner.add_to_build_file(
-        "src/python/root/mid/leaf", "python_test_utils()\npython_tests(name='tests')"
+    rule_runner.write_files(
+        {
+            "src/python/root/conftest.py": "",
+            "src/python/root/BUILD": "python_test_utils()",
+            "src/python/root/mid/conftest.py": "",
+            "src/python/root/mid/BUILD": "python_test_utils()",
+            "src/python/root/mid/leaf/conftest.py": "",
+            "src/python/root/mid/leaf/this_is_a_test.py": "",
+            "src/python/root/mid/leaf/BUILD": "python_test_utils()\npython_tests(name='tests')",
+        }
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
@@ -274,11 +268,12 @@ def test_infer_python_strict(caplog) -> None:
         context_aware_object_factories={"python_requirements": PythonRequirementsCAOF},
     )
 
-    rule_runner.create_file(
-        "src/python/cheesey.py",
-        "import venezuelan_beaver_cheese",
+    rule_runner.write_files(
+        {
+            "src/python/cheesey.py": "import venezuelan_beaver_cheese",
+            "src/python/BUILD": "python_sources()",
+        }
     )
-    rule_runner.add_to_build_file("src/python", "python_sources()")
 
     def run_dep_inference(
         address: Address,
@@ -317,45 +312,47 @@ def test_infer_python_strict(caplog) -> None:
     caplog.clear()
 
     # All modes should be fine if the module is explictly declared as a requirement
-    rule_runner.add_to_build_file(
-        "src/python",
-        dedent(
-            """\
-                python_requirement(
-                    name="venezuelan_beaver_cheese",
-                    modules=["venezuelan_beaver_cheese"],
-                    requirements=["venezuelan_beaver_cheese==1.0.0"],
-                )
-                python_sources(dependencies=[":venezuelan_beaver_cheese"])
-            """
-        ),
-        overwrite=True,
+    rule_runner.write_files(
+        {
+            "src/python/BUILD": dedent(
+                """\
+                    python_requirement(
+                        name="venezuelan_beaver_cheese",
+                        modules=["venezuelan_beaver_cheese"],
+                        requirements=["venezuelan_beaver_cheese==1.0.0"],
+                    )
+                    python_sources(dependencies=[":venezuelan_beaver_cheese"])
+                """
+            ),
+        }
     )
     for mode in UnownedDependencyUsage:
         run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
         assert not caplog.records
 
-    rule_runner.add_to_build_file("src/python", "python_sources()", overwrite=True)  # Cleanup
-
     # All modes should be fine if the module is implictly found via requirements.txt
-    rule_runner.create_file("src/python/requirements.txt", "venezuelan_beaver_cheese==1.0.0")
-    rule_runner.add_to_build_file(
-        "src/python",
-        dedent(
-            """\
-                python_requirements()
-                python_sources()
-            """
-        ),
-        overwrite=True,
+    rule_runner.write_files(
+        {
+            "src/python/requirements.txt": "venezuelan_beaver_cheese==1.0.0",
+            "src/python/BUILD": dedent(
+                """\
+                    python_requirements()
+                    python_sources()
+                """
+            ),
+        }
     )
     for mode in UnownedDependencyUsage:
         run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
         assert not caplog.records
 
     # All modes should be fine if the module is owned by a first party
-    rule_runner.create_file("src/python/venezuelan_beaver_cheese.py")
-    rule_runner.add_to_build_file("src/python", "python_sources()", overwrite=True)
+    rule_runner.write_files(
+        {
+            "src/python/venezuelan_beaver_cheese.py": "",
+            "src/python/BUILD": "python_sources()",
+        }
+    )
     for mode in UnownedDependencyUsage:
         run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
         assert not caplog.records
