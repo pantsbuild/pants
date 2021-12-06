@@ -4,7 +4,8 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from functools import reduce
+from typing import Callable, Optional
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -71,11 +72,14 @@ logger = logging.getLogger()
 class PytestPluginSetup:
     """The result of custom set up logic before Pytest runs.
 
-    Please reach out it if you would like certain functionality, such as allowing your plugin to set
-    environment variables.
+    The `preprocess_callback` takes the pytest `Process` and returns a possibly modified `Process`
+    with any required modifications, such as adding additional environment variables etc.
+
+    Please reach out it if you would like certain functionality.
     """
 
     digest: Digest = EMPTY_DIGEST
+    preprocess_callback: Optional[Callable[[Process], Process]] = None
 
 
 @union
@@ -317,6 +321,13 @@ async def setup_pytest_for_target(
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,
         ),
+    )
+    process = reduce(
+        lambda proc, plugin_setup: plugin_setup.preprocess_callback
+        and plugin_setup.preprocess_callback(proc)
+        or proc,
+        plugin_setups,
+        process,
     )
     return TestSetup(process, results_file_name=results_file_name)
 

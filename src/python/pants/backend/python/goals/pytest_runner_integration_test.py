@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 from textwrap import dedent
@@ -13,7 +14,12 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.goals.pytest_runner import (
+    PytestPluginSetup,
+    PytestPluginSetupRequest,
+    TestSetup,
+    TestSetupRequest,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.pytest import rules as pytest_subsystem_rules
@@ -37,6 +43,7 @@ from pants.core.goals.test import (
 from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.process import Process
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -45,6 +52,7 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_and_python3_present,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -572,3 +580,44 @@ def test_skip_tests(rule_runner: RuleRunner) -> None:
 
     assert not is_applicable("t1", "test_skip_me.py")
     assert is_applicable("t2", "test_foo.py")
+
+
+class CallbackPlugin(PytestPluginSetupRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return True
+
+    def preprocess(self, process: Process) -> Process:
+        return dataclasses.replace(process, env=FrozenDict({"CALLBACK": "Plugin", **process.env}))
+
+
+@rule
+async def callback_plugin(plugin: CallbackPlugin) -> PytestPluginSetup:
+    return PytestPluginSetup(preprocess_callback=plugin.preprocess)
+
+
+def test_setup_plugin_preprocess_callback(rule_runner: RuleRunner) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *rule_runner.rules,
+            callback_plugin,
+            used_plugin,
+            UnionRule(PytestPluginSetupRequest, UsedPlugin),
+            UnionRule(PytestPluginSetupRequest, CallbackPlugin),
+            QueryRule(TestSetup, (TestSetupRequest,)),
+        ],
+        target_types=rule_runner.target_types,
+    )
+    rule_runner.write_files(
+        {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    args = [
+        "--backend-packages=pants.backend.python",
+        f"--source-root-patterns={SOURCE_ROOT}",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    setup = rule_runner.request(
+        TestSetup, [TestSetupRequest(PythonTestFieldSet.create(tgt), is_debug=False)]
+    )
+    assert setup.process.env["CALLBACK"] == "Plugin"
