@@ -79,7 +79,7 @@ class JvmToolBase(Subsystem):
         register(
             "--lockfile",
             type=str,
-            default=cls.default_lockfile_path,
+            default=DEFAULT_TOOL_LOCKFILE,
             advanced=True,
             help=(
                 "Path to a lockfile used for installing the tool.\n\n"
@@ -104,10 +104,7 @@ class JvmToolBase(Subsystem):
     def lockfile(self) -> str:
         f"""The path to a lockfile or special string '{DEFAULT_TOOL_LOCKFILE}'."""
         lockfile = cast(str, self.options.lockfile)
-        if lockfile != DEFAULT_TOOL_LOCKFILE:
-            return lockfile
-        pkg, path = self.default_lockfile_resource
-        return f"src/python/{pkg.replace('.', '/')}/{path}"
+        return lockfile
 
     def lockfile_content(self) -> bytes:
         lockfile_path = self.lockfile
@@ -135,6 +132,12 @@ class JvmToolLockfileRequest:
 
     @classmethod
     def from_tool(cls, tool: JvmToolBase) -> JvmToolLockfileRequest:
+        lockfile_dest = tool.lockfile
+        if lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+            raise ValueError(
+                f"Internal error: Request to write tool lockfile but `[{tool.options_scope}.lockfile]` "
+                f'is set to the default ("{DEFAULT_TOOL_LOCKFILE}").'
+            )
         return cls(
             artifact_inputs=FrozenOrderedSet(tool.artifact_inputs),
             resolve_name=tool.options_scope,
@@ -166,7 +169,7 @@ class GenerateJvmLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for tool lockfiles which are "
                 "the options scope for that tool such as `junit`.\n\n"
-                "For example, you can run `./pants generate-lockfiles --resolve=junit "
+                "For example, you can run `./pants jvm-generate-lockfiles --resolve=junit "
                 "to only generate lockfiles for the `junit` tool.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
                 "possible values.\n\n"
