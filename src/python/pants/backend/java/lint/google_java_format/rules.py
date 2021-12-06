@@ -122,7 +122,7 @@ async def setup_google_java_format(
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format with google_java_format", level=LogLevel.DEBUG)
+@rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_fmt(
     field_sets: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
 ) -> FmtResult:
