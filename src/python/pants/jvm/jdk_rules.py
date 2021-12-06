@@ -54,8 +54,7 @@ def parse_jre_major_version(version_lines: str) -> int | None:
     for line in version_lines.splitlines():
         m = VERSION_REGEX.search(line)
         if m:
-            pos = m[1].find(".")
-            major_version = m[1] if pos == -1 else m[1][0:pos]
+            major_version, _, _ = m[1].partition(".")
             return int(major_version)
     return None
 
