@@ -471,10 +471,13 @@ class RuleRunner:
         mode = "w" if overwrite else "a"
         return self._create_file(str(build_path), target, mode=mode)
 
-    def write_files(self, files: Mapping[str | PurePath, str]) -> tuple[str, ...]:
+    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public
+
+        files: A mapping of file names to contents.
+        returns: A tuple of absolute file paths created.
         """
         paths = []
         for path, content in files.items():
