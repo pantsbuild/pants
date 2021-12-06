@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.scala.lint import scala_fmt
-
 from pants.backend.scala.lint.scalafmt import rules as scalafmt_rules
 from pants.backend.scala.lint.scalafmt import skip_field
 
