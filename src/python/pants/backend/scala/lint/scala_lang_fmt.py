@@ -14,18 +14,18 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 
 
 @dataclass(frozen=True)
-class ScalaFmtTargets(LanguageFmtTargets):
+class ScalaLangFmtTargets(LanguageFmtTargets):
     required_fields = (ScalaSourceField,)
 
 
 @union
-class ScalaFmtRequest(StyleRequest):
+class ScalaLangFmtRequest(StyleRequest):
     pass
 
 
 @rule
 async def format_scala_target(
-    scala_fmt_targets: ScalaFmtTargets, union_membership: UnionMembership
+    scala_fmt_targets: ScalaLangFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
@@ -34,7 +34,7 @@ async def format_scala_target(
     prior_formatter_result = original_sources.snapshot
 
     results = []
-    fmt_request_types: Iterable[type[StyleRequest]] = union_membership[ScalaFmtRequest]
+    fmt_request_types: Iterable[type[StyleRequest]] = union_membership[ScalaLangFmtRequest]
     for fmt_request_type in fmt_request_types:
         request = fmt_request_type(
             (
@@ -46,7 +46,7 @@ async def format_scala_target(
         )
         if not request.field_sets:
             continue
-        result = await Get(FmtResult, ScalaFmtRequest, request)
+        result = await Get(FmtResult, ScalaLangFmtRequest, request)
         results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
@@ -58,4 +58,4 @@ async def format_scala_target(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LanguageFmtTargets, ScalaFmtTargets)]
+    return [*collect_rules(), UnionRule(LanguageFmtTargets, ScalaLangFmtTargets)]

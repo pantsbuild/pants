@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.scala.lint.scala_fmt import ScalaFmtRequest
+from pants.backend.scala.lint.scala_lang_fmt import ScalaLangFmtRequest
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
@@ -36,7 +36,7 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(ScalaFmtRequest, LintRequest):
+class ScalafmtRequest(ScalaLangFmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
 
 
@@ -170,6 +170,6 @@ async def generate_scalafmt_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(ScalaFmtRequest, ScalafmtRequest),
+        UnionRule(ScalaLangFmtRequest, ScalafmtRequest),
         UnionRule(JvmToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

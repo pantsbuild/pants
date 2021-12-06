@@ -6,7 +6,7 @@ import pytest
 
 from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
-from pants.backend.scala.lint import scala_fmt
+from pants.backend.scala.lint import scala_lang_fmt
 from pants.backend.scala.lint.scalafmt import skip_field
 from pants.backend.scala.lint.scalafmt.rules import ScalafmtFieldSet, ScalafmtRequest
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *jdk_rules(),
             *target_types.rules(),
-            *scala_fmt.rules(),
+            *scala_lang_fmt.rules(),
             *scalafmt_rules(),
             *skip_field.rules(),
             QueryRule(LintResults, (ScalafmtRequest,)),
