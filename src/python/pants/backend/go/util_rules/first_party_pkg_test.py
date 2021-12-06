@@ -400,4 +400,5 @@ def test_missing_embeds(rule_runner: RuleRunner) -> None:
     )
     assert maybe_digest.pkg_digest is None
     assert maybe_digest.exit_code == 1
+    assert maybe_digest.stderr is not None
     assert "Failed to find embedded resources: could not embed grok.txt" in maybe_digest.stderr
