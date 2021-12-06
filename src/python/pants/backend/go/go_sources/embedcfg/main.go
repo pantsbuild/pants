@@ -11,14 +11,34 @@
 package main
 
 import (
+    "encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+type Patterns struct {
+	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
+	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
+}
+
+type EmbedCfg struct {
+	Patterns map[string][]string
+	Files    map[string]string
+}
+
+type EmbedConfigs struct {
+	EmbedConfig      *EmbedCfg `json:",omitempty"` // files matching the EmbedPatterns
+	TestEmbedConfig  *EmbedCfg `json:",omitempty"` // files matching the TestEmbedPatterns
+	XTestEmbedConfig *EmbedCfg `json:",omitempty"` // files matching the XTestEmbedPatterns
+}
 
 // findInRootDirs returns a string from rootDirs which is a parent of the
 // file path p. If there is no such string, findInRootDirs returns "".
@@ -157,7 +177,6 @@ func buildEmbedTree(embedSrcs, embedRootDirs []string) (root *embedNode, err err
 			err = fmt.Errorf("building tree of embeddable files in directories %s: %v", strings.Join(embedRootDirs, string(filepath.ListSeparator)), err)
 		}
 	}()
-	fmt.Fprintf(os.Stderr, "embedSrcs=%v", embedSrcs)
 	// Add each path to the tree.
 	root = &embedNode{name: "", children: make(map[string]*embedNode)}
 	for _, src := range embedSrcs {
@@ -282,4 +301,131 @@ func fsValidPath(name string) bool {
 		}
 		name = name[i+1:]
 	}
+}
+
+func computeEmbedConfigs(directory string, patterns *Patterns) (*EmbedConfigs, error) {
+	// Obtain a list of files in and under the package's directory. These will be embeddable files.
+	// TODO: Support resource targets elsewhere in the repository.
+
+	configs := &EmbedConfigs{}
+
+	var embedSrcs []string
+	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		embedSrcs = append(embedSrcs, path)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	root, err := buildEmbedTree(embedSrcs, []string{directory})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(patterns.EmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range patterns.EmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.EmbedConfig = embedCfg
+	}
+
+	if len(patterns.TestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+		if configs.EmbedConfig != nil {
+			for key, value := range configs.EmbedConfig.Patterns {
+				embedCfg.Patterns[key] = value
+			}
+			for key, value := range configs.EmbedConfig.Files {
+				embedCfg.Files[key] = value
+			}
+		}
+
+		for _, pattern := range patterns.TestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.TestEmbedConfig = embedCfg
+	}
+
+	if len(patterns.XTestEmbedPatterns) > 0 {
+		embedCfg := &EmbedCfg{
+			Patterns: make(map[string][]string),
+			Files:    make(map[string]string),
+		}
+
+		for _, pattern := range patterns.XTestEmbedPatterns {
+			matchedPaths, matchedFiles, err := resolveEmbed(pattern, root)
+			if err != nil {
+				return nil, err
+			}
+			embedCfg.Patterns[pattern] = matchedPaths
+			for i, rel := range matchedPaths {
+				embedCfg.Files[rel] = matchedFiles[i]
+			}
+		}
+
+		configs.XTestEmbedConfig = embedCfg
+	}
+
+	return configs, nil
+}
+
+func main() {
+	data, err := ioutil.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to open input JSON: %s\"}", err)
+		os.Exit(1)
+	}
+
+	var patterns Patterns
+	err = json.Unmarshal(data, &patterns)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to deserialize JSON: %s\"}", err)
+		os.Exit(1)
+	}
+
+	result, err := computeEmbedConfigs("__resources__", &patterns)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to find embedded resources: %s\"}", err)
+		os.Exit(1)
+	}
+
+	outputBytes, err := json.Marshal(result)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to encode embed config: %s\"}", err)
+		os.Exit(1)
+	}
+	_, err = os.Stdout.Write(outputBytes)
+	if err != nil {
+		fmt.Printf("{\"Error\": \"Failed to write embed config: %s\"}", err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }

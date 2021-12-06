@@ -18,20 +18,21 @@ class EmbedConfig:
     files: FrozenDict[str, str]
 
     def __init__(self, patterns: Mapping[str, Iterable[str]], files: Mapping[str, str]) -> None:
-        """Configuration passed to the Go compiler to configure file embedding. The compiler relies
-        entirely on the caller to map embed patterns to actual filesystem paths. All embed patterns
+        """Configuration passed to the Go compiler to configure file embedding.
+
+        The compiler relies entirely on the caller to map embed patterns to actual filesystem
+        paths. All embed patterns
         contained in the package must be mapped. Consult
-        `FirstPartyPkgInfo.{EmbedPatterns,TestEmbedPatterns,XTestEmbedPatterns}` for the embed
-        patterns obtained from analysis.
+        `FirstPartyPkgAnalysis.embed_patterns` for the embed patterns obtained from analysis.
 
-        :param patterns: Maps each pattern provided via a //go:embed directive to a list of file paths relative to
-        the package directory for files to embed for that pattern. When the embedded variable is an `embed.FS`,
-        those relative file paths define the virtual directory hierarchy exposed by the embed.FS filesystem
-        abstraction. The relative file paths are resolved to actual filesystem paths for their content by consulting
-        the `files` dictionary.
-
-        :param files: Maps each virtual, relative file path used as a value in the `patterns` dictionary to the actual
-        filesystem path with that file's content.
+        :param patterns: Maps each pattern provided via a //go:embed directive to a list of file
+          paths relative to the package directory for files to embed for that pattern. When the
+          embedded variable is an `embed.FS`, those relative file paths define the virtual
+          directory hierarchy exposed by the embed.FS filesystem abstraction. The relative file
+          paths are resolved to actual filesystem paths for their content by consulting the
+          `files` dictionary.
+        :param files: Maps each virtual, relative file path used as a value in the `patterns`
+          dictionary to the actual filesystem path with that file's content.
         """
         self.patterns = FrozenDict({k: tuple(v) for k, v in patterns.items()})
         self.files = FrozenDict(files)
