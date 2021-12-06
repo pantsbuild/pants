@@ -889,17 +889,17 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
             QueryRule(ProcessResult, (Process,)),
         ],
     )
-
     rule_runner.set_options(["--backend-packages=pants.backend.python"])
-
-    rule_runner.create_file("src/python/somefiles/BUILD", "python_sources()")
-    rule_runner.create_file("src/python/somefiles/a.py", "print('')")
-    rule_runner.create_file("src/python/somefiles/b.py", "print('')")
-
-    rule_runner.create_file("src/python/others/BUILD", "python_sources()")
-    rule_runner.create_file("src/python/others/a.py", "print('')")
-    rule_runner.create_file("src/python/others/b.py", "print('')")
-
+    rule_runner.write_files(
+        {
+            "src/python/somefiles/BUILD": "python_sources()",
+            "src/python/somefiles/a.py": "print('')",
+            "src/python/somefiles/b.py": "print('')",
+            "src/python/others/BUILD": "python_sources()",
+            "src/python/others/a.py": "print('')",
+            "src/python/others/b.py": "print('')",
+        }
+    )
     specs = SpecsParser(get_buildroot()).parse_specs(
         ["src/python/somefiles::", "src/python/others/b.py"]
     )
