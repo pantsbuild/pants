@@ -25,11 +25,11 @@ class JavaFmtRequest(StyleRequest):
 
 @rule
 async def format_java_target(
-    python_fmt_targets: JavaFmtTargets, union_membership: UnionMembership
+    java_fmt_targets: JavaFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[JavaSourceField] for target in python_fmt_targets.targets),
+        SourceFilesRequest(target[JavaSourceField] for target in java_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
@@ -39,7 +39,7 @@ async def format_java_target(
         request = fmt_request_type(
             (
                 fmt_request_type.field_set_type.create(target)
-                for target in python_fmt_targets.targets
+                for target in java_fmt_targets.targets
                 if fmt_request_type.field_set_type.is_applicable(target)
             ),
             prior_formatter_result=prior_formatter_result,
