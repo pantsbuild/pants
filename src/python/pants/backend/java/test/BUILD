@@ -4,4 +4,4 @@
 python_sources(dependencies=[":lockfile"])
 python_tests(name="tests", timeout=240)
 
-resources(name="lockfile", sources=["junit.default.lockfile.txt"])
+resource(name="lockfile", source="junit.default.lockfile.txt")

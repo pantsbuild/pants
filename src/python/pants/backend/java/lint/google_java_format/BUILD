@@ -5,4 +5,4 @@ python_sources(dependencies=[":lockfile"])
 
 python_tests(name="tests")
 
-resources(name="lockfile", sources=["google_java_format.default.lockfile.txt"])
+resource(name="lockfile", source="google_java_format.default.lockfile.txt")
