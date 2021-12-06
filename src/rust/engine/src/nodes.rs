@@ -641,7 +641,7 @@ impl WrappedNode for SessionValues {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Value> {
-    Ok(context.session.session_values())
+    Ok(Value::new(context.session.session_values()))
   }
 }
 

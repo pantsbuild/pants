@@ -680,7 +680,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .expect("size_bytes must be a non-negative number");
       let digest = Digest::new(fingerprint, size_bytes);
       let v = match store
-        .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
+        .load_file_bytes_with(digest, Bytes::copy_from_slice)
         .await?
       {
         None => {

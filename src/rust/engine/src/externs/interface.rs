@@ -34,7 +34,7 @@ use pyo3::prelude::{
   PyResult as PyO3Result, Python,
 };
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
-use pyo3::{create_exception, PyAny};
+use pyo3::{create_exception, IntoPy, PyAny};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
@@ -360,7 +360,7 @@ impl PySession {
           core,
           should_render_ui,
           build_id,
-          session_values.into(),
+          session_values,
           cancellation_latch,
         )
       })
@@ -740,8 +740,8 @@ async fn workunit_to_py_value(
   let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => externs::store_utf8(py, v),
-      UserMetadataItem::ImmediateInt(n) => externs::store_i64(py, *n),
+      UserMetadataItem::ImmediateString(v) => v.into_py(py),
+      UserMetadataItem::ImmediateInt(n) => n.into_py(py),
       UserMetadataItem::PyValue(py_val_handle) => {
         match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
           None => {
@@ -755,7 +755,10 @@ async fn workunit_to_py_value(
         }
       }
     };
-    user_metadata_entries.push((externs::store_utf8(py, user_metadata_key.as_str()), value));
+    user_metadata_entries.push((
+      externs::store_utf8(py, user_metadata_key.as_str()),
+      Value::new(value),
+    ));
   }
 
   dict_entries.push((

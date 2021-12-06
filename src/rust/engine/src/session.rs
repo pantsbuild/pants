@@ -17,6 +17,7 @@ use futures::FutureExt;
 use graph::LastObserved;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
+use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
@@ -79,12 +80,12 @@ struct SessionState {
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
   // Per-Session values that have been set for this session.
-  session_values: Mutex<Value>,
+  session_values: Mutex<PyObject>,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
+  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, PyObject>>,
 }
 
 ///
@@ -140,7 +141,7 @@ impl Session {
     core: Arc<Core>,
     should_render_ui: bool,
     build_id: String,
-    session_values: Value,
+    session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
     let workunit_store = WorkunitStore::new(!should_render_ui);
@@ -226,7 +227,7 @@ impl Session {
 
   pub fn with_metadata_map<F, T>(&self, f: F) -> T
   where
-    F: FnOnce(&mut HashMap<UserMetadataPyValue, Value>) -> T,
+    F: FnOnce(&mut HashMap<UserMetadataPyValue, PyObject>) -> T,
   {
     f(&mut self.state.workunit_metadata_map.write())
   }
@@ -252,7 +253,7 @@ impl Session {
     roots.keys().map(|r| r.clone().into()).collect()
   }
 
-  pub fn session_values(&self) -> Value {
+  pub fn session_values(&self) -> PyObject {
     self.state.session_values.lock().clone()
   }
 

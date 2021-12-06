@@ -28,8 +28,8 @@ use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
 pub struct ByteStore {
   instance_name: Option<String>,
   chunk_size_bytes: usize,
-  upload_timeout: Duration,
-  rpc_attempts: usize,
+  _upload_timeout: Duration,
+  _rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
   capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
@@ -103,8 +103,8 @@ impl ByteStore {
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
-      upload_timeout,
-      rpc_attempts: rpc_retries + 1,
+      _upload_timeout: upload_timeout,
+      _rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
       capabilities_cell: capabilities_cell_opt

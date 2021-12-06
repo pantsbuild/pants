@@ -98,6 +98,13 @@ def test_eq() -> None:
     assert fd1 != d1
 
 
+@pytest.mark.xfail(reason="FrozenDict equality broken for different insertion orders.")
+def test_eq_different_orders() -> None:
+    fd1 = FrozenDict({"a": 0, "b": 1})
+    fd2 = FrozenDict({"b": 1, "a": 0})
+    assert fd1 == fd2
+
+
 def test_lt() -> None:
     d = {"a": 0, "b": 1}
     assert FrozenDict(d) < FrozenDict({"a": 1, "b": 2})
