@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
 from dataclasses import dataclass
-from typing import Iterator
 
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
@@ -87,28 +86,28 @@ async def setup_google_java_format(
         MergeDigests([source_files_snapshot.digest, tool_classpath.digest, jdk_setup.digest]),
     )
 
-    def add_java16_or_higher_options() -> Iterator[str]:
-        if jdk_setup.jre_major_version >= 16:
-            yield from [
-                "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
-                "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
-                "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
-                "--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
-                "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
-            ]
+    maybe_java16_or_higher_options = []
+    if jdk_setup.jre_major_version >= 16:
+        maybe_java16_or_higher_options = [
+            "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+        ]
 
-    def add_aosp_option() -> Iterator[str]:
-        if tool.aosp:
-            yield "--aosp"
+    maybe_aosp_option = []
+    if tool.aosp:
+        maybe_aosp_option = ["--aosp"]
 
     args = [
         *jdk_setup.args(bash, tool_classpath.classpath_entries()),
-        *add_java16_or_higher_options(),
+        *maybe_java16_or_higher_options,
         "com.google.googlejavaformat.java.Main",
-        *add_aosp_option(),
+        *maybe_aosp_option,
         "--dry-run" if setup_request.check_only else "--replace",
+        *source_files.files,
     ]
-    args.extend(source_files.files)
 
     process = Process(
         argv=args,
