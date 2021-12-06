@@ -75,6 +75,21 @@ class DockerBinary(BinaryPath):
             for tag in tags
         )
 
+    def run_image(
+        self,
+        tag: str,
+        *,
+        docker_run_args: tuple[str, ...] | None = None,
+        image_args: tuple[str, ...] | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> Process:
+        return Process(
+            argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Running docker image {tag}",
+            env=env,
+        )
+
 
 @dataclass(frozen=True)
 class DockerBinaryRequest:

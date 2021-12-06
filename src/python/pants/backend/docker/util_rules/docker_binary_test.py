@@ -51,3 +51,17 @@ def test_docker_binary_push_image(docker_path: str, docker: DockerBinary) -> Non
         ),
     )
     assert push_request[0].description == f"Pushing docker image {image_ref}"
+
+
+def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None:
+    image_ref = "registry/repo/name:tag"
+    port_spec = "127.0.0.1:80:8080/tcp"
+    run_request = docker.run_image(
+        image_ref, docker_run_args=("-p", port_spec), image_args=("test-input",)
+    )
+    assert run_request == Process(
+        argv=(docker_path, "run", "-p", port_spec, image_ref, "test-input"),
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",  # The description field is marked `compare=False`
+    )
+    assert run_request.description == f"Running docker image {image_ref}"

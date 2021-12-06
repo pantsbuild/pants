@@ -11,6 +11,12 @@ from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
 
+doc_links = {
+    "docker_env_vars": (
+        "https://docs.docker.com/engine/reference/commandline/cli/#environment-variables"
+    ),
+}
+
 
 class DockerOptions(Subsystem):
     options_scope = "docker"
@@ -86,15 +92,32 @@ class DockerOptions(Subsystem):
             default=[],
             advanced=True,
             help=(
-                "Environment variables to set for `docker` invocations. "
+                "Environment variables to set for `docker` invocations.\n\n"
                 "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
                 "or just `ENV_VAR` to copy the value from Pants's own environment."
+            ),
+        )
+
+        register(
+            "--run-args",
+            type=list,
+            member_type=str,
+            default=[],
+            help=(
+                "Additional arguments to use for `docker run` invocations.\n\n"
+                "To provide the top-level options to the `docker` client, use `[docker].env_vars` "
+                f"to configure the [Environment variables]({doc_links['docker_env_vars']}) as "
+                "appropriate."
             ),
         )
 
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
+
+    @property
+    def run_args(self) -> tuple[str, ...]:
+        return tuple(self.options.run_args)
 
     @property
     def env_vars(self) -> tuple[str, ...]:
