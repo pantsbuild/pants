@@ -203,7 +203,7 @@ def test_skip_twine(rule_runner, packages) -> None:
     ],
 )
 def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
-    ca_cert_path = rule_runner.create_file("conf/ca_certs.pem", "")
+    ca_cert_path = rule_runner.write_files({"conf/ca_certs.pem": ""})[0]
     rule_runner.write_files(project_files(repositories=["@private"]))
     set_options(rule_runner, [opt.format(ca_cert_path) for opt in options])
     result = request_publish_processes(rule_runner, packages)
