@@ -20,10 +20,14 @@ class MockTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     runner = RuleRunner(rules=paths_rules(), target_types=[MockTarget])
-    runner.add_to_build_file("base", "tgt()")
-    runner.add_to_build_file("intermediate", "tgt(dependencies=['base'])")
-    runner.add_to_build_file("intermediate2", "tgt(dependencies=['base'])")
-    runner.add_to_build_file("leaf", "tgt(dependencies=['intermediate', 'intermediate2'])")
+    runner.write_files(
+        {
+            "base/BUILD": "tgt()",
+            "intermediate/BUILD": "tgt(dependencies=['base'])",
+            "intermediate2/BUILD": "tgt(dependencies=['base'])",
+            "leaf/BUILD": "tgt(dependencies=['intermediate', 'intermediate2'])",
+        }
+    )
     return runner
 
 

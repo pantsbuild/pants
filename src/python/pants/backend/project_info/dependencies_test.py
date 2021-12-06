@@ -35,22 +35,26 @@ def rule_runner() -> RuleRunner:
 def create_python_sources(
     rule_runner: RuleRunner, path: str, *, dependencies: Optional[List[str]] = None
 ) -> None:
-    rule_runner.add_to_build_file(
-        path, f"python_sources(name='target', sources=[], dependencies={dependencies or []})"
+    rule_runner.write_files(
+        {path: f"python_sources(name='target', sources=[], dependencies={dependencies or []})"}
     )
 
 
-def create_python_requirement_tgt(rule_runner: RuleRunner, name: str) -> None:
-    rule_runner.add_to_build_file(
-        "3rdparty/python",
-        dedent(
-            f"""\
-            python_requirement(
-                name='{name}',
-                requirements=['{name}==1.0.0'],
+def create_python_requirement_tgts(rule_runner: RuleRunner, *names: str) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/python/BUILD": "\n".join(
+                dedent(
+                    f"""\
+                    python_requirement(
+                        name='{name}',
+                        requirements=['{name}==1.0.0'],
+                    )
+                    """
+                )
+                for name in names
             )
-            """
-        ),
+        }
     )
 
 
@@ -77,7 +81,7 @@ def test_no_target(rule_runner: RuleRunner) -> None:
 
 
 def test_no_dependencies(rule_runner: RuleRunner) -> None:
-    create_python_sources(rule_runner, path="some/target")
+    create_python_sources(rule_runner, path="some/target/BUILD")
     assert_dependencies(rule_runner, specs=["some/target"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target"], expected=[], transitive=True)
     assert_dependencies(
@@ -93,29 +97,31 @@ def test_no_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            special_deps_tgt(name='t1')
-            special_deps_tgt(name='t2', special_deps=[':t1'])
-            special_deps_tgt(name='t3', special_deps=[':t2'])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                special_deps_tgt(name='t1')
+                special_deps_tgt(name='t2', special_deps=[':t1'])
+                special_deps_tgt(name='t3', special_deps=[':t2'])
+                """
+            ),
+        }
     )
     assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t2"])
     assert_dependencies(rule_runner, specs=["//:t3"], expected=["//:t1", "//:t2"], transitive=True)
 
 
 def test_python_dependencies(rule_runner: RuleRunner) -> None:
-    create_python_requirement_tgt(rule_runner, name="req1")
-    create_python_requirement_tgt(rule_runner, name="req2")
-    create_python_sources(rule_runner, path="dep/target")
+    create_python_requirement_tgts(rule_runner, "req1", "req2")
+    create_python_sources(rule_runner, path="dep/target/BUILD")
     create_python_sources(
-        rule_runner, path="some/target", dependencies=["dep/target", "3rdparty/python:req1"]
+        rule_runner, path="some/target/BUILD", dependencies=["dep/target", "3rdparty/python:req1"]
     )
     create_python_sources(
-        rule_runner, path="some/other/target", dependencies=["some/target", "3rdparty/python:req2"]
+        rule_runner,
+        path="some/other/target/BUILD",
+        dependencies=["some/target", "3rdparty/python:req2"],
     )
 
     assert_deps = partial(assert_dependencies, rule_runner)
