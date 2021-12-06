@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import sys
 from textwrap import dedent
 from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
+from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
@@ -73,22 +75,31 @@ class DockerOptions(Subsystem):
         register(
             "--build-args",
             type=list,
-            member_type=str,
+            member_type=shell_str,
             default=[],
             help=(
-                "Global build arguments (`--build-arg`) to use for all `docker build` invocations. "
+                "Global build arguments (for Docker `--build-arg` options) to use for all "
+                "`docker build` invocations.\n\n"
                 "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
                 "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
-                "May be provided multiple times on the command line.\n\n"
-                "Use the `extra_build_args` field on a `docker_image` target for additional image "
-                "specific build arguments."
+                + dedent(
+                    f"""\
+                    Example:
+
+                        [{cls.options_scope}]
+                        build_args = ["VAR1=value", "VAR2"]
+
+                    """
+                )
+                + "Use the `extra_build_args` field on a `docker_image` target for additional "
+                "image specific build arguments."
             ),
         )
 
         register(
             "--env-vars",
             type=list,
-            member_type=str,
+            member_type=shell_str,
             default=[],
             advanced=True,
             help=(
@@ -101,13 +112,19 @@ class DockerOptions(Subsystem):
         register(
             "--run-args",
             type=list,
-            member_type=str,
-            default=[],
+            member_type=shell_str,
+            default=["--interactive", "--tty"] if sys.stdout.isatty() else [],
             help=(
                 "Additional arguments to use for `docker run` invocations.\n\n"
-                "To provide the top-level options to the `docker` client, use `[docker].env_vars` "
-                f"to configure the [Environment variables]({doc_links['docker_env_vars']}) as "
-                "appropriate."
+                "Example:\n\n"
+                f'    $ ./pants run --{cls.options_scope}-run-args="-p 127.0.0.1:80:8080/tcp '
+                '--name demo" src/example:image -- [image entrypoint args]\n\n'
+                "To provide the top-level options to the `docker` client, use "
+                f"`[{cls.options_scope}].env_vars` to configure the [Environment variables]("
+                f"{doc_links['docker_env_vars']}) as appropriate.\n\n"
+                "The arguments for the image entrypoint may be passed on the command line after a "
+                "double dash (`--`), or using the `--run-args` option.\n\n"
+                "Defaults to `--interactive --tty` when stdout is connected to a terminal."
             ),
         )
 
