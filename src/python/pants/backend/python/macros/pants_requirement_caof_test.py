@@ -32,7 +32,7 @@ def assert_pants_requirement(
     expected_dist: str = "pantsbuild.pants",
     expected_module: str = "pants",
 ) -> None:
-    rule_runner.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
+    rule_runner.write_files({"3rdparty/python/BUILD": f"{build_file_entry}\n"})
     target = rule_runner.get_target(Address("3rdparty/python", target_name=expected_target_name))
     assert isinstance(target, PythonRequirementTarget)
     assert target[PythonRequirementsField].value == (

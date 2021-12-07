@@ -373,3 +373,54 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
         "scala.io.apply",
         "sio.apply",
     }
+
+
+def test_package_object(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            package object bar {
+              val Hello = "World"
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.provided_symbols) == ["foo.bar.Hello"]
+
+
+def test_extract_annotations(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            @objectAnnotation("hello")
+            object Object {
+              @deprecated
+              def foo(arg: String @argAnnotation("foo")): Unit = {}
+            }
+
+            @classAnnotation("world")
+            class Class {
+              @valAnnotation val foo = 3
+              @varAnnotation var bar = 4
+            }
+
+            @traitAnnotation
+            trait Trait {}
+            """
+        ),
+    )
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.String",
+        "foo.Unit",
+        "foo.classAnnotation",
+        "foo.deprecated",
+        "foo.objectAnnotation",
+        "foo.traitAnnotation",
+        "foo.valAnnotation",
+        "foo.varAnnotation",
+    ]

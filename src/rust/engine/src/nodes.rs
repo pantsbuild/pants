@@ -31,14 +31,15 @@ use fs::{
   Vfs,
 };
 use process_execution::{
-  self, CacheDest, CacheName, Platform, Process, ProcessCacheScope, ProcessResultSource,
+  self, CacheDest, CacheName, InputDigests, Platform, Process, ProcessCacheScope,
+  ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
-use store::{self, StoreFileByDigest};
+use store::{self, Store, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
   WorkunitMetadata,
@@ -282,16 +283,31 @@ pub struct ExecuteProcess {
 }
 
 impl ExecuteProcess {
-  fn lift_process(value: &PyAny) -> Result<Process, String> {
+  async fn lift_process_input_digests(
+    store: &Store,
+    value: &Value,
+  ) -> Result<InputDigests, String> {
+    let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
+      let value = (**value).as_ref(py);
+      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
+        .map_err(|err| format!("Error parsing input_digest {}", err))?;
+      let use_nailgun = lift_directory_digest(externs::getattr(value, "use_nailgun").unwrap())
+        .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
+
+      Ok(InputDigests::new(store, input_files, use_nailgun))
+    });
+
+    input_digests_fut?
+      .await
+      .map_err(|e| format!("Failed to merge input digests for process: {:?}", e))
+  }
+
+  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
       Some(dir) => Some(RelativePath::new(dir)?),
     };
-
-    let py_digest = externs::getattr(value, "input_digest").unwrap();
-    let digest = lift_directory_digest(py_digest)
-      .map_err(|err| format!("Error parsing input_digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
       .unwrap()
@@ -324,10 +340,6 @@ impl ExecuteProcess {
 
     let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
 
-    let py_use_nailgun = externs::getattr(value, "use_nailgun").unwrap();
-    let use_nailgun = lift_directory_digest(py_use_nailgun)
-      .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
-
     let execution_slot_variable =
       externs::getattr_as_optional_string(value, "execution_slot_variable");
 
@@ -349,7 +361,7 @@ impl ExecuteProcess {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
       working_directory,
-      input_files: digest,
+      input_digests,
       output_files,
       output_directories,
       timeout,
@@ -358,15 +370,14 @@ impl ExecuteProcess {
       append_only_caches,
       jdk_home,
       platform_constraint,
-      use_nailgun,
       execution_slot_variable,
       cache_scope,
     })
   }
 
-  pub fn lift(value: &PyAny) -> Result<Self, String> {
-    let process = Self::lift_process(value)?;
-
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, String> {
+    let input_digests = Self::lift_process_input_digests(store, &value).await?;
+    let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
     Ok(Self { process })
   }
 }

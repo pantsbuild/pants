@@ -163,6 +163,13 @@ class SourceAnalysisTraverser extends Traverser {
     })
   }
 
+  def visitMods(mods: List[Mod]): Unit = {
+    mods.foreach({
+      case Mod.Annot(init) => apply(init)  // rely on `Init` extraction in main parsing match code
+      case _ => ()
+    })
+  }
+
   override def apply(tree: Tree): Unit = tree match {
     case Pkg(ref, stats) => {
       val name = extractName(ref)
@@ -170,30 +177,42 @@ class SourceAnalysisTraverser extends Traverser {
       withNamePart(name, () => super.apply(stats))
     }
 
-    case Defn.Class(_mods, nameNode, _tparams, _ctor, templ) => {
+    case Pkg.Object(mods, nameNode, templ) => {
+      visitMods(mods)
+      val name = extractName(nameNode)
+      recordScope(name)
+      visitTemplate(templ, name)
+    }
+
+    case Defn.Class(mods, nameNode, _tparams, _ctor, templ) => {
+      visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
       visitTemplate(templ, name)
     }
 
-    case Defn.Trait(_mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Trait(mods, nameNode, _tparams, _ctor, templ) => {
+      visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawTrait = true)
       visitTemplate(templ, name)
     }
 
-    case Defn.Object(_mods, nameNode, templ) => {
+    case Defn.Object(mods, nameNode, templ) => {
+      visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawObject = true)
       visitTemplate(templ, name)
     }
 
-    case Defn.Type(_mods, nameNode, _tparams, _body) => {
+    case Defn.Type(mods, nameNode, _tparams, _body) => {
+      visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name)
     }
 
-    case Defn.Val(_mods, pats, decltpe, rhs) => {
+    case Defn.Val(mods, pats, decltpe, rhs) => {
+      visitMods(mods)
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
         recordProvidedName(name)
@@ -204,7 +223,8 @@ class SourceAnalysisTraverser extends Traverser {
       super.apply(rhs)
     }
 
-    case Defn.Var(_mods, pats, decltpe, rhs) => {
+    case Defn.Var(mods, pats, decltpe, rhs) => {
+      visitMods(mods)
       pats.headOption.foreach(pat => {
         val name = extractName(pat)
         recordProvidedName(name)
@@ -215,7 +235,8 @@ class SourceAnalysisTraverser extends Traverser {
       super.apply(rhs)
     }
 
-    case Defn.Def(_mods, nameNode, _tparams, params, decltpe, body) => {
+    case Defn.Def(mods, nameNode, _tparams, params, decltpe, body) => {
+      visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name)
 
@@ -257,19 +278,22 @@ class SourceAnalysisTraverser extends Traverser {
       extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
     }
 
-    case Term.Param(_mods, _name, decltpe, _default) => {
+    case Term.Param(mods, _name, decltpe, _default) => {
+      visitMods(mods)
       decltpe.foreach(tpe => {
         extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
     }
 
-    case Ctor.Primary(_mods, _name, params_list) => {
+    case Ctor.Primary(mods, _name, params_list) => {
+      visitMods(mods)
       params_list.foreach(params => {
         params.foreach(param => apply(param))
       })
     }
 
-    case Ctor.Secondary(_mods, _name, params_list, init, stats) => {
+    case Ctor.Secondary(mods, _name, params_list, init, stats) => {
+      visitMods(mods)
       params_list.foreach(params => {
         params.foreach(param => apply(param))
       })

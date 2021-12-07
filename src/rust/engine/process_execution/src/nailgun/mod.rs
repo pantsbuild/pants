@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -12,8 +12,10 @@ use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
 
-use crate::local::{CapturedWorkdir, ChildOutput};
-use crate::{Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process};
+use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
+use crate::{
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
+};
 
 #[cfg(test)]
 pub mod tests;
@@ -44,15 +46,21 @@ fn construct_nailgun_server_request(
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
   full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|&a| a.to_string()));
 
+  // Strip the input_files, preserving only the use_nailgun digest.
+  let input_digests = InputDigests {
+    complete: client_request.input_digests.use_nailgun,
+    use_nailgun: client_request.input_digests.use_nailgun,
+    input_files: hashing::EMPTY_DIGEST,
+  };
+
   Process {
     argv: full_args,
-    input_files: client_request.use_nailgun,
+    input_digests,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
     timeout: None,
     description: format!("nailgun server for {}", nailgun_name),
     level: log::Level::Info,
-    use_nailgun: hashing::EMPTY_DIGEST,
     execution_slot_variable: None,
     env: client_request.env,
     append_only_caches: client_request.append_only_caches,
@@ -69,6 +77,8 @@ fn construct_nailgun_client_request(
   Process {
     argv: client_args,
     jdk_home: None,
+    // The append_only_caches are created and preserved by the server.
+    append_only_caches: BTreeMap::new(),
     ..original_req
   }
 }
@@ -122,7 +132,7 @@ impl super::CommandRunner for CommandRunner {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    if req.use_nailgun == hashing::EMPTY_DIGEST {
+    if req.input_digests.use_nailgun == hashing::EMPTY_DIGEST {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;
     }
@@ -141,17 +151,22 @@ impl super::CommandRunner for CommandRunner {
       |workunit| async move {
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
 
-        // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
+        // Separate argument lists, to form distinct EPRs for
+        //  1. starting the nailgun server
+        //  2. running the client against it
         let ParsedJVMCommandLines {
           nailgun_args,
+          client_args,
           client_main_class,
           ..
         } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
-        let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-
-        let nailgun_req =
-          construct_nailgun_server_request(&nailgun_name, nailgun_args, req.clone());
-        trace!("Running request under nailgun:\n {:#?}", &nailgun_req);
+        let nailgun_req = construct_nailgun_server_request(
+          &CommandRunner::calculate_nailgun_name(&client_main_class),
+          nailgun_args,
+          req.clone(),
+        );
+        let client_req = construct_nailgun_client_request(req, client_main_class, client_args);
+        trace!("Running request under nailgun:\n {:#?}", &client_req);
 
         // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
         let mut nailgun_process = self
@@ -160,14 +175,27 @@ impl super::CommandRunner for CommandRunner {
           .await
           .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
 
+        // Prepare the workdir.
+        let exclusive_spawn = prepare_workdir(
+          nailgun_process.workdir_path().to_owned(),
+          &client_req,
+          client_req.input_digests.input_files,
+          context.clone(),
+          self.inner.store.clone(),
+          self.executor.clone(),
+          self.named_caches(),
+        )
+        .await?;
+
         let res = self
           .run_and_capture_workdir(
-            req,
+            client_req,
             context,
             self.inner.store.clone(),
             self.executor.clone(),
             nailgun_process.workdir_path().to_owned(),
             (nailgun_process.name().to_owned(), nailgun_process.address()),
+            exclusive_spawn,
             Platform::current().unwrap(),
           )
           .await;
@@ -204,28 +232,20 @@ impl CapturedWorkdir for CommandRunner {
       workdir_path.to_path_buf()
     };
 
-    let ParsedJVMCommandLines {
-      client_args,
-      client_main_class,
-      ..
-    } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
-
     let (name, addr) = workdir_token;
     debug!("Connected to nailgun instance {} at {}...", name, addr);
     let mut child = {
       // Run the client request in the nailgun we have active.
-      let client_req = construct_nailgun_client_request(req, client_main_class, client_args);
       let cmd = Command {
-        command: client_req.argv[0].clone(),
-        args: client_req.argv[1..].to_vec(),
-        env: client_req
+        command: req.argv[0].clone(),
+        args: req.argv[1..].to_vec(),
+        env: req
           .env
           .iter()
           .map(|(k, v)| (k.clone(), v.clone()))
           .collect(),
         working_dir: client_workdir,
       };
-      trace!("Client request: {:#?}", client_req);
       TcpStream::connect(addr)
         .and_then(move |stream| {
           nails::client::handle_connection(nails::Config::default(), stream, cmd, async {

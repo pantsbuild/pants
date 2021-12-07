@@ -23,9 +23,13 @@ class MockTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     runner = RuleRunner(rules=dependee_rules(), target_types=[MockTarget])
-    runner.add_to_build_file("base", "tgt()")
-    runner.add_to_build_file("intermediate", "tgt(dependencies=['base'])")
-    runner.add_to_build_file("leaf", "tgt(dependencies=['intermediate'])")
+    runner.write_files(
+        {
+            "base/BUILD": "tgt()",
+            "intermediate/BUILD": "tgt(dependencies=['base'])",
+            "leaf/BUILD": "tgt(dependencies=['intermediate'])",
+        }
+    )
     return runner
 
 
@@ -84,7 +88,7 @@ def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("special", "tgt(special_deps=['intermediate'])")
+    rule_runner.write_files({"special/BUILD": "tgt(special_deps=['intermediate'])"})
     assert_dependees(
         rule_runner, targets=["intermediate"], expected=["leaf:leaf", "special:special"]
     )

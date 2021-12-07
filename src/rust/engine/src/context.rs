@@ -183,9 +183,12 @@ impl Core {
           local_execution_root_dir.to_path_buf(),
           store.clone(),
           executor.clone(),
-          // TODO: The nailgun pool size should almost certainly be configurable independent
-          // of concurrency, along with per-instance memory usage.
-          exec_strategy_opts.local_parallelism,
+          // We set the nailgun pool size to twice the number that will ever be active in order to
+          // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
+          // while busy running scalac, keeping some javac processes idle).
+          // TODO: The nailgun pool size should be configurable independent of concurrency, along
+          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
+          exec_strategy_opts.local_parallelism * 2,
         ))
       } else {
         Box::new(local_command_runner)

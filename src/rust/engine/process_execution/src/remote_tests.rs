@@ -23,8 +23,8 @@ use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
+  Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
 use std::any::type_name;
 use std::io::Cursor;
@@ -76,7 +76,7 @@ async fn make_execute_request() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -86,7 +86,6 @@ async fn make_execute_request() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -153,7 +152,7 @@ async fn make_execute_request_with_instance_name() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -163,7 +162,6 @@ async fn make_execute_request_with_instance_name() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -243,7 +241,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -253,7 +251,6 @@ async fn make_execute_request_with_cache_key_gen_version() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -331,7 +328,7 @@ async fn make_execute_request_with_jdk() {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
   req.jdk_home = Some(PathBuf::from("/tmp"));
   req.description = "some description".to_owned();
-  req.input_files = input_directory.digest();
+  req.input_digests = InputDigests::with_input_files(input_directory.digest());
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
@@ -387,7 +384,7 @@ async fn make_execute_request_with_jdk() {
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
-  req.input_files = input_directory.digest();
+  req.input_digests = InputDigests::with_input_files(input_directory.digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
 
@@ -480,7 +477,7 @@ async fn make_execute_request_with_timeout() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -490,7 +487,6 @@ async fn make_execute_request_with_timeout() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    use_nailgun: EMPTY_DIGEST,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -2367,7 +2363,8 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
 pub(crate) fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
-  process.input_files = TestDirectory::containing_roland().digest();
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::containing_roland().digest());
   process.timeout = one_second();
   process.description = "cat a roland".to_string();
   process
