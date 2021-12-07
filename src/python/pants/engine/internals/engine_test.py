@@ -38,6 +38,7 @@ from pants.engine.streaming_workunit_handler import (
     TargetInfo,
     WorkunitsCallback,
 )
+from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -942,3 +943,36 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     )
     with handler:
         rule_runner.request(ProcessResult, [stdout_process])
+
+
+@union
+class Union:
+    pass
+
+
+class Member(Union):
+    pass
+
+
+def test_union_member_construction(run_tracker: RunTracker) -> None:
+    """Use a union member which is a subclass of its @union as a Get input."""
+
+    @rule
+    async def output(_: Member) -> str:
+        return "yep"
+
+    @rule
+    async def for_member() -> str:
+        return await Get(str, Member())
+
+    rule_runner = RuleRunner(
+        target_types=[],
+        rules=[
+            UnionRule(Union, Member),
+            QueryRule(str, ()),
+            output,
+            for_member,
+        ],
+    )
+
+    assert "yep" == rule_runner.request(str, [])
