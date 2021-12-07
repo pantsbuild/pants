@@ -39,31 +39,26 @@ def rule_runner() -> RuleRunner:
 
 
 def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file(
-        "project/image/test",
-        dedent(
-            """\
-            docker_image(name="image")
-            """
-        ),
-    )
-    rule_runner.create_file(
-        "project/image/test/Dockerfile",
-        dedent(
-            """\
-            FROM baseimage
-            ENTRYPOINT ["./entrypoint"]
-            COPY project.hello.main/main_binary.pex /entrypoint
-            """
-        ),
-    )
-    rule_runner.add_to_build_file(
-        "project/hello/main",
-        dedent(
-            """\
-            pex_binary(name="main_binary")
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "project/image/test/BUILD": dedent(
+                """\
+                docker_image(name="image")
+                """
+            ),
+            "project/image/test/Dockerfile": dedent(
+                """\
+                FROM baseimage
+                ENTRYPOINT ["./entrypoint"]
+                COPY project.hello.main/main_binary.pex /entrypoint
+                """
+            ),
+            "project/hello/main/BUILD": dedent(
+                """\
+                pex_binary(name="main_binary")
+                """
+            ),
+        }
     )
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
     injected = rule_runner.request(

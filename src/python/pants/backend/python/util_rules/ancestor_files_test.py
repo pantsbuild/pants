@@ -34,8 +34,7 @@ def assert_injected(
     expected_discovered: List[str],
 ) -> None:
     rule_runner.set_options([f"--source-root-patterns={source_roots}"])
-    for f in original_undeclared_files:
-        rule_runner.create_file(f, "# undeclared")
+    rule_runner.write_files({f: "# undeclared" for f in original_undeclared_files})
     request = AncestorFilesRequest(
         "__init__.py",
         rule_runner.make_snapshot({fp: "# declared" for fp in original_declared_files}),
