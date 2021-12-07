@@ -10,7 +10,7 @@ from typing import Any, Iterator, Mapping
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
-    DockerBuildOptionField,
+    DockerBuildOptionFieldMixin,
     DockerImageSourceField,
     DockerImageTagsField,
     DockerRegistriesField,
@@ -165,7 +165,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
 def get_build_options(target: Target) -> Iterator[str]:
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionField):
+        if issubclass(field_type, DockerBuildOptionFieldMixin):
             yield from target[field_type].options()
 
 

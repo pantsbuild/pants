@@ -21,7 +21,6 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
-    Field,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -150,8 +149,10 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
-class DockerBuildOptionField(ABC, Field):
-    docker_option: ClassVar[str]
+class DockerBuildOptionFieldMixin(ABC):
+    """Inherit this mixin class to provide options to `docker build`."""
+
+    docker_build_option: ClassVar[str]
 
     @abstractmethod
     def option_values(self) -> Iterator[str]:
@@ -161,26 +162,26 @@ class DockerBuildOptionField(ABC, Field):
     @final
     def options(self) -> Iterator[str]:
         for value in self.option_values():
-            yield f"{self.docker_option}={shlex.quote(value)}"
+            yield f"{self.docker_build_option}={shlex.quote(value)}"
 
 
 class DockerBuildSecretsOptionField(
-    AsyncFieldMixin, DockerBuildOptionField, DictStringToStringField
+    AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
     help = "Secret file to expose to the build (only if BuildKit enabled).\n\n" + dedent(
         """\
-            Example:
+        Example:
 
-                docker_image(
-                    secrets={
-                        "mysecret": "/local/secret",
-                    }
-                )
-            """
+            docker_image(
+                secrets={
+                    "mysecret": "/local/secret",
+                }
+            )
+        """
     )
 
-    docker_option = "--secret"
+    docker_build_option = "--secret"
 
     def option_values(self) -> Iterator[str]:
         root = os.path.join(get_buildroot(), self.address.spec_path)
