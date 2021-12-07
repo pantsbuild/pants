@@ -52,20 +52,20 @@ class ScalafmtToolLockfileSentinel(JvmToolLockfileSentinel):
 
 
 @dataclass(frozen=True)
-class ScalafmtSetupRequest:
+class SetupRequest:
     request: ScalafmtRequest
     check_only: bool
 
 
 @dataclass(frozen=True)
-class ScalafmtPartition:
+class Partition:
     process: Process
     description: str
 
 
 @dataclass(frozen=True)
-class ScalafmtSetup:
-    partitions: tuple[ScalafmtPartition, ...]
+class Setup:
+    partitions: tuple[Partition, ...]
     original_digest: Digest
 
 
@@ -127,11 +127,11 @@ async def gather_scalafmt_config_files(
 @logging
 @rule(level=LogLevel.DEBUG)
 async def setup_scalafmt(
-    setup_request: ScalafmtSetupRequest,
+    setup_request: SetupRequest,
     tool: ScalafmtSubsystem,
     jdk_setup: JdkSetup,
     bash: BashBinary,
-) -> ScalafmtSetup:
+) -> Setup:
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
@@ -195,18 +195,16 @@ async def setup_scalafmt(
             description=f"Run `scalafmt` on {pluralize(len(files), 'file')}.",
             level=LogLevel.DEBUG,
         )
-        partitions.append(
-            ScalafmtPartition(process, f"{pluralize(len(files), 'file')} ({config_file})")
-        )
+        partitions.append(Partition(process, f"{pluralize(len(files), 'file')} ({config_file})"))
 
-    return ScalafmtSetup(tuple(partitions), original_digest=source_files_snapshot.digest)
+    return Setup(tuple(partitions), original_digest=source_files_snapshot.digest)
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
 async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
     if tool.skip:
         return FmtResult.skip(formatter_name="scalafmt")
-    setup = await Get(ScalafmtSetup, ScalafmtSetupRequest(field_sets, check_only=False))
+    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     results = await MultiGet(
         Get(FallibleProcessResult, Process, partition.process) for partition in setup.partitions
     )
@@ -246,7 +244,7 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
 async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
     if tool.skip:
         return LintResults([], linter_name="scalafmt")
-    setup = await Get(ScalafmtSetup, ScalafmtSetupRequest(field_sets, check_only=True))
+    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
     results = await MultiGet(
         Get(FallibleProcessResult, Process, partition.process) for partition in setup.partitions
     )
