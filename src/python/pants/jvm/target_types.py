@@ -56,6 +56,15 @@ class JvmArtifactUrlField(StringField):
     )
 
 
+class JvmArtifactJarSourceField(SingleSourceField):
+    alias = "jar"
+    expected_file_extensions = (".jar",)
+    required = False
+    help = (
+        "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
+    )
+
+
 class JvmArtifactPackagesField(StringSequenceField):
     alias = "packages"
     help = (
@@ -107,24 +116,11 @@ class JvmArtifact(Target):
         *COMMON_TARGET_FIELDS,
         *JvmArtifactFieldSet.required_fields,
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
+        JvmArtifactJarSourceField,
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
         "that is, its `group`, `artifact`, and `version` components."
-    )
-
-
-class JvmJarSource(SingleSourceField):
-    expected_file_extensions = (".jar",)
-    required = True
-    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
-
-
-class JvmLocalArtifact(Target):
-    alias = "jvm_local_artifact"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        *JvmArtifactFieldSet.required_fields,
     )
 
 

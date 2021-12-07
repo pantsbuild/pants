@@ -9,7 +9,7 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Iterable, Iterator
+from typing import Any, Dict, Iterable, Iterator, List
 from urllib.parse import quote_plus as url_quote_plus
 from urllib.parse import unquote as url_unquote
 
@@ -51,14 +51,15 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
+    JvmArtifactJarSourceField,
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
-    JvmJarSource,
     JvmLockfileSources,
     JvmRequirementsField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -157,6 +158,20 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
+@dataclass(frozen=True)
+class AllJarTargets:
+    """A dictionary of targets that provide JAR files, indexed by coordinate."""
+
+    by_coordinate: FrozenDict[Coordinate, Target]
+
+
+@rule
+async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
+    jars = [tgt for tgt in all_targets if tgt.has_field(JvmArtifactJarSourceField) and tgt[JvmArtifactJarSourceField].value != None]
+    jars_by_coordinate = FrozenDict((Coordinate.from_jvm_artifact_target(tgt), tgt) for tgt in jars)
+    return AllJarTargets(by_coordinate=jars_by_coordinate)
+
+
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
 class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
     """An ordered list of Coordinates used as requirements."""
@@ -174,15 +189,6 @@ class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
             for maven_coord in (field.value or ())
         )
         return ArtifactRequirements((*field_requirements, *additional_requirements))
-
-
-class AllJarTargets(DeduplicatedCollection[Target]):
-    """A list of targets that provide JAR files."""
-
-
-@rule
-async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
-    return AllJarTargets([tgt for tgt in all_targets if tgt.has_field(JvmJarSource)])
 
 
 @dataclass(frozen=True)
@@ -330,6 +336,41 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
     return f"{dest_name}{ext}"
 
 
+@dataclass(frozen=True)
+class ArtifactRequirementsWithReifiedLocalArtifacts:
+    # omg tidy up this name. it's bad
+    artifact_requirements: ArtifactRequirements
+    digest: Digest
+
+
+@rule
+async def use_local_artifacts_where_possible(
+    input_requirements: ArtifactRequirements,
+    all_jars: AllJarTargets,
+) -> ArtifactRequirementsWithReifiedLocalArtifacts:
+
+    output: List[Coordinate] = []
+
+    further_processing: List[Target] = []
+
+    for req in input_requirements:
+        tgt = all_jars.by_coordinate.get(req)
+        if not tgt:
+            output.append(req)
+        else:
+            further_processing.append(tgt)
+    
+
+    files = await Get(SourceFiles, SourceFilesRequest(tgt[JvmArtifactJarSourceField] for tgt in further_processing))
+
+    for target, file in zip(further_processing, files.files):
+        coord = Coordinate.from_jvm_artifact_target(target)
+        coord = Coordinate(artifact=coord.artifact, group=coord.group, version=coord.version, url=f"file:./{file}")
+        output.append(coord)
+        
+    return ArtifactRequirementsWithReifiedLocalArtifacts(artifact_requirements=ArtifactRequirements(output), digest=files.snapshot.digest)
+
+
 @rule(level=LogLevel.DEBUG)
 async def coursier_resolve_lockfile(
     bash: BashBinary,
@@ -363,6 +404,12 @@ async def coursier_resolve_lockfile(
     if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
+    # Transform requirements with local JAR files into coordinates, and yoink the relevant
+    # files into the coursier sandbox
+    better_artifacts = await Get(ArtifactRequirementsWithReifiedLocalArtifacts, ArtifactRequirements, artifact_requirements)
+    artifact_requirements = better_artifacts.artifact_requirements
+    input_digest = await Get(Digest, MergeDigests([better_artifacts.digest, coursier.digest]))
+
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
@@ -382,7 +429,7 @@ async def coursier_resolve_lockfile(
                 ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=coursier.digest,
+            input_digest=input_digest,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
@@ -760,9 +807,7 @@ class MaterializedClasspath:
 
 
 @rule(level=LogLevel.DEBUG)
-async def materialize_classpath(
-    request: MaterializedClasspathRequest, all_jars: AllJarTargets
-) -> MaterializedClasspath:
+async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
     artifact_requirements_lockfiles = await MultiGet(
