@@ -4,6 +4,7 @@
 from pants.backend.docker.goals.package_image import rules as package_rules
 from pants.backend.docker.goals.publish import rules as publish_rules
 from pants.backend.docker.goals.run_image import rules as run_rules
+from pants.backend.docker.python.run_tests import rules as python_run_tests_rules
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.util_rules.dependencies import rules as dependencies_rules
 from pants.backend.docker.util_rules.docker_binary import rules as binary_rules
@@ -12,12 +13,10 @@ from pants.backend.docker.util_rules.docker_build_context import rules as contex
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 
-from pants.backend.docker.python.run_tests import rules as python_run_tests_rules
 
 def rules():
     return [
         *python_run_tests_rules(),
-
         *binary_rules(),
         *build_args_rules(),
         *build_env_rules(),
