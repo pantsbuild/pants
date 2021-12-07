@@ -97,9 +97,9 @@ class SetupScalafmtPartition:
     check_only: bool
 
 
-def find_nearest_ancestor_config_file(files: set[str], dir: str) -> str | None:
+def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
     while True:
-        candidate_config_file_path = os.path.join(dir, _SCALAFMT_CONF_FILENAME)
+        candidate_config_file_path = os.path.join(dir, config_file)
         if candidate_config_file_path in files:
             return candidate_config_file_path
 
@@ -132,7 +132,9 @@ async def gather_scalafmt_config_files(
 
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
-        config_file = find_nearest_ancestor_config_file(config_files_set, source_dir)
+        config_file = find_nearest_ancestor_file(
+            config_files_set, source_dir, _SCALAFMT_CONF_FILENAME
+        )
         if not config_file:
             raise ValueError(
                 f"No scalafmt config file (`{_SCALAFMT_CONF_FILENAME}`) found for "

@@ -3,6 +3,6 @@
 
 python_sources(dependencies=[":lockfile"])
 
-python_tests(name="tests")
+python_tests(name="tests", timeout=360)
 
 resource(name="lockfile", source="scalafmt.default.lockfile.txt")

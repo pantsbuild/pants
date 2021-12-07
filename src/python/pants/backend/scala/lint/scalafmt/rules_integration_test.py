@@ -10,7 +10,13 @@ from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint import scala_lang_fmt
 from pants.backend.scala.lint.scalafmt import skip_field
-from pants.backend.scala.lint.scalafmt.rules import ScalafmtFieldSet, ScalafmtRequest
+from pants.backend.scala.lint.scalafmt.rules import (
+    GatherScalafmtConfigFilesRequest,
+    ScalafmtConfigFiles,
+    ScalafmtFieldSet,
+    ScalafmtRequest,
+    find_nearest_ancestor_file,
+)
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
@@ -19,7 +25,7 @@ from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
@@ -53,6 +59,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(LintResults, (ScalafmtRequest,)),
             QueryRule(FmtResult, (ScalafmtRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
+            QueryRule(Snapshot, (PathGlobs,)),
+            QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
         target_types=[ScalaSourceTarget, ScalaSourcesGeneratorTarget],
     )
@@ -98,7 +106,9 @@ object Bar {
 }
 """
 
-SCALAFMT_CONF_FILE = """\
+SCALAFMT_CONF_FILENAME = ".scalafmt.conf"
+
+BASIC_SCALAFMT_CONF = """\
 version = "3.2.1"
 runner.dialect = scala213
 """
@@ -134,7 +144,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
         {
             "Foo.scala": GOOD_FILE,
             "BUILD": "scala_sources(name='t')",
-            ".scalafmt.conf": SCALAFMT_CONF_FILE,
+            ".scalafmt.conf": BASIC_SCALAFMT_CONF,
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.scala"))
@@ -150,7 +160,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
         {
             "Bar.scala": BAD_FILE,
             "BUILD": "scala_sources(name='t')",
-            ".scalafmt.conf": SCALAFMT_CONF_FILE,
+            ".scalafmt.conf": BASIC_SCALAFMT_CONF,
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala"))
@@ -168,7 +178,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             "Foo.scala": GOOD_FILE,
             "Bar.scala": BAD_FILE,
             "BUILD": "scala_sources(name='t')",
-            ".scalafmt.conf": SCALAFMT_CONF_FILE,
+            ".scalafmt.conf": BASIC_SCALAFMT_CONF,
         }
     )
     tgts = [
@@ -188,14 +198,14 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_multiple_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            ".scalafmt.conf": SCALAFMT_CONF_FILE,
+            SCALAFMT_CONF_FILENAME: BASIC_SCALAFMT_CONF,
             "foo/BUILD": "scala_sources()",
             "foo/Foo.scala": GOOD_FILE,
             "foo/bar/BUILD": "scala_sources()",
             "foo/bar/Bar.scala": BAD_FILE,
-            "foo/bar/.scalafmt.conf": textwrap.dedent(
+            f"foo/bar/{SCALAFMT_CONF_FILENAME}": textwrap.dedent(
                 f"""\
-                {SCALAFMT_CONF_FILE}
+                {BASIC_SCALAFMT_CONF}
                 indent.main = 4
                 """
             ),
@@ -213,3 +223,53 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
         rule_runner, {"foo/Foo.scala": GOOD_FILE, "foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
     assert fmt_result.did_change is True
+
+
+def test_find_nearest_ancestor_file() -> None:
+    files = {"grok.conf", "foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files, "foo/bar", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/bar/", "grok.conf") == "foo/bar/grok.conf"
+    assert find_nearest_ancestor_file(files, "foo", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello", "grok.conf") == "grok.conf"
+    assert find_nearest_ancestor_file(files, "hello/", "grok.conf") == "grok.conf"
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo", "grok.conf") == "hello/world/grok.conf"
+    )
+    assert (
+        find_nearest_ancestor_file(files, "hello/world/foo/", "grok.conf")
+        == "hello/world/grok.conf"
+    )
+
+    files2 = {"foo/bar/grok.conf", "hello/world/grok.conf"}
+    assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
+    assert find_nearest_ancestor_file(files2, "", "grok.conf") is None
+
+
+def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            SCALAFMT_CONF_FILENAME: "",
+            f"foo/bar/{SCALAFMT_CONF_FILENAME}": "",
+            f"hello/{SCALAFMT_CONF_FILENAME}": "",
+            "hello/Foo.scala": "",
+            "hello/world/Foo.scala": "",
+            "foo/bar/Foo.scala": "",
+            "foo/bar/xyyzzy/Foo.scala": "",
+            "foo/blah/Foo.scala": "",
+        }
+    )
+
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
+    request = rule_runner.request(ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot)])
+    assert sorted(request.source_dir_to_config_file.items()) == [
+        ("foo/bar", "foo/bar/.scalafmt.conf"),
+        ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),
+        ("foo/blah", ".scalafmt.conf"),
+        ("hello", "hello/.scalafmt.conf"),
+        ("hello/world", "hello/.scalafmt.conf"),
+    ]
