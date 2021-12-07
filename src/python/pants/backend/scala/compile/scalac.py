@@ -8,7 +8,8 @@ from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
-from pants.backend.scala.compile.scalac_plugins import ScalacPlugins
+from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
+from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
@@ -31,7 +32,6 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspathRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ async def compile_scala_source(
     coursier: Coursier,
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
-    scalac_plugins: ScalacPlugins,
+    scalac_plugins: GlobalScalacPlugins,
     union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
@@ -110,11 +110,7 @@ async def compile_scala_source(
             exit_code=0,
         )
 
-    (
-        tool_classpath,
-        scalac_plugin_classpath,
-        merged_transitive_dependency_classpath_entries_digest,
-    ) = await MultiGet(
+    (tool_classpath, merged_transitive_dependency_classpath_entries_digest,) = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
@@ -138,13 +134,6 @@ async def compile_scala_source(
             ),
         ),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__scalac_plugin_cp",
-                lockfiles=(scalac_plugins.resolved_lockfile(),),
-            ),
-        ),
-        Get(
             Digest,
             # Flatten the entire transitive classpath.
             MergeDigests(
@@ -162,7 +151,9 @@ async def compile_scala_source(
     merged_tool_digest, merged_input_digest = await MultiGet(
         Get(
             Digest,
-            MergeDigests((tool_classpath.digest, scalac_plugin_classpath.digest, jdk_setup.digest)),
+            MergeDigests(
+                (tool_classpath.digest, scalac_plugins.classpath.digest, jdk_setup.digest)
+            ),
         ),
         Get(
             Digest,
@@ -177,7 +168,6 @@ async def compile_scala_source(
             ),
         ),
     )
-    scalac_plugins_arg = ":".join(scalac_plugin_classpath.classpath_entries())
 
     classpath_arg = ClasspathEntry.arg(
         ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
@@ -192,8 +182,7 @@ async def compile_scala_source(
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
-                *((f"-Xplugin:{scalac_plugins_arg}",) if scalac_plugins_arg else ()),
-                *(f"-Xplugin-require:{name}" for name in scalac_plugins.names),
+                *scalac_plugins.args(),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
@@ -226,22 +215,10 @@ async def compile_scala_source(
     )
 
 
-class ScalacPluginsToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = ScalacPlugins.options_scope
-
-
-@rule
-def generate_scalac_plugins_lockfile_request(
-    _: ScalacPluginsToolLockfileSentinel,
-    tool: ScalacPlugins,
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(tool)
-
-
 def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        *scalac_plugins_rules(),
         UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
-        UnionRule(JvmToolLockfileSentinel, ScalacPluginsToolLockfileSentinel),
     ]

@@ -11,7 +11,15 @@ from typing import ClassVar, Iterable, Sequence, cast
 from pants.backend.python.target_types import UnrecognizedResolveNamesError
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
@@ -24,6 +32,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierResolvedLockfile,
 )
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -274,6 +283,31 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
         )
 
     return Coordinates(coordinates)
+
+
+@rule
+async def load_jvm_lockfile(
+    request: JvmToolLockfileRequest,
+) -> CoursierResolvedLockfile:
+    """Loads an existing lockfile."""
+
+    if not request.artifact_inputs:
+        return CoursierResolvedLockfile(entries=())
+
+    lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
+    if not lockfile_snapshot.files:
+        raise ValueError(
+            f"JVM tool `{request.resolve_name}` does not have a lockfile generated. "
+            f"Run `{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name} to "
+            "generate it."
+        )
+
+    return await Get(
+        CoursierResolvedLockfile,
+        CoursierResolveKey(
+            name=request.resolve_name, path=request.lockfile_dest, digest=lockfile_snapshot.digest
+        ),
+    )
 
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)

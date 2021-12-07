@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from textwrap import dedent
 
 import pytest
@@ -12,7 +11,7 @@ from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.goals.check import ScalacCheckRequest
 from pants.backend.scala.goals.check import rules as scalac_check_rules
-from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
+from pants.backend.scala.target_types import ScalacPluginTarget, ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
@@ -62,7 +61,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
-        target_types=[ScalaSourcesGeneratorTarget, JvmArtifact],
+        target_types=[JvmArtifact, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
     )
     rule_runner.set_options(
         args=[
@@ -393,31 +392,34 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
 @logging
 @maybe_skip_jdk_test
 def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
-    plugin_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
-    # TODO: Should be relative:
-    #   see https://github.com/pantsbuild/pants/pull/13777#discussion_r763488984
-    lockfile_abs = os.path.join(rule_runner.build_root, "coursier_resolve.lockfile")
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
                 """\
                 jvm_artifact(
-                    name = "acyclic",
+                    name = "acyclic_lib",
                     group = "com.lihaoyi",
                     artifact = "acyclic_2.13",
                     version = "0.2.1",
                     packages=["acyclic.**"],
                 )
 
+                scalac_plugin(
+                    name = "acyclic",
+                    artifact = ":acyclic_lib",
+                )
+
                 scala_sources(
-                  dependencies=[':acyclic'],
+                  dependencies=[':acyclic_lib'],
                 )
                 """
             ),
             "coursier_resolve.lockfile": CoursierResolvedLockfile(
                 entries=(
                     CoursierLockfileEntry(
-                        coord=plugin_coord,
+                        coord=Coordinate(
+                            group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1"
+                        ),
                         file_name="acyclic_2.13-0.2.1.jar",
                         direct_dependencies=Coordinates([]),
                         dependencies=Coordinates([]),
@@ -455,9 +457,8 @@ def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
         args=[
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
-            f"--scalac-plugins-artifacts={plugin_coord.to_coord_str()}",
-            "--scalac-plugins-names=acyclic",
-            f"--scalac-plugins-lockfile={lockfile_abs}",
+            "--scalac-plugins-global=lib:acyclic",
+            "--scalac-plugins-lockfile=coursier_resolve.lockfile",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
