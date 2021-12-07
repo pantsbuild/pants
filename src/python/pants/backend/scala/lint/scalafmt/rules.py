@@ -11,20 +11,27 @@ from pants.backend.scala.lint.scala_lang_fmt import ScalaLangFmtRequest
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    Digest,
+    DigestSubset,
+    GlobExpansionConjunction,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, FallibleProcessResult, Process
+from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
-from pants.testutil.rule_runner import logging
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -80,6 +87,16 @@ class ScalafmtConfigFiles:
     config_files_for_source_dir: FrozenDict[str, str]
 
 
+@dataclass(frozen=True)
+class SetupScalafmtPartition:
+    merged_sources_digest: Digest
+    jdk_invoke_args: tuple[str, ...]
+    tool_digest: Digest
+    config_file: str
+    files: tuple[str, ...]
+    check_only: bool
+
+
 def find_nearest_ancestor_config_file(files: set[str], dir: str) -> str | None:
     while True:
         candidate_config_file_path = os.path.join(dir, _SCALAFMT_CONF_FILENAME)
@@ -102,8 +119,10 @@ async def gather_scalafmt_config_files(
     source_dirs_with_ancestors = {"", *source_dirs}
     for source_dir in source_dirs:
         source_dir_parts = source_dir.split(os.path.sep)
-        for i in range(0, len(source_dir_parts) - 1):
-            source_dirs_with_ancestors.add(os.path.join(*source_dir_parts[0:i]))
+        source_dir_parts.pop()
+        while source_dir_parts:
+            source_dirs_with_ancestors.add(os.path.sep.join(source_dir_parts))
+            source_dir_parts.pop()
 
     config_file_globs = [
         os.path.join(dir, _SCALAFMT_CONF_FILENAME) for dir in source_dirs_with_ancestors
@@ -124,7 +143,48 @@ async def gather_scalafmt_config_files(
     return ScalafmtConfigFiles(config_files_snapshot, FrozenDict(config_files_for_source_dir))
 
 
-@logging
+@rule
+async def setup_scalafmt_partition(
+    request: SetupScalafmtPartition, jdk_setup: JdkSetup
+) -> Partition:
+    sources_digest = await Get(
+        Digest,
+        DigestSubset(
+            request.merged_sources_digest,
+            PathGlobs(
+                [request.config_file, *request.files],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin=f"the files in scalafmt partition for config file {request.config_file}",
+            ),
+        ),
+    )
+
+    input_digest = await Get(Digest, MergeDigests([sources_digest, request.tool_digest]))
+
+    args = [
+        *request.jdk_invoke_args,
+        "org.scalafmt.cli.Cli",
+        f"--config={request.config_file}",
+        "--non-interactive",
+    ]
+    if request.check_only:
+        args.append("--list")
+    args.extend(request.files)
+
+    process = Process(
+        argv=args,
+        input_digest=input_digest,
+        output_files=request.files,
+        append_only_caches=jdk_setup.append_only_caches,
+        env=jdk_setup.env,
+        description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
+        level=LogLevel.DEBUG,
+    )
+
+    return Partition(process, f"{pluralize(len(request.files), 'file')} ({request.config_file})")
+
+
 @rule(level=LogLevel.DEBUG)
 async def setup_scalafmt(
     setup_request: SetupRequest,
@@ -156,15 +216,24 @@ async def setup_scalafmt(
         ScalafmtConfigFiles, GatherScalafmtConfigFilesRequest(source_files_snapshot)
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                source_files_snapshot.digest,
-                config_files.snapshot.digest,
-                tool_classpath.digest,
-                jdk_setup.digest,
-            ]
+    merged_sources_digest, tool_digest = await MultiGet(
+        Get(
+            Digest,
+            MergeDigests(
+                [
+                    source_files_snapshot.digest,
+                    config_files.snapshot.digest,
+                ]
+            ),
+        ),
+        Get(
+            Digest,
+            MergeDigests(
+                [
+                    tool_classpath.digest,
+                    jdk_setup.digest,
+                ]
+            ),
         ),
     )
 
@@ -172,30 +241,25 @@ async def setup_scalafmt(
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
     for source_dir, files_in_source_dir in group_by_dir(source_files_snapshot.files).items():
         config_file_for_source_dir = config_files.config_files_for_source_dir[source_dir]
-        source_files_by_config_file[config_file_for_source_dir].union(files_in_source_dir)
-
-    partitions = []
-    for config_file, files in source_files_by_config_file.items():
-        args = [
-            *jdk_setup.args(bash, tool_classpath.classpath_entries()),
-            "org.scalafmt.cli.Cli",
-            f"--config={config_file}",
-            "--non-interactive",
-        ]
-        if setup_request.check_only:
-            args.append("--list")
-        args.extend(sorted(files))
-
-        process = Process(
-            argv=args,
-            input_digest=input_digest,
-            output_files=source_files_snapshot.files,
-            append_only_caches=jdk_setup.append_only_caches,
-            env=jdk_setup.env,
-            description=f"Run `scalafmt` on {pluralize(len(files), 'file')}.",
-            level=LogLevel.DEBUG,
+        source_files_by_config_file[config_file_for_source_dir].update(
+            os.path.join(source_dir, name) for name in files_in_source_dir
         )
-        partitions.append(Partition(process, f"{pluralize(len(files), 'file')} ({config_file})"))
+
+    jdk_invoke_args = jdk_setup.args(bash, tool_classpath.classpath_entries())
+    partitions = await MultiGet(
+        Get(
+            Partition,
+            SetupScalafmtPartition(
+                merged_sources_digest=merged_sources_digest,
+                tool_digest=tool_digest,
+                jdk_invoke_args=jdk_invoke_args,
+                config_file=config_file,
+                files=tuple(sorted(files)),
+                check_only=setup_request.check_only,
+            ),
+        )
+        for config_file, files in source_files_by_config_file.items()
+    )
 
     return Setup(tuple(partitions), original_digest=source_files_snapshot.digest)
 
@@ -206,16 +270,16 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
         return FmtResult.skip(formatter_name="scalafmt")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     results = await MultiGet(
-        Get(FallibleProcessResult, Process, partition.process) for partition in setup.partitions
+        Get(ProcessResult, Process, partition.process) for partition in setup.partitions
     )
 
-    def format(description, output):
+    def format(description: str, output) -> str:
         if len(output.strip()) == 0:
             return ""
 
         return textwrap.dedent(
             f"""\
-        Output from `scalafmt fmt` on {description}:
+        Output from `scalafmt` on {description}:
         {output.decode("utf-8")}
 
         """
@@ -228,7 +292,7 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
         stderr_content += format(partition.description, result.stderr)
 
     # Merge all of the outputs into a single output.
-    output_digest = await Get(Digest, MergeDigests(r.output_digest for r in results))
+    output_digest = await Get(Digest, MergeDigests([r.output_digest for r in results]))
 
     fmt_result = FmtResult(
         input=setup.original_digest,

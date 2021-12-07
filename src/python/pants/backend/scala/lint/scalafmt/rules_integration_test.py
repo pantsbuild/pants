@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import textwrap
+
 import pytest
 
 from pants.backend.scala import target_types
@@ -88,6 +90,14 @@ object Bar {
 }
 """
 
+FIXED_BAD_FILE_INDENT_4 = """\
+package org.pantsbuild.example
+
+object Bar {
+    val Foo = 3
+}
+"""
+
 SCALAFMT_CONF_FILE = """\
 version = "3.2.1"
 runner.dialect = scala213
@@ -171,5 +181,35 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "Bar.scala\n" == lint_results[0].stdout
     assert fmt_result.output == get_digest(
         rule_runner, {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
+    )
+    assert fmt_result.did_change is True
+
+
+def test_multiple_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            ".scalafmt.conf": SCALAFMT_CONF_FILE,
+            "foo/BUILD": "scala_sources()",
+            "foo/Foo.scala": GOOD_FILE,
+            "foo/bar/BUILD": "scala_sources()",
+            "foo/bar/Bar.scala": BAD_FILE,
+            "foo/bar/.scalafmt.conf": textwrap.dedent(
+                f"""\
+                {SCALAFMT_CONF_FILE}
+                indent.main = 4
+                """
+            ),
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("foo", target_name="foo", relative_file_path="Foo.scala")),
+        rule_runner.get_target(
+            Address("foo/bar", target_name="bar", relative_file_path="Bar.scala")
+        ),
+    ]
+    lint_results, fmt_result = run_scalafmt(rule_runner, tgts)
+    assert len(lint_results) == 2
+    assert fmt_result.output == get_digest(
+        rule_runner, {"foo/Foo.scala": GOOD_FILE, "foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
     assert fmt_result.did_change is True
