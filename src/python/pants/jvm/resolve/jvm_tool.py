@@ -11,7 +11,15 @@ from typing import ClassVar, Iterable, Sequence, cast
 from pants.backend.python.target_types import UnrecognizedResolveNamesError
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
@@ -24,6 +32,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierResolvedLockfile,
 )
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -38,12 +47,12 @@ logger = logging.getLogger(__name__)
 class JvmToolBase(Subsystem):
     """Base class for subsystems that configure a set of artifact requirements for a JVM tool."""
 
-    # Default version of the tool. (Subclasses must set.)
-    default_version: ClassVar[str]
+    # Default version of the tool. (Subclasses may set.)
+    default_version: ClassVar[str | None] = None
 
     # Default artifacts for the tool in GROUP:NAME format. The `--version` value will be used for the
     # artifact version if it has not been specified for a particular requirement. (Subclasses must set.)
-    default_artifacts: ClassVar[Sequence[str]]
+    default_artifacts: ClassVar[tuple[str, ...]]
 
     # Default resource for the tool's lockfile. (Subclasses must set.)
     default_lockfile_resource: ClassVar[tuple[str, str]]
@@ -69,7 +78,7 @@ class JvmToolBase(Subsystem):
             type=list,
             member_type=str,
             advanced=True,
-            default=cls.default_artifacts,
+            default=list(cls.default_artifacts),
             help=(
                 "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
                 "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
@@ -274,6 +283,31 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
         )
 
     return Coordinates(coordinates)
+
+
+@rule
+async def load_jvm_lockfile(
+    request: JvmToolLockfileRequest,
+) -> CoursierResolvedLockfile:
+    """Loads an existing lockfile."""
+
+    if not request.artifact_inputs:
+        return CoursierResolvedLockfile(entries=())
+
+    lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
+    if not lockfile_snapshot.files:
+        raise ValueError(
+            f"JVM tool `{request.resolve_name}` does not have a lockfile generated. "
+            f"Run `{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name} to "
+            "generate it."
+        )
+
+    return await Get(
+        CoursierResolvedLockfile,
+        CoursierResolveKey(
+            name=request.resolve_name, path=request.lockfile_dest, digest=lockfile_snapshot.digest
+        ),
+    )
 
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)

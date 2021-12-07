@@ -25,7 +25,7 @@ from pants.jvm.resolve.jvm_tool import (
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -35,9 +35,7 @@ class MockJvmTool(JvmToolBase):
     options_scope = "mock-tool"
 
     default_version = "1.3"
-    default_artifacts = [
-        "org.hamcrest:hamcrest-core:{version}",
-    ]
+    default_artifacts = ("org.hamcrest:hamcrest-core:{version}",)
     default_lockfile_resource = ("pants.backend.jvm.resolve", "mock-tool.default.lockfile.txt")
     default_lockfile_url = ""
 
@@ -69,7 +67,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             QueryRule(Coordinates, (GatherJvmCoordinatesRequest,)),
             QueryRule(DigestContents, (Digest,)),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact],
+        target_types=[JvmArtifact],
     )
     rule_runner.set_options(
         args=[

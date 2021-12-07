@@ -20,7 +20,6 @@ from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmDependencyLockfile
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -41,7 +40,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, (SourceFilesRequest,)),
             QueryRule(ScalaSourceDependencyAnalysis, (SourceFiles,)),
         ],
-        target_types=[JvmDependencyLockfile, ScalaSourceTarget],
+        target_types=[ScalaSourceTarget],
     )
     rule_runner.set_options(args=["-ldebug"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner

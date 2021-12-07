@@ -11,7 +11,7 @@ class GoogleJavaFormatSubsystem(JvmToolBase):
     help = "Google Java Format (https://github.com/google/google-java-format)"
 
     default_version = "1.13.0"
-    default_artifacts = ["com.google.googlejavaformat:google-java-format:{version}"]
+    default_artifacts = ("com.google.googlejavaformat:google-java-format:{version}",)
     default_lockfile_resource = (
         "pants.backend.java.lint.google_java_format",
         "google_java_format.default.lockfile.txt",
