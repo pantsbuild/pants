@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 from abc import ABC, abstractmethod
 from textwrap import dedent
@@ -11,10 +12,12 @@ from typing import ClassVar, Iterator
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DictStringToStringField,
@@ -161,7 +164,9 @@ class DockerBuildOptionField(ABC, Field):
             yield f"{self.docker_option}={shlex.quote(value)}"
 
 
-class DockerBuildSecretsOptionField(DockerBuildOptionField, DictStringToStringField):
+class DockerBuildSecretsOptionField(
+    AsyncFieldMixin, DockerBuildOptionField, DictStringToStringField
+):
     alias = "secrets"
     help = "Secret file to expose to the build (only if BuildKit enabled).\n\n" + dedent(
         """\
@@ -178,8 +183,9 @@ class DockerBuildSecretsOptionField(DockerBuildOptionField, DictStringToStringFi
     docker_option = "--secret"
 
     def option_values(self) -> Iterator[str]:
+        root = os.path.join(get_buildroot(), self.address.spec_path)
         for secret, path in (self.value or {}).items():
-            yield f"id={secret},src={path}"
+            yield f"id={secret},src={os.path.join(root, path)}"
 
 
 class DockerImageTarget(Target):
