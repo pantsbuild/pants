@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from textwrap import dedent
 
 import pytest
@@ -233,7 +234,6 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-@logging
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     resolved_joda_lockfile = CoursierResolvedLockfile(
         entries=(
@@ -388,3 +388,86 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "error: object joda is not a member of package org" in fallible_result.stderr
+
+
+@logging
+@maybe_skip_jdk_test
+def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
+    plugin_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
+    # TODO: Should be relative:
+    #   see https://github.com/pantsbuild/pants/pull/13777#discussion_r763488984
+    lockfile_abs = os.path.join(rule_runner.build_root, "coursier_resolve.lockfile")
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name = "acyclic",
+                    group = "com.lihaoyi",
+                    artifact = "acyclic_2.13",
+                    version = "0.2.1",
+                    packages=["acyclic.**"],
+                )
+
+                scala_sources(
+                  dependencies=[':acyclic'],
+                )
+                """
+            ),
+            "coursier_resolve.lockfile": CoursierResolvedLockfile(
+                entries=(
+                    CoursierLockfileEntry(
+                        coord=plugin_coord,
+                        file_name="acyclic_2.13-0.2.1.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
+                            62534,
+                        ),
+                    ),
+                )
+            )
+            .to_json()
+            .decode("utf-8"),
+            "lib/A.scala": dedent(
+                """
+                package lib
+                import acyclic.file
+
+                class A {
+                  val b: B = null
+                }
+                """
+            ),
+            "lib/B.scala": dedent(
+                """
+                package lib
+
+                class B {
+                  val a: A = null
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            NAMED_RESOLVE_OPTIONS,
+            DEFAULT_RESOLVE_OPTION,
+            f"--scalac-plugins-artifacts={plugin_coord.to_coord_str()}",
+            "--scalac-plugins-names=acyclic",
+            f"--scalac-plugins-lockfile={lockfile_abs}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="lib", relative_file_path="A.scala")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "error: Unwanted cyclic dependency" in fallible_result.stderr

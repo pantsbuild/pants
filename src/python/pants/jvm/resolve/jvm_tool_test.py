@@ -35,9 +35,7 @@ class MockJvmTool(JvmToolBase):
     options_scope = "mock-tool"
 
     default_version = "1.3"
-    default_artifacts = [
-        "org.hamcrest:hamcrest-core:{version}",
-    ]
+    default_artifacts = ("org.hamcrest:hamcrest-core:{version}",)
     default_lockfile_resource = ("pants.backend.jvm.resolve", "mock-tool.default.lockfile.txt")
     default_lockfile_url = ""
 

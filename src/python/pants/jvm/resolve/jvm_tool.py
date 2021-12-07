@@ -38,12 +38,12 @@ logger = logging.getLogger(__name__)
 class JvmToolBase(Subsystem):
     """Base class for subsystems that configure a set of artifact requirements for a JVM tool."""
 
-    # Default version of the tool. (Subclasses must set.)
-    default_version: ClassVar[str]
+    # Default version of the tool. (Subclasses may set.)
+    default_version: ClassVar[str | None] = None
 
     # Default artifacts for the tool in GROUP:NAME format. The `--version` value will be used for the
     # artifact version if it has not been specified for a particular requirement. (Subclasses must set.)
-    default_artifacts: ClassVar[Sequence[str]]
+    default_artifacts: ClassVar[tuple[str, ...]]
 
     # Default resource for the tool's lockfile. (Subclasses must set.)
     default_lockfile_resource: ClassVar[tuple[str, str]]
@@ -69,7 +69,7 @@ class JvmToolBase(Subsystem):
             type=list,
             member_type=str,
             advanced=True,
-            default=cls.default_artifacts,
+            default=list(cls.default_artifacts),
             help=(
                 "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
                 "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
