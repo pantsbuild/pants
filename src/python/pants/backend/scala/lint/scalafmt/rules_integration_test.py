@@ -88,6 +88,11 @@ object Bar {
 }
 """
 
+SCALAFMT_CONF_FILE = """\
+version = "3.2.1"
+runner.dialect = scala213
+"""
+
 
 def run_scalafmt(
     rule_runner: RuleRunner, targets: list[Target]
@@ -115,7 +120,11 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Foo.scala": GOOD_FILE, "BUILD": "scala_sources(name='t')"})
+    rule_runner.write_files({
+        "Foo.scala": GOOD_FILE,
+        "BUILD": "scala_sources(name='t')",
+        ".scalafmt.conf": SCALAFMT_CONF_FILE,
+    })
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.scala"))
     lint_results, fmt_result = run_scalafmt(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -125,7 +134,11 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"Bar.scala": BAD_FILE, "BUILD": "scala_sources(name='t')"})
+    rule_runner.write_files({
+        "Bar.scala": BAD_FILE,
+        "BUILD": "scala_sources(name='t')",
+        ".scalafmt.conf": SCALAFMT_CONF_FILE,
+    })
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala"))
     lint_results, fmt_result = run_scalafmt(rule_runner, [tgt])
     assert len(lint_results) == 1
@@ -136,9 +149,12 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {"Foo.scala": GOOD_FILE, "Bar.scala": BAD_FILE, "BUILD": "scala_sources(name='t')"}
-    )
+    rule_runner.write_files({
+        "Foo.scala": GOOD_FILE,
+        "Bar.scala": BAD_FILE,
+        "BUILD": "scala_sources(name='t')",
+         ".scalafmt.conf": SCALAFMT_CONF_FILE,
+    })
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.scala")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala")),
