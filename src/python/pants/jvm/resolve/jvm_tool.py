@@ -21,6 +21,7 @@ from pants.jvm.goals.coursier import coordinate_from_target
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
+    Coordinates,
     CoursierResolvedLockfile,
 )
 from pants.jvm.target_types import JvmArtifactFieldSet
@@ -79,7 +80,7 @@ class JvmToolBase(Subsystem):
         register(
             "--lockfile",
             type=str,
-            default=cls.default_lockfile_path,
+            default=DEFAULT_TOOL_LOCKFILE,
             advanced=True,
             help=(
                 "Path to a lockfile used for installing the tool.\n\n"
@@ -104,10 +105,7 @@ class JvmToolBase(Subsystem):
     def lockfile(self) -> str:
         f"""The path to a lockfile or special string '{DEFAULT_TOOL_LOCKFILE}'."""
         lockfile = cast(str, self.options.lockfile)
-        if lockfile != DEFAULT_TOOL_LOCKFILE:
-            return lockfile
-        pkg, path = self.default_lockfile_resource
-        return f"src/python/{pkg.replace('.', '/')}/{path}"
+        return lockfile
 
     def lockfile_content(self) -> bytes:
         lockfile_path = self.lockfile
@@ -135,6 +133,12 @@ class JvmToolLockfileRequest:
 
     @classmethod
     def from_tool(cls, tool: JvmToolBase) -> JvmToolLockfileRequest:
+        lockfile_dest = tool.lockfile
+        if lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+            raise ValueError(
+                f"Internal error: Request to write tool lockfile but `[{tool.options_scope}.lockfile]` "
+                f'is set to the default ("{DEFAULT_TOOL_LOCKFILE}").'
+            )
         return cls(
             artifact_inputs=FrozenOrderedSet(tool.artifact_inputs),
             resolve_name=tool.options_scope,
@@ -147,6 +151,12 @@ class JvmToolLockfile:
     digest: Digest
     resolve_name: str
     path: str
+
+
+@dataclass(frozen=True)
+class GatherJvmCoordinatesRequest:
+    artifact_inputs: FrozenOrderedSet[str]
+    option_name: str
 
 
 class GenerateJvmLockfilesSubsystem(GoalSubsystem):
@@ -166,7 +176,7 @@ class GenerateJvmLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for tool lockfiles which are "
                 "the options scope for that tool such as `junit`.\n\n"
-                "For example, you can run `./pants generate-lockfiles --resolve=junit "
+                "For example, you can run `./pants jvm-generate-lockfiles --resolve=junit "
                 "to only generate lockfiles for the `junit` tool.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
                 "possible values.\n\n"
@@ -216,10 +226,8 @@ async def generate_lockfiles_goal(
     return GenerateJvmLockfilesGoal(exit_code=0)
 
 
-@rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
-async def generate_jvm_lockfile(
-    request: JvmToolLockfileRequest,
-) -> JvmToolLockfile:
+@rule
+async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesRequest) -> Coordinates:
     # Separate `artifact_inputs` by whether the strings parse as an `Address` or not.
     coordinates: set[Coordinate] = set()
     candidate_address_inputs: set[AddressInput] = set()
@@ -244,7 +252,7 @@ async def generate_jvm_lockfile(
     if bad_artifact_inputs:
         raise ValueError(
             "The following values could not be parsed as an address nor as a JVM coordinate string. "
-            f"The problematic inputs supplied to the `--{request.resolve_name}-artifacts option were: "
+            f"The problematic inputs supplied to the `{request.option_name}` option were: "
             f"{', '.join(bad_artifact_inputs)}."
         )
 
@@ -261,10 +269,21 @@ async def generate_jvm_lockfile(
     if other_targets:
         raise ValueError(
             "The following addresses reference targets that are not `jvm_artifact` targets. "
-            f"Please only supply the addresses of `jvm_artifact` for the `--{request.resolve_name}-artifacts "
+            f"Please only supply the addresses of `jvm_artifact` for the `{request.option_name}` "
             f"option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}."
         )
 
+    return Coordinates(coordinates)
+
+
+@rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
+async def generate_jvm_lockfile(
+    request: JvmToolLockfileRequest,
+) -> JvmToolLockfile:
+    coordinates = await Get(
+        Coordinates,
+        GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
+    )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements(coordinates))
     lockfile_content = resolved_lockfile.to_json()
     lockfile_digest = await Get(
