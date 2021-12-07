@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import textwrap
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.backend.scala.lint.scala_lang_fmt import ScalaLangFmtRequest
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
@@ -109,17 +108,14 @@ async def setup_google_java_format(
         ),
     )
 
-    def add_check_args() -> Iterable[str]:
-        if setup_request.check_only:
-            yield "--list"
-
     args = [
         *jdk_setup.args(bash, tool_classpath.classpath_entries()),
         "org.scalafmt.cli.Cli",
         "--config=.scalafmt.conf",
         "--non-interactive",
-        *add_check_args(),
     ]
+    if setup_request.check_only:
+        args.append("--list")
     args.extend(source_files.files)
 
     process = Process(
@@ -128,7 +124,7 @@ async def setup_google_java_format(
         output_files=source_files_snapshot.files,
         append_only_caches=jdk_setup.append_only_caches,
         env=jdk_setup.env,
-        description=f"Run `scalafmt` against {pluralize(len(setup_request.request.field_sets), 'file')}.",
+        description=f"Run `scalafmt` on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
