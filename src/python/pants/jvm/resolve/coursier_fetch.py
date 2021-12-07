@@ -345,7 +345,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 
 @dataclass(frozen=True)
-class ArtifactRequirementsWithReifiedLocalArtifacts:
+class ArtifactRequirementsWithLocalFiles:
     # omg tidy up this name. it's bad
     artifact_requirements: ArtifactRequirements
     digest: Digest
@@ -355,10 +355,8 @@ class ArtifactRequirementsWithReifiedLocalArtifacts:
 async def use_local_artifacts_where_possible(
     input_requirements: ArtifactRequirements,
     all_jars: AllJarTargets,
-) -> ArtifactRequirementsWithReifiedLocalArtifacts:
-
+) -> ArtifactRequirementsWithLocalFiles:
     output: List[Coordinate] = []
-
     further_processing: List[Target] = []
 
     for req in input_requirements:
@@ -379,11 +377,12 @@ async def use_local_artifacts_where_possible(
             artifact=coord.artifact,
             group=coord.group,
             version=coord.version,
+            # coursier requires absolute url
             url=f"file:{WORKING_DIRECTORY_URL_PLACEHOLDER}/{file}",
         )
         output.append(coord)
 
-    return ArtifactRequirementsWithReifiedLocalArtifacts(
+    return ArtifactRequirementsWithLocalFiles(
         artifact_requirements=ArtifactRequirements(output), digest=files.snapshot.digest
     )
 
@@ -424,7 +423,7 @@ async def coursier_resolve_lockfile(
     # Transform requirements with local JAR files into coordinates, and yoink the relevant
     # files into the coursier sandbox
     better_artifacts = await Get(
-        ArtifactRequirementsWithReifiedLocalArtifacts, ArtifactRequirements, artifact_requirements
+        ArtifactRequirementsWithLocalFiles, ArtifactRequirements, artifact_requirements
     )
     artifact_requirements = better_artifacts.artifact_requirements
     input_digest = await Get(Digest, MergeDigests([better_artifacts.digest, coursier.digest]))
