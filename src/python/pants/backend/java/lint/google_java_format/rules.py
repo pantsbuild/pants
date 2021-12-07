@@ -115,7 +115,7 @@ async def setup_google_java_format(
         output_files=source_files_snapshot.files,
         append_only_caches=jdk_setup.append_only_caches,
         env=jdk_setup.env,
-        description=f"Run Google Java Format against {pluralize(len(setup_request.request.field_sets), 'file')}.",
+        description=f"Run Google Java Format on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
