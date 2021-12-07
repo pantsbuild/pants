@@ -114,6 +114,20 @@ class JvmArtifact(Target):
     )
 
 
+class JvmJarSource(SingleSourceField):
+    expected_file_extensions = (".jar",)
+    required = True
+    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
+
+
+class JvmLocalArtifact(Target):
+    alias = "jvm_local_artifact"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        *JvmArtifactFieldSet.required_fields,
+    )
+
+
 class JvmCompatibleResolveNamesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False

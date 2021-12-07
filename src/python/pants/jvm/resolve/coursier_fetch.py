@@ -29,7 +29,13 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    AllTargets,
+    Target,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -48,6 +54,7 @@ from pants.jvm.target_types import (
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
+    JvmJarSource,
     JvmLockfileSources,
     JvmRequirementsField,
 )
@@ -167,6 +174,15 @@ class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
             for maven_coord in (field.value or ())
         )
         return ArtifactRequirements((*field_requirements, *additional_requirements))
+
+
+class AllJarTargets(DeduplicatedCollection[Target]):
+    """A list of targets that provide JAR files."""
+
+
+@rule
+async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
+    return AllJarTargets([tgt for tgt in all_targets if tgt.has_field(JvmJarSource)])
 
 
 @dataclass(frozen=True)
@@ -744,7 +760,9 @@ class MaterializedClasspath:
 
 
 @rule(level=LogLevel.DEBUG)
-async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
+async def materialize_classpath(
+    request: MaterializedClasspathRequest, all_jars: AllJarTargets
+) -> MaterializedClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
     artifact_requirements_lockfiles = await MultiGet(
