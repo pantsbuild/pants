@@ -84,7 +84,7 @@ class GatherScalafmtConfigFilesRequest:
 @dataclass(frozen=True)
 class ScalafmtConfigFiles:
     snapshot: Snapshot
-    config_files_for_source_dir: FrozenDict[str, str]
+    source_dir_to_config_file: FrozenDict[str, str]
 
 
 @dataclass(frozen=True)
@@ -130,7 +130,7 @@ async def gather_scalafmt_config_files(
     config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
     config_files_set = set(config_files_snapshot.files)
 
-    config_files_for_source_dir: dict[str, str] = {}
+    source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
         config_file = find_nearest_ancestor_config_file(config_files_set, source_dir)
         if not config_file:
@@ -138,9 +138,9 @@ async def gather_scalafmt_config_files(
                 f"No scalafmt config file (`{_SCALAFMT_CONF_FILENAME}`) found for "
                 f"source directory '{source_dir}'"
             )
-        config_files_for_source_dir[source_dir] = config_file
+        source_dir_to_config_file[source_dir] = config_file
 
-    return ScalafmtConfigFiles(config_files_snapshot, FrozenDict(config_files_for_source_dir))
+    return ScalafmtConfigFiles(config_files_snapshot, FrozenDict(source_dir_to_config_file))
 
 
 @rule
@@ -240,8 +240,8 @@ async def setup_scalafmt(
     # Partition the work by which source files share the same config file (regardless of directory).
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
     for source_dir, files_in_source_dir in group_by_dir(source_files_snapshot.files).items():
-        config_file_for_source_dir = config_files.config_files_for_source_dir[source_dir]
-        source_files_by_config_file[config_file_for_source_dir].update(
+        config_file = config_files.source_dir_to_config_file[source_dir]
+        source_files_by_config_file[config_file].update(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
