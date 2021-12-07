@@ -147,9 +147,9 @@ class Coordinate:
         version = target[JvmArtifactVersionField].value
         url = target[JvmArtifactUrlField].value
 
-        if url and url.startswith("file:/"):
+        if url and url.startswith("file:"):
             raise CoursierError(
-                "Pants does not support `file:/` URLS. Use the `jar` field instead."
+                "Pants does not support `file:` URLS. Use the `jar` field instead."
             )
 
         # These are all required, but mypy doesn't think so.
