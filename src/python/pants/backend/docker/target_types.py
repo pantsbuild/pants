@@ -3,7 +3,12 @@
 
 from __future__ import annotations
 
+import shlex
+from abc import ABC, abstractmethod
 from textwrap import dedent
+from typing import ClassVar, Iterator
+
+from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.core.goals.run import RestartableField
@@ -12,6 +17,8 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    DictStringToStringField,
+    Field,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -140,6 +147,41 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
+class DockerBuildOptionField(ABC, Field):
+    docker_option: ClassVar[str]
+
+    @abstractmethod
+    def option_values(self) -> Iterator[str]:
+        """Subclasses must implement this, to turn their `self.value` into none, one or more option
+        values."""
+
+    @final
+    def options(self) -> Iterator[str]:
+        for value in self.option_values():
+            yield f"{self.docker_option}={shlex.quote(value)}"
+
+
+class DockerBuildSecretsOptionField(DockerBuildOptionField, DictStringToStringField):
+    alias = "secrets"
+    help = "Secret file to expose to the build (only if BuildKit enabled).\n\n" + dedent(
+        """\
+            Example:
+
+                docker_image(
+                    secrets={
+                        "mysecret": "/local/secret",
+                    }
+                )
+            """
+    )
+
+    docker_option = "--secret"
+
+    def option_values(self) -> Iterator[str]:
+        for secret, path in (self.value or {}).items():
+            yield f"id={secret},src={path}"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -151,6 +193,7 @@ class DockerImageTarget(Target):
         DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
+        DockerBuildSecretsOptionField,
         DockerSkipPushField,
         RestartableField,
     )

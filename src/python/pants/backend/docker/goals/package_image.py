@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from os import path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
+    DockerBuildOptionField,
     DockerImageSourceField,
     DockerImageTagsField,
     DockerRegistriesField,
@@ -23,8 +24,10 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
+from pants.engine.addresses import Address
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.strutil import bullet_list, pluralize
 
@@ -160,18 +163,27 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
 
+def get_build_options(target: Target) -> Iterator[str]:
+    for field_type in target.field_types:
+        if issubclass(field_type, DockerBuildOptionField):
+            yield from target[field_type].options()
+
+
 @rule
 async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
     docker: DockerBinary,
 ) -> BuiltPackage:
-    context = await Get(
-        DockerBuildContext,
-        DockerBuildContextRequest(
-            address=field_set.address,
-            build_upstream_images=True,
+    context, wrapped_target = await MultiGet(
+        Get(
+            DockerBuildContext,
+            DockerBuildContextRequest(
+                address=field_set.address,
+                build_upstream_images=True,
+            ),
         ),
+        Get(WrappedTarget, Address, field_set.address),
     )
 
     tags = field_set.image_refs(
@@ -189,6 +201,7 @@ async def build_docker_image(
             dockerfile=context.dockerfile,
             env=context.env,
             tags=tags,
+            extra_args=tuple(get_build_options(wrapped_target.target)),
         ),
     )
 

@@ -39,6 +39,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult, ProcessResultMetadata
+from pants.engine.target import WrappedTarget
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
@@ -116,6 +117,11 @@ def assert_build(
                 output_type=DockerBuildContext,
                 input_type=DockerBuildContextRequest,
                 mock=build_context_mock,
+            ),
+            MockGet(
+                output_type=WrappedTarget,
+                input_type=Address,
+                mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
                 output_type=ProcessResult,
@@ -526,6 +532,43 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
             {
                 "FROM_ENV": "env value",
             }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  secrets={
+                    "mysecret": "/var/run/secrets/mysecret",
+                    "password": "/mnt/secrets/password",
+                  }
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--secret=id=mysecret,src=/var/run/secrets/mysecret",
+            "--secret=id=password,src=/mnt/secrets/password",
+            "-t",
+            "img1:latest",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
         )
 
     assert_build(
