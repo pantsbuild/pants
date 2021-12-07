@@ -30,7 +30,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
@@ -62,7 +62,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
         ],
-        target_types=[JvmDependencyLockfile, ScalaSourcesGeneratorTarget, JvmArtifact],
+        target_types=[ScalaSourcesGeneratorTarget, JvmArtifact],
     )
     rule_runner.set_options(
         args=[

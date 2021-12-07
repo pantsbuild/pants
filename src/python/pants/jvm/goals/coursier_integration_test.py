@@ -24,7 +24,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -57,7 +57,6 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
         ],
         target_types=[
-            JvmDependencyLockfile,
             JvmArtifact,
             ResourcesGeneratorTarget,
             JavaSourcesGeneratorTarget,
