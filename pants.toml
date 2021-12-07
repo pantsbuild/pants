@@ -180,6 +180,9 @@ lockfile = "src/python/pants/backend/java/test/junit.default.lockfile.txt"
 [google-java-format]
 lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
 
+[scalafmt]
+lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
+
 [toolchain-setup]
 repo = "pants"
 
