@@ -9,7 +9,7 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any, Iterable, Iterator, List
 from urllib.parse import quote_plus as url_quote_plus
 from urllib.parse import unquote as url_unquote
 
@@ -43,6 +43,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
+from pants.jvm.resolve.coursier_constants import WORKING_DIRECTORY_URL_PLACEHOLDER
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -167,7 +168,12 @@ class AllJarTargets:
 
 @rule
 async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
-    jars = [tgt for tgt in all_targets if tgt.has_field(JvmArtifactJarSourceField) and tgt[JvmArtifactJarSourceField].value != None]
+    jars = [
+        tgt
+        for tgt in all_targets
+        if tgt.has_field(JvmArtifactJarSourceField)
+        and tgt[JvmArtifactJarSourceField].value is not None
+    ]
     jars_by_coordinate = FrozenDict((Coordinate.from_jvm_artifact_target(tgt), tgt) for tgt in jars)
     return AllJarTargets(by_coordinate=jars_by_coordinate)
 
@@ -359,16 +365,25 @@ async def use_local_artifacts_where_possible(
             output.append(req)
         else:
             further_processing.append(tgt)
-    
 
-    files = await Get(SourceFiles, SourceFilesRequest(tgt[JvmArtifactJarSourceField] for tgt in further_processing))
+    files = await Get(
+        SourceFiles,
+        SourceFilesRequest(tgt[JvmArtifactJarSourceField] for tgt in further_processing),
+    )
 
     for target, file in zip(further_processing, files.files):
         coord = Coordinate.from_jvm_artifact_target(target)
-        coord = Coordinate(artifact=coord.artifact, group=coord.group, version=coord.version, url=f"file:./{file}")
+        coord = Coordinate(
+            artifact=coord.artifact,
+            group=coord.group,
+            version=coord.version,
+            url=f"file:{WORKING_DIRECTORY_URL_PLACEHOLDER}/{file}",
+        )
         output.append(coord)
-        
-    return ArtifactRequirementsWithReifiedLocalArtifacts(artifact_requirements=ArtifactRequirements(output), digest=files.snapshot.digest)
+
+    return ArtifactRequirementsWithReifiedLocalArtifacts(
+        artifact_requirements=ArtifactRequirements(output), digest=files.snapshot.digest
+    )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -406,7 +421,9 @@ async def coursier_resolve_lockfile(
 
     # Transform requirements with local JAR files into coordinates, and yoink the relevant
     # files into the coursier sandbox
-    better_artifacts = await Get(ArtifactRequirementsWithReifiedLocalArtifacts, ArtifactRequirements, artifact_requirements)
+    better_artifacts = await Get(
+        ArtifactRequirementsWithReifiedLocalArtifacts, ArtifactRequirements, artifact_requirements
+    )
     artifact_requirements = better_artifacts.artifact_requirements
     input_digest = await Get(Digest, MergeDigests([better_artifacts.digest, coursier.digest]))
 

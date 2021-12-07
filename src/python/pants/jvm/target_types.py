@@ -60,9 +60,7 @@ class JvmArtifactJarSourceField(SingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
     required = False
-    help = (
-        "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
-    )
+    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
 
 
 class JvmArtifactPackagesField(StringSequenceField):

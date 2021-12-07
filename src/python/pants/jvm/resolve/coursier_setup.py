@@ -18,6 +18,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.jvm.resolve.coursier_constants import WORKING_DIRECTORY_URL_PLACEHOLDER
 from pants.python.binaries import PythonBinary
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
@@ -142,7 +143,11 @@ async def setup_coursier(
         json_output_file="$1"
         shift
 
-        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" "$@"
+        WORKING_DIRECTORY=$(pwd)
+        ARGS=$@
+        ARGS=$(echo $ARGS | /usr/bin/sed 's|{WORKING_DIRECTORY_URL_PLACEHOLDER}|'$WORKING_DIRECTORY'|g')
+
+        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" $(echo $ARGS)
 
         /bin/mkdir -p classpath
         {python.path} coursier_post_processing_script.py "$json_output_file"
