@@ -20,6 +20,7 @@ target(
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/scala",
+        "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/google_cloud_function/python",
         "src/python/pants/backend/plugin_development",

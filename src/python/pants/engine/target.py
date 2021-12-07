@@ -1848,6 +1848,9 @@ class GenerateSourcesRequest:
     The rule to actually implement the codegen should take the subclass as input, and it must
     return `GeneratedSources`.
 
+    The `exportable` attribute disables the use of this codegen by the `export-codegen` goal when
+    set to False.
+
     For example:
 
         class GenerateFortranFromAvroRequest:
@@ -1870,6 +1873,8 @@ class GenerateSourcesRequest:
 
     input: ClassVar[type[SourcesField]]
     output: ClassVar[type[SourcesField]]
+
+    exportable: ClassVar[bool] = True
 
 
 @dataclass(frozen=True)
