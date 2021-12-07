@@ -145,10 +145,6 @@ def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) 
                     artifact = 'hamcrest-core',
                     version = "1.3",
                 )
-                coursier_lockfile(
-                    name='example-lockfile',
-                    source="coursier_resolve.lockfile",
-                )
                 """
             ),
             "coursier_resolve.lockfile": expected_lockfile.to_json().decode("utf-8"),
@@ -178,9 +174,6 @@ def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
                     group = 'org.hamcrest',
                     artifact = 'hamcrest-core',
                     version = "1.3",
-                )
-                coursier_lockfile(
-                    name = 'example-lockfile',
                 )
                 """
             ),
@@ -229,9 +222,6 @@ def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> Non
                     group = 'org.hamcrest',
                     artifact = 'hamcrest-core',
                     version = "1.3",
-                )
-                coursier_lockfile(
-                    name = 'example-lockfile',
                 )
                 """
             ),
