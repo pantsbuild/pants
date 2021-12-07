@@ -17,3 +17,9 @@ docker_image(
         "COPY testprojects.src.python.hello.main/main.pex /hello",
     ],
 )
+
+python_sources()
+python_tests(
+    name="tests",
+    run_in_container=":test-example",
+)

@@ -12,9 +12,12 @@ from pants.backend.docker.util_rules.docker_build_context import rules as contex
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 
+from pants.backend.docker.python.run_tests import rules as python_run_tests_rules
 
 def rules():
     return [
+        *python_run_tests_rules(),
+
         *binary_rules(),
         *build_args_rules(),
         *build_env_rules(),
