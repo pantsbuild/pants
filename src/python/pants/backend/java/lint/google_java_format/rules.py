@@ -96,15 +96,11 @@ async def setup_google_java_format(
             "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
         ]
 
-    maybe_aosp_option = []
-    if tool.aosp:
-        maybe_aosp_option = ["--aosp"]
-
     args = [
         *jdk_setup.args(bash, tool_classpath.classpath_entries()),
         *maybe_java16_or_higher_options,
         "com.google.googlejavaformat.java.Main",
-        *maybe_aosp_option,
+        *(["--aosp"] if tool.aosp else []),
         "--dry-run" if setup_request.check_only else "--replace",
         *source_files.files,
     ]
