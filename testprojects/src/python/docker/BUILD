@@ -18,8 +18,16 @@ docker_image(
     ],
 )
 
+docker_image(
+    name="test-runner",
+    instructions=[
+        "FROM python:3.7",
+        'ENTRYPOINT ["python3"]',
+    ],
+)
+
 python_sources()
 python_tests(
     name="tests",
-    run_in_container=":test-example",
+    run_in_container=":test-runner",
 )

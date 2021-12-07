@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import logging
+import dataclasses
 import pkgutil
 from functools import partial
 from typing import cast
@@ -21,9 +21,6 @@ from pants.engine.target import StringField, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
-logger = logging.getLogger(__name__)
-import dataclasses
-
 _DOCKER_PYTHON_PACKAGE = "pants.backend.docker.python"
 _DOCKER_SHIM_FILE = "docker_shim.sh"
 
@@ -40,12 +37,20 @@ class RunInContainerRequest(PytestPluginSetupRequest):
 
     @classmethod
     def preprocess(cls, process: Process, docker: DockerBinary, image_ref: str) -> Process:
-        argv = ("./docker_shim.sh", *process.env.keys(), "--", *process.argv)
-        env = FrozenDict({
-            "_DOCKER_BIN_": docker.path,
-            "_DOCKER_IMAGE_": image_ref,
-            **process.env,
-        })
+        argv = (
+            "./docker_shim.sh",
+            *process.env.keys(),
+            "--",
+            "./pytest_runner.pex",
+            *process.argv[1:],
+        )
+        env = FrozenDict(
+            {
+                "_DOCKER_BIN_": docker.path,
+                "_DOCKER_IMAGE_": image_ref,
+                **process.env,
+            }
+        )
         return dataclasses.replace(process, argv=argv, env=env)
 
 
@@ -54,6 +59,11 @@ async def setup_run_in_container(
     request: RunInContainerRequest, docker: DockerBinary
 ) -> PytestPluginSetup:
     image_address = request.target[DockerRunPythonTests].value
+    if not image_address:
+        raise RuntimeError(
+            "Internal bug. The `run_in_container` pytest plugin should not be applicable for "
+            f"target {request.target.address}."
+        )
     targets = await Get(
         Targets, UnparsedAddressInputs([image_address], owning_address=request.target.address)
     )

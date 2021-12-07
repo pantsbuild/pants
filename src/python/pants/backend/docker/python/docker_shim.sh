@@ -8,10 +8,9 @@ function parse_args {
   for arg; do
     case "$arg" in
       --)
-        run_args="$run_args --entrypoint \"$2\""
+        # run_args="$run_args --entrypoint $2" ; shift
         shift
-        shift
-        img_args="$@"
+        img_args="$*"
         return
         ;;
       PYENV_ROOT | HOME | PATH)
@@ -28,4 +27,5 @@ function parse_args {
 
 parse_args "$@"
 
-exec $_DOCKER_BIN_ run --rm --volume $(pwd):/sandbox --workdir /sandbox $run_args $_DOCKER_IMAGE_ $img_args
+# shellcheck disable=SC2086
+exec "$_DOCKER_BIN_" run --rm --volume "$(pwd):/sandbox" --workdir /sandbox $run_args "$_DOCKER_IMAGE_" $img_args
