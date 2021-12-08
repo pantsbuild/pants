@@ -114,13 +114,9 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
-    def to_requirement_coordinate(self, coord: Coordinate) -> RequirementCoordinate:
+    def to_requirement_coordinate(self) -> RequirementCoordinate:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
-        return RequirementCoordinate(
-            group=self.group,
-            artifact=self.artifact,
-            version=self.version,
-        )
+        return RequirementCoordinate(coordinate=self)
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
@@ -139,10 +135,7 @@ class RequirementCoordinate:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""
 
-    group: str
-    artifact: str
-    version: str
-    # `packaging` is not set at `jvm_artifact` level so doesn't make sense here?
+    coordinate: Coordinate
 
     url: str | None = None
     jar: str | None = None
@@ -188,12 +181,11 @@ class RequirementCoordinate:
             )
 
         return RequirementCoordinate(
-            group=group, artifact=artifact, version=version, url=url, jar=jar
+            coordinate=Coordinate(group=group, artifact=artifact, version=version), url=url, jar=jar
         )
 
-
     def to_coord_str(self, versioned: bool = True) -> str:
-        without_url = self.to_coordinate().to_coord_str(versioned)
+        without_url = self.coordinate.to_coord_str(versioned)
         if self.url:
             url_suffix = f",url={url_quote_plus(self.url)}"
         return f"{without_url}{url_suffix}"
@@ -219,16 +211,6 @@ class RequirementCoordinate:
             # Coursier requires exact URL
             url=f"file:{Coursier.working_directory_placeholder}/{rel_path}",
         )
-
-    def to_coordinate(self) -> Coordinate:
-        """Converts a `RequirementCoordinate` to a `Coordinate`.
-
-        Note that this will discard `url` and `jar` information, so it's generally not a good idea
-        to use this.
-        """
-
-        return Coordinate(self.group, self.artifact, self.version)
-
 
 
 class RequirementCoordinates(DeduplicatedCollection[RequirementCoordinate]):
@@ -577,9 +559,7 @@ async def fetch_with_coursier(
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
         request.resolve,
-        Coordinate.from_requirement_coordinate(
-            RequirementCoordinate.from_jvm_artifact_target(request.component.representative)
-        ),
+        RequirementCoordinate.from_jvm_artifact_target(request.component.representative).coordinate,
     )
 
     classpath_entries = await MultiGet(
