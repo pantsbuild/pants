@@ -10,7 +10,8 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Iterable, Iterator, List
+from itertools import chain
+from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -30,7 +31,6 @@ from pants.engine.fs import (
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    AllTargets,
     InvalidTargetException,
     Target,
     Targets,
@@ -58,7 +58,6 @@ from pants.jvm.target_types import (
     JvmCompatibleResolveNamesField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -138,7 +137,7 @@ class ArtifactRequirement:
     coordinate: Coordinate
 
     url: str | None = None
-    jar: str | None = None
+    jar: JvmArtifactJarSourceField | None = None
 
     @classmethod
     def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
@@ -167,7 +166,8 @@ class ArtifactRequirement:
             )
 
         url = target[JvmArtifactUrlField].value
-        jar = target[JvmArtifactJarSourceField].value
+        jar_ = target[JvmArtifactJarSourceField]
+        jar = jar_ if jar_.value else None
 
         if url and url.startswith("file:"):
             raise CoursierError(
@@ -190,49 +190,6 @@ class ArtifactRequirement:
         if self.url:
             url_suffix = f",url={url_quote_plus(self.url)}"
         return f"{without_url}{url_suffix}"
-
-    def to_url_coordinate_from_jar(
-        self,
-        rel_path: str,
-        working_directory_placeholder: str = Coursier.working_directory_placeholder,
-    ) -> ArtifactRequirement:
-        """Returns an `ArtifactRequirement` with `jar` field set into one with a `url` field set,
-        with a working directory placeholder in place.
-
-        Note that the `jar` field must have " "been used to materialize an actual JAR file
-        independently of calling this method.
-        """
-
-        if not self.jar:
-            raise CoursierError("`jar` must be set. TODO: more detail")
-
-        return dataclasses.replace(
-            self,
-            jar=None,
-            # Coursier requires exact URL
-            url=f"file:{working_directory_placeholder}/{rel_path}",
-        )
-
-
-@dataclass(frozen=True)
-class AllJarTargets:
-    """A dictionary of targets that provide JAR files, indexed by coordinate."""
-
-    by_coordinate: FrozenDict[ArtifactRequirement, Target]
-
-
-@rule
-async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
-    jars = [
-        tgt
-        for tgt in all_targets
-        if tgt.has_field(JvmArtifactJarSourceField)
-        and tgt[JvmArtifactJarSourceField].value is not None
-    ]
-    jars_by_coordinate = FrozenDict(
-        (ArtifactRequirement.from_jvm_artifact_target(tgt), tgt) for tgt in jars
-    )
-    return AllJarTargets(by_coordinate=jars_by_coordinate)
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
@@ -390,42 +347,42 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 
 @dataclass(frozen=True)
-class ArtifactRequirementsWithLocalFiles:
-    artifact_requirements: ArtifactRequirements
+class CoursierResolveInfo:
+    coord_strings: FrozenSet[str]
     digest: Digest
 
 
 @rule
-async def use_local_artifacts_where_possible(
-    input_requirements: ArtifactRequirements,
-    all_jars: AllJarTargets,
-) -> ArtifactRequirementsWithLocalFiles:
-    output: List[ArtifactRequirement] = []
-    further_processing: List[Target] = []
+async def prepare_coursier_resolve_info(
+    artifact_requirements: ArtifactRequirements,
+) -> CoursierResolveInfo:
+    # Transform requirements that correspond to local JAR files into coordinates with `file:/`
+    # URLs, and put the files in the place specified by the URLs.
+    no_jars: List[ArtifactRequirement] = []
+    jars: List[Tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
 
-    for req in input_requirements:
-        tgt = all_jars.by_coordinate.get(req)
-        if not tgt:
-            output.append(req)
+    for req in artifact_requirements:
+        jar = req.jar
+        if not jar:
+            no_jars.append(req)
         else:
-            further_processing.append(tgt)
+            jars.append((req, jar))
 
-    files = await Get(
-        SourceFiles,
-        SourceFilesRequest(tgt[JvmArtifactJarSourceField] for tgt in further_processing),
-    )
+    jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
+    jar_file_paths = jar_files.snapshot.files
 
-    for target, file in zip(further_processing, files.files):
-        coord = ArtifactRequirement.from_jvm_artifact_target(target)
-        coord = dataclasses.replace(
-            coord,
-            # coursier requires absolute url
-            url=f"file:{Coursier.working_directory_placeholder}/{file}",
+    resolvable_jar_requirements = [
+        dataclasses.replace(
+            req, jar=None, url=f"file:{Coursier.working_directory_placeholder}/{path}"
         )
-        output.append(coord)
+        for req, path in zip((i[0] for i in jars), jar_file_paths)
+    ]
 
-    return ArtifactRequirementsWithLocalFiles(
-        artifact_requirements=ArtifactRequirements(output), digest=files.snapshot.digest
+    to_resolve = chain(no_jars, resolvable_jar_requirements)
+
+    return CoursierResolveInfo(
+        coord_strings=frozenset(req.to_coord_str() for req in to_resolve),
+        digest=jar_files.snapshot.digest,
     )
 
 
@@ -462,15 +419,11 @@ async def coursier_resolve_lockfile(
     if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
-    # Transform requirements that correspond to local JAR files into coordinates with `file:/`
-    # URLs, and put the files in the place specified by the URLs.
-    artifacts_with_local_files = await Get(
-        ArtifactRequirementsWithLocalFiles, ArtifactRequirements, artifact_requirements
+    coursier_resolve_info = await Get(
+        CoursierResolveInfo, ArtifactRequirements, artifact_requirements
     )
-    artifact_requirements = artifacts_with_local_files.artifact_requirements
-    input_digest = await Get(
-        Digest, MergeDigests([artifacts_with_local_files.digest, coursier.digest])
-    )
+
+    input_digest = await Get(Digest, MergeDigests([coursier_resolve_info.digest, coursier.digest]))
 
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
@@ -479,7 +432,7 @@ async def coursier_resolve_lockfile(
             argv=coursier.args(
                 [
                     coursier_report_file_name,
-                    *(req.to_coord_str() for req in artifact_requirements),
+                    *coursier_resolve_info.coord_strings,
                     # TODO(#13496): Disable --strict-include to work around Coursier issue
                     # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
                     # artifact rules as malformed.
