@@ -144,11 +144,11 @@ async def setup_coursier(
         shift
 
         WORKING_DIRECTORY=$(pwd)
-        ARGS=$@
+        ARGS=$*
         ARGS=$(echo $ARGS | /usr/bin/sed 's|{Coursier.working_directory_placeholder}|'$WORKING_DIRECTORY'|g')
 
-        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" $(echo $ARGS)
 
+        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" $ARGS
         /bin/mkdir -p classpath
         {python.path} coursier_post_processing_script.py "$json_output_file"
         """
