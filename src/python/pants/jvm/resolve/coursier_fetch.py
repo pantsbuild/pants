@@ -10,9 +10,8 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Iterable, Iterator, List
+from typing import Any, Iterator, List
 from urllib.parse import quote_plus as url_quote_plus
-from urllib.parse import unquote as url_unquote
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -57,7 +56,6 @@ from pants.jvm.target_types import (
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
-    JvmRequirementsField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.frozendict import FrozenDict
@@ -77,14 +75,13 @@ class CoursierError(Exception):
 
 @dataclass(frozen=True)
 class Coordinate:
-    """A single Maven-style coordinate for a JVM dependency."""
+    """A single Maven-style coordinate for a JVM dependency that contains."""
 
     group: str
     artifact: str
     version: str
     packaging: str = "jar"
-    url: str | None = None
-    jar: Digest | None = None
+
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
     strict: bool = True
@@ -95,7 +92,6 @@ class Coordinate:
             group=data["group"],
             artifact=data["artifact"],
             version=data["version"],
-            url=data.get("url", None),
             packaging=data.get("packaging", "jar"),
         )
 
@@ -106,40 +102,56 @@ class Coordinate:
             "version": self.version,
             "packaging": self.packaging,
         }
-        if self.url:
-            ret["url"] = self.url
         return ret
 
     @classmethod
     def from_coord_str(cls, s: str) -> Coordinate:
-        # if there's a `url=` part, capture the URL after it (otherwise a no-op):
-        s, _, quoted_url = s.partition(",url=")
-        url = url_unquote(quoted_url)  # no effect if `quoted_url` is empty
-
         parts = s.split(":")
         return cls(
             group=parts[0],
             artifact=parts[1],
             version=parts[2],
             packaging=parts[3] if len(parts) == 4 else "jar",
-            url=url if url else None,
         )
+
+    @classmethod
+    def from_requirement_coordinate(cls, req_coord: RequirementCoordinate) -> Coordinate:
+        """Converts a `RequirementCoordinate` to a coordinate.
+
+        Note that this will discard `url` and `jar` information, so it's generally not a good idea
+        to use this.
+        """
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
         version_suffix = ""
-        url_suffix = ""
         if versioned:
             version_suffix = f":{self.version}"
-        if self.url:
-            url_suffix = f",url={url_quote_plus(self.url)}"
-        return f"{unversioned}{version_suffix}{url_suffix}"
+        return f"{unversioned}{version_suffix}"
 
-    @staticmethod
-    def from_jvm_artifact_target(target: Target) -> Coordinate:
+
+class Coordinates(DeduplicatedCollection[Coordinate]):
+    """An ordered list of `Coordinate`s."""
+
+
+@dataclass(frozen=True)
+class RequirementCoordinate:
+    """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
+    the dependency if it is not to be fetched from a Maven repository."""
+
+    group: str
+    artifact: str
+    version: str
+    # `packaging` is not set at `jvm_artifact` level so doesn't make sense here?
+
+    url: str | None = None
+    jar: str | None = None
+
+    @classmethod
+    def from_jvm_artifact_target(cls, target: Target) -> RequirementCoordinate:
         if not JvmArtifactFieldSet.is_applicable(target):
             raise CoursierError(
-                "`Coordinate.from_jvm_artifact_target()` only works on targets with "
+                "`RequirementCoordinate.from_jvm_artifact_target()` only works on targets with "
                 "`JvmArtifactFieldSet` fields present."
             )
 
@@ -162,6 +174,7 @@ class Coordinate:
             )
 
         url = target[JvmArtifactUrlField].value
+        jar = target[JvmArtifactJarSourceField].value
 
         if url and url.startswith("file:"):
             raise CoursierError(
@@ -169,11 +182,54 @@ class Coordinate:
                 "relative path to the local jar file."
             )
 
-        # These are all required, but mypy doesn't think so.
-        return Coordinate(group=group, artifact=artifact, version=version, url=url)
+        if url and jar:
+            raise CoursierError(
+                "You cannot specify both a `url` and `jar` for the same `jvm_artifact`."
+            )
+
+        return RequirementCoordinate(
+            group=group, artifact=artifact, version=version, url=url, jar=jar
+        )
+
+    @classmethod
+    def from_coordinate(cls, coord: Coordinate) -> RequirementCoordinate:
+        """Creates a `RequirementCoordinate` from a `Coordinate`."""
+        return cls(
+            group=coord.group,
+            artifact=coord.artifact,
+            version=coord.version,
+        )
+
+    def to_coord_str(self, versioned: bool = True) -> str:
+        without_url = Coordinate.from_requirement_coordinate(self).to_coord_str(versioned)
+        if self.url:
+            url_suffix = f",url={url_quote_plus(self.url)}"
+        return f"{without_url}{url_suffix}"
+
+    def to_url_coordinate_from_jar(
+        self,
+        rel_path: str,
+        working_directory_placeholder: str = Coursier.working_directory_placeholder,
+    ) -> RequirementCoordinate:
+        """Returns a `RequirementCoordinate` with `jar` field set into one with a `url` field set,
+        with a working directory placeholder in place.
+
+        Note that the `jar` field must have " "been used to materialize an actual JAR file
+        independently of calling this method.
+        """
+
+        if not self.jar:
+            raise CoursierError("`jar` must be set. TODO: more detail")
+
+        return dataclasses.replace(
+            self,
+            jar=None,
+            # Coursier requires exact URL
+            url=f"file:{Coursier.working_directory_placeholder}/{rel_path}",
+        )
 
 
-class Coordinates(DeduplicatedCollection[Coordinate]):
+class RequirementCoordinates(DeduplicatedCollection[RequirementCoordinate]):
     """An ordered list of `Coordinate`s."""
 
 
@@ -181,7 +237,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
 class AllJarTargets:
     """A dictionary of targets that provide JAR files, indexed by coordinate."""
 
-    by_coordinate: FrozenDict[Coordinate, Target]
+    by_coordinate: FrozenDict[RequirementCoordinate, Target]
 
 
 @rule
@@ -192,12 +248,14 @@ async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
         if tgt.has_field(JvmArtifactJarSourceField)
         and tgt[JvmArtifactJarSourceField].value is not None
     ]
-    jars_by_coordinate = FrozenDict((Coordinate.from_jvm_artifact_target(tgt), tgt) for tgt in jars)
+    jars_by_coordinate = FrozenDict(
+        (RequirementCoordinate.from_jvm_artifact_target(tgt), tgt) for tgt in jars
+    )
     return AllJarTargets(by_coordinate=jars_by_coordinate)
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
-class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
+class ArtifactRequirements(DeduplicatedCollection[RequirementCoordinate]):
     """An ordered list of Coordinates used as requirements."""
 
 
@@ -357,7 +415,7 @@ async def use_local_artifacts_where_possible(
     input_requirements: ArtifactRequirements,
     all_jars: AllJarTargets,
 ) -> ArtifactRequirementsWithLocalFiles:
-    output: List[Coordinate] = []
+    output: List[RequirementCoordinate] = []
     further_processing: List[Target] = []
 
     for req in input_requirements:
@@ -373,7 +431,7 @@ async def use_local_artifacts_where_possible(
     )
 
     for target, file in zip(further_processing, files.files):
-        coord = Coordinate.from_jvm_artifact_target(target)
+        coord = RequirementCoordinate.from_jvm_artifact_target(target)
         coord = dataclasses.replace(
             coord,
             # coursier requires absolute url
@@ -516,7 +574,10 @@ async def fetch_with_coursier(
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
-        request.resolve, Coordinate.from_jvm_artifact_target(request.component.representative)
+        request.resolve,
+        Coordinate.from_requirement_coordinate(
+            RequirementCoordinate.from_jvm_artifact_target(request.component.representative)
+        ),
     )
 
     classpath_entries = await MultiGet(

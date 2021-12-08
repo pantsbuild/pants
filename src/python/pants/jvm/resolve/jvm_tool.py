@@ -28,8 +28,9 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
-    Coordinates,
     CoursierResolvedLockfile,
+    RequirementCoordinate,
+    RequirementCoordinates,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
@@ -235,9 +236,11 @@ async def generate_lockfiles_goal(
 
 
 @rule
-async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesRequest) -> Coordinates:
+async def gather_coordinates_for_jvm_lockfile(
+    request: GatherJvmCoordinatesRequest,
+) -> RequirementCoordinates:
     # Separate `artifact_inputs` by whether the strings parse as an `Address` or not.
-    coordinates: set[Coordinate] = set()
+    coordinates: set[RequirementCoordinate] = set()
     candidate_address_inputs: set[AddressInput] = set()
     bad_artifact_inputs = []
     for artifact_input in request.artifact_inputs:
@@ -245,7 +248,9 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
         # group name is a file on disk.
         if 2 <= artifact_input.count(":") <= 3:
             try:
-                maybe_coord = Coordinate.from_coord_str(artifact_input)
+                maybe_coord = RequirementCoordinate.from_coordinate(
+                    Coordinate.from_coord_str(artifact_input)
+                )
                 coordinates.add(maybe_coord)
                 continue
             except Exception:
@@ -270,7 +275,7 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
     other_targets = []
     for tgt in all_supplied_targets:
         if JvmArtifactFieldSet.is_applicable(tgt):
-            coordinates.add(Coordinate.from_jvm_artifact_target(tgt))
+            coordinates.add(RequirementCoordinate.from_jvm_artifact_target(tgt))
         else:
             other_targets.append(tgt)
 
@@ -281,7 +286,7 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
             f"option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}."
         )
 
-    return Coordinates(coordinates)
+    return RequirementCoordinates(coordinates)
 
 
 @rule
@@ -314,7 +319,7 @@ async def generate_jvm_lockfile(
     request: JvmToolLockfileRequest,
 ) -> JvmToolLockfile:
     coordinates = await Get(
-        Coordinates,
+        RequirementCoordinates,
         GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
     )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements(coordinates))

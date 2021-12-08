@@ -24,9 +24,9 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
-    Coordinate,
     CoursierError,
     CoursierResolvedLockfile,
+    RequirementCoordinate,
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolveNamesField
@@ -137,7 +137,7 @@ async def coursier_generate_lockfile(
     ]
 
     artifact_requirements = ArtifactRequirements(
-        [Coordinate.from_jvm_artifact_target(tgt) for tgt in resolvable_dependencies]
+        [RequirementCoordinate.from_jvm_artifact_target(tgt) for tgt in resolvable_dependencies]
     )
 
     resolved_lockfile = await Get(
