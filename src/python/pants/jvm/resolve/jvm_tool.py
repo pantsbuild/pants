@@ -25,7 +25,6 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
-from pants.jvm.goals.coursier import coordinate_from_target
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -271,7 +270,7 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
     other_targets = []
     for tgt in all_supplied_targets:
         if JvmArtifactFieldSet.is_applicable(tgt):
-            coordinates.add(coordinate_from_target(tgt))
+            coordinates.add(Coordinate.from_jvm_artifact_target(tgt))
         else:
             other_targets.append(tgt)
 

@@ -21,14 +21,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import (
-    AllTargets,
-    InvalidTargetException,
-    Target,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import AllTargets, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirements,
     Coordinate,
@@ -36,14 +29,7 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import (
-    JvmArtifactArtifactField,
-    JvmArtifactFieldSet,
-    JvmArtifactGroupField,
-    JvmArtifactUrlField,
-    JvmArtifactVersionField,
-    JvmCompatibleResolveNamesField,
-)
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolveNamesField
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
@@ -64,35 +50,6 @@ class CoursierResolveSubsystem(GoalSubsystem):
 
 class CoursierResolve(Goal):
     subsystem_cls = CoursierResolveSubsystem
-
-
-def coordinate_from_target(tgt: Target) -> Coordinate:
-    group = tgt[JvmArtifactGroupField].value
-    if not group:
-        raise InvalidTargetException(
-            f"The `group` field of {tgt.alias} target {tgt.address} must be set."
-        )
-
-    artifact = tgt[JvmArtifactArtifactField].value
-    if not artifact:
-        raise InvalidTargetException(
-            f"The `artifact` field of {tgt.alias} target {tgt.address} must be set."
-        )
-
-    version = tgt[JvmArtifactVersionField].value
-    if not version:
-        raise InvalidTargetException(
-            f"The `version` field of {tgt.alias} target {tgt.address} must be set."
-        )
-
-    url = tgt[JvmArtifactUrlField].value
-
-    return Coordinate(
-        group=group,
-        artifact=artifact,
-        version=version,
-        url=url,
-    )
 
 
 @dataclass(frozen=True)
@@ -180,7 +137,7 @@ async def coursier_generate_lockfile(
     ]
 
     artifact_requirements = ArtifactRequirements(
-        [coordinate_from_target(tgt) for tgt in resolvable_dependencies]
+        [Coordinate.from_jvm_artifact_target(tgt) for tgt in resolvable_dependencies]
     )
 
     resolved_lockfile = await Get(

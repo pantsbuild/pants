@@ -32,6 +32,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
+    InvalidTargetException,
     Target,
     Targets,
     TransitiveTargets,
@@ -83,6 +84,7 @@ class Coordinate:
     version: str
     packaging: str = "jar"
     url: str | None = None
+    jar: Digest | None = None
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
     strict: bool = True
@@ -142,8 +144,23 @@ class Coordinate:
             )
 
         group = target[JvmArtifactGroupField].value
+        if not group:
+            raise InvalidTargetException(
+                f"The `group` field of {target.alias} target {target.address} must be set."
+            )
+
         artifact = target[JvmArtifactArtifactField].value
+        if not artifact:
+            raise InvalidTargetException(
+                f"The `artifact` field of {target.alias} target {target.address} must be set."
+            )
+
         version = target[JvmArtifactVersionField].value
+        if not version:
+            raise InvalidTargetException(
+                f"The `version` field of {target.alias} target {target.address} must be set."
+            )
+
         url = target[JvmArtifactUrlField].value
 
         if url and url.startswith("file:"):
@@ -153,7 +170,6 @@ class Coordinate:
             )
 
         # These are all required, but mypy doesn't think so.
-        assert group is not None and artifact is not None and version is not None
         return Coordinate(group=group, artifact=artifact, version=version, url=url)
 
 
