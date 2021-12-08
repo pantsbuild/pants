@@ -6,7 +6,7 @@ backends.
 
 Usage:
 
-    $ ./pants --backend-packages=pants.backend.plugin_development.tools check-names > apply-fixes-script.sh
+    $ ./pants --backend-packages=pants.backend.plugin_development.tools check-names --fix > apply-fixes-script.sh
 
 
 Implemented checks:
@@ -16,17 +16,18 @@ Implemented checks:
 """
 
 from __future__ import annotations
+
 import platform
+from dataclasses import dataclass, field
 from typing import Iterator, Sequence, cast
-from dataclasses import dataclass
+
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Field
-from pants.source.source_root import AllSourceRoots
 from pants.option.global_options import GlobalOptions
+from pants.source.source_root import AllSourceRoots
 from pants.util.strutil import bullet_list
-
 
 _SED_REGEXP_WORD_BOUNDARIES = {
     "Darwin": {
@@ -54,14 +55,20 @@ class CheckNamesSubsystem(GoalSubsystem):
             "--sed-begin-word-boundary",
             type=str,
             default=_SED_REGEXP_WORD_BOUNDARIES[system]["begin"],
-            help="The appropriate reg exp to use for `sed` to detect beginning of word boundaries."
+            help="The appropriate reg exp to use for `sed` to detect beginning of word boundaries.",
         )
 
         register(
             "--sed-end-word-boundary",
             type=str,
             default=_SED_REGEXP_WORD_BOUNDARIES[system]["end"],
-            help="The appropriate reg exp to use for `sed` to detect ending of word boundaries."
+            help="The appropriate reg exp to use for `sed` to detect ending of word boundaries.",
+        )
+
+        register(
+            "--fix",
+            type=bool,
+            help="Generates a 'apply fixes' script on stdout.",
         )
 
     @property
@@ -72,18 +79,36 @@ class CheckNamesSubsystem(GoalSubsystem):
     def end_word_regexp(self) -> str:
         return cast(str, self.options.sed_end_word_boundary)
 
+    @property
+    def fix(self) -> bool:
+        return cast(bool, self.options.fix)
+
 
 class CheckNames(Goal):
     subsystem_cls = CheckNamesSubsystem
 
 
-@dataclass(frozen=True)
+@dataclass
 class Context:
     console: Console
     options: CheckNamesSubsystem
-    
-    def output(self, info: str, script: str|None = None) -> None:
+    output_script: bool = field(init=False)
+
+    def __post_init__(self):
+        self.output_script = self.options.fix
+        if self.output_script:
+            self.console.print_stderr("Generating 'apply fixes' script on stdout")
+        else:
+            self.console.print_stdout(
+                "## Hint: use `--fix` to generate a script that can be executed to apply the "
+                "suggested corrections."
+            )
+
+    def output(self, info: str, script: str | None = None) -> None:
         self.console.print_stderr(info)
+        if not self.output_script:
+            return
+
         if script is None:
             self.console.print_stdout(f"\n# {info}")
         else:
@@ -91,17 +116,24 @@ class Context:
 
 
 @goal_rule
-async def check_names(console: Console, subsystem: CheckNamesSubsystem, asr: AllSourceRoots, global_options: GlobalOptions) -> CheckNames:
+async def check_names(
+    console: Console,
+    subsystem: CheckNamesSubsystem,
+    asr: AllSourceRoots,
+    global_options: GlobalOptions,
+) -> CheckNames:
     backends = bullet_list(global_options.options.backend_packages)
     src_roots = " ".join(src_root.path or "." for src_root in asr)
     ctx = Context(console, subsystem)
     ctx.output(
         f"Checking code loaded for these backends:\n{backends}",
-        (
-            "#!/usr/bin/env bash\n"
-            "set -eufo pipefail\n"
-            f"SOURCE_ROOTS={src_roots!r}\n"
-        )
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -eufo pipefail",
+                f"SOURCE_ROOTS={src_roots!r}\n",
+            ]
+        ),
     )
 
     exit_code = check_field_names(ctx)
@@ -118,7 +150,10 @@ async def check_names(console: Console, subsystem: CheckNamesSubsystem, asr: All
 
 
 def get_subclass_suffix_replacements(
-    base_class: type, *replace_suffix: tuple[str, str], valid_suffixes: Sequence[str], default_suffix: str
+    base_class: type,
+    *replace_suffix: tuple[str, str],
+    valid_suffixes: Sequence[str],
+    default_suffix: str,
 ) -> Iterator[tuple[str, str, str]]:
     for cls in base_class.__subclasses__():
         for suffix in valid_suffixes:
@@ -133,7 +168,9 @@ def get_subclass_suffix_replacements(
             else:
                 replacement = default_suffix
             yield cls.__name__, cls.__module__, cls.__name__[:strip] + replacement
-        yield from get_subclass_suffix_replacements(cls, *replace_suffix, valid_suffixes=valid_suffixes, default_suffix=default_suffix)
+        yield from get_subclass_suffix_replacements(
+            cls, *replace_suffix, valid_suffixes=valid_suffixes, default_suffix=default_suffix
+        )
 
 
 def check_field_names(ctx: Context) -> int:
@@ -142,12 +179,12 @@ def check_field_names(ctx: Context) -> int:
         (
             "# Fix field class names\n"
             "cat <<EOF | sed -f - -i '' $(find $SOURCE_ROOTS -name \\*.py)"
-        )
+        ),
     )
     exit_code = 0
     seen = set()
     for class_name, module, new_class_name in get_subclass_suffix_replacements(
-            Field, ("Bases", "Base"), valid_suffixes=("Field", "Base", "Mixin"), default_suffix="Field"
+        Field, ("Bases", "Base"), valid_suffixes=("Field", "Base", "Mixin"), default_suffix="Field"
     ):
         if class_name in seen:
             continue
@@ -158,7 +195,7 @@ def check_field_names(ctx: Context) -> int:
         )
         ctx.output(
             f"  * Rename: {module}.{class_name} => {new_class_name}",
-            f"s/{class_name_regexp}/{new_class_name}/g"
+            f"s/{class_name_regexp}/{new_class_name}/g",
         )
         exit_code = 1
 
