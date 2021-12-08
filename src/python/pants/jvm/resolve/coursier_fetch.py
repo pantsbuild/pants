@@ -15,6 +15,7 @@ from urllib.parse import quote_plus as url_quote_plus
 from urllib.parse import unquote as url_unquote
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,

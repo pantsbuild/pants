@@ -6,6 +6,7 @@ from __future__ import annotations
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
+    SingleSourceField,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
