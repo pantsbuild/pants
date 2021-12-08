@@ -200,20 +200,6 @@ async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
 class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
     """An ordered list of Coordinates used as requirements."""
 
-    @classmethod
-    def create_from_maven_coordinates_fields(
-        cls,
-        fields: Iterable[JvmRequirementsField],
-        *,
-        additional_requirements: Iterable[Coordinate] = (),
-    ) -> ArtifactRequirements:
-        field_requirements = (
-            Coordinate.from_coord_str(str(maven_coord))
-            for field in fields
-            for maven_coord in (field.value or ())
-        )
-        return ArtifactRequirements((*field_requirements, *additional_requirements))
-
 
 @dataclass(frozen=True)
 class CoursierLockfileEntry:
