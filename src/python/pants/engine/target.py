@@ -2218,7 +2218,7 @@ class InferredDependencies:
         return iter(self.dependencies)
 
 
-class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
+class SpecialCasedDependenciesField(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
 

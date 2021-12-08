@@ -39,7 +39,7 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    SpecialCasedDependencies,
+    SpecialCasedDependenciesField,
     StringField,
     Target,
     Targets,
@@ -139,13 +139,13 @@ async def generate_targets_from_files(
 # -----------------------------------------------------------------------------------------------
 
 
-class RelocatedFilesSources(MultipleSourcesField):
+class RelocatedFilesSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
     expected_num_files = 0
 
 
-class RelocatedFilesOriginalTargets(SpecialCasedDependencies):
+class RelocatedFilesOriginalTargetsField(SpecialCasedDependenciesField):
     alias = "files_targets"
     required = True
     help = (
@@ -179,8 +179,8 @@ class RelocatedFiles(Target):
     alias = "relocated_files"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        RelocatedFilesSources,
-        RelocatedFilesOriginalTargets,
+        RelocatedFilesSourcesField,
+        RelocatedFilesOriginalTargetsField,
         RelocatedFilesSrcField,
         RelocatedFilesDestField,
     )
@@ -223,7 +223,7 @@ class RelocatedFiles(Target):
 
 
 class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
-    input = RelocatedFilesSources
+    input = RelocatedFilesSourcesField
     output = FileSourceField
     exportable = False
 
@@ -239,7 +239,9 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     original_file_targets = await Get(
         Targets,
         UnparsedAddressInputs,
-        request.protocol_target.get(RelocatedFilesOriginalTargets).to_unparsed_address_inputs(),
+        request.protocol_target.get(
+            RelocatedFilesOriginalTargetsField
+        ).to_unparsed_address_inputs(),
     )
     original_files_sources = await MultiGet(
         Get(
@@ -365,7 +367,7 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ArchivePackages(SpecialCasedDependencies):
+class ArchivePackagesField(SpecialCasedDependenciesField):
     alias = "packages"
     help = (
         "Addresses to any targets that can be built with `./pants package`, e.g. "
@@ -377,7 +379,7 @@ class ArchivePackages(SpecialCasedDependencies):
     )
 
 
-class ArchiveFiles(SpecialCasedDependencies):
+class ArchiveFilesField(SpecialCasedDependenciesField):
     alias = "files"
     help = (
         "Addresses to any `file`, `files`, or `relocated_files` targets to include in the "
@@ -405,8 +407,8 @@ class ArchiveTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        ArchivePackages,
-        ArchiveFiles,
+        ArchivePackagesField,
+        ArchiveFilesField,
         ArchiveFormatField,
     )
     help = "A ZIP or TAR file containing loose files and code packages."
@@ -416,8 +418,8 @@ class ArchiveTarget(Target):
 class ArchiveFieldSet(PackageFieldSet):
     required_fields = (ArchiveFormatField,)
 
-    packages: ArchivePackages
-    files: ArchiveFiles
+    packages: ArchivePackagesField
+    files: ArchiveFilesField
     format_field: ArchiveFormatField
     output_path: OutputPathField
 

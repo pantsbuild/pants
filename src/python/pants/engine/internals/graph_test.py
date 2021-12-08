@@ -67,7 +67,7 @@ from pants.engine.target import (
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
-    SpecialCasedDependencies,
+    SpecialCasedDependenciesField,
     StringField,
     Tags,
     Target,
@@ -90,11 +90,11 @@ class MockDependencies(Dependencies):
     deprecated_alias_removal_version = "9.9.9.dev0"
 
 
-class SpecialCasedDeps1(SpecialCasedDependencies):
+class SpecialCasedDeps1(SpecialCasedDependenciesField):
     alias = "special_cased_deps1"
 
 
-class SpecialCasedDeps2(SpecialCasedDependencies):
+class SpecialCasedDeps2(SpecialCasedDependenciesField):
     alias = "special_cased_deps2"
 
 
@@ -265,8 +265,8 @@ def test_transitive_targets_transitive_exclude(transitive_targets_rule_runner: R
 
 
 def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) -> None:
-    """Test that subclasses of `SpecialCasedDependencies` show up if requested, but otherwise are
-    left off.
+    """Test that subclasses of `SpecialCasedDependenciesField` show up if requested, but otherwise
+    are left off.
 
     This uses the same test setup as `test_transitive_targets`, but does not use the `dependencies`
     field like normal.

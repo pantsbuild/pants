@@ -6,7 +6,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     DictStringToStringField,
     MultipleSourcesField,
-    SpecialCasedDependencies,
+    SpecialCasedDependenciesField,
     StringField,
     Target,
 )
@@ -36,7 +36,7 @@ class DebianInstallPrefix(StringField):
     help = "Absolute path to a directory where Debian package will be installed to."
 
 
-class DebianPackageDependencies(SpecialCasedDependencies):
+class DebianPackageDependencies(SpecialCasedDependenciesField):
     alias = "packages"
     required = True
     help = (

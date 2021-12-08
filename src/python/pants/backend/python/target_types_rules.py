@@ -20,9 +20,9 @@ from pants.backend.python.dependency_inference.rules import PythonInferSubsystem
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.target_types import (
     EntryPoint,
-    PexBinaryDependencies,
+    PexBinaryDependenciesField,
     PexEntryPointField,
-    PythonDistributionDependencies,
+    PythonDistributionDependenciesField,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
@@ -239,7 +239,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
 
 
 class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
-    inject_for = PexBinaryDependencies
+    inject_for = PexBinaryDependenciesField
 
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
@@ -413,7 +413,7 @@ async def resolve_python_distribution_entry_points(
 
 
 class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependencies
+    inject_for = PythonDistributionDependenciesField
 
 
 @rule
