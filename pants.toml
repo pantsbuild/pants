@@ -213,6 +213,9 @@ version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 [scala-infer]
 force_add_siblings_as_dependencies = false
 
+[ammonite]
+lockfile = "src/python/pants/backend/scala/goals/ammonite.default.lockfile.txt"
+
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"

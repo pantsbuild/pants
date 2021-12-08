@@ -1,0 +1,3322 @@
+[
+    {
+        "coord": {
+            "group": "ch.epfl.scala",
+            "artifact": "bsp4j",
+            "version": "2.0.0-M6",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.generator",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.generator",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "ch.epfl.scala_bsp4j_2.0.0-M6.jar",
+        "file_digest": {
+            "fingerprint": "0cbbbf176f79ce2e008999d6ae14abc810eb72c83a7cb3587664ac9243977ec8",
+            "serialized_bytes_length": 109332
+        }
+    },
+    {
+        "coord": {
+            "group": "com.github.javaparser",
+            "artifact": "javaparser-core",
+            "version": "3.2.5",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.github.javaparser_javaparser-core_3.2.5.jar",
+        "file_digest": {
+            "fingerprint": "980ea72583d788703fa3e35a91c60a019059595955a76f5f3afba94f502d64e1",
+            "serialized_bytes_length": 861986
+        }
+    },
+    {
+        "coord": {
+            "group": "com.google.code.gson",
+            "artifact": "gson",
+            "version": "2.8.2",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.google.code.gson_gson_2.8.2.jar",
+        "file_digest": {
+            "fingerprint": "b7134929f7cc7c04021ec1cc27ef63ab907e410cf0588e397b8851181eb91092",
+            "serialized_bytes_length": 232932
+        }
+    },
+    {
+        "coord": {
+            "group": "com.google.guava",
+            "artifact": "guava",
+            "version": "21.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.google.guava_guava_21.0.jar",
+        "file_digest": {
+            "fingerprint": "972139718abc8a4893fa78cba8cf7b2c903f35c97aaf44fa3031b0669948b480",
+            "serialized_bytes_length": 2521113
+        }
+    },
+    {
+        "coord": {
+            "group": "com.google.protobuf",
+            "artifact": "protobuf-java",
+            "version": "3.15.8",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.google.protobuf_protobuf-java_3.15.8.jar",
+        "file_digest": {
+            "fingerprint": "8d0e2f9834f4fc1a083a65239adc507ca83682c754a27f4c80e4f21990eff686",
+            "serialized_bytes_length": 1674945
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-compiler-interface_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-compiler-interface_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "3abef7cb7907af7cc1ef819cb507d805c53b8843705377574081abf4ba8fac55",
+            "serialized_bytes_length": 37000
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-compiler_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.github.javaparser",
+                "artifact": "javaparser-core",
+                "version": "3.2.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-compiler",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "scalaparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.javassist",
+                "artifact": "javassist",
+                "version": "3.21.0-GA",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.github.javaparser",
+                "artifact": "javaparser-core",
+                "version": "3.2.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-compiler",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "scalaparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline",
+                "version": "3.19.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.javassist",
+                "artifact": "javassist",
+                "version": "3.21.0-GA",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-compiler_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "453f6605e9708f72ee038baf6b3c90282df01dced350abd8047e9ab8b3d81cca",
+            "serialized_bytes_length": 393843
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-interp-api_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-interp-api_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "07108dc73b922bb4853b8ced73c9143665d09cc95e29c922737c77e154392479",
+            "serialized_bytes_length": 26397
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-interp_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "trees_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "ch.epfl.scala",
+                "artifact": "bsp4j",
+                "version": "2.0.0-M6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "requests_2.13",
+                "version": "0.6.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.generator",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "trees_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "common_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "ch.epfl.scala",
+                "artifact": "bsp4j",
+                "version": "2.0.0-M6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "fastparse-v2_2.13",
+                "version": "2.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-interp_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "4ff34e435d395c130b5824738f325cd5eb72bb3142f4c55f8c0e0ed9c3f0e516",
+            "serialized_bytes_length": 239241
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-ops_2.13",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-ops_2.13_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "1a9dcc0cd3a11c1b7b42bc11d8397b403cea6d25f78051a89c23b6480d5719b6",
+            "serialized_bytes_length": 131442
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-repl-api_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-repl-api_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "f7460afdbc7bf748e5160bfcab4e4106a6a43d46d0fc837ceb9203402022d9bb",
+            "serialized_bytes_length": 81234
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-repl_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-reader",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-terminal_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal-jna",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "requests_2.13",
+                "version": "0.6.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.generator",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "trees_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "common_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-reader",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "ch.epfl.scala",
+                "artifact": "bsp4j",
+                "version": "2.0.0-M6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "fastparse-v2_2.13",
+                "version": "2.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-terminal_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal-jna",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-repl_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "86c91a9e7a841ba79f7ba19e0e8d0fd81d815b321174a3dc673e3ba6b327fcb8",
+            "serialized_bytes_length": 106207
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-runtime_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "requests_2.13",
+                "version": "0.6.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "requests_2.13",
+                "version": "0.6.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-runtime_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "3965002e1c71dc486a6f267e67b09186393adf5c49f75f9bde465a0e4390d4cc",
+            "serialized_bytes_length": 193191
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-terminal_2.13",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-terminal_2.13_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "57ad290e9fa4e53523648329fb07365bac6eefc4caecbfde17bc1a7d91baf7d8",
+            "serialized_bytes_length": 179544
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite-util_2.13",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite-util_2.13_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "cfe4f95eb7a3db4757fce8200d4e02aa5fc12a4faa121033a20d70782f36b208",
+            "serialized_bytes_length": 139489
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ammonite_2.13.6",
+            "version": "2.4.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-terminal_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "io.get-coursier",
+                "artifact": "interface",
+                "version": "0.0.21",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.github.javaparser",
+                "artifact": "javaparser-core",
+                "version": "3.2.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-compiler",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-ops_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "mainargs_2.13",
+                "version": "0.2.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "scalaparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-xml_2.13",
+                "version": "2.0.0-M3",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "requests_2.13",
+                "version": "0.6.5",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.generator",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "os-lib_2.13",
+                "version": "0.7.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "trees_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "common_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-util_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-interp-api_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-reader",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "ch.epfl.scala",
+                "artifact": "bsp4j",
+                "version": "2.0.0-M6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline",
+                "version": "3.19.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "fastparse-v2_2.13",
+                "version": "2.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-terminal_2.13",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "pprint_2.13",
+                "version": "0.6.6",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.javassist",
+                "artifact": "javassist",
+                "version": "3.21.0-GA",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal-jna",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-compiler-interface_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-repl_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ammonite-runtime_2.13.6",
+                "version": "2.4.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ammonite_2.13.6_2.4.1.jar",
+        "file_digest": {
+            "fingerprint": "5cbe549cdaf366d42947055f88ddae05b67464b54e083d63170b321417c87ffc",
+            "serialized_bytes_length": 165187
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "fansi_2.13",
+            "version": "0.2.14",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_fansi_2.13_0.2.14.jar",
+        "file_digest": {
+            "fingerprint": "250014f81c734b9f5bb8ffc92cfad42c2425ffd8d60fa27e0828adf07483ebfb",
+            "serialized_bytes_length": 65403
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "fastparse_2.13",
+            "version": "2.3.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_fastparse_2.13_2.3.0.jar",
+        "file_digest": {
+            "fingerprint": "74b8635408547d5a611c6462b65ef0ef82f53f0c8d4296903fb33f6cf2f41980",
+            "serialized_bytes_length": 317572
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "geny_2.13",
+            "version": "0.6.10",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.lihaoyi_geny_2.13_0.6.10.jar",
+        "file_digest": {
+            "fingerprint": "15ab2c6540b6990bf1eb407def01b0ccebeb805951e7eccb00ddbff707f9723c",
+            "serialized_bytes_length": 85388
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "mainargs_2.13",
+            "version": "0.2.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_mainargs_2.13_0.2.0.jar",
+        "file_digest": {
+            "fingerprint": "769df12c9d03603af2ed34844fe1ce0b5ce229f9a137fbe453a0a0fa34e09063",
+            "serialized_bytes_length": 219308
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "os-lib_2.13",
+            "version": "0.7.2",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_os-lib_2.13_0.7.2.jar",
+        "file_digest": {
+            "fingerprint": "85c4e1826191260bcc8ce29487226d419cac0f3fede22671eac24834db018f66",
+            "serialized_bytes_length": 331309
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "pprint_2.13",
+            "version": "0.6.6",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fansi_2.13",
+                "version": "0.2.14",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_pprint_2.13_0.6.6.jar",
+        "file_digest": {
+            "fingerprint": "c4f89810da70c3100b52458a85f8d520f54243e05047b98e829e2473f0092283",
+            "serialized_bytes_length": 165433
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "requests_2.13",
+            "version": "0.6.5",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_requests_2.13_0.6.5.jar",
+        "file_digest": {
+            "fingerprint": "b7d7ce0ec836dbfb9b168eaa4e17f7e02bc4d0df80ab8e61bd44185b06579f57",
+            "serialized_bytes_length": 119545
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "scalaparse_2.13",
+            "version": "2.3.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "fastparse_2.13",
+                "version": "2.3.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_scalaparse_2.13_2.3.0.jar",
+        "file_digest": {
+            "fingerprint": "2f377b515c85448f2e8a2e9c56d4b8bd5b3a0d3e8d195c21f357cf0d5e8756ac",
+            "serialized_bytes_length": 411986
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "sourcecode_2.13",
+            "version": "0.2.7",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "com.lihaoyi_sourcecode_2.13_0.2.7.jar",
+        "file_digest": {
+            "fingerprint": "a639a90e2d21bbafd8a5e213c65442aad200ee086951605cbda8835bc6ef11d3",
+            "serialized_bytes_length": 118671
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "ujson_2.13",
+            "version": "1.4.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_ujson_2.13_1.4.0.jar",
+        "file_digest": {
+            "fingerprint": "7994a694cc85d98b5e6ff11762edb15bbc60dcef415d826f8a32682c2a39066e",
+            "serialized_bytes_length": 200531
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "upack_2.13",
+            "version": "1.4.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_upack_2.13_1.4.0.jar",
+        "file_digest": {
+            "fingerprint": "149ab70dfa33437114d2c5dbbeb62fa8fdd970da867f045fb702d12c4ae05a21",
+            "serialized_bytes_length": 108430
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "upickle-core_2.13",
+            "version": "1.4.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_upickle-core_2.13_1.4.0.jar",
+        "file_digest": {
+            "fingerprint": "abe25b644576e520289236dc686d41b6595632e9e1453d1e2e5e1e76b52caccc",
+            "serialized_bytes_length": 169549
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "upickle-implicits_2.13",
+            "version": "1.4.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_upickle-implicits_2.13_1.4.0.jar",
+        "file_digest": {
+            "fingerprint": "f10d302c6f2f12aeaacb20688f0da9c99aa867bd18032fa2d6c90f0564d124bf",
+            "serialized_bytes_length": 182710
+        }
+    },
+    {
+        "coord": {
+            "group": "com.lihaoyi",
+            "artifact": "upickle_2.13",
+            "version": "1.4.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-core_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "ujson_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upack_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "upickle-implicits_2.13",
+                "version": "1.4.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.lihaoyi_upickle_2.13_1.4.0.jar",
+        "file_digest": {
+            "fingerprint": "1498b3977a6a840817f1823b72a37bf4e544f05176171427edcf65fd9780a5a0",
+            "serialized_bytes_length": 100295
+        }
+    },
+    {
+        "coord": {
+            "group": "com.thesamet.scalapb",
+            "artifact": "lenses_2.13",
+            "version": "0.11.4",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.thesamet.scalapb_lenses_2.13_0.11.4.jar",
+        "file_digest": {
+            "fingerprint": "18943a007752b150ae45f27e901c34f0e92009304f2f804ef156ab3056d79874",
+            "serialized_bytes_length": 34801
+        }
+    },
+    {
+        "coord": {
+            "group": "com.thesamet.scalapb",
+            "artifact": "scalapb-runtime_2.13",
+            "version": "0.11.4",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "com.thesamet.scalapb_scalapb-runtime_2.13_0.11.4.jar",
+        "file_digest": {
+            "fingerprint": "3be88effcb57ea136a2e5c377cdda3924d61b024afc2169f892c46662e266288",
+            "serialized_bytes_length": 2421167
+        }
+    },
+    {
+        "coord": {
+            "group": "io.get-coursier",
+            "artifact": "interface",
+            "version": "0.0.21",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "io.get-coursier_interface_0.0.21.jar",
+        "file_digest": {
+            "fingerprint": "bdddf5d6593e2eea3a879f7cf2b208a12eceb0904d4b75e84a071679b6c70248",
+            "serialized_bytes_length": 3026195
+        }
+    },
+    {
+        "coord": {
+            "group": "net.java.dev.jna",
+            "artifact": "jna",
+            "version": "5.3.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "net.java.dev.jna_jna_5.3.1.jar",
+        "file_digest": {
+            "fingerprint": "01cb505c0698d0f7acf3524c7e73acb7dc424a5bae5e9c86ce44075ab32bc4ee",
+            "serialized_bytes_length": 1505196
+        }
+    },
+    {
+        "coord": {
+            "group": "org.eclipse.lsp4j",
+            "artifact": "org.eclipse.lsp4j.generator",
+            "version": "0.8.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.lsp4j",
+                "artifact": "org.eclipse.lsp4j.jsonrpc",
+                "version": "0.8.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.eclipse.lsp4j_org.eclipse.lsp4j.generator_0.8.1.jar",
+        "file_digest": {
+            "fingerprint": "374be17803037c775067d7180755878c848b6fa0844d08747fd3eccf30cecf26",
+            "serialized_bytes_length": 52118
+        }
+    },
+    {
+        "coord": {
+            "group": "org.eclipse.lsp4j",
+            "artifact": "org.eclipse.lsp4j.jsonrpc",
+            "version": "0.8.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.google.code.gson",
+                "artifact": "gson",
+                "version": "2.8.2",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.eclipse.lsp4j_org.eclipse.lsp4j.jsonrpc_0.8.1.jar",
+        "file_digest": {
+            "fingerprint": "ba9cc0259272b516fa963c3a28a037556b99f5591a8c18318583cd485c0605bb",
+            "serialized_bytes_length": 134099
+        }
+    },
+    {
+        "coord": {
+            "group": "org.eclipse.xtend",
+            "artifact": "org.eclipse.xtend.lib.macro",
+            "version": "2.18.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.eclipse.xtend_org.eclipse.xtend.lib.macro_2.18.0.jar",
+        "file_digest": {
+            "fingerprint": "169edced01f37276c23bb76ed4a3338c7e6ad8c383d9c1dc335f7bace198d5f2",
+            "serialized_bytes_length": 75351
+        }
+    },
+    {
+        "coord": {
+            "group": "org.eclipse.xtend",
+            "artifact": "org.eclipse.xtend.lib",
+            "version": "2.18.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.eclipse.xtend",
+                "artifact": "org.eclipse.xtend.lib.macro",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.eclipse.xtext",
+                "artifact": "org.eclipse.xtext.xbase.lib",
+                "version": "2.18.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.eclipse.xtend_org.eclipse.xtend.lib_2.18.0.jar",
+        "file_digest": {
+            "fingerprint": "8bdf0d6919c38a82a1362a5135f4915c0ace21001fc843677ed7b1df03b9a5b1",
+            "serialized_bytes_length": 104841
+        }
+    },
+    {
+        "coord": {
+            "group": "org.eclipse.xtext",
+            "artifact": "org.eclipse.xtext.xbase.lib",
+            "version": "2.18.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.google.guava",
+                "artifact": "guava",
+                "version": "21.0",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.eclipse.xtext_org.eclipse.xtext.xbase.lib_2.18.0.jar",
+        "file_digest": {
+            "fingerprint": "a033eb1e59137f545f2110f666f12899a4856bac797b1c523996b53fca59f646",
+            "serialized_bytes_length": 159410
+        }
+    },
+    {
+        "coord": {
+            "group": "org.javassist",
+            "artifact": "javassist",
+            "version": "3.21.0-GA",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "org.javassist_javassist_3.21.0-GA.jar",
+        "file_digest": {
+            "fingerprint": "7aa59e031f941984af07dacc6ca85e6dc9bd3a485e9aa2494cbc034efa1225d0",
+            "serialized_bytes_length": 734815
+        }
+    },
+    {
+        "coord": {
+            "group": "org.jline",
+            "artifact": "jline-reader",
+            "version": "3.14.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.jline_jline-reader_3.14.1.jar",
+        "file_digest": {
+            "fingerprint": "ba86fac0a56589a6f0153cc9dddc887dd43fa687ddd70ce2c70565ff9011a7d1",
+            "serialized_bytes_length": 161361
+        }
+    },
+    {
+        "coord": {
+            "group": "org.jline",
+            "artifact": "jline-terminal-jna",
+            "version": "3.14.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline-terminal",
+                "version": "3.14.1",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.jline_jline-terminal-jna_3.14.1.jar",
+        "file_digest": {
+            "fingerprint": "590547585b74975dd17049495b577e530e461951f9e6a37be33e8fb4eb5ad482",
+            "serialized_bytes_length": 62969
+        }
+    },
+    {
+        "coord": {
+            "group": "org.jline",
+            "artifact": "jline-terminal",
+            "version": "3.14.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "org.jline_jline-terminal_3.14.1.jar",
+        "file_digest": {
+            "fingerprint": "a986d06dde0cff9f49cccb002fed8e8f7ae849c554863441991eb693fc2244e9",
+            "serialized_bytes_length": 214856
+        }
+    },
+    {
+        "coord": {
+            "group": "org.jline",
+            "artifact": "jline",
+            "version": "3.19.0",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "org.jline_jline_3.19.0.jar",
+        "file_digest": {
+            "fingerprint": "c99ddcfa5431cab88d1cd40fd63bec6ab5a3fe2e83877051198539af66592a46",
+            "serialized_bytes_length": 987021
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scala-lang.modules",
+            "artifact": "scala-collection-compat_2.13",
+            "version": "2.4.4",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scala-lang.modules_scala-collection-compat_2.13_2.4.4.jar",
+        "file_digest": {
+            "fingerprint": "f17aec79f7588c60c028d879affe1bbbb92b3d2475cf8fa44b0afb9d3da2861f",
+            "serialized_bytes_length": 5609
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scala-lang.modules",
+            "artifact": "scala-xml_2.13",
+            "version": "2.0.0-M3",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scala-lang.modules_scala-xml_2.13_2.0.0-M3.jar",
+        "file_digest": {
+            "fingerprint": "d7889bec5d7f2af4fd95d91e52082633dc111035204ecd405ada8bdf4a553ff6",
+            "serialized_bytes_length": 481094
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scala-lang",
+            "artifact": "scala-compiler",
+            "version": "2.13.6",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline",
+                "version": "3.19.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "net.java.dev.jna",
+                "artifact": "jna",
+                "version": "5.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.jline",
+                "artifact": "jline",
+                "version": "3.19.0",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-reflect",
+                "version": "2.13.6",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scala-lang_scala-compiler_2.13.6.jar",
+        "file_digest": {
+            "fingerprint": "310d263d622a3d016913e94ee00b119d270573a5ceaa6b21312d69637fd9eec1",
+            "serialized_bytes_length": 12010571
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scala-lang",
+            "artifact": "scala-library",
+            "version": "2.13.7",
+            "packaging": "jar"
+        },
+        "directDependencies": [],
+        "dependencies": [],
+        "file_name": "org.scala-lang_scala-library_2.13.7.jar",
+        "file_digest": {
+            "fingerprint": "a8bc08f3b9ff93d0496032bf2677163071b8d212992f41dbf04212e07d91616b",
+            "serialized_bytes_length": 6004712
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scala-lang",
+            "artifact": "scala-reflect",
+            "version": "2.13.6",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scala-lang_scala-reflect_2.13.6.jar",
+        "file_digest": {
+            "fingerprint": "f713593809b387c60935bb9a940dfcea53bd0dbf8fdc8d10739a2896f8ac56fa",
+            "serialized_bytes_length": 3769997
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scalameta",
+            "artifact": "common_2.13",
+            "version": "4.4.30",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scalameta_common_2.13_4.4.30.jar",
+        "file_digest": {
+            "fingerprint": "faec8003d08e27971b292062f79e16a4a428491f50736d140b8a1de38cd5c6b1",
+            "serialized_bytes_length": 2344659
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scalameta",
+            "artifact": "fastparse-v2_2.13",
+            "version": "2.3.1",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scalameta_fastparse-v2_2.13_2.3.1.jar",
+        "file_digest": {
+            "fingerprint": "8fca8597ad6d7c13c48009ee13bbe80c176b08ab12e68af54a50f7f69d8447c5",
+            "serialized_bytes_length": 320855
+        }
+    },
+    {
+        "coord": {
+            "group": "org.scalameta",
+            "artifact": "trees_2.13",
+            "version": "4.4.30",
+            "packaging": "jar"
+        },
+        "directDependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "common_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "fastparse-v2_2.13",
+                "version": "2.3.1",
+                "packaging": "jar"
+            }
+        ],
+        "dependencies": [
+            {
+                "group": "org.scala-lang",
+                "artifact": "scala-library",
+                "version": "2.13.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "scalapb-runtime_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "common_2.13",
+                "version": "4.4.30",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "sourcecode_2.13",
+                "version": "0.2.7",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scalameta",
+                "artifact": "fastparse-v2_2.13",
+                "version": "2.3.1",
+                "packaging": "jar"
+            },
+            {
+                "group": "org.scala-lang.modules",
+                "artifact": "scala-collection-compat_2.13",
+                "version": "2.4.4",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.lihaoyi",
+                "artifact": "geny_2.13",
+                "version": "0.6.10",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.google.protobuf",
+                "artifact": "protobuf-java",
+                "version": "3.15.8",
+                "packaging": "jar"
+            },
+            {
+                "group": "com.thesamet.scalapb",
+                "artifact": "lenses_2.13",
+                "version": "0.11.4",
+                "packaging": "jar"
+            }
+        ],
+        "file_name": "org.scalameta_trees_2.13_4.4.30.jar",
+        "file_digest": {
+            "fingerprint": "79fdf691ff0f75265c99422f31db519ee044e88f52a32bbc39d30c16f6781315",
+            "serialized_bytes_length": 4274882
+        }
+    }
+]
