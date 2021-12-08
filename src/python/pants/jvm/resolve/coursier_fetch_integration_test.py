@@ -17,6 +17,7 @@ from pants.jvm.resolve.coursier_fetch import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    RequirementCoordinate,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -69,7 +70,7 @@ def test_empty_resolve(rule_runner: RuleRunner) -> None:
 def test_resolve_with_no_deps(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        [ArtifactRequirements([HAMCREST_COORD])],
+        [ArtifactRequirements.from_coordinates([HAMCREST_COORD])],
     )
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
@@ -93,7 +94,7 @@ def test_resolve_with_transitive_deps(rule_runner: RuleRunner) -> None:
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
         [
-            ArtifactRequirements([junit_coord]),
+            ArtifactRequirements.from_coordinates([junit_coord]),
         ],
     )
 
@@ -132,7 +133,9 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
             # will be exact and pinned.  As noted above, this is an especially brittle unit test, but version
             # 4.8 was chosen because it has multiple patch versions and no new versions have been uploaded
             # to 4.8.x in over a decade.
-            ArtifactRequirements([Coordinate(group="junit", artifact="junit", version="4.8+")]),
+            ArtifactRequirements.from_coordinates(
+                [Coordinate(group="junit", artifact="junit", version="4.8+")]
+            ),
         ],
     )
 
@@ -160,7 +163,7 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
         rule_runner.request(
             CoursierResolvedLockfile,
             [
-                ArtifactRequirements(
+                ArtifactRequirements.from_coordinates(
                     [
                         Coordinate(group="junit", artifact="junit", version="4.8.1"),
                         Coordinate(group="junit", artifact="junit", version="4.8.2"),
@@ -173,10 +176,12 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
-    coordinate = Coordinate(
-        group="org.hamcrest",
-        artifact="hamcrest-core",
-        version="1.3_inexplicably_wrong",  # if the group/artifact/version is real, coursier will fallback
+    coordinate = RequirementCoordinate(
+        coordinate=Coordinate(
+            group="org.hamcrest",
+            artifact="hamcrest-core",
+            version="1.3_inexplicably_wrong",  # if the group/artifact/version is real, coursier will fallback
+        ),
         url="https://this_url_does_not_work",
     )
 
@@ -192,17 +197,21 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
 
-    coordinate = Coordinate(
-        group="apache-commons-local",
-        artifact="commons-collections",
-        version="1.0.0_JAR_LOCAL",
+    requirement = RequirementCoordinate(
+        coordinate=Coordinate(
+            group="apache-commons-local",
+            artifact="commons-collections",
+            version="1.0.0_JAR_LOCAL",
+        ),
         url="https://search.maven.org/remotecontent?filepath=org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
     )
 
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        [ArtifactRequirements([coordinate])],
+        [ArtifactRequirements([requirement])],
     )
+
+    coordinate = requirement.coordinate
 
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(

@@ -116,7 +116,7 @@ async def compile_scala_source(
             MaterializedClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
-                    ArtifactRequirements(
+                    ArtifactRequirements.from_coordinates(
                         [
                             Coordinate(
                                 group="org.scala-lang",
