@@ -19,9 +19,11 @@ backend_packages.add = [
   "pants.backend.experimental.docker.lint.hadolint",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
+  "pants.backend.experimental.java.lint.google_java_format",
   "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
+  "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
@@ -97,6 +99,7 @@ ignore_adding_targets = [
   "src/python/pants/backend/go/go_sources:bin",
   "src/python/pants/backend/go/go_sources:go_sources0",
   "src/python/pants/backend/go/go_sources/analyze_package:bin",
+  "src/python/pants/backend/go/go_sources/embedcfg:bin",
   "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
   "src/python/pants/backend/python/dependency_inference:import_parser",
@@ -170,6 +173,15 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
+
+[junit]
+lockfile = "src/python/pants/backend/java/test/junit.default.lockfile.txt"
+
+[google-java-format]
+lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
+
+[scalafmt]
+lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"

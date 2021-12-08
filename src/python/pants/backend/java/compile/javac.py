@@ -158,7 +158,6 @@ async def compile_java_source(
             (
                 prefixed_direct_dependency_classpath_digest,
                 dest_dir_digest,
-                jdk_setup.digest,
                 *(
                     sources.snapshot.digest
                     for _, sources in component_members_and_java_source_files

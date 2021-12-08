@@ -100,7 +100,6 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   platform: Platform,
   store: Store,
-  headers: BTreeMap<String, String>,
   execution_client: Arc<ExecutionClient<LayeredService>>,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
@@ -153,7 +152,7 @@ impl CommandRunner {
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
-    let mut store_headers = headers.clone();
+    let mut store_headers = headers;
     let store_endpoint = grpc_util::create_endpoint(
       store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
@@ -172,7 +171,6 @@ impl CommandRunner {
 
     let command_runner = CommandRunner {
       metadata,
-      headers,
       execution_client,
       action_cache_client,
       store,
@@ -791,7 +789,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_files),
+      Some(request.input_digests.complete),
     )
     .await?;
 
@@ -1030,7 +1028,7 @@ pub fn make_execute_request(
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_files).into()),
+    input_root_digest: Some((&req.input_digests.complete).into()),
     ..remexec::Action::default()
   };
 

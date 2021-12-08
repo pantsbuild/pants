@@ -41,6 +41,7 @@ use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
+use store::{SnapshotOps, SnapshotOpsError, Store};
 use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, WorkunitStore};
 
 pub mod cache;
@@ -178,6 +179,63 @@ fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::
 }
 
 ///
+/// Input Digests for a process execution. The `complete` Digest is the computed union of all
+/// inputs: the rest of the Digests should be disjoint (or have identical contents where they
+/// overlap).
+///
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
+pub struct InputDigests {
+  ///
+  /// All of the input Digests, merged.
+  ///
+  pub complete: Digest,
+
+  ///
+  /// The input files for the process execution, which will be materialize as mutable inputs in a
+  /// sandbox for the process.
+  ///
+  pub input_files: Digest,
+
+  ///
+  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
+  ///
+  pub use_nailgun: Digest,
+}
+
+impl InputDigests {
+  pub async fn new(
+    store: &Store,
+    input_files: Digest,
+    use_nailgun: Digest,
+  ) -> Result<Self, SnapshotOpsError> {
+    let complete = store.merge(vec![input_files, use_nailgun]).await?;
+    Ok(Self {
+      complete,
+      input_files,
+      use_nailgun,
+    })
+  }
+
+  pub fn with_input_files(input_files: Digest) -> Self {
+    Self {
+      complete: input_files,
+      input_files,
+      use_nailgun: hashing::EMPTY_DIGEST,
+    }
+  }
+}
+
+impl Default for InputDigests {
+  fn default() -> Self {
+    Self {
+      complete: hashing::EMPTY_DIGEST,
+      input_files: hashing::EMPTY_DIGEST,
+      use_nailgun: hashing::EMPTY_DIGEST,
+    }
+  }
+}
+
+///
 /// A process to be executed.
 ///
 #[derive(Derivative, Clone, Debug, Eq, Serialize)]
@@ -206,7 +264,10 @@ pub struct Process {
   ///
   pub working_directory: Option<RelativePath>,
 
-  pub input_files: hashing::Digest,
+  ///
+  /// All of the input digests for the process.
+  ///
+  pub input_digests: InputDigests,
 
   pub output_files: BTreeSet<RelativePath>,
 
@@ -251,14 +312,6 @@ pub struct Process {
 
   pub platform_constraint: Option<Platform>,
 
-  ///
-  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
-  ///
-  /// TODO: Currently this Digest must be a subset of the `input_digest`, but we should consider
-  /// making it disjoint, and then automatically merging it.
-  ///
-  pub use_nailgun: Digest,
-
   pub cache_scope: ProcessCacheScope,
 }
 
@@ -278,7 +331,7 @@ impl Process {
       argv,
       env: BTreeMap::new(),
       working_directory: None,
-      input_files: hashing::EMPTY_DIGEST,
+      input_digests: InputDigests::default(),
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: None,
@@ -287,7 +340,6 @@ impl Process {
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       platform_constraint: None,
-      use_nailgun: hashing::EMPTY_DIGEST,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
     }

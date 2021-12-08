@@ -14,7 +14,6 @@ from urllib.parse import quote_plus as url_quote_plus
 from urllib.parse import unquote as url_unquote
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -48,7 +47,6 @@ from pants.jvm.target_types import (
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
-    JvmLockfileSources,
     JvmRequirementsField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
@@ -541,28 +539,6 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
         Get(ClasspathEntry, CoursierLockfileEntry, entry) for entry in lockfile.entries
     )
     return ResolvedClasspathEntries(classpath_entries)
-
-
-@rule(level=LogLevel.DEBUG)
-async def load_coursier_lockfile_from_source(
-    lockfile_field: JvmLockfileSources,
-) -> CoursierResolvedLockfile:
-    lockfile_sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [lockfile_field],
-            for_sources_types=[JvmLockfileSources],
-            enable_codegen=False,
-        ),
-    )
-    if len(lockfile_sources.files) != 1:
-        raise CoursierError("JvmLockfileSources must have exactly 1 source file")
-
-    source_lockfile_digest_contents = await Get(
-        DigestContents, Digest, lockfile_sources.snapshot.digest
-    )
-    source_lockfile_content = source_lockfile_digest_contents[0]
-    return CoursierResolvedLockfile.from_json_dict(json.loads(source_lockfile_content.content))
 
 
 @rule

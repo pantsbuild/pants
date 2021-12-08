@@ -111,15 +111,6 @@ async def analyze_java_source_dependencies(
             )
         ),
     )
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                tool_digest,
-                prefixed_source_files_digest,
-            )
-        ),
-    )
 
     analysis_output_path = "__source_analysis.json"
 
@@ -132,7 +123,7 @@ async def analyze_java_source_dependencies(
                 analysis_output_path,
                 source_path,
             ],
-            input_digest=merged_digest,
+            input_digest=prefixed_source_files_digest,
             output_files=(analysis_output_path,),
             use_nailgun=tool_digest,
             append_only_caches=jdk_setup.append_only_caches,

@@ -23,7 +23,7 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -48,7 +48,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
         ],
         target_types=[
-            JvmDependencyLockfile,
             JavaSourcesGeneratorTarget,
             JvmArtifact,
             DeployJar,

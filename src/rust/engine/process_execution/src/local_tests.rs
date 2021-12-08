@@ -3,7 +3,7 @@ use testutil;
 
 use crate::{
   CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, RelativePath,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use shell_quote::bash;
@@ -377,7 +377,7 @@ async fn test_directory_preservation() {
 
   let mut process =
     Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
-  process.input_files = TestDirectory::nested().digest();
+  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
   process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
@@ -553,7 +553,7 @@ async fn working_directory() {
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
-  process.input_files = TestDirectory::nested().digest();
+  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
 

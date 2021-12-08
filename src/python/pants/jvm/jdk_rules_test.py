@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import textwrap
+
 import pytest
 
 from pants.core.util_rules import config_files, source_files
@@ -10,7 +12,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.process import rules as process_rules
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkSetup, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -90,3 +92,24 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         assert "javac 16.0" in run_javac_version(rule_runner)
+
+
+@maybe_skip_jdk_test
+def test_parse_java_version() -> None:
+    version1 = textwrap.dedent(
+        """\
+    openjdk version "17.0.1" 2021-10-19
+    OpenJDK Runtime Environment Homebrew (build 17.0.1+0)
+    OpenJDK 64-Bit Server VM Homebrew (build 17.0.1+0, mixed mode, sharing)
+    """
+    )
+    assert parse_jre_major_version(version1) == 17
+
+    version2 = textwrap.dedent(
+        """\
+    openjdk version "11" 2018-09-25
+    OpenJDK Runtime Environment AdoptOpenJDK (build 11+28)
+    OpenJDK 64-Bit Server VM AdoptOpenJDK (build 11+28, mixed mode)
+    """
+    )
+    assert parse_jre_major_version(version2) == 11

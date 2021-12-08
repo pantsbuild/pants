@@ -232,6 +232,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
++ Yoav Alon
 + Yuhan GUO
 + Yujie Chen
 + billybecker

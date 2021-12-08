@@ -38,6 +38,7 @@ from pants.engine.streaming_workunit_handler import (
     TargetInfo,
     WorkunitsCallback,
 )
+from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -889,17 +890,17 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
             QueryRule(ProcessResult, (Process,)),
         ],
     )
-
     rule_runner.set_options(["--backend-packages=pants.backend.python"])
-
-    rule_runner.create_file("src/python/somefiles/BUILD", "python_sources()")
-    rule_runner.create_file("src/python/somefiles/a.py", "print('')")
-    rule_runner.create_file("src/python/somefiles/b.py", "print('')")
-
-    rule_runner.create_file("src/python/others/BUILD", "python_sources()")
-    rule_runner.create_file("src/python/others/a.py", "print('')")
-    rule_runner.create_file("src/python/others/b.py", "print('')")
-
+    rule_runner.write_files(
+        {
+            "src/python/somefiles/BUILD": "python_sources()",
+            "src/python/somefiles/a.py": "print('')",
+            "src/python/somefiles/b.py": "print('')",
+            "src/python/others/BUILD": "python_sources()",
+            "src/python/others/a.py": "print('')",
+            "src/python/others/b.py": "print('')",
+        }
+    )
     specs = SpecsParser(get_buildroot()).parse_specs(
         ["src/python/somefiles::", "src/python/others/b.py"]
     )
@@ -942,3 +943,36 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     )
     with handler:
         rule_runner.request(ProcessResult, [stdout_process])
+
+
+@union
+class Union:
+    pass
+
+
+class Member(Union):
+    pass
+
+
+def test_union_member_construction(run_tracker: RunTracker) -> None:
+    """Use a union member which is a subclass of its @union as a Get input."""
+
+    @rule
+    async def output(_: Member) -> str:
+        return "yep"
+
+    @rule
+    async def for_member() -> str:
+        return await Get(str, Member())
+
+    rule_runner = RuleRunner(
+        target_types=[],
+        rules=[
+            UnionRule(Union, Member),
+            QueryRule(str, ()),
+            output,
+            for_member,
+        ],
+    )
+
+    assert "yep" == rule_runner.request(str, [])
