@@ -337,7 +337,7 @@ fn add_prefix_request_to_digest(
     let digest = context
       .core
       .store()
-      .add_prefix(digest, prefix)
+      .add_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -490,7 +490,7 @@ fn create_digest_to_digest(
             res
           }
           CreateDigestItem::Dir(path) => store
-            .create_empty_dir(path)
+            .create_empty_dir(&path)
             .await
             .map_err(|e| format!("{:?}", e)),
         }
@@ -564,7 +564,7 @@ fn interactive_process(
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
       let input_digest: Digest = lift_directory_digest(py_input_digest)?;
-      let env = externs::getattr_from_str_frozendict(py_interactive_process, "env");
+      let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
       let append_only_caches = externs::getattr_from_str_frozendict(py_interactive_process, "append_only_caches")
         .into_iter()

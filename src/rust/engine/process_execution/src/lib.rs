@@ -65,7 +65,6 @@ mod remote_cache_tests;
 pub mod nailgun;
 
 pub mod named_caches;
-pub mod reusable_caches;
 
 extern crate uname;
 
@@ -180,19 +179,22 @@ fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::
 }
 
 ///
-/// Input Digests for a process execution. The `complete` Digest is the computed union of all
-/// inputs: the rest of the Digests should be disjoint (or have identical contents where they
-/// overlap).
+/// Input Digests for a process execution.
+///
+/// The `complete` Digest is the computed union of all inputs: the rest of the Digests should be
+/// disjoint (or have identical contents where they overlap), which is validated by computing this
+/// value.
 ///
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
 pub struct InputDigests {
   ///
-  /// All of the input Digests, merged.
+  /// All of the input Digests, merged and properly relativized. Runners without the ability to
+  /// consume the Digests individually should directly consume this value.
   ///
   pub complete: Digest,
 
   ///
-  /// The input files for the process execution, which will be materialize as mutable inputs in a
+  /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
   pub input_files: Digest,
@@ -200,7 +202,28 @@ pub struct InputDigests {
   ///
   /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
   ///
+  /// TODO: The `use_nailgun` Digest is disjoint with the `reusable_input_digests`. When nailgun
+  /// is in use, it amortizes the cost of materializing this Digest across all of the uses of the
+  /// server, which makes the optimizations available to `reusable_input_digests` less necessary.
+  /// We should likely still eventually implement the `use_nailgun` Digest in terms of
+  /// `reusable_input_digests` though, in order to improve performance when nailgun is disabled.
+  ///
   pub use_nailgun: Digest,
+
+  /// "Reusable" digests to make available in the input root.
+  ///
+  /// These digests are intended for inputs that will be reused between multiple Process
+  /// invocations.This is useful, for example, for the files used by a tool to be
+  /// invoked in the `Process`.
+  ///
+  /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
+  /// The executor may choose how to make the digests available, including by just merging
+  /// the digest normally into the input root, creating a symlink to a persistent cache,
+  /// or bind mounting the directory read-only into a persistent cache.
+  ///
+  /// Assumes the build action does not modify the digest as made available. This may be
+  /// enforced by an executor, for example by bind mounting the directory read-only.
+  pub reusable_input_digests: BTreeMap<RelativePath, Digest>,
 }
 
 impl InputDigests {
@@ -208,12 +231,24 @@ impl InputDigests {
     store: &Store,
     input_files: Digest,
     use_nailgun: Digest,
+    reusable_input_digests: BTreeMap<RelativePath, Digest>,
   ) -> Result<Self, SnapshotOpsError> {
-    let complete = store.merge(vec![input_files, use_nailgun]).await?;
+    let mut complete_digests = futures::future::try_join_all(
+      reusable_input_digests
+        .iter()
+        .map(|(path, digest)| store.add_prefix(*digest, path))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    complete_digests.push(input_files);
+    complete_digests.push(use_nailgun);
+
+    let complete = store.merge(complete_digests).await?;
     Ok(Self {
       complete,
       input_files,
       use_nailgun,
+      reusable_input_digests,
     })
   }
 
@@ -222,6 +257,7 @@ impl InputDigests {
       complete: input_files,
       input_files,
       use_nailgun: hashing::EMPTY_DIGEST,
+      reusable_input_digests: BTreeMap::new(),
     }
   }
 }
@@ -232,6 +268,7 @@ impl Default for InputDigests {
       complete: hashing::EMPTY_DIGEST,
       input_files: hashing::EMPTY_DIGEST,
       use_nailgun: hashing::EMPTY_DIGEST,
+      reusable_input_digests: BTreeMap::default(),
     }
   }
 }
@@ -314,21 +351,6 @@ pub struct Process {
   pub platform_constraint: Option<Platform>,
 
   pub cache_scope: ProcessCacheScope,
-
-  /// "Reusable" digests to make available in the input root.
-  ///
-  /// These digests are intended for inputs that will be reused between multiple Process
-  /// invocations.This is useful, for example, for the files used by a tool to be
-  /// invoked in the `Process`.
-  ///
-  /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
-  /// The executor may choose how to make the digests available, including by just merging
-  /// the digest normally into the input root, creating a symlink to a persistent cache,
-  /// or bind mounting the directory read-only into a persistent cache.
-  ///
-  /// Assumes the build action does not modify the digest as made available. This may be
-  /// enforced by an executor, for example by bind mounting the directory read-only.
-  pub reusable_input_digests: BTreeMap<RelativePath, Digest>,
 }
 
 impl Process {
@@ -358,7 +380,6 @@ impl Process {
       platform_constraint: None,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
-      reusable_input_digests: BTreeMap::new(),
     }
   }
 
@@ -394,14 +415,6 @@ impl Process {
     append_only_caches: BTreeMap<CacheName, CacheDest>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
-    self
-  }
-
-  ///
-  /// Replaces the reusable digests for this process.
-  ///
-  pub fn reusable_digests(mut self, reusable_digests: BTreeMap<RelativePath, Digest>) -> Self {
-    self.reusable_input_digests = reusable_digests;
     self
   }
 }

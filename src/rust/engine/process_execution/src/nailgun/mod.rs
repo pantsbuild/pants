@@ -46,11 +46,12 @@ fn construct_nailgun_server_request(
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
   full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|&a| a.to_string()));
 
-  // Strip the input_files, preserving only the use_nailgun digest.
+  // Strip all other input digests, preserving only the use_nailgun digest.
   let input_digests = InputDigests {
     complete: client_request.input_digests.use_nailgun,
     use_nailgun: client_request.input_digests.use_nailgun,
     input_files: hashing::EMPTY_DIGEST,
+    reusable_input_digests: BTreeMap::default(),
   };
 
   Process {

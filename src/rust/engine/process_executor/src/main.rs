@@ -431,7 +431,7 @@ async fn make_request_from_flat_args(
     _ => EMPTY_DIGEST,
   };
 
-  let input_digests = InputDigests::new(store, input_files, use_nailgun)
+  let input_digests = InputDigests::new(store, input_files, use_nailgun, BTreeMap::default())
     .await
     .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
 
@@ -450,7 +450,6 @@ async fn make_request_from_flat_args(
     platform_constraint: None,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let metadata = ProcessMetadata {
@@ -537,7 +536,6 @@ async fn extract_request_from_action_digest(
     jdk_home: None,
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let metadata = ProcessMetadata {

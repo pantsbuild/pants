@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -293,8 +293,18 @@ impl ExecuteProcess {
         .map_err(|err| format!("Error parsing input_digest {}", err))?;
       let use_nailgun = lift_directory_digest(externs::getattr(value, "use_nailgun").unwrap())
         .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
+      let reusable_input_digests =
+        externs::getattr_from_str_frozendict::<&PyAny>(value, "reusable_input_digests")
+          .into_iter()
+          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
+          .collect::<Result<BTreeMap<_, _>, String>>()?;
 
-      Ok(InputDigests::new(store, input_files, use_nailgun))
+      Ok(InputDigests::new(
+        store,
+        input_files,
+        use_nailgun,
+        reusable_input_digests,
+      ))
     });
 
     input_digests_fut?
@@ -357,25 +367,6 @@ impl ExecuteProcess {
         None
       };
 
-    let reusable_input_digests = {
-      let py_reusable_input_digests: PyObject =
-        externs::getattr(value, "reusable_input_digests").unwrap();
-      let pydict: PyDict = externs::getattr(&py_reusable_input_digests, "_data").unwrap();
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      let items = pydict
-        .items(py)
-        .into_iter()
-        .map(|(key, value)| {
-          lift_directory_digest(&value).map(|digest| (externs::val_to_str(&key), digest))
-        })
-        .collect::<Result<Vec<(_, _)>, String>>()?;
-      items
-        .into_iter()
-        .map(|(path, digest)| RelativePath::new(path).map(|p| (p, digest)))
-        .collect::<Result<BTreeMap<RelativePath, Digest>, String>>()?
-    };
-
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -391,7 +382,6 @@ impl ExecuteProcess {
       platform_constraint,
       execution_slot_variable,
       cache_scope,
-      reusable_input_digests,
     })
   }
 
