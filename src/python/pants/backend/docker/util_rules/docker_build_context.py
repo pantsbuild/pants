@@ -73,7 +73,14 @@ class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
 
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """This is a meta field for the context files generator, to tell the codegen machinery what
-    source fields are good to use."""
+    source fields are good to use.
+
+    Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
+    that should be accepted.
+
+    This is implemented using the `ABC.register` from Python lib:
+    https://docs.python.org/3/library/abc.html#abc.ABCMeta.register
+    """
 
 
 DockerContextFilesAcceptableInputsField.register(FileSourceField)

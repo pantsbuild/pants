@@ -1871,7 +1871,6 @@ class GenerateSourcesRequest:
     protocol_sources: Snapshot
     protocol_target: Target
 
-    exportable: ClassVar[bool] = True
     input: ClassVar[type[SourcesField]]
     output: ClassVar[type[SourcesField]]
 
