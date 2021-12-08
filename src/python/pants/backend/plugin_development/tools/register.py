@@ -5,4 +5,4 @@ from pants.backend.plugin_development.tools import check_names
 
 
 def rules():
-    return (*check_names.rules(),)
+    return check_names.rules()

@@ -68,7 +68,7 @@ class CheckNamesSubsystem(GoalSubsystem):
         register(
             "--fix",
             type=bool,
-            help="Generates a 'apply fixes' script on stdout.",
+            help="Generates a 'apply fixes' script to stdout.",
         )
 
     @property
@@ -97,7 +97,7 @@ class Context:
     def __post_init__(self):
         self.output_script = self.options.fix
         if self.output_script:
-            self.console.print_stderr("Generating 'apply fixes' script on stdout")
+            self.console.print_stderr("Generating 'apply fixes' script to stdout")
         else:
             self.console.print_stdout(
                 "## Hint: use `--fix` to generate a script that can be executed to apply the "

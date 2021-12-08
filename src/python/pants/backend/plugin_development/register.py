@@ -6,7 +6,7 @@ from pants.backend.plugin_development.pants_requirements import PantsRequirement
 
 
 def rules():
-    return (*pants_requirements.rules(),)
+    return pants_requirements.rules()
 
 
 def target_types():
