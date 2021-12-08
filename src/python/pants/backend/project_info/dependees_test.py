@@ -7,11 +7,11 @@ import pytest
 
 from pants.backend.project_info.dependees import DependeesGoal
 from pants.backend.project_info.dependees import rules as dependee_rules
-from pants.engine.target import Dependencies, SpecialCasedDependenciesField, Target
+from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-class SpecialDeps(SpecialCasedDependenciesField):
+class SpecialDeps(SpecialCasedDependencies):
     alias = "special_deps"
 
 

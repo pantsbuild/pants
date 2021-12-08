@@ -29,7 +29,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     SourcesField,
-    SpecialCasedDependenciesField,
+    SpecialCasedDependencies,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -515,7 +515,7 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 # -------------------------------------------------------------------------------------------
 
 
-class RuntimePackageDependenciesField(SpecialCasedDependenciesField):
+class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
     help = (
         "Addresses to targets that can be built with the `./pants package` goal and whose "

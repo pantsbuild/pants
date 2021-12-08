@@ -70,7 +70,7 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    SpecialCasedDependenciesField,
+    SpecialCasedDependencies,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -994,18 +994,18 @@ async def resolve_dependencies(
         )
         generated_addresses = tuple(generated_targets.keys())
 
-    # If the target has `SpecialCasedDependenciesField`, such as the `archive` target having
+    # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
     # being handled elsewhere in the calling code.
     special_cased: tuple[Address, ...] = ()
     if request.include_special_cased_deps:
         # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependenciesField.
+        # SpecialCasedDependencies.
         special_cased_fields = tuple(
             field
             for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependenciesField)
+            if isinstance(field, SpecialCasedDependencies)
         )
         # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
         special_cased = await MultiGet(

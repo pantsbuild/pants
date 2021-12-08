@@ -9,13 +9,13 @@ import pytest
 
 from pants.backend.project_info.dependencies import Dependencies, rules
 from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
-from pants.engine.target import SpecialCasedDependenciesField, Target
+from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-# We verify that any subclasses of `SpecialCasedDependenciesField` will show up with the `dependencies`
+# We verify that any subclasses of `SpecialCasedDependencies` will show up with the `dependencies`
 # goal by creating a mock target.
-class SpecialDepsField(SpecialCasedDependenciesField):
+class SpecialDepsField(SpecialCasedDependencies):
     alias = "special_deps"
 
 

@@ -39,7 +39,7 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    SpecialCasedDependenciesField,
+    SpecialCasedDependencies,
     StringField,
     Target,
     Targets,
@@ -145,7 +145,7 @@ class RelocatedFilesSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
-class RelocatedFilesOriginalTargetsField(SpecialCasedDependenciesField):
+class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
     alias = "files_targets"
     required = True
     help = (
@@ -367,7 +367,7 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ArchivePackagesField(SpecialCasedDependenciesField):
+class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
     help = (
         "Addresses to any targets that can be built with `./pants package`, e.g. "
@@ -379,7 +379,7 @@ class ArchivePackagesField(SpecialCasedDependenciesField):
     )
 
 
-class ArchiveFilesField(SpecialCasedDependenciesField):
+class ArchiveFilesField(SpecialCasedDependencies):
     alias = "files"
     help = (
         "Addresses to any `file`, `files`, or `relocated_files` targets to include in the "

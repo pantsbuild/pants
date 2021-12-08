@@ -6,7 +6,7 @@ from __future__ import annotations
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
-    SpecialCasedDependenciesField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -133,7 +133,7 @@ class JvmResolveNameField(StringField):
     )
 
 
-class JvmRequirementsField(SpecialCasedDependenciesField):
+class JvmRequirementsField(SpecialCasedDependencies):
     alias = "requirements"
     required = True
     help = (
