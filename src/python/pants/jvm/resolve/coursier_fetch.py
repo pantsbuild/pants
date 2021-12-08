@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import operator
@@ -43,7 +44,6 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
-from pants.jvm.resolve.coursier_constants import WORKING_DIRECTORY_URL_PLACEHOLDER
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -148,7 +148,10 @@ class Coordinate:
         url = target[JvmArtifactUrlField].value
 
         if url and url.startswith("file:"):
-            raise CoursierError("Pants does not support `file:` URLS. Use the `jar` field instead.")
+            raise CoursierError(
+                "Pants does not support `file:` URLS. Instead, use the `jar` field to specify the "
+                "relative path to the local jar file."
+            )
 
         # These are all required, but mypy doesn't think so.
         assert group is not None and artifact is not None and version is not None
@@ -371,12 +374,10 @@ async def use_local_artifacts_where_possible(
 
     for target, file in zip(further_processing, files.files):
         coord = Coordinate.from_jvm_artifact_target(target)
-        coord = Coordinate(
-            artifact=coord.artifact,
-            group=coord.group,
-            version=coord.version,
+        coord = dataclasses.replace(
+            coord,
             # coursier requires absolute url
-            url=f"file:{WORKING_DIRECTORY_URL_PLACEHOLDER}/{file}",
+            url=f"file:{Coursier.working_directory_placeholder}/{file}",
         )
         output.append(coord)
 
@@ -418,13 +419,15 @@ async def coursier_resolve_lockfile(
     if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
-    # Transform requirements with local JAR files into coordinates, and yoink the relevant
-    # files into the coursier sandbox
-    better_artifacts = await Get(
+    # Transform requirements that correspond to local JAR files into coordinates with `file:/`
+    # URLs, and put the files in the place specified by the URLs.
+    artifacts_with_local_files = await Get(
         ArtifactRequirementsWithLocalFiles, ArtifactRequirements, artifact_requirements
     )
-    artifact_requirements = better_artifacts.artifact_requirements
-    input_digest = await Get(Digest, MergeDigests([better_artifacts.digest, coursier.digest]))
+    artifact_requirements = artifacts_with_local_files.artifact_requirements
+    input_digest = await Get(
+        Digest, MergeDigests([artifacts_with_local_files.digest, coursier.digest])
+    )
 
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(

@@ -18,7 +18,6 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.resolve.coursier_constants import WORKING_DIRECTORY_URL_PLACEHOLDER
 from pants.python.binaries import PythonBinary
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
@@ -108,6 +107,7 @@ class Coursier:
     post_processing_script: ClassVar[str] = "coursier_post_processing_script.py"
     cache_name: ClassVar[str] = "coursier"
     cache_dir: ClassVar[str] = ".cache"
+    working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
         return tuple((*wrapper, self.coursier.exe, *args))
@@ -145,7 +145,7 @@ async def setup_coursier(
 
         WORKING_DIRECTORY=$(pwd)
         ARGS=$@
-        ARGS=$(echo $ARGS | /usr/bin/sed 's|{WORKING_DIRECTORY_URL_PLACEHOLDER}|'$WORKING_DIRECTORY'|g')
+        ARGS=$(echo $ARGS | /usr/bin/sed 's|{Coursier.working_directory_placeholder}|'$WORKING_DIRECTORY'|g')
 
         "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" $(echo $ARGS)
 
