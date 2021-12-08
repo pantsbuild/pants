@@ -114,13 +114,13 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
-    @classmethod
-    def from_requirement_coordinate(cls, req_coord: RequirementCoordinate) -> Coordinate:
-        """Converts a `RequirementCoordinate` to a coordinate.
-
-        Note that this will discard `url` and `jar` information, so it's generally not a good idea
-        to use this.
-        """
+    def to_requirement_coordinate(self, coord: Coordinate) -> RequirementCoordinate:
+        """Creates a `RequirementCoordinate` from a `Coordinate`."""
+        return RequirementCoordinate(
+            group=self.group,
+            artifact=self.artifact,
+            version=self.version,
+        )
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
@@ -191,17 +191,9 @@ class RequirementCoordinate:
             group=group, artifact=artifact, version=version, url=url, jar=jar
         )
 
-    @classmethod
-    def from_coordinate(cls, coord: Coordinate) -> RequirementCoordinate:
-        """Creates a `RequirementCoordinate` from a `Coordinate`."""
-        return cls(
-            group=coord.group,
-            artifact=coord.artifact,
-            version=coord.version,
-        )
 
     def to_coord_str(self, versioned: bool = True) -> str:
-        without_url = Coordinate.from_requirement_coordinate(self).to_coord_str(versioned)
+        without_url = self.to_coordinate().to_coord_str(versioned)
         if self.url:
             url_suffix = f",url={url_quote_plus(self.url)}"
         return f"{without_url}{url_suffix}"
@@ -227,6 +219,16 @@ class RequirementCoordinate:
             # Coursier requires exact URL
             url=f"file:{Coursier.working_directory_placeholder}/{rel_path}",
         )
+
+    def to_coordinate(self) -> Coordinate:
+        """Converts a `RequirementCoordinate` to a `Coordinate`.
+
+        Note that this will discard `url` and `jar` information, so it's generally not a good idea
+        to use this.
+        """
+
+        return Coordinate(self.group, self.artifact, self.version)
+
 
 
 class RequirementCoordinates(DeduplicatedCollection[RequirementCoordinate]):
