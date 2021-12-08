@@ -28,7 +28,7 @@ class ScalaSourceField(SingleSourceField):
     expected_file_extensions = (".scala",)
 
 
-class ScalaGeneratorSources(MultipleSourcesField):
+class ScalaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".scala",)
 
 
@@ -41,9 +41,9 @@ class ScalaFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class ScalaGeneratorFieldSet(FieldSet):
-    required_fields = (ScalaGeneratorSources,)
+    required_fields = (ScalaGeneratorSourcesField,)
 
-    sources: ScalaGeneratorSources
+    sources: ScalaGeneratorSourcesField
 
 
 # -----------------------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class ScalaJunitTestTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaTestsGeneratorSourcesField(ScalaGeneratorSources):
+class ScalaTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
 
 
@@ -134,7 +134,7 @@ class ScalaSourceTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSources):
+class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*.scala",) + tuple(f"!{pat}" for pat in ScalaTestsGeneratorSourcesField.default)
 
 

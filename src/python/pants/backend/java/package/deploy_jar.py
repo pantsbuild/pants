@@ -7,7 +7,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.java.target_types import JvmMainClassName
+from pants.backend.java.target_types import JvmMainClassNameField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -35,11 +35,11 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 @dataclass(frozen=True)
 class DeployJarFieldSet(PackageFieldSet):
     required_fields = (
-        JvmMainClassName,
+        JvmMainClassNameField,
         Dependencies,
     )
 
-    main_class: JvmMainClassName
+    main_class: JvmMainClassNameField
     output_path: OutputPathField
     dependencies: Dependencies
 

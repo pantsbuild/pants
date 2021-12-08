@@ -123,7 +123,7 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     )
 
 
-class JvmResolveName(StringField):
+class JvmResolveNameField(StringField):
     alias = "resolve"
     required = False
     help = (
