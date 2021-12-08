@@ -293,8 +293,8 @@ impl ExecuteProcess {
         .map_err(|err| format!("Error parsing input_digest {}", err))?;
       let use_nailgun = lift_directory_digest(externs::getattr(value, "use_nailgun").unwrap())
         .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
-      let reusable_input_digests =
-        externs::getattr_from_str_frozendict::<&PyAny>(value, "reusable_input_digests")
+      let immutable_inputs =
+        externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
           .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
@@ -303,7 +303,7 @@ impl ExecuteProcess {
         store,
         input_files,
         use_nailgun,
-        reusable_input_digests,
+        immutable_inputs,
       ))
     });
 

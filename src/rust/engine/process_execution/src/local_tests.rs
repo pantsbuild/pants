@@ -579,7 +579,7 @@ async fn working_directory() {
 }
 
 #[tokio::test]
-async fn reusable_input_digests() {
+async fn immutable_inputs() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -609,7 +609,7 @@ async fn reusable_input_digests() {
   process.input_files = EMPTY_DIGEST;
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
-  process.reusable_input_digests = {
+  process.immutable_inputs = {
     let mut map = BTreeMap::new();
     map.insert(
       RelativePath::new("cats").unwrap(),

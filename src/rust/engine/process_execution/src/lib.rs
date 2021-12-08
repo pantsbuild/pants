@@ -197,33 +197,35 @@ pub struct InputDigests {
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
+  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
+  ///
   pub input_files: Digest,
 
-  ///
-  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
-  ///
-  /// TODO: The `use_nailgun` Digest is disjoint with the `reusable_input_digests`. When nailgun
-  /// is in use, it amortizes the cost of materializing this Digest across all of the uses of the
-  /// server, which makes the optimizations available to `reusable_input_digests` less necessary.
-  /// We should likely still eventually implement the `use_nailgun` Digest in terms of
-  /// `reusable_input_digests` though, in order to improve performance when nailgun is disabled.
-  ///
-  pub use_nailgun: Digest,
-
-  /// "Reusable" digests to make available in the input root.
+  /// Immutable input digests to make available in the input root.
   ///
   /// These digests are intended for inputs that will be reused between multiple Process
-  /// invocations.This is useful, for example, for the files used by a tool to be
-  /// invoked in the `Process`.
+  /// invocations, without being mutated. This might be useful to provide the tools being executed,
+  /// but can also be used for tool inputs such as compilation artifacts.
   ///
   /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
   /// The executor may choose how to make the digests available, including by just merging
   /// the digest normally into the input root, creating a symlink to a persistent cache,
   /// or bind mounting the directory read-only into a persistent cache.
   ///
-  /// Assumes the build action does not modify the digest as made available. This may be
+  /// Assumes the build action does not modify the Digest as made available. This may be
   /// enforced by an executor, for example by bind mounting the directory read-only.
-  pub reusable_input_digests: BTreeMap<RelativePath, Digest>,
+  pub immutable_inputs: BTreeMap<RelativePath, Digest>,
+
+  ///
+  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
+  ///
+  /// TODO: The `use_nailgun` Digest is disjoint with the `immutable_inputs`. When nailgun
+  /// is in use, it amortizes the cost of materializing this Digest across all of the uses of the
+  /// server, which makes the optimizations available to `immutable_inputs` less necessary.
+  /// We should likely still eventually implement the `use_nailgun` Digest in terms of
+  /// `immutable_inputs` though, in order to improve performance when nailgun is disabled.
+  ///
+  pub use_nailgun: Digest,
 }
 
 impl InputDigests {
@@ -231,10 +233,10 @@ impl InputDigests {
     store: &Store,
     input_files: Digest,
     use_nailgun: Digest,
-    reusable_input_digests: BTreeMap<RelativePath, Digest>,
+    immutable_inputs: BTreeMap<RelativePath, Digest>,
   ) -> Result<Self, SnapshotOpsError> {
     let mut complete_digests = futures::future::try_join_all(
-      reusable_input_digests
+      immutable_inputs
         .iter()
         .map(|(path, digest)| store.add_prefix(*digest, path))
         .collect::<Vec<_>>(),
@@ -247,8 +249,8 @@ impl InputDigests {
     Ok(Self {
       complete,
       input_files,
+      immutable_inputs,
       use_nailgun,
-      reusable_input_digests,
     })
   }
 
@@ -256,8 +258,8 @@ impl InputDigests {
     Self {
       complete: input_files,
       input_files,
+      immutable_inputs: BTreeMap::new(),
       use_nailgun: hashing::EMPTY_DIGEST,
-      reusable_input_digests: BTreeMap::new(),
     }
   }
 }
@@ -267,8 +269,8 @@ impl Default for InputDigests {
     Self {
       complete: hashing::EMPTY_DIGEST,
       input_files: hashing::EMPTY_DIGEST,
+      immutable_inputs: BTreeMap::default(),
       use_nailgun: hashing::EMPTY_DIGEST,
-      reusable_input_digests: BTreeMap::default(),
     }
   }
 }

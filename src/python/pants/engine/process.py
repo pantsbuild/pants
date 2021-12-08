@@ -56,6 +56,8 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
+    immutable_input_digests: FrozenDict[str, Digest]
+    use_nailgun: Digest
     working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
@@ -63,10 +65,8 @@ class Process:
     output_directories: tuple[str, ...]
     timeout_seconds: int | float
     jdk_home: str | None
-    use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
-    reusable_input_digests: FrozenDict[str, Digest]
     platform: str | None
 
     def __init__(
@@ -76,6 +76,8 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        use_nailgun: Digest = EMPTY_DIGEST,
         working_directory: str | None = None,
         env: Mapping[str, str] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
@@ -83,10 +85,8 @@ class Process:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
-        use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-        reusable_input_digests: Mapping[str, Digest] | None = None,
         platform: Platform | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
@@ -121,6 +121,8 @@ class Process:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
+        self.use_nailgun = use_nailgun
         self.working_directory = working_directory
         self.env = FrozenDict(env or {})
         self.append_only_caches = FrozenDict(append_only_caches or {})
@@ -129,10 +131,8 @@ class Process:
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
-        self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
-        self.reusable_input_digests = FrozenDict(reusable_input_digests or {})
         self.platform = platform.value if platform is not None else None
 
 

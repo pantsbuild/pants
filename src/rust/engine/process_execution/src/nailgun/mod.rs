@@ -51,7 +51,7 @@ fn construct_nailgun_server_request(
     complete: client_request.input_digests.use_nailgun,
     use_nailgun: client_request.input_digests.use_nailgun,
     input_files: hashing::EMPTY_DIGEST,
-    reusable_input_digests: BTreeMap::default(),
+    immutable_inputs: BTreeMap::default(),
   };
 
   Process {

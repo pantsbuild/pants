@@ -89,7 +89,6 @@ async fn make_execute_request() {
     platform_constraint: None,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -166,7 +165,6 @@ async fn make_execute_request_with_instance_name() {
     platform_constraint: None,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -256,7 +254,6 @@ async fn make_execute_request_with_cache_key_gen_version() {
     platform_constraint: None,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let mut want_command = remexec::Command {
@@ -493,7 +490,6 @@ async fn make_execute_request_with_timeout() {
     platform_constraint: None,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
-    reusable_input_digests: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -551,7 +547,7 @@ async fn make_execute_request_with_timeout() {
 }
 
 #[tokio::test]
-async fn make_execute_request_using_reusable_input_digests() {
+async fn make_execute_request_using_immutable_inputs() {
   let input_directory = TestDirectory::containing_roland();
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
