@@ -214,10 +214,6 @@ class RequirementCoordinate:
         )
 
 
-class RequirementCoordinates(DeduplicatedCollection[RequirementCoordinate]):
-    """An ordered list of `Coordinate`s."""
-
-
 @dataclass(frozen=True)
 class AllJarTargets:
     """A dictionary of targets that provide JAR files, indexed by coordinate."""
