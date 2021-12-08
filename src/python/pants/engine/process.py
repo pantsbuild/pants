@@ -57,7 +57,7 @@ class Process:
     level: LogLevel
     input_digest: Digest
     immutable_input_digests: FrozenDict[str, Digest]
-    use_nailgun: Digest
+    use_nailgun: tuple[str, ...]
     working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
@@ -77,7 +77,7 @@ class Process:
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
         immutable_input_digests: Mapping[str, Digest] | None = None,
-        use_nailgun: Digest = EMPTY_DIGEST,
+        use_nailgun: Sequence[str] = (),
         working_directory: str | None = None,
         env: Mapping[str, str] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
@@ -122,7 +122,7 @@ class Process:
         self.level = level
         self.input_digest = input_digest
         self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
-        self.use_nailgun = use_nailgun
+        self.use_nailgun = tuple(use_nailgun)
         self.working_directory = working_directory
         self.env = FrozenDict(env or {})
         self.append_only_caches = FrozenDict(append_only_caches or {})

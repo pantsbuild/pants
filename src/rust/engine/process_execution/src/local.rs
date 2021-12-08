@@ -33,7 +33,7 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -44,6 +44,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
+  immutable_inputs: ImmutableInputs,
   cleanup_local_dirs: bool,
   platform: Platform,
   spawn_lock: RwLock<()>,
@@ -55,6 +56,7 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
+    immutable_inputs: ImmutableInputs,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
@@ -62,6 +64,7 @@ impl CommandRunner {
       executor,
       work_dir_base,
       named_caches,
+      immutable_inputs,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
@@ -124,6 +127,14 @@ impl CommandRunner {
       .await
     })
     .boxed()
+  }
+
+  pub fn named_caches(&self) -> &NamedCaches {
+    &self.named_caches
+  }
+
+  pub fn immutable_inputs(&self) -> &ImmutableInputs {
+    &self.immutable_inputs
   }
 }
 
@@ -286,11 +297,12 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           workdir_path.clone(),
           &req,
-          req.input_digests.complete,
+          req.input_digests.input_files,
           context.clone(),
           self.store.clone(),
           self.executor.clone(),
-          self.named_caches(),
+          &self.named_caches,
+          &self.immutable_inputs,
         )
         .await?;
 
@@ -340,10 +352,6 @@ impl super::CommandRunner for CommandRunner {
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = ();
-
-  fn named_caches(&self) -> &NamedCaches {
-    &self.named_caches
-  }
 
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
@@ -567,8 +575,6 @@ pub trait CapturedWorkdir {
     }
   }
 
-  fn named_caches(&self) -> &NamedCaches;
-
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
   ///
@@ -605,15 +611,19 @@ pub trait CapturedWorkdir {
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
-  input_digest: hashing::Digest,
+  materialized_input_digest: hashing::Digest,
   context: Context,
   store: Store,
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
+  immutable_inputs: &ImmutableInputs,
 ) -> Result<bool, String> {
-  // If named caches are configured, collect the symlinks to create.
-  let named_cache_symlinks = named_caches
-    .local_paths(&req.append_only_caches)
+  // Collect the symlinks to create for immutable inputs or named caches.
+  let workdir_symlinks = immutable_inputs
+    .local_paths(&req.input_digests.immutable_inputs)
+    .await?
+    .into_iter()
+    .chain(named_caches.local_paths(&req.append_only_caches))
     .collect::<Vec<_>>();
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
@@ -640,7 +650,11 @@ pub async fn prepare_workdir(
     },
     |_workunit| async move {
       store2
-        .materialize_directory(workdir_path_2, input_digest, Permissions::Writable)
+        .materialize_directory(
+          workdir_path_2,
+          materialized_input_digest,
+          Permissions::Writable,
+        )
         .await
     },
   )
@@ -660,16 +674,13 @@ pub async fn prepare_workdir(
       // The bazel remote execution API specifies that the parent directories for output files and
       // output directories should be created before execution completes: see
       //   https://github.com/pantsbuild/pants/issues/7084.
-      // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
-      // even more efficient to only retain the directories at greatest nesting depth, as
-      // create_dir_all() will ensure all parents are created. At that point, we might consider
-      // explicitly enumerating all the directories to be created and just using create_dir(),
-      // unless there is some optimization in create_dir_all() that makes that less efficient.
+      // TODO: Creating a Digest containing all directories to create, and merging it into the
+      // `materialized` Digest above would allow these to be materialized in parallel.
       let parent_paths_to_create: HashSet<_> = output_file_paths
         .iter()
         .chain(output_dir_paths.iter())
         .map(|relative_path| relative_path.as_ref())
-        .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
+        .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
         .filter_map(|rel_path| rel_path.parent())
         .map(|parent_relpath| workdir_path2.join(parent_relpath))
         .collect();
@@ -682,20 +693,21 @@ pub async fn prepare_workdir(
         })?;
       }
 
-      for named_cache_symlink in named_cache_symlinks {
-        safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+      for workdir_symlink in workdir_symlinks {
+        // TODO: Move initialization of the dst directory into NamedCaches.
+        safe_create_dir_all_ioerror(&workdir_symlink.dst).map_err(|err| {
           format!(
             "Error making {} for local execution: {:?}",
-            named_cache_symlink.src.display(),
+            workdir_symlink.dst.display(),
             err
           )
         })?;
-        let dst = workdir_path2.join(&named_cache_symlink.dst);
-        symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+        let src = workdir_path2.join(&workdir_symlink.src);
+        symlink(&workdir_symlink.dst, &src).map_err(|err| {
           format!(
             "Error linking {} -> {} for local execution: {:?}",
-            named_cache_symlink.src.display(),
-            dst.display(),
+            src.display(),
+            workdir_symlink.dst.display(),
             err
           )
         })?;

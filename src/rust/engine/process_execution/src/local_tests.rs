@@ -1,24 +1,26 @@
-use tempfile;
-use testutil;
-
-use crate::{
-  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, RelativePath,
-};
-use hashing::EMPTY_DIGEST;
-use shell_quote::bash;
-use spectral::{assert_that, string::StrAssertions};
 use std;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
+
+use hashing::EMPTY_DIGEST;
+use maplit::hashset;
+use shell_quote::bash;
+use spectral::{assert_that, string::StrAssertions};
 use store::Store;
+use tempfile;
 use tempfile::TempDir;
+use testutil;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
+
+use crate::{
+  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  ImmutableInputs, InputDigests, NamedCaches, Platform, Process, RelativePath,
+};
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -306,7 +308,7 @@ async fn append_only_cache_created() {
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = CacheDest::new(format!("{}/{}", dest_base, name)).unwrap();
+  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
   let result = run_command_locally(
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
@@ -586,8 +588,6 @@ async fn immutable_inputs() {
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
-  // then run from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
@@ -597,26 +597,30 @@ async fn immutable_inputs() {
     .await
     .expect("Error saving directory");
   store
-    .record_directory(&TestDirectory::nested().directory(), true)
+    .record_directory(&TestDirectory::containing_falcons_dir().directory(), true)
     .await
     .expect("Error saving directory");
 
   let work_dir = TempDir::new().unwrap();
 
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
-  process.working_directory = Some(RelativePath::new("cats").unwrap());
-  process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
-  process.input_files = EMPTY_DIGEST;
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::containing_falcons_dir().digest(),
+    {
+      let mut map = BTreeMap::new();
+      map.insert(
+        RelativePath::new("cats").unwrap(),
+        TestDirectory::containing_roland().digest(),
+      );
+      map
+    },
+    vec![],
+  )
+  .await
+  .unwrap();
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
-  process.immutable_inputs = {
-    let mut map = BTreeMap::new();
-    map.insert(
-      RelativePath::new("cats").unwrap(),
-      TestDirectory::containing_roland().digest(),
-    );
-    map
-  };
 
   let result = run_command_locally_in_dir(
     process,
@@ -629,14 +633,13 @@ async fn immutable_inputs() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
+  let stdout_lines = str::from_utf8(&result.stdout_bytes)
+    .unwrap()
+    .lines()
+    .collect::<HashSet<_>>();
+  assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(
-    result.original.output_directory,
-    TestDirectory::containing_roland().digest()
-  );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
@@ -662,8 +665,9 @@ async fn run_command_locally_in_dir(
   let runner = crate::local::CommandRunner::new(
     store.clone(),
     executor.clone(),
-    dir,
+    dir.clone(),
     NamedCaches::new(named_cache_dir.path().to_owned()),
+    ImmutableInputs::new(store.clone(), &dir)?,
     cleanup,
   );
   let original = runner.run(Context::default(), workunit, req.into()).await?;

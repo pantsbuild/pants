@@ -36,6 +36,8 @@ use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
+use futures::future::try_join_all;
+use futures::try_join;
 use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -50,9 +52,15 @@ mod cache_tests;
 
 pub mod children;
 
+pub mod immutable_inputs;
+
 pub mod local;
 #[cfg(test)]
 mod local_tests;
+
+pub mod nailgun;
+
+pub mod named_caches;
 
 pub mod remote;
 #[cfg(test)]
@@ -62,14 +70,11 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod nailgun;
-
-pub mod named_caches;
-
 extern crate uname;
 
 pub use crate::children::ManagedChild;
-pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+pub use crate::immutable_inputs::ImmutableInputs;
+pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -178,27 +183,37 @@ fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::
   s.serialize_str(&level.to_string())
 }
 
-///
+/// A symlink from a relative src to an absolute dst (outside of the workdir).
+#[derive(Debug)]
+pub struct WorkdirSymlink {
+  pub src: RelativePath,
+  pub dst: PathBuf,
+}
+
 /// Input Digests for a process execution.
 ///
-/// The `complete` Digest is the computed union of all inputs: the rest of the Digests should be
-/// disjoint (or have identical contents where they overlap), which is validated by computing this
-/// value.
+/// The `complete` and `nailgun` Digests are the computed union of various inputs.
 ///
+/// TODO: Validate that `immutable_inputs` and `input_files` are disjoint in terms of created
+/// symlinks. Currently the local runner will fail to symlink if the `input_files` contain any
+/// directories/files which collide which the symlinks created for `immutable_inputs`, but we
+/// should fail earlier with an error message. One way to do that would be to create a synthetic
+/// Digest with the symlinks that we will create as files with content like `Symlink to $DIGEST`,
+/// and then merge that with the `input_files` Digest: that would trigger collisions for either
+/// directories or files at the location of the symlink.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
 pub struct InputDigests {
-  ///
-  /// All of the input Digests, merged and properly relativized. Runners without the ability to
-  /// consume the Digests individually should directly consume this value.
-  ///
+  /// All of the input Digests, merged and relativized. Runners without the ability to consume the
+  /// Digests individually should directly consume this value.
   pub complete: Digest,
 
-  ///
+  /// The merged Digest of any `use_nailgun`-relevant Digests.
+  pub nailgun: Digest,
+
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
   /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
-  ///
   pub input_files: Digest,
 
   /// Immutable input digests to make available in the input root.
@@ -210,44 +225,52 @@ pub struct InputDigests {
   /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
   /// The executor may choose how to make the digests available, including by just merging
   /// the digest normally into the input root, creating a symlink to a persistent cache,
-  /// or bind mounting the directory read-only into a persistent cache.
+  /// or bind mounting the directory read-only into a persistent cache. Consequently, the mount
+  /// point of each input must not overlap the `input_files`, even for directory entries.
   ///
   /// Assumes the build action does not modify the Digest as made available. This may be
   /// enforced by an executor, for example by bind mounting the directory read-only.
   pub immutable_inputs: BTreeMap<RelativePath, Digest>,
 
-  ///
-  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
-  ///
-  /// TODO: The `use_nailgun` Digest is disjoint with the `immutable_inputs`. When nailgun
-  /// is in use, it amortizes the cost of materializing this Digest across all of the uses of the
-  /// server, which makes the optimizations available to `immutable_inputs` less necessary.
-  /// We should likely still eventually implement the `use_nailgun` Digest in terms of
-  /// `immutable_inputs` though, in order to improve performance when nailgun is disabled.
-  ///
-  pub use_nailgun: Digest,
+  /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
+  /// as server inputs. All other keys (and the input_files) will be client inputs.
+  pub use_nailgun: Vec<RelativePath>,
 }
 
 impl InputDigests {
   pub async fn new(
     store: &Store,
     input_files: Digest,
-    use_nailgun: Digest,
     immutable_inputs: BTreeMap<RelativePath, Digest>,
+    use_nailgun: Vec<RelativePath>,
   ) -> Result<Self, SnapshotOpsError> {
-    let mut complete_digests = futures::future::try_join_all(
+    // Collect all digests into `complete`.
+    let mut complete_digests = try_join_all(
       immutable_inputs
         .iter()
         .map(|(path, digest)| store.add_prefix(*digest, path))
         .collect::<Vec<_>>(),
     )
     .await?;
+    // And collect only the subset of the Digests which impact nailgun into `nailgun`.
+    let nailgun_digests = immutable_inputs
+      .keys()
+      .zip(complete_digests.iter())
+      .filter_map(|(path, digest)| {
+        if use_nailgun.contains(path) {
+          Some(*digest)
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
     complete_digests.push(input_files);
-    complete_digests.push(use_nailgun);
 
-    let complete = store.merge(complete_digests).await?;
+    let (complete, nailgun) =
+      try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
       complete,
+      nailgun,
       input_files,
       immutable_inputs,
       use_nailgun,
@@ -257,10 +280,44 @@ impl InputDigests {
   pub fn with_input_files(input_files: Digest) -> Self {
     Self {
       complete: input_files,
+      nailgun: hashing::EMPTY_DIGEST,
       input_files,
       immutable_inputs: BTreeMap::new(),
-      use_nailgun: hashing::EMPTY_DIGEST,
+      use_nailgun: Vec::new(),
     }
+  }
+
+  /// Split the InputDigests into client and server subsets.
+  ///
+  /// TODO: The server subset will have an accurate `complete` Digest, but the client will not.
+  /// This is currently safe because the nailgun client code does not consume that field, but it
+  /// would be good to find a better factoring.
+  pub fn nailgun_client_and_server(&self) -> (InputDigests, InputDigests) {
+    let (server, client) = self
+      .immutable_inputs
+      .clone()
+      .into_iter()
+      .partition(|(path, _digest)| self.use_nailgun.contains(path));
+
+    (
+      // Client.
+      InputDigests {
+        // TODO: See method doc.
+        complete: hashing::EMPTY_DIGEST,
+        nailgun: hashing::EMPTY_DIGEST,
+        input_files: self.input_files,
+        immutable_inputs: client,
+        use_nailgun: vec![],
+      },
+      // Server.
+      InputDigests {
+        complete: self.nailgun,
+        nailgun: hashing::EMPTY_DIGEST,
+        input_files: hashing::EMPTY_DIGEST,
+        immutable_inputs: server,
+        use_nailgun: vec![],
+      },
+    )
   }
 }
 
@@ -268,9 +325,10 @@ impl Default for InputDigests {
   fn default() -> Self {
     Self {
       complete: hashing::EMPTY_DIGEST,
+      nailgun: hashing::EMPTY_DIGEST,
       input_files: hashing::EMPTY_DIGEST,
-      immutable_inputs: BTreeMap::default(),
-      use_nailgun: hashing::EMPTY_DIGEST,
+      immutable_inputs: BTreeMap::new(),
+      use_nailgun: Vec::new(),
     }
   }
 }
@@ -338,7 +396,7 @@ pub struct Process {
   /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
   /// must never assume that it has exclusive access to the provided directory.
   ///
-  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
+  pub append_only_caches: BTreeMap<CacheName, RelativePath>,
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
@@ -414,7 +472,7 @@ impl Process {
   ///
   pub fn append_only_caches(
     mut self,
-    append_only_caches: BTreeMap<CacheName, CacheDest>,
+    append_only_caches: BTreeMap<CacheName, RelativePath>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
     self

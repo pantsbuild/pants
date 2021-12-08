@@ -23,7 +23,7 @@ use fs::{safe_create_dir_all_ioerror, Permissions, PreparedPathGlobs, RelativePa
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
-use process_execution::{CacheDest, CacheName, ManagedChild, NamedCaches};
+use process_execution::{CacheName, ManagedChild, NamedCaches};
 use pyo3::{PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -566,9 +566,9 @@ fn interactive_process(
       let input_digest: Digest = lift_directory_digest(py_input_digest)?;
       let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
-      let append_only_caches = externs::getattr_from_str_frozendict(py_interactive_process, "append_only_caches")
+      let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
         .into_iter()
-        .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
+        .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
         .collect::<Result<BTreeMap<_, _>, String>>()?;
       if !append_only_caches.is_empty() && run_in_workspace {
         return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned());
@@ -608,39 +608,42 @@ fn interactive_process(
         .await?;
     }
 
+    // TODO: `immutable_input_digests` are not supported for InteractiveProcess, but they would be
+    // materialized here.
+    //   see https://github.com/pantsbuild/pants/issues/13852
     if !append_only_caches.is_empty() {
        let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
        let named_cache_symlinks = named_caches
            .local_paths(&append_only_caches)
            .collect::<Vec<_>>();
 
-       let destination = match maybe_tempdir {
+       let workdir = match maybe_tempdir {
          Some(ref dir) => dir.path().to_path_buf(),
          None => unreachable!(),
        };
 
        for named_cache_symlink in named_cache_symlinks {
-         safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+         safe_create_dir_all_ioerror(&named_cache_symlink.dst).map_err(|err| {
            format!(
              "Error making {} for local execution: {:?}",
-             named_cache_symlink.src.display(),
+             named_cache_symlink.dst.display(),
              err
            )
          })?;
 
-         let dst = destination.join(&named_cache_symlink.dst);
-         if let Some(dir) = dst.parent() {
+         let src = workdir.join(&named_cache_symlink.src);
+         if let Some(dir) = src.parent() {
            safe_create_dir_all_ioerror(dir).map_err(|err| {
              format!(
                "Error making {} for local execution: {:?}", dir.display(), err
              )
            })?;
          }
-         symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+         symlink(&named_cache_symlink.dst, &src).map_err(|err| {
            format!(
              "Error linking {} -> {} for local execution: {:?}",
-             named_cache_symlink.src.display(),
-             dst.display(),
+             src.display(),
+             named_cache_symlink.dst.display(),
              err
            )
          })?;
