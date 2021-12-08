@@ -11,7 +11,7 @@ class ScalafmtSubsystem(JvmToolBase):
     help = "scalafmt (https://scalameta.org/scalafmt/)"
 
     default_version = "3.2.1"
-    default_artifacts = ["org.scalameta:scalafmt-cli_2.13:{version}"]
+    default_artifacts = ("org.scalameta:scalafmt-cli_2.13:{version}",)
     default_lockfile_resource = (
         "pants.backend.scala.lint.scalafmt",
         "scalafmt.default.lockfile.txt",
