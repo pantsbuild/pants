@@ -20,17 +20,17 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
     PexBinary,
-    PexBinaryDependencies,
+    PexBinaryDependenciesField,
     PexEntryPointField,
     PexScriptField,
     PythonDistribution,
-    PythonDistributionDependencies,
+    PythonDistributionDependenciesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
-    PythonTestsTimeout,
+    PythonTestsTimeoutField,
     PythonTestTarget,
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
@@ -87,7 +87,7 @@ def test_timeout_calculation() -> None:
         global_max: int | None = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
+        field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -253,7 +253,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependencies])],
+            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
         )
         assert injected == InjectedDependencies([expected] if expected else [])
 
@@ -483,7 +483,7 @@ def test_inject_python_distribution_dependencies() -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
+            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
         )
         assert injected == InjectedDependencies(expected)
 

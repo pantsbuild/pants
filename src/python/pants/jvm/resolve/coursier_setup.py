@@ -107,6 +107,7 @@ class Coursier:
     post_processing_script: ClassVar[str] = "coursier_post_processing_script.py"
     cache_name: ClassVar[str] = "coursier"
     cache_dir: ClassVar[str] = ".cache"
+    working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
         return tuple((*wrapper, self.coursier.exe, *args))
@@ -142,8 +143,12 @@ async def setup_coursier(
         json_output_file="$1"
         shift
 
-        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" "$@"
+        WORKING_DIRECTORY=$(pwd)
+        ARGS=$*
+        ARGS=$(echo $ARGS | /usr/bin/sed 's|{Coursier.working_directory_placeholder}|'$WORKING_DIRECTORY'|g')
 
+
+        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" $ARGS
         /bin/mkdir -p classpath
         {python.path} coursier_post_processing_script.py "$json_output_file"
         """
