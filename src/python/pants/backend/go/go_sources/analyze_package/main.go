@@ -60,9 +60,9 @@ type Package struct {
 	//	//go:embed a* b.c
 	// then the list will contain those two strings as separate entries.
 	// (See package embed for more details about //go:embed.)
-	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
-	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
-	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
+	EmbedPatterns      []string  `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	TestEmbedPatterns  []string  `json:",omitempty"` // patterns from TestGoFiles
+	XTestEmbedPatterns []string  `json:",omitempty"` // patterns from XTestGoFiles
 
 	// Error information. This differs from how `go list` reports errors.
 	InvalidGoFiles map[string]string `json:",omitempty"`

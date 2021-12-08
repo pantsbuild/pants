@@ -457,7 +457,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
         "idna==2.5",
         "urllib3==1.21.1",
     ]
-    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    rule_runner.write_files({"constraints.txt": "\n".join(constraints)})
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
         requirements=PexRequirements(direct_deps, apply_constraints=True),
@@ -559,7 +559,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         "idna==2.10",
         "urllib3==1.25.11",
     ]
-    rule_runner.create_file("constraints.txt", "\n".join(constraints))
+    rule_runner.write_files({"constraints.txt": "\n".join(constraints)})
     pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,

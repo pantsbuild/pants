@@ -8,6 +8,8 @@ from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
+from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
+from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
@@ -46,6 +48,7 @@ async def compile_scala_source(
     coursier: Coursier,
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
+    scalac_plugins: GlobalScalacPlugins,
     union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
@@ -145,18 +148,24 @@ async def compile_scala_source(
         Digest, AddPrefix(merged_transitive_dependency_classpath_entries_digest, usercp)
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                prefixed_transitive_dependency_classpath_digest,
-                tool_classpath.digest,
-                jdk_setup.digest,
-                *(
-                    sources.snapshot.digest
-                    for _, sources in component_members_and_scala_source_files
-                ),
-            )
+    merged_tool_digest, merged_input_digest = await MultiGet(
+        Get(
+            Digest,
+            MergeDigests(
+                (tool_classpath.digest, scalac_plugins.classpath.digest, jdk_setup.digest)
+            ),
+        ),
+        Get(
+            Digest,
+            MergeDigests(
+                (
+                    prefixed_transitive_dependency_classpath_digest,
+                    *(
+                        sources.snapshot.digest
+                        for _, sources in component_members_and_scala_source_files
+                    ),
+                )
+            ),
         ),
     )
 
@@ -173,6 +182,7 @@ async def compile_scala_source(
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
+                *scalac_plugins.args(),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
@@ -183,8 +193,8 @@ async def compile_scala_source(
                     )
                 ),
             ],
-            input_digest=merged_digest,
-            use_nailgun=jdk_setup.digest,
+            input_digest=merged_input_digest,
+            use_nailgun=merged_tool_digest,
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
@@ -209,5 +219,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        *scalac_plugins_rules(),
         UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
     ]

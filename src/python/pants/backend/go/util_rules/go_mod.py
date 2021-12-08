@@ -12,9 +12,9 @@ from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, RemovePrefix
+from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -66,13 +66,8 @@ async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
 class GoModInfo:
     # Import path of the Go module, based on the `module` in `go.mod`.
     import_path: str
-
-    # Digest containing the full paths to `go.mod` and `go.sum`.
     digest: Digest
-
-    # Digest containing `go.mod` and `go.sum` with no path prefixes.
-    stripped_digest: Digest
-
+    mod_path: str
     minimum_go_version: str | None
 
 
@@ -96,9 +91,8 @@ async def determine_go_mod_info(
     # Get the `go.mod` (and `go.sum`) and strip so the file has no directory prefix.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources_field))
     sources_digest = hydrated_sources.snapshot.digest
-    stripped_source_get = Get(Digest, RemovePrefix(sources_digest, go_mod_dir))
 
-    mod_json_get = Get(
+    mod_json = await Get(
         ProcessResult,
         GoSdkProcess(
             command=("mod", "edit", "-json"),
@@ -107,13 +101,11 @@ async def determine_go_mod_info(
             description=f"Parse {go_mod_path}",
         ),
     )
-
-    mod_json, stripped_sources = await MultiGet(mod_json_get, stripped_source_get)
     module_metadata = json.loads(mod_json.stdout)
     return GoModInfo(
         import_path=module_metadata["Module"]["Path"],
         digest=sources_digest,
-        stripped_digest=stripped_sources,
+        mod_path=go_mod_path,
         minimum_go_version=module_metadata.get("Go"),
     )
 

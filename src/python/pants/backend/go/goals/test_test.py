@@ -23,8 +23,10 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
-from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
+from pants.core.target_types import FileTarget
+from pants.core.util_rules import source_files
+from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -43,21 +45,49 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
+            *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
 
 
 def test_transform_test_args() -> None:
-    assert transform_test_args(["-v", "--", "-v"]) == ("-test.v", "--", "-v")
-    assert transform_test_args(["-run=TestFoo", "-v"]) == ("-test.run=TestFoo", "-test.v")
-    assert transform_test_args(["-run", "TestFoo", "-foo", "-v"]) == (
+    assert transform_test_args(["-v", "--", "-v"], timeout_field_value=None) == (
+        "-test.v",
+        "--",
+        "-v",
+    )
+    assert transform_test_args(["-run=TestFoo", "-v"], timeout_field_value=None) == (
+        "-test.run=TestFoo",
+        "-test.v",
+    )
+    assert transform_test_args(["-run", "TestFoo", "-foo", "-v"], timeout_field_value=None) == (
         "-test.run",
         "TestFoo",
         "-foo",
+        "-test.v",
+    )
+
+    assert transform_test_args(["-timeout=1m", "-v"], timeout_field_value=None) == (
+        "-test.timeout=1m",
+        "-test.v",
+    )
+    assert transform_test_args(["-timeout", "1m", "-v"], timeout_field_value=None) == (
+        "-test.timeout",
+        "1m",
+        "-test.v",
+    )
+    assert transform_test_args(["-v"], timeout_field_value=100) == ("-test.v", "-test.timeout=100s")
+    assert transform_test_args(["-timeout=1m", "-v"], timeout_field_value=100) == (
+        "-test.timeout=1m",
+        "-test.v",
+    )
+    assert transform_test_args(["-timeout", "1m", "-v"], timeout_field_value=100) == (
+        "-test.timeout",
+        "1m",
         "-test.v",
     )
 
@@ -546,3 +576,44 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 1
     assert "failed to parse" in result.stderr
+
+
+def test_file_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "f.txt": "",
+            "BUILD": "file(name='root', source='f.txt')",
+            "foo/BUILD": textwrap.dedent(
+                """
+                go_mod(name='mod')
+                go_package(dependencies=[":testdata", "//:root"])
+                file(name="testdata", source="testdata/f.txt")
+                """
+            ),
+            "foo/go.mod": "module foo",
+            "foo/foo_test.go": textwrap.dedent(
+                """
+                package foo
+                import (
+                  "os"
+                  "testing"
+                )
+
+                func TestFilesAvailable(t *testing.T) {
+                  _, err1 := os.Stat("testdata/f.txt")
+                  if err1 != nil {
+                    t.Fatalf("Could not stat foo/testdata/f.txt: %v", err1)
+                  }
+                  _, err2 := os.Stat("../f.txt")
+                  if err2 != nil {
+                    t.Fatalf("Could not stat f.txt: %v", err2)
+                  }
+                }
+                """
+            ),
+            "foo/testdata/f.txt": "",
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0

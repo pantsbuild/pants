@@ -72,7 +72,7 @@ def set_up_go_mod(rule_runner: RuleRunner, go_mod: str, go_sum: str) -> Digest:
 def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest)]
+        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest, "go.mod")]
     )
     assert set(all_packages.import_paths_to_pkg_info.keys()) == {
         "golang.org/x/text/encoding/japanese",
@@ -242,7 +242,7 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)])
+        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
 def test_missing_go_sum(rule_runner: RuleRunner) -> None:
@@ -264,7 +264,7 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(contains="github.com/google/uuid@v1.3.0: missing go.sum entry"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)])
+        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
 def test_stale_go_mod(rule_runner: RuleRunner) -> None:
@@ -289,7 +289,7 @@ def test_stale_go_mod(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="updates to go.mod needed"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)])
+        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
 def test_pkg_missing(rule_runner: RuleRunner) -> None:
@@ -298,7 +298,8 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
         AssertionError, contains="The package `another_project.org/foo` was not downloaded"
     ):
         rule_runner.request(
-            ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest("another_project.org/foo", digest)]
+            ThirdPartyPkgInfo,
+            [ThirdPartyPkgInfoRequest("another_project.org/foo", digest, "go.mod")],
         )
 
 
@@ -320,7 +321,7 @@ def test_module_with_no_packages(rule_runner) -> None:
         ),
     )
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest)]
+        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")]
     )
     assert not all_packages.import_paths_to_pkg_info
 
@@ -392,7 +393,8 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest)]
+        ThirdPartyPkgInfo,
+        [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
     )
     assert pkg_info.error is not None
 
@@ -513,7 +515,7 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest)],
+        [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
     )
     assert pkg_info.dir_path == "github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
@@ -541,7 +543,7 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("github.com/ugorji/go/codec", digest)],
+        [ThirdPartyPkgInfoRequest("github.com/ugorji/go/codec", digest, "go.mod")],
     )
     assert pkg_info.error is not None
     # This particular error is tricky because `Dir` will not have been set, which we need to

@@ -1875,6 +1875,8 @@ class GenerateSourcesRequest:
     input: ClassVar[type[SourcesField]]
     output: ClassVar[type[SourcesField]]
 
+    exportable: ClassVar[bool] = True
+
 
 @dataclass(frozen=True)
 class GeneratedSources:

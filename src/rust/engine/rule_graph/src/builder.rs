@@ -589,7 +589,7 @@ impl<R: Rule> Builder<R> {
             .collect::<Vec<_>>(),
           dependees_by_out_set
         .keys()
-        .map(|out_set| params_str(out_set))
+        .map(params_str)
         .collect::<Vec<_>>(),
         )
       } else {

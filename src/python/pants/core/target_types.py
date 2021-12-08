@@ -225,6 +225,7 @@ class RelocatedFiles(Target):
 class RelocateFilesViaCodegenRequest(GenerateSourcesRequest):
     input = RelocatedFilesSources
     output = FileSourceField
+    exportable = False
 
 
 @rule(desc="Relocating loose files for `relocated_files` targets", level=LogLevel.DEBUG)

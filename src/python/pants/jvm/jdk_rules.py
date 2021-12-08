@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 import textwrap
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ class JdkSetup:
     digest: Digest
     nailgun_jar: str
     coursier: Coursier
+    jre_major_version: int
     jdk_preparation_script: ClassVar[str] = "__jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
@@ -43,6 +45,18 @@ class JdkSetup:
     @property
     def append_only_caches(self) -> dict[str, str]:
         return self.coursier.append_only_caches
+
+
+VERSION_REGEX = re.compile(r"version \"(.+?)\"")
+
+
+def parse_jre_major_version(version_lines: str) -> int | None:
+    for line in version_lines.splitlines():
+        m = VERSION_REGEX.search(line)
+        if m:
+            major_version, _, _ = m[1].partition(".")
+            return int(major_version)
+    return None
 
 
 @rule
@@ -92,12 +106,21 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
-    java_version = java_version_result.stdout.decode("utf-8").strip()
+    java_version = java_version_result.stderr.decode("utf-8").strip()
+    jre_major_version = parse_jre_major_version(java_version)
+    if not jre_major_version:
+        raise ValueError(
+            f"Pants was unable to parse the output of `java -version` for JDK `{javac.options.jdk}`. "
+            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
+            f"with the following output:\n\n{java_version}"
+        )
 
     # TODO: Locate `ln`.
+    version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
     jdk_preparation_script = textwrap.dedent(
         f"""\
-        # pants javac script using Coursier {coursier_jdk_option}. `java -version`: {java_version}"
+        # pants javac script using Coursier {coursier_jdk_option}. `java -version`:"
+        {version_comment}
         set -eu
 
         /bin/ln -s "$({java_home_command})" "{JdkSetup.java_home}"
@@ -129,6 +152,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         ),
         nailgun_jar=nailgun.filenames[0],
         coursier=coursier,
+        jre_major_version=jre_major_version,
     )
 
 

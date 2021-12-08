@@ -1012,13 +1012,10 @@ impl Store {
     let res = async move {
       let write_result = store
         .load_file_bytes_with(digest, move |bytes| {
-          if destination.exists() {
-            std::fs::remove_file(&destination)
-              .map_err(|e| format!("Failed to overwrite {}: {:?}", destination.display(), e))?;
-          }
           let mut f = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .mode(if is_executable { 0o755 } else { 0o644 })
             .open(&destination)
             .map_err(|e| {
@@ -1062,7 +1059,7 @@ impl Store {
               let store = store.clone();
               let res = async move {
                 let maybe_bytes = store
-                  .load_file_bytes_with(file_node_digest, |b| Bytes::copy_from_slice(b))
+                  .load_file_bytes_with(file_node_digest, Bytes::copy_from_slice)
                   .await?;
                 maybe_bytes
                   .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))

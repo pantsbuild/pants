@@ -7,7 +7,11 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.goals.publish import PublishToPyPiFieldSet, PublishToPyPiRequest, rules
+from pants.backend.python.goals.publish import (
+    PublishPythonPackageFieldSet,
+    PublishPythonPackageRequest,
+    rules,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
@@ -28,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *config_files_rules(),
             *pex_from_targets.rules(),
             *rules(),
-            QueryRule(PublishProcesses, [PublishToPyPiRequest]),
+            QueryRule(PublishProcesses, [PublishPythonPackageRequest]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
@@ -71,7 +75,7 @@ def project_files(
                 name="my-package",
                 version="0.1.0",
               ),
-              pypi_repositories={repositories!r},
+              repositories={repositories!r},
               skip_twine={skip_twine},
             )
             """
@@ -83,7 +87,7 @@ def project_files(
 
 def request_publish_processes(rule_runner: RuleRunner, packages) -> PublishProcesses:
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
-    fs = PublishToPyPiFieldSet.create(tgt)
+    fs = PublishPythonPackageFieldSet.create(tgt)
     return rule_runner.request(PublishProcesses, [fs._request(packages)])
 
 
@@ -199,7 +203,7 @@ def test_skip_twine(rule_runner, packages) -> None:
     ],
 )
 def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
-    ca_cert_path = rule_runner.create_file("conf/ca_certs.pem", "")
+    ca_cert_path = rule_runner.write_files({"conf/ca_certs.pem": ""})[0]
     rule_runner.write_files(project_files(repositories=["@private"]))
     set_options(rule_runner, [opt.format(ca_cert_path) for opt in options])
     result = request_publish_processes(rule_runner, packages)

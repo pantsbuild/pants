@@ -20,10 +20,11 @@ class GoTestSubsystem(Subsystem):
             member_type=shell_str,
             passthrough=True,
             help=(
-                'Arguments to pass directly to the Go test binary, e.g. `--go-test-args="-run TestFoo -v"` '
-                "Known Go test options will be transformed into the form expected by the test binary, "
-                "e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to learn more about "
-                "the options supported by Go test binaries."
+                "Arguments to pass directly to the Go test binary, e.g. "
+                '`--go-test-args="-run TestFoo -v"`.\n\n'
+                "Known Go test options will be transformed into the form expected by the test "
+                "binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to "
+                "learn more about the options supported by Go test binaries."
             ),
         )
 

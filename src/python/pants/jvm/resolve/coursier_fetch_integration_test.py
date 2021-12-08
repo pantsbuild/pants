@@ -20,7 +20,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
@@ -47,7 +47,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
         ],
-        target_types=[JvmDependencyLockfile, JvmArtifact],
+        target_types=[JvmArtifact],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -168,6 +168,58 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
                 ),
             ],
         )
+
+
+@maybe_skip_jdk_test
+def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
+
+    coordinate = Coordinate(
+        group="org.hamcrest",
+        artifact="hamcrest-core",
+        version="1.3_inexplicably_wrong",  # if the group/artifact/version is real, coursier will fallback
+        url="https://this_url_does_not_work",
+    )
+
+    expected_exception_msg = r".*this_url_does_not_work not found under https.*"
+
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        rule_runner.request(
+            CoursierResolvedLockfile,
+            [ArtifactRequirements([coordinate])],
+        )
+
+
+@maybe_skip_jdk_test
+def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
+
+    coordinate = Coordinate(
+        group="apache-commons-local",
+        artifact="commons-collections",
+        version="1.0.0_JAR_LOCAL",
+        url="https://search.maven.org/remotecontent?filepath=org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
+    )
+
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements([coordinate])],
+    )
+
+    assert resolved_lockfile == CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group=coordinate.group, artifact=coordinate.artifact, version=coordinate.version
+                ),
+                file_name=f"{coordinate.group}_{coordinate.artifact}_{coordinate.version}.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    fingerprint="6a594721d51444fd97b3eaefc998a77f606dedb03def494f74755aead3c9df3e",
+                    serialized_bytes_length=752798,
+                ),
+            ),
+        )
+    )
 
 
 @maybe_skip_jdk_test

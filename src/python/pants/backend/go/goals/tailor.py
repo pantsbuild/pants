@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.go.target_types import (
     GoBinaryMainPackage,
@@ -69,11 +70,14 @@ async def find_putative_go_targets(
     # Add `go_package` targets.
     unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
     for dirname, filenames in group_by_dir(unowned_go_files).items():
+        dir_path = PurePath(dirname)
+        if "testdata" in dir_path.parts:
+            continue
         putative_targets.append(
             PutativeTarget.for_target_type(
                 GoPackageTarget,
                 path=dirname,
-                name=os.path.basename(dirname),
+                name=dir_path.name,
                 triggering_sources=sorted(filenames),
             )
         )

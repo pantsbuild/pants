@@ -85,30 +85,38 @@ def assert_build_context(
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
-    # img_A -> files_A
-    # img_A -> img_B -> files_B
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
-            files(name="files_A", sources=["files/**"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            # img_A -> files_A
+            # img_A -> img_B
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+                files(name="files_A", sources=["files/**"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "src/a/files/a01": "",
+            "src/a/files/a02": "",
+            # img_B -> files_B
+            "src/b/BUILD": dedent(
+                """\
+                docker_image(name="img_B", dependencies=[":files_B"])
+                files(name="files_B", sources=["files/**"])
+                """
+            ),
+            "src/b/Dockerfile": "FROM base",
+            "src/b/files/b01": "",
+            "src/b/files/b02": "",
+            # Mixed
+            "src/c/BUILD": dedent(
+                """\
+                docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
+                """
+            ),
+            "src/c/Dockerfile": "FROM base",
+        }
     )
-    rule_runner.add_to_build_file(
-        "src/b",
-        dedent(
-            """\
-            docker_image(name="img_B", dependencies=[":files_B"])
-            files(name="files_B", sources=["files/**"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("src/a/files", ["a01", "a02"])
-    rule_runner.create_files("src/b", ["Dockerfile"])
-    rule_runner.create_files("src/b/files", ["b01", "b02"])
 
     # We want files_B in build context for img_B
     assert_build_context(
@@ -125,16 +133,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     # Mixed.
-    rule_runner.add_to_build_file(
-        "src/c",
-        dedent(
-            """\
-            docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/c", ["Dockerfile"])
-
     assert_build_context(
         rule_runner,
         Address("src/c", target_name="img_C"),
@@ -150,25 +148,24 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
 
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=["res/static:files"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=["res/static:files"])
+                """
+            ),
+            "res/static/BUILD": dedent(
+                """\
+                files(name="files", sources=["!BUILD", "**/*"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "res/static/s01": "",
+            "res/static/s02": "",
+            "res/static/sub/s03": "",
+        }
     )
-    rule_runner.add_to_build_file(
-        "res/static",
-        dedent(
-            """\
-            files(name="files", sources=["!BUILD", "**/*"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("res/static", ["s01", "s02"])
-    rule_runner.create_files("res/static/sub", ["s03"])
 
     assert_build_context(
         rule_runner,

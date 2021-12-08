@@ -1,6 +1,8 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashSet;
+use std::ffi::OsString;
 use std::io::{self, BufRead, Read};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::process::ExitStatusExt;
@@ -10,6 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
+use futures::future;
 use hashing::Fingerprint;
 use lazy_static::lazy_static;
 use log::{debug, info};
@@ -19,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{Context, MultiPlatformProcess, NamedCaches, Process, ProcessMetadata};
+use crate::{Context, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -28,7 +31,16 @@ lazy_static! {
 struct PoolEntry {
   fingerprint: NailgunProcessFingerprint,
   last_used: Instant,
-  process: Arc<Mutex<NailgunProcess>>,
+  // Because `NailgunProcess` instances are started outside of the NailgunPool's lock, the inner
+  // instance is an `Option`. But since they are started eagerly by the task that adds them to the
+  // pool, any acquirer that encounters an empty instance here can assume that it died while
+  // starting, and re-create it.
+  //
+  // This uses a `Mutex<Option<_>>` rather than something like `DoubleCheckedCell` because the
+  // outer `Mutex` is used to track while the `NailgunProcess` is in use.
+  //
+  // See also: `NailgunProcessRef`.
+  process: Arc<Mutex<Option<NailgunProcess>>>,
 }
 
 pub type Port = u16;
@@ -86,27 +98,39 @@ impl NailgunPool {
   ) -> Result<BorrowedNailgunProcess, String> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
-    let mut processes = self.processes.lock().await;
+    let mut process_ref = {
+      let mut processes = self.processes.lock().await;
 
-    // Start by seeing whether there are any idle processes with a matching fingerprint.
-    if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
-      return Ok(BorrowedNailgunProcess::new(process));
-    }
+      // Start by seeing whether there are any idle processes with a matching fingerprint.
+      if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
+        return Ok(BorrowedNailgunProcess::new(process));
+      }
 
-    // There wasn't a matching, valid, available process. We need to start one.
-    if processes.len() >= self.size {
-      // Find the oldest idle non-matching process and remove it.
-      let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
-        // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
-        // should be impossible.
-        "No idle slots in nailgun pool.".to_owned()
-      })?;
+      // There wasn't a matching, valid, available process. We need to start one.
+      if processes.len() >= self.size {
+        // Find the oldest idle non-matching process and remove it.
+        let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
+          // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
+          // should be impossible.
+          "No idle slots in nailgun pool.".to_owned()
+        })?;
 
-      processes.swap_remove(idx);
-    }
+        processes.swap_remove(idx);
+      }
 
-    // Start the new process.
-    let process = Arc::new(Mutex::new(
+      // Add a new entry for the process, and immediately acquire its mutex, but wait to spawn it
+      // until we're outside the pool's mutex.
+      let process = Arc::new(Mutex::new(None));
+      processes.push(PoolEntry {
+        fingerprint: requested_fingerprint.clone(),
+        last_used: Instant::now(),
+        process: process.clone(),
+      });
+      process.lock_arc().await
+    };
+
+    // Now that we're outside the pool's mutex, spawn and return the process.
+    *process_ref = Some(
       NailgunProcess::start_new(
         name.clone(),
         server_process,
@@ -115,17 +139,12 @@ impl NailgunPool {
         &self.store,
         self.executor.clone(),
         &self.named_caches,
-        requested_fingerprint.clone(),
+        requested_fingerprint,
       )
       .await?,
-    ));
-    processes.push(PoolEntry {
-      fingerprint: requested_fingerprint,
-      last_used: Instant::now(),
-      process: process.clone(),
-    });
+    );
 
-    Ok(BorrowedNailgunProcess::new(process.lock_arc().await))
+    Ok(BorrowedNailgunProcess::new(process_ref))
   }
 
   ///
@@ -134,7 +153,7 @@ impl NailgunPool {
   fn find_usable(
     pool_entries: &mut Vec<PoolEntry>,
     fingerprint: &NailgunProcessFingerprint,
-  ) -> Result<Option<(usize, MutexGuardArc<NailgunProcess>)>, String> {
+  ) -> Result<Option<(usize, NailgunProcessRef)>, String> {
     let mut dead_processes = Vec::new();
     for (idx, pool_entry) in pool_entries.iter_mut().enumerate() {
       if &pool_entry.fingerprint != fingerprint {
@@ -171,10 +190,15 @@ impl NailgunPool {
   }
 
   fn try_use(pool_entry: &mut PoolEntry) -> Result<TryUse, String> {
-    let mut process = if let Some(process) = pool_entry.process.try_lock_arc() {
-      process
+    let mut process_guard = if let Some(process_guard) = pool_entry.process.try_lock_arc() {
+      process_guard
     } else {
       return Ok(TryUse::Busy);
+    };
+    let process = if let Some(process) = process_guard.as_mut() {
+      process
+    } else {
+      return Ok(TryUse::Dead);
     };
 
     pool_entry.last_used = Instant::now();
@@ -196,7 +220,7 @@ impl NailgunPool {
           "Found nailgun process {}, with fingerprint {:?}",
           process.name, process.fingerprint
         );
-        Ok(TryUse::Usable(process))
+        Ok(TryUse::Usable(process_guard))
       }
       Some(status) => {
         // The process has exited with some exit code: restart it.
@@ -215,8 +239,14 @@ impl NailgunPool {
   }
 }
 
+/// A borrowed `PoolEntry::process` which has already been validated to be present: see those docs.
+///
+/// TODO: This Mutex does not have a `map` method to allow converting this into a
+/// `MutexGuardArc<NailgunProcess>`, although that would be useful here.
+type NailgunProcessRef = MutexGuardArc<Option<NailgunProcess>>;
+
 enum TryUse {
-  Usable(MutexGuardArc<NailgunProcess>),
+  Usable(NailgunProcessRef),
   Busy,
   Dead,
 }
@@ -226,12 +256,44 @@ pub struct NailgunProcess {
   pub name: String,
   fingerprint: NailgunProcessFingerprint,
   workdir: TempDir,
+  workdir_include_names: HashSet<OsString>,
   port: Port,
   executor: task_executor::Executor,
   handle: std::process::Child,
 }
 
-fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
+/// Spawn a nailgun process, and read its port from stdout.
+///
+/// NB: Uses blocking APIs, so should be backgrounded on an executor.
+fn spawn_and_read_port(
+  process: Process,
+  workdir: PathBuf,
+) -> Result<(std::process::Child, Port), String> {
+  let cmd = process.argv[0].clone();
+  // TODO: This is an expensive operation, and thus we info! it.
+  //       If it becomes annoying, we can downgrade the logging to just debug!
+  info!(
+    "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {}",
+    cmd,
+    &process.argv[1..],
+    workdir.display()
+  );
+
+  let mut child = std::process::Command::new(&cmd)
+    .args(&process.argv[1..])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .env_clear()
+    .envs(&process.env)
+    .current_dir(&workdir)
+    .spawn()
+    .map_err(|e| {
+      format!(
+        "Failed to create child handle with cmd: {} options {:#?}: {}",
+        &cmd, &process, e
+      )
+    })?;
+
   let stdout = child
     .stdout
     .as_mut()
@@ -264,13 +326,15 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
   }
   let port_line = port_line?;
 
-  let port = &NAILGUN_PORT_REGEX
+  let port_str = &NAILGUN_PORT_REGEX
     .captures_iter(&port_line)
     .next()
     .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{:?}", port_line))?[1];
-  port
+  let port = port_str
     .parse::<Port>()
-    .map_err(|e| format!("Error parsing port {}! {}", &port, e))
+    .map_err(|e| format!("Error parsing port {}! {}", port_str, e))?;
+
+  Ok((child, port))
 }
 
 impl NailgunProcess {
@@ -289,57 +353,40 @@ impl NailgunProcess {
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
+    // Prepare the workdir, and then list it to identify the base set of names which should be
+    // preserved across runs. TODO: This is less efficient than computing the set of names
+    // directly from the Process (or returning them from `prepare_workdir`), but it's also much
+    // simpler.
     prepare_workdir(
       workdir.path().to_owned(),
       &startup_options,
+      startup_options.input_digests.use_nailgun,
       context.clone(),
       store.clone(),
       executor.clone(),
       named_caches,
     )
     .await?;
-    store
-      .materialize_directory(workdir.path().to_owned(), startup_options.input_files)
+    let workdir_include_names = list_workdir(workdir.path()).await?;
+
+    // Spawn the process and read its port from stdout.
+    let (child, port) = executor
+      .spawn_blocking({
+        let workdir = workdir.path().to_owned();
+        move || spawn_and_read_port(startup_options, workdir)
+      })
       .await?;
-
-    let cmd = startup_options.argv[0].clone();
-    // TODO: This is an expensive operation, and thus we info! it.
-    //       If it becomes annoying, we can downgrade the logging to just debug!
-    info!(
-      "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {:?}",
-      cmd,
-      &startup_options.argv[1..],
-      workdir.path()
-    );
-    let mut child = std::process::Command::new(&cmd)
-      .args(&startup_options.argv[1..])
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .env_clear()
-      .envs(&startup_options.env)
-      .current_dir(&workdir)
-      .spawn()
-      .map_err(|e| {
-        format!(
-          "Failed to create child handle with cmd: {} options {:#?}: {}",
-          &cmd, &startup_options, e
-        )
-      })?;
-
-    let port = read_port(&mut child)?;
     debug!(
       "Created nailgun server process with pid {} and port {}",
       child.id(),
       port
     );
 
-    // Now that we've started it, clear its directory before the first client can access it.
-    clear_workdir(workdir.path(), &executor).await?;
-
     Ok(NailgunProcess {
       port,
       fingerprint: nailgun_server_fingerprint,
       workdir,
+      workdir_include_names,
       name,
       executor,
       handle: child,
@@ -370,10 +417,7 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
   pub fn new(name: String, nailgun_req: &Process) -> Result<Self, String> {
-    let nailgun_req_digest = crate::digest(
-      MultiPlatformProcess::from(nailgun_req.clone()),
-      &ProcessMetadata::default(),
-    );
+    let nailgun_req_digest = crate::digest(nailgun_req, &ProcessMetadata::default());
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,
@@ -385,19 +429,20 @@ impl NailgunProcessFingerprint {
 /// A wrapper around a NailgunProcess checked out from the pool. If `release` is not called, the
 /// guard assumes cancellation, and kills the underlying process.
 ///
-pub struct BorrowedNailgunProcess(Option<MutexGuardArc<NailgunProcess>>);
+pub struct BorrowedNailgunProcess(Option<NailgunProcessRef>);
 
 impl BorrowedNailgunProcess {
-  fn new(process: MutexGuardArc<NailgunProcess>) -> Self {
+  fn new(process: NailgunProcessRef) -> Self {
+    assert!(process.is_some());
     Self(Some(process))
   }
 
   pub fn name(&self) -> &str {
-    &self.0.as_ref().unwrap().name
+    &self.0.as_ref().unwrap().as_ref().unwrap().name
   }
 
   pub fn port(&self) -> u16 {
-    self.0.as_ref().unwrap().port
+    self.0.as_ref().unwrap().as_ref().unwrap().port
   }
 
   pub fn address(&self) -> SocketAddr {
@@ -405,7 +450,7 @@ impl BorrowedNailgunProcess {
   }
 
   pub fn workdir_path(&self) -> &Path {
-    self.0.as_ref().unwrap().workdir.path()
+    self.0.as_ref().unwrap().as_ref().unwrap().workdir.path()
   }
 
   ///
@@ -414,9 +459,19 @@ impl BorrowedNailgunProcess {
   /// Clears the working directory for the process before returning it.
   ///
   pub async fn release(&mut self) -> Result<(), String> {
-    let process = self.0.as_ref().expect("release may only be called once.");
+    let process = self
+      .0
+      .as_ref()
+      .expect("release may only be called once.")
+      .as_ref()
+      .unwrap();
 
-    clear_workdir(process.workdir.path(), &process.executor).await?;
+    clear_workdir(
+      &process.executor,
+      process.workdir.path(),
+      &process.workdir_include_names,
+    )
+    .await?;
 
     // Once we've successfully cleaned up, remove the process.
     let _ = self.0.take();
@@ -430,14 +485,18 @@ impl Drop for BorrowedNailgunProcess {
       // Kill the process, but rely on the pool to notice that it is dead and restart it.
       debug!(
         "Killing nailgun process {:?} due to cancellation.",
-        process.name
+        process.as_ref().unwrap().name
       );
-      let _ = process.handle.kill();
+      let _ = process.as_mut().unwrap().handle.kill();
     }
   }
 }
 
-async fn clear_workdir(workdir: &Path, executor: &Executor) -> Result<(), String> {
+async fn clear_workdir(
+  executor: &Executor,
+  workdir: &Path,
+  exclude_names: &HashSet<OsString>,
+) -> Result<(), String> {
   // Move all content into a temporary directory.
   let garbage_dir = tempfile::Builder::new()
     .prefix("process-execution")
@@ -448,30 +507,41 @@ async fn clear_workdir(workdir: &Path, executor: &Executor) -> Result<(), String
         err
       )
     })?;
-  let mut dir_entries = tokio::fs::read_dir(workdir)
-    .await
-    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
-  while let Some(dir_entry) = dir_entries
-    .next_entry()
-    .await
-    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
-  {
-    tokio::fs::rename(
-      dir_entry.path(),
-      garbage_dir.path().join(dir_entry.file_name()),
-    )
-    .await
-    .map_err(|e| {
-      format!(
-        "Failed to move {} to garbage: {}",
-        dir_entry.path().display(),
-        e
-      )
-    })?;
-  }
+  let moves = list_workdir(workdir)
+    .await?
+    .into_iter()
+    .filter(|n| !exclude_names.contains(n))
+    .map(|name| async {
+      tokio::fs::rename(workdir.join(&name), garbage_dir.path().join(&name))
+        .await
+        .map_err(|e| {
+          format!(
+            "Failed to move {} to garbage: {}",
+            workdir.join(name).display(),
+            e
+          )
+        })
+    })
+    .collect::<Vec<_>>();
+  future::try_join_all(moves).await?;
 
   // And drop it in the background.
   let _ = executor.spawn_blocking(move || std::mem::drop(garbage_dir));
 
   Ok(())
+}
+
+async fn list_workdir(workdir: &Path) -> Result<HashSet<OsString>, String> {
+  let mut dir_entries = tokio::fs::read_dir(workdir)
+    .await
+    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
+  let mut names = HashSet::new();
+  while let Some(dir_entry) = dir_entries
+    .next_entry()
+    .await
+    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
+  {
+    names.insert(dir_entry.file_name());
+  }
+  Ok(names)
 }

@@ -20,10 +20,10 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgInfo,
+    FallibleFirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
-    FirstPartyPkgInfoRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
@@ -95,7 +95,6 @@ async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPac
     return ImportPathToPackages(frozen_mapping)
 
 
-# TODO: Use dependency injection. This doesn't actually look at the Sources field.
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
     infer_from = GoPackageSourcesField
 
@@ -107,26 +106,31 @@ async def infer_go_dependencies(
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
     addr = request.sources_field.address
-    maybe_pkg_info = await Get(FallibleFirstPartyPkgInfo, FirstPartyPkgInfoRequest(addr))
-    if maybe_pkg_info.info is None:
+    maybe_pkg_analysis = await Get(
+        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr)
+    )
+    if maybe_pkg_analysis.analysis is None:
         logger.error(
-            f"Failed to analyze {maybe_pkg_info.import_path} for dependency inference:\n"
-            f"{maybe_pkg_info.stderr}"
+            f"Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:\n"
+            f"{maybe_pkg_analysis.stderr}"
         )
         return InferredDependencies([])
-    pkg_info = maybe_pkg_info.info
+    pkg_analysis = maybe_pkg_analysis.analysis
 
     inferred_dependencies = []
-    for import_path in (*pkg_info.imports, *pkg_info.test_imports, *pkg_info.xtest_imports):
+    for import_path in (
+        *pkg_analysis.imports,
+        *pkg_analysis.test_imports,
+        *pkg_analysis.xtest_imports,
+    ):
         if import_path in std_lib_imports:
             continue
         # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
-        if import_path == pkg_info.import_path:
+        if import_path == pkg_analysis.import_path:
             continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
-            # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
-            # way of doing disambiguation.
+            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
             logger.warning(
                 f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
@@ -160,7 +164,9 @@ async def inject_go_third_party_package_dependencies(
     tgt = wrapped_target.target
     pkg_info = await Get(
         ThirdPartyPkgInfo,
-        ThirdPartyPkgInfoRequest(tgt[GoImportPathField].value, go_mod_info.stripped_digest),
+        ThirdPartyPkgInfoRequest(
+            tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
+        ),
     )
 
     inferred_dependencies = []
@@ -170,8 +176,7 @@ async def inject_go_third_party_package_dependencies(
 
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if len(candidate_packages) > 1:
-            # TODO: Use ExplicitlyProvidedDependencies.maybe_warn_of_ambiguous_dependency_inference standard
-            # way of doing disambiguation.
+            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
             logger.warning(
                 f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
             )
@@ -203,7 +208,8 @@ async def generate_targets_from_go_mod(
     generator_addr = request.generator.address
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
     all_packages = await Get(
-        AllThirdPartyPackages, AllThirdPartyPackagesRequest(go_mod_info.stripped_digest)
+        AllThirdPartyPackages,
+        AllThirdPartyPackagesRequest(go_mod_info.digest, go_mod_info.mod_path),
     )
 
     def create_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
