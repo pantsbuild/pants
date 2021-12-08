@@ -346,7 +346,6 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 @dataclass(frozen=True)
 class ArtifactRequirementsWithLocalFiles:
-    # omg tidy up this name. it's bad
     artifact_requirements: ArtifactRequirements
     digest: Digest
 
