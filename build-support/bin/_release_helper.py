@@ -279,29 +279,17 @@ def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
 def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
     def run_venv_pants(args: list[str]) -> str:
         # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
-        # backend plugins so when we execute it at the repo build root, the root pants.toml will
-        # ask it to load internal backend packages and their dependencies which it doesn't have,
-        # and it'll fail. To solve that problem, we load the internal backend package dependencies
-        # into the pantsbuild.pants venv.
+        # backend plugins embedded (but it does have all other backends): to load only the internal
+        # packages, we override the `--python-path` to include them (and to implicitly exclude
+        # `src/python`).
         return (
             subprocess.run(
                 [
                     venv_dir / "bin/pants",
-                    "--no-verify-config",
                     "--no-remote-cache-read",
                     "--no-remote-cache-write",
                     "--no-pantsd",
                     "--pythonpath=['pants-plugins']",
-                    (
-                        "--backend-packages=["
-                        "'pants.backend.awslambda.python', "
-                        "'pants.backend.python', "
-                        "'pants.backend.shell', "
-                        "'pants.backend.experimental.java', "
-                        "'pants.backend.experimental.scala', "
-                        "'internal_plugins.releases'"
-                        "]"
-                    ),
                     *args,
                 ],
                 check=True,
