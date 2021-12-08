@@ -50,6 +50,15 @@ class Gen2Request(GenerateSourcesRequest):
     output = ResourceSourceField
 
 
+class GenNoExportRequest(GenerateSourcesRequest):
+    """The presence of this generator is simply to verify that is not used when running the export-
+    codegen goal."""
+
+    input = Gen1Sources
+    output = Gen2Sources
+    exportable = False
+
+
 @rule
 async def gen1(_: Gen1Request) -> GeneratedSources:
     result = await Get(Snapshot, CreateDigest([FileContent("assets/README.md", b"Hello!")]))
@@ -62,6 +71,11 @@ async def gen2(_: Gen2Request) -> GeneratedSources:
     return GeneratedSources(result)
 
 
+@rule
+async def gen_no_export(_: GenNoExportRequest) -> GeneratedSources:
+    assert False, "Should not ever get here as `GenNoExportRequest.exportable==False`"
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -69,8 +83,10 @@ def rule_runner() -> RuleRunner:
             *write_codegen_rules(),
             gen1,
             gen2,
+            gen_no_export,
             UnionRule(GenerateSourcesRequest, Gen1Request),
             UnionRule(GenerateSourcesRequest, Gen2Request),
+            UnionRule(GenerateSourcesRequest, GenNoExportRequest),
             *distdir.rules(),
         ],
         target_types=[Gen1Target, Gen2Target],

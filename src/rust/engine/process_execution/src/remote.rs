@@ -100,7 +100,6 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   platform: Platform,
   store: Store,
-  _headers: BTreeMap<String, String>,
   execution_client: Arc<ExecutionClient<LayeredService>>,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
@@ -153,7 +152,7 @@ impl CommandRunner {
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
-    let mut store_headers = headers.clone();
+    let mut store_headers = headers;
     let store_endpoint = grpc_util::create_endpoint(
       store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
@@ -172,7 +171,6 @@ impl CommandRunner {
 
     let command_runner = CommandRunner {
       metadata,
-      _headers: headers,
       execution_client,
       action_cache_client,
       store,

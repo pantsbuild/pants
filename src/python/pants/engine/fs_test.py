@@ -85,7 +85,7 @@ def prime_store_with_roland_digest(rule_runner: RuleRunner) -> None:
 def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
     """Extract fs_test.tar into the rule_runner's build root.
 
-    Note that we use a tar, rather than rule_runner.create_file(), because it has symlinks set up a
+    Note that we use a tar, rather than rule_runner.write_files(), because it has symlinks set up a
     certain way.
 
     Contents:
