@@ -26,10 +26,10 @@ from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirement,
     ArtifactRequirements,
     Coordinate,
     CoursierResolvedLockfile,
-    RequirementCoordinate,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
@@ -239,7 +239,7 @@ async def gather_coordinates_for_jvm_lockfile(
     request: GatherJvmCoordinatesRequest,
 ) -> ArtifactRequirements:
     # Separate `artifact_inputs` by whether the strings parse as an `Address` or not.
-    requirements: set[RequirementCoordinate] = set()
+    requirements: set[ArtifactRequirement] = set()
     candidate_address_inputs: set[AddressInput] = set()
     bad_artifact_inputs = []
     for artifact_input in request.artifact_inputs:
@@ -272,7 +272,7 @@ async def gather_coordinates_for_jvm_lockfile(
     other_targets = []
     for tgt in all_supplied_targets:
         if JvmArtifactFieldSet.is_applicable(tgt):
-            requirements.add(RequirementCoordinate.from_jvm_artifact_target(tgt))
+            requirements.add(ArtifactRequirement.from_jvm_artifact_target(tgt))
         else:
             other_targets.append(tgt)
 

@@ -114,9 +114,9 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
-    def as_requirement(self) -> RequirementCoordinate:
+    def as_requirement(self) -> ArtifactRequirement:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
-        return RequirementCoordinate(coordinate=self)
+        return ArtifactRequirement(coordinate=self)
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
@@ -131,7 +131,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
 
 
 @dataclass(frozen=True)
-class RequirementCoordinate:
+class ArtifactRequirement:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""
 
@@ -141,10 +141,10 @@ class RequirementCoordinate:
     jar: str | None = None
 
     @classmethod
-    def from_jvm_artifact_target(cls, target: Target) -> RequirementCoordinate:
+    def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
         if not JvmArtifactFieldSet.is_applicable(target):
             raise CoursierError(
-                "`RequirementCoordinate.from_jvm_artifact_target()` only works on targets with "
+                "`ArtifactRequirement.from_jvm_artifact_target()` only works on targets with "
                 "`JvmArtifactFieldSet` fields present."
             )
 
@@ -180,7 +180,7 @@ class RequirementCoordinate:
                 "You cannot specify both a `url` and `jar` for the same `jvm_artifact`."
             )
 
-        return RequirementCoordinate(
+        return ArtifactRequirement(
             coordinate=Coordinate(group=group, artifact=artifact, version=version), url=url, jar=jar
         )
 
@@ -195,8 +195,8 @@ class RequirementCoordinate:
         self,
         rel_path: str,
         working_directory_placeholder: str = Coursier.working_directory_placeholder,
-    ) -> RequirementCoordinate:
-        """Returns a `RequirementCoordinate` with `jar` field set into one with a `url` field set,
+    ) -> ArtifactRequirement:
+        """Returns an `ArtifactRequirement` with `jar` field set into one with a `url` field set,
         with a working directory placeholder in place.
 
         Note that the `jar` field must have " "been used to materialize an actual JAR file
@@ -218,7 +218,7 @@ class RequirementCoordinate:
 class AllJarTargets:
     """A dictionary of targets that provide JAR files, indexed by coordinate."""
 
-    by_coordinate: FrozenDict[RequirementCoordinate, Target]
+    by_coordinate: FrozenDict[ArtifactRequirement, Target]
 
 
 @rule
@@ -230,13 +230,13 @@ async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
         and tgt[JvmArtifactJarSourceField].value is not None
     ]
     jars_by_coordinate = FrozenDict(
-        (RequirementCoordinate.from_jvm_artifact_target(tgt), tgt) for tgt in jars
+        (ArtifactRequirement.from_jvm_artifact_target(tgt), tgt) for tgt in jars
     )
     return AllJarTargets(by_coordinate=jars_by_coordinate)
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
-class ArtifactRequirements(DeduplicatedCollection[RequirementCoordinate]):
+class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
     """An ordered list of Coordinates used as requirements."""
 
     @classmethod
@@ -400,7 +400,7 @@ async def use_local_artifacts_where_possible(
     input_requirements: ArtifactRequirements,
     all_jars: AllJarTargets,
 ) -> ArtifactRequirementsWithLocalFiles:
-    output: List[RequirementCoordinate] = []
+    output: List[ArtifactRequirement] = []
     further_processing: List[Target] = []
 
     for req in input_requirements:
@@ -416,7 +416,7 @@ async def use_local_artifacts_where_possible(
     )
 
     for target, file in zip(further_processing, files.files):
-        coord = RequirementCoordinate.from_jvm_artifact_target(target)
+        coord = ArtifactRequirement.from_jvm_artifact_target(target)
         coord = dataclasses.replace(
             coord,
             # coursier requires absolute url
@@ -560,7 +560,7 @@ async def fetch_with_coursier(
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
         request.resolve,
-        RequirementCoordinate.from_jvm_artifact_target(request.component.representative).coordinate,
+        ArtifactRequirement.from_jvm_artifact_target(request.component.representative).coordinate,
     )
 
     classpath_entries = await MultiGet(

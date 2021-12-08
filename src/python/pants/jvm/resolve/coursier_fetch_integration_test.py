@@ -12,12 +12,12 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirement,
     ArtifactRequirements,
     Coordinate,
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
-    RequirementCoordinate,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -176,7 +176,7 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
-    coordinate = RequirementCoordinate(
+    coordinate = ArtifactRequirement(
         coordinate=Coordinate(
             group="org.hamcrest",
             artifact="hamcrest-core",
@@ -197,7 +197,7 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
 
-    requirement = RequirementCoordinate(
+    requirement = ArtifactRequirement(
         coordinate=Coordinate(
             group="apache-commons-local",
             artifact="commons-collections",
