@@ -10,7 +10,7 @@ import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any, Iterator, List
+from typing import Any, Iterable, Iterator, List
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -114,7 +114,7 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
-    def to_requirement_coordinate(self) -> RequirementCoordinate:
+    def as_requirement(self) -> RequirementCoordinate:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
         return RequirementCoordinate(coordinate=self)
 
@@ -186,6 +186,7 @@ class RequirementCoordinate:
 
     def to_coord_str(self, versioned: bool = True) -> str:
         without_url = self.coordinate.to_coord_str(versioned)
+        url_suffix = ""
         if self.url:
             url_suffix = f",url={url_quote_plus(self.url)}"
         return f"{without_url}{url_suffix}"
@@ -209,7 +210,7 @@ class RequirementCoordinate:
             self,
             jar=None,
             # Coursier requires exact URL
-            url=f"file:{Coursier.working_directory_placeholder}/{rel_path}",
+            url=f"file:{working_directory_placeholder}/{rel_path}",
         )
 
 
@@ -241,6 +242,10 @@ async def all_jar_targets(all_targets: AllTargets) -> AllJarTargets:
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
 class ArtifactRequirements(DeduplicatedCollection[RequirementCoordinate]):
     """An ordered list of Coordinates used as requirements."""
+
+    @classmethod
+    def from_coordinates(cls, coordinates: Iterable[Coordinate]) -> ArtifactRequirements:
+        return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
 
 
 @dataclass(frozen=True)
