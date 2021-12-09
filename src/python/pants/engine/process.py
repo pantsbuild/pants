@@ -77,7 +77,7 @@ class Process:
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
         immutable_input_digests: Mapping[str, Digest] | None = None,
-        use_nailgun: Sequence[str] = (),
+        use_nailgun: Iterable[str] = (),
         working_directory: str | None = None,
         env: Mapping[str, str] | None = None,
         append_only_caches: Mapping[str, str] | None = None,

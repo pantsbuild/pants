@@ -73,9 +73,16 @@ async def create_scala_repl_request(
         Digest, AddPrefix(user_classpath.content.digest, user_classpath_prefix)
     )
 
+    # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
+    # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
+    jdk_setup_digests = await MultiGet(
+        Get(Digest, AddPrefix(digest, relpath))
+        for relpath, digest in jdk_setup.immutable_input_digests.items()
+    )
+
     repl_digest = await Get(
         Digest,
-        MergeDigests([prefixed_user_classpath, tool_classpath.content.digest, jdk_setup.digest]),
+        MergeDigests([prefixed_user_classpath, tool_classpath.content.digest, *jdk_setup_digests]),
     )
 
     return ReplRequest(
