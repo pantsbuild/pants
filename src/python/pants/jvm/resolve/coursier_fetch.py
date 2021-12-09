@@ -75,7 +75,7 @@ class CoursierError(Exception):
 
 @dataclass(frozen=True)
 class Coordinate:
-    """A single Maven-style coordinate for a JVM dependency that contains."""
+    """A single Maven-style coordinate for a JVM dependency."""
 
     group: str
     artifact: str
