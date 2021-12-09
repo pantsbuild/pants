@@ -232,11 +232,14 @@ class CoursierLockfileEntry:
     CoursierLockfileEntry(
         coord="com.chuusai:shapeless_2.13:2.3.3", # identical
         file_name="shapeless_2.13-2.3.3.jar" # PurePath(entry["file"].name)
-        direct_dependencies=(MavenCoord("org.scala-lang:scala-library:2.13.0"),),
-        dependencies=(MavenCoord("org.scala-lang:scala-library:2.13.0"),),
+        direct_dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
+        dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
         file_digest=FileDigest(fingerprint=<sha256 of the jar>, ...),
     )
     ```
+
+    The fields `remote_url` and `pants_address` are set by Pants if the `coord` field matches a
+    `jvm_artifact` that had either the `url` or `jar` fields set.
     """
 
     coord: Coordinate
@@ -244,6 +247,8 @@ class CoursierLockfileEntry:
     direct_dependencies: Coordinates
     dependencies: Coordinates
     file_digest: FileDigest
+    remote_url: str | None = None
+    pants_address: str | None = None
 
     @classmethod
     def from_json_dict(cls, entry) -> CoursierLockfileEntry:
@@ -260,6 +265,8 @@ class CoursierLockfileEntry:
                 fingerprint=entry["file_digest"]["fingerprint"],
                 serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
             ),
+            remote_url=entry["remote_url"],
+            pants_address=entry["pants_address"],
         )
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -274,6 +281,8 @@ class CoursierLockfileEntry:
                 fingerprint=self.file_digest.fingerprint,
                 serialized_bytes_length=self.file_digest.serialized_bytes_length,
             ),
+            remote_url=self.remote_url,
+            pants_address=self.pants_address,
         )
 
 
@@ -481,7 +490,8 @@ async def coursier_resolve_lockfile(
             stripped_artifact_digests, artifact_file_names
         )
     )
-    return CoursierResolvedLockfile(
+
+    first_pass_lockfile = CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
                 coord=Coordinate.from_coord_str(dep["coord"]),
@@ -497,6 +507,17 @@ async def coursier_resolve_lockfile(
             )
         )
     )
+
+    inverted_artifacts = {req.coordinate: req for req in artifact_requirements}
+    new_entries = []
+    for entry in first_pass_lockfile.entries:
+        req = inverted_artifacts.get(entry.coord)
+        if req:
+            address = req.jar.address if req.jar else None
+            entry = dataclasses.replace(entry, remote_url=req.url, pants_address=str(address))
+        new_entries.append(entry)
+
+    return CoursierResolvedLockfile(entries=tuple(new_entries))
 
 
 @rule(desc="Fetch with coursier")
