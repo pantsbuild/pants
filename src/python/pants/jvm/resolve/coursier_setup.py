@@ -146,7 +146,7 @@ async def setup_coursier(
         working_dir="$(pwd)"
         "$coursier_exe" fetch {repos_args} \
           --json-output-file="$json_output_file" \
-          "$@//{Coursier.working_directory_placeholder}/$working_dir"
+          "${{@//{Coursier.working_directory_placeholder}/$working_dir}}"
         /bin/mkdir -p classpath
         {python.path} coursier_post_processing_script.py "$json_output_file"
         """
