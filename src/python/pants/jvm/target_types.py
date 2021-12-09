@@ -6,7 +6,6 @@ from __future__ import annotations
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
-    SingleSourceField,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
@@ -52,16 +51,8 @@ class JvmArtifactUrlField(StringField):
     help = (
         "A URL that points to the location of this artifact. If specified, Pants will not fetch this artifact "
         "from default maven repositories, and instead fetch the artifact from this URL. To use default maven "
-        "repositories, do not set this value. \n\nNote that `file:` URLs are not supported due to Pants' "
-        "sandboxing feature. To use a local `JAR` file, use the `jar` field instead."
+        "repositories, do not set this value. \n\nNote that `file:` URLs are not presently supported."
     )
-
-
-class JvmArtifactJarSourceField(SingleSourceField):
-    alias = "jar"
-    expected_file_extensions = (".jar",)
-    required = False
-    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
 
 
 class JvmArtifactPackagesField(StringSequenceField):
@@ -115,7 +106,6 @@ class JvmArtifact(Target):
         *COMMON_TARGET_FIELDS,
         *JvmArtifactFieldSet.required_fields,
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
-        JvmArtifactJarSourceField,
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
