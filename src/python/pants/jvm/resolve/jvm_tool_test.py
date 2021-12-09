@@ -97,9 +97,10 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
         "org.hamcrest:hamcrest-core:1.3",
     ]
 
-    coordinates = rule_runner.request(
+    requirements = rule_runner.request(
         ArtifactRequirements, [GatherJvmCoordinatesRequest(lockfile_request.artifact_inputs, "")]
     )
+    coordinates = [i.coordinate for i in requirements]
     assert sorted(coordinates, key=lambda c: (c.group, c.artifact, c.version)) == [
         Coordinate(group="junit", artifact="junit", version="4.13.2"),
         Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),

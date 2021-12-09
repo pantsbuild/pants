@@ -15,9 +15,8 @@ from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.build_graph.address import Address, AddressInput
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -584,13 +583,16 @@ async def coursier_fetch_one_coord(
     # Prepare any URL- or JAR-specifying entries for use with Coursier
     req: ArtifactRequirement
     if request.pants_address:
-        targets = await Get(Targets, UnparsedAddressInputs([request.pants_address], owning_address=None))
+        targets = await Get(
+            Targets, UnparsedAddressInputs([request.pants_address], owning_address=None)
+        )
         req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
     else:
         req = ArtifactRequirement(request.coord, url=request.remote_url)
-    
+
     coursier_resolve_info = await Get(
-        CoursierResolveInfo, ArtifactRequirements([req]),
+        CoursierResolveInfo,
+        ArtifactRequirements([req]),
     )
 
     input_digest = await Get(Digest, MergeDigests([coursier.digest, coursier_resolve_info.digest]))
