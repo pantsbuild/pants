@@ -15,7 +15,9 @@ from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.build_graph.address import Address, AddressInput
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -514,7 +516,8 @@ async def coursier_resolve_lockfile(
         req = inverted_artifacts.get(entry.coord)
         if req:
             address = req.jar.address if req.jar else None
-            entry = dataclasses.replace(entry, remote_url=req.url, pants_address=str(address))
+            address_spec = address.spec if address else None
+            entry = dataclasses.replace(entry, remote_url=req.url, pants_address=address_spec)
         new_entries.append(entry)
 
     return CoursierResolvedLockfile(entries=tuple(new_entries))
@@ -577,15 +580,30 @@ async def coursier_fetch_one_coord(
     confirm that what was downloaded matches exactly (by content digest) what
     was specified in the lockfile (what Coursier originally downloaded).
     """
+
+    # Prepare any URL- or JAR-specifying entries for use with Coursier
+    req: ArtifactRequirement
+    if request.pants_address:
+        targets = await Get(Targets, UnparsedAddressInputs([request.pants_address], owning_address=None))
+        req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
+    else:
+        req = ArtifactRequirement(request.coord, url=request.remote_url)
+    
+    coursier_resolve_info = await Get(
+        CoursierResolveInfo, ArtifactRequirements([req]),
+    )
+
+    input_digest = await Get(Digest, MergeDigests([coursier.digest, coursier_resolve_info.digest]))
+
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
         Process(
             argv=coursier.args(
-                [coursier_report_file_name, "--intransitive", request.coord.to_coord_str()],
+                [coursier_report_file_name, "--intransitive", *coursier_resolve_info.coord_strings],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=coursier.digest,
+            input_digest=input_digest,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
