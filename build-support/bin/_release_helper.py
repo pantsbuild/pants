@@ -695,7 +695,10 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     if fetch:
         extra_pex_args = [
-            "--interpreter-constraint=CPython>=3.7,<3.10",
+            "--python-shebang",
+            "/usr/bin/env python",
+            "--interpreter-constraint",
+            "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
                 for plat in ("linux_x86_64", "macosx_10.15_x86_64")
