@@ -5,5 +5,3 @@ python_sources(dependencies=[":lockfile"])
 resource(name="lockfile", source="scalapbc.default.lockfile.txt")
 
 python_tests(name="tests")
-
-
