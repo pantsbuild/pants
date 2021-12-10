@@ -231,6 +231,8 @@ def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
                     fingerprint="6a594721d51444fd97b3eaefc998a77f606dedb03def494f74755aead3c9df3e",
                     serialized_bytes_length=752798,
                 ),
+                remote_url=requirement.url,
+                pants_address=None,
             ),
         )
     )
@@ -276,7 +278,6 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
     )
 
     coordinate = requirement.coordinate
-    # raise Exception(resolved_lockfile)
     assert resolved_lockfile == CoursierResolvedLockfile(
         entries=(
             CoursierLockfileEntry(
@@ -298,16 +299,17 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_fetch_one_coord_with_jar(rule_runner: RuleRunner) -> None:
-
+    coord = Coordinate(group="jeremy", artifact="jeremy", version="4.13.2")
+    file_name = f"{coord.group}_{coord.artifact}_{coord.version}.jar"
     rule_runner.write_files(
         {
             "BUILD": textwrap.dedent(
-                """\
+                f"""\
             jvm_artifact(
               name="jeremy",
-              group="jeremy",
-              artifact="jeremy",
-              version="4.13.2",
+              group="{coord.group}",
+              artifact="{coord.artifact}",
+              version="{coord.version}",
               jar="jeremy.jar",
             )
             """
@@ -320,8 +322,8 @@ def test_fetch_one_coord_with_jar(rule_runner: RuleRunner) -> None:
         ClasspathEntry,
         [
             CoursierLockfileEntry(
-                coord=HAMCREST_COORD,
-                file_name="jeremy.jar",
+                coord=coord,
+                file_name=file_name,
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
                 file_digest=FileDigest(
@@ -332,10 +334,10 @@ def test_fetch_one_coord_with_jar(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    assert classpath_entry.filenames == ("jeremy.jar",)
+    assert classpath_entry.filenames == (file_name,)
     file_digest = rule_runner.request(
         FileDigest,
-        [ExtractFileDigest(classpath_entry.digest, "jeremy.jar")],
+        [ExtractFileDigest(classpath_entry.digest, file_name)],
     )
     assert file_digest == FileDigest(
         fingerprint="55b9afa8d7776cd6c318eec51f506e9c7f66c247dcec343d4667f5f269714f86",
