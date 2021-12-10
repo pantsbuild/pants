@@ -3,13 +3,17 @@
 
 from __future__ import annotations
 
+import textwrap
+
 import pytest
 
+from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
+from pants.engine.target import Targets
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirement,
@@ -21,7 +25,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact
+from pants.jvm.target_types import JvmArtifact, JvmArtifactJarSourceField
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
@@ -44,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
+            QueryRule(Targets, [AddressSpecs]),
             QueryRule(CoursierResolvedLockfile, (ArtifactRequirements,)),
             QueryRule(ClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
@@ -226,6 +231,66 @@ def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
                     fingerprint="6a594721d51444fd97b3eaefc998a77f606dedb03def494f74755aead3c9df3e",
                     serialized_bytes_length=752798,
                 ),
+            ),
+        )
+    )
+
+
+@maybe_skip_jdk_test
+def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
+
+    rule_runner.write_files(
+        {
+            "BUILD": textwrap.dedent(
+                """\
+            jvm_artifact(
+              name="jeremy",
+              group="jeremy",
+              artifact="jeremy",
+              version="4.13.2",
+              jar="jeremy.jar",
+            )
+            """
+            ),
+            "jeremy.jar": "hello dave",
+        }
+    )
+
+    targets = rule_runner.request(Targets, [AddressSpecs([DescendantAddresses("")])])
+    jeremy_target = targets[0]
+
+    jar_field = jeremy_target[JvmArtifactJarSourceField]
+
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="jeremy",
+            artifact="jeremy",
+            version="4.13.2",
+        ),
+        jar=jar_field,
+    )
+
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements([requirement])],
+    )
+
+    coordinate = requirement.coordinate
+    # raise Exception(resolved_lockfile)
+    assert resolved_lockfile == CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group=coordinate.group, artifact=coordinate.artifact, version=coordinate.version
+                ),
+                file_name=f"{coordinate.group}_{coordinate.artifact}_{coordinate.version}.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    fingerprint="55b9afa8d7776cd6c318eec51f506e9c7f66c247dcec343d4667f5f269714f86",
+                    serialized_bytes_length=10,
+                ),
+                pants_address=jar_field.address.spec,
             ),
         )
     )
