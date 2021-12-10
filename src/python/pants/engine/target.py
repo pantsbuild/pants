@@ -1578,7 +1578,8 @@ class SourcesField(AsyncFieldMixin, Field):
         """
 
         if not self.required and not self.value:
-            # #13851 if value is not set, validation results are spurious
+            # If this field isn't required or set, validation is done against the default value
+            # which is probably not valuable (See #13851).
             return None
 
         if self.expected_file_extensions is not None:
