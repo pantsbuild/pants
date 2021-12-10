@@ -88,7 +88,7 @@ CIRCE_DEPENDENCIES = [
     ]
 ]
 
-SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
+SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
     SCALAMETA_DEPENDENCIES + CIRCE_DEPENDENCIES
 )
 
@@ -323,7 +323,7 @@ async def setup_scala_parser_classfiles(
             MaterializedClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
-                    ArtifactRequirements(
+                    ArtifactRequirements.from_coordinates(
                         [
                             Coordinate(
                                 group="org.scala-lang",

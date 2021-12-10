@@ -25,11 +25,10 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
-from pants.jvm.goals.coursier import coordinate_from_target
 from pants.jvm.resolve.coursier_fetch import (
+    ArtifactRequirement,
     ArtifactRequirements,
     Coordinate,
-    Coordinates,
     CoursierResolvedLockfile,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -236,9 +235,11 @@ async def generate_lockfiles_goal(
 
 
 @rule
-async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesRequest) -> Coordinates:
+async def gather_coordinates_for_jvm_lockfile(
+    request: GatherJvmCoordinatesRequest,
+) -> ArtifactRequirements:
     # Separate `artifact_inputs` by whether the strings parse as an `Address` or not.
-    coordinates: set[Coordinate] = set()
+    requirements: set[ArtifactRequirement] = set()
     candidate_address_inputs: set[AddressInput] = set()
     bad_artifact_inputs = []
     for artifact_input in request.artifact_inputs:
@@ -246,8 +247,8 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
         # group name is a file on disk.
         if 2 <= artifact_input.count(":") <= 3:
             try:
-                maybe_coord = Coordinate.from_coord_str(artifact_input)
-                coordinates.add(maybe_coord)
+                maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
+                requirements.add(maybe_coord)
                 continue
             except Exception:
                 pass
@@ -271,7 +272,7 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
     other_targets = []
     for tgt in all_supplied_targets:
         if JvmArtifactFieldSet.is_applicable(tgt):
-            coordinates.add(coordinate_from_target(tgt))
+            requirements.add(ArtifactRequirement.from_jvm_artifact_target(tgt))
         else:
             other_targets.append(tgt)
 
@@ -282,7 +283,7 @@ async def gather_coordinates_for_jvm_lockfile(request: GatherJvmCoordinatesReque
             f"option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}."
         )
 
-    return Coordinates(coordinates)
+    return ArtifactRequirements(requirements)
 
 
 @rule
@@ -314,11 +315,11 @@ async def load_jvm_lockfile(
 async def generate_jvm_lockfile(
     request: JvmToolLockfileRequest,
 ) -> JvmToolLockfile:
-    coordinates = await Get(
-        Coordinates,
+    requirements = await Get(
+        ArtifactRequirements,
         GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
     )
-    resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements(coordinates))
+    resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
     lockfile_content = resolved_lockfile.to_json()
     lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])

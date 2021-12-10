@@ -44,7 +44,7 @@ async def create_scala_repl_request(
             MaterializedClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
-                    ArtifactRequirements(
+                    ArtifactRequirements.from_coordinates(
                         [
                             Coordinate(
                                 group="org.scala-lang",
