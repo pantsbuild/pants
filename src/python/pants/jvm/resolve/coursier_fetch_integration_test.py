@@ -297,6 +297,53 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_fetch_one_coord_with_jar(rule_runner: RuleRunner) -> None:
+
+    rule_runner.write_files(
+        {
+            "BUILD": textwrap.dedent(
+                """\
+            jvm_artifact(
+              name="jeremy",
+              group="jeremy",
+              artifact="jeremy",
+              version="4.13.2",
+              jar="jeremy.jar",
+            )
+            """
+            ),
+            "jeremy.jar": "hello dave",
+        }
+    )
+
+    classpath_entry = rule_runner.request(
+        ClasspathEntry,
+        [
+            CoursierLockfileEntry(
+                coord=HAMCREST_COORD,
+                file_name="jeremy.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    fingerprint="55b9afa8d7776cd6c318eec51f506e9c7f66c247dcec343d4667f5f269714f86",
+                    serialized_bytes_length=10,
+                ),
+                pants_address="//:jeremy",
+            )
+        ],
+    )
+    assert classpath_entry.filenames == ("jeremy.jar",)
+    file_digest = rule_runner.request(
+        FileDigest,
+        [ExtractFileDigest(classpath_entry.digest, "jeremy.jar")],
+    )
+    assert file_digest == FileDigest(
+        fingerprint="55b9afa8d7776cd6c318eec51f506e9c7f66c247dcec343d4667f5f269714f86",
+        serialized_bytes_length=10,
+    )
+
+
+@maybe_skip_jdk_test
 def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
 
     classpath_entry = rule_runner.request(
