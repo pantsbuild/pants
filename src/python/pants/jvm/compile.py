@@ -172,12 +172,12 @@ class ClasspathEntry:
         )
 
     @classmethod
-    def arg(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> str:
-        """Builds the non-recursive classpath arg for the given entries.
+    def args(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> Iterator[str]:
+        """Returns the filenames for the given entries.
 
-        To construct a recursive classpath arg, first expand the entries with `cls.closure()`.
+        To compute transitive filenames, first expand the entries with `cls.closure()`.
         """
-        return ":".join(os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
+        return (os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
 
     @classmethod
     def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:

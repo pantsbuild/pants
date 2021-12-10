@@ -169,8 +169,10 @@ async def compile_scala_source(
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
     }
 
-    classpath_arg = ClasspathEntry.arg(
-        ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
+    classpath_arg = ":".join(
+        ClasspathEntry.args(
+            ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
+        )
     )
 
     output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"

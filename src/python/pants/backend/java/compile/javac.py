@@ -150,7 +150,9 @@ async def compile_java_source(
     prefixed_direct_dependency_classpath_digest = await Get(
         Digest, AddPrefix(merged_direct_dependency_classpath_digest, usercp)
     )
-    classpath_arg = ClasspathEntry.arg(direct_dependency_classpath_entries, prefix=usercp)
+    classpath_arg = ":".join(
+        ClasspathEntry.args(direct_dependency_classpath_entries, prefix=usercp)
+    )
 
     merged_digest = await Get(
         Digest,
@@ -206,6 +208,7 @@ async def compile_java_source(
     # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
     output_snapshot = await Get(Snapshot, Digest, compile_result.output_digest)
     output_file = f"{request.component.representative.address.path_safe_spec}.javac.jar"
+    output_files: tuple[str, ...] = (output_file,)
     if output_snapshot.files:
         jar_result = await Get(
             ProcessResult,
@@ -218,7 +221,7 @@ async def compile_java_source(
                     ),
                 ],
                 input_digest=compile_result.output_digest,
-                output_files=(output_file,),
+                output_files=output_files,
                 description=f"Capture outputs of {request.component} for javac",
                 level=LogLevel.TRACE,
             ),
@@ -227,10 +230,11 @@ async def compile_java_source(
     else:
         # If there was no output, then do not create a jar file. This may occur, for example, when compiling
         # a `package-info.java` in a single partition.
+        output_files = ()
         jar_output_digest = EMPTY_DIGEST
 
     output_classpath = ClasspathEntry(
-        jar_output_digest, (output_file,), direct_dependency_classpath_entries
+        jar_output_digest, output_files, direct_dependency_classpath_entries
     )
 
     if export_classpath_entries:

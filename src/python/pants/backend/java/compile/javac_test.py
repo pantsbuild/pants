@@ -67,9 +67,10 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *testutil.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
-            QueryRule(FallibleClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
+            QueryRule(FallibleClasspathEntry, (CompileJavaSourceRequest,)),
+            QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
         target_types=[JavaSourcesGeneratorTarget, JvmArtifact],
         bootstrap_args=[
@@ -132,12 +133,10 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
         rule_runner, Address(spec_path="", target_name="lib")
     )
 
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [CompileJavaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
-
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
@@ -183,8 +182,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
@@ -249,8 +247,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     request0 = CompileJavaSourceRequest(
         component=coarsened_targets_sorted[0], resolve=make_resolve(rule_runner)
     )
-    compiled_classfiles0 = rule_runner.request(ClasspathEntry, [request0])
-    classpath0 = rule_runner.request(RenderedClasspath, [compiled_classfiles0.digest])
+    classpath0 = rule_runner.request(RenderedClasspath, [request0])
     assert classpath0.content == {
         ".ExampleLib.java.lib.javac.jar": {
             "org/pantsbuild/example/lib/ExampleLib.class",
@@ -260,8 +257,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     request1 = CompileJavaSourceRequest(
         component=coarsened_targets_sorted[1], resolve=make_resolve(rule_runner)
     )
-    compiled_classfiles1 = rule_runner.request(ClasspathEntry, [request1])
-    classpath1 = rule_runner.request(RenderedClasspath, [compiled_classfiles1.digest])
+    classpath1 = rule_runner.request(RenderedClasspath, [request1])
     assert classpath1.content == {
         ".OtherLib.java.lib.javac.jar": {
             "org/pantsbuild/example/lib/OtherLib.class",
@@ -344,8 +340,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
         component=coarsened_target, resolve=make_resolve(rule_runner)
     )
 
-    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         "a.A.java.javac.jar": {
             "org/pantsbuild/a/A.class",
@@ -425,8 +420,8 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
         }
     )
 
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -436,7 +431,6 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {".Main.java.main.javac.jar": {"org/pantsbuild/main/Main.class"}}
 
 
@@ -502,11 +496,10 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
         rule_runner, Address(spec_path="", target_name="main")
     )
 
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [CompileJavaSourceRequest(component=ctgt, resolve=make_resolve(rule_runner))],
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".Main.java.main.javac.jar": {
             "org/pantsbuild/main/Main.class",
@@ -545,8 +538,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -556,7 +549,6 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".Example.java.main.javac.jar": {"org/pantsbuild/example/Example.class"}
     }
@@ -588,8 +580,8 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [
             CompileJavaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -599,7 +591,6 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {}
 
 
@@ -691,8 +682,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
+    classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".Example.java.main.javac.jar": {"org/pantsbuild/example/Example.class"}
     }
