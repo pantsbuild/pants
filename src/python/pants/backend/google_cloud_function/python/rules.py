@@ -28,6 +28,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -58,6 +59,17 @@ async def package_python_google_cloud_function(
     lambdex: Lambdex,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
+
+    if Platform.is_macos:
+        logger.warning(
+            "Google Cloud Functions built on macOS may fail to build. If your function uses any"
+            " third-party dependencies without binary wheels (bdist) for Linux available, it will"
+            " fail to build. If this happens, you will either need to update your dependencies to"
+            " only use dependencies with pre-built wheels, or find a Linux environment to run"
+            " ./pants package. (See https://realpython.com/python-wheels/ for more about"
+            " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
+        )
+
     output_filename = field_set.output_path.value_or_default(
         # Cloud Functions typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",

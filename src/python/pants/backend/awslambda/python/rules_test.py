@@ -109,7 +109,7 @@ def test_create_hello_world_lambda(
     assert "lambdex_handler.py" in names
     assert "foo/bar/hello_world.py" in names
     if sys.platform == "darwin":
-        assert "Building lambdas on macOS is not recommended." in caplog.text
+        assert "AWS Lambdas built on macOS may fail to build." in caplog.text
 
 
 def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:

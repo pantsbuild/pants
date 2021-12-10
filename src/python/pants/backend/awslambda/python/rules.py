@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import sys
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
@@ -28,6 +27,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -56,11 +56,14 @@ async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
 ) -> BuiltPackage:
 
-    if sys.platform == "darwin":
+    if Platform.is_macos:
         logger.warning(
-            "Building lambdas on macOS is not recommended. Lambdas must be built for Linux "
-            "and it is difficult to ensure that all transitive requirements have "
-            "prebuilt linux wheels."
+            "AWS Lambdas built on macOS may fail to build. If your lambda uses any third-party"
+            " dependencies without binary wheels (bdist) for Linux available, it will fail to"
+            " build. If this happens, you will either need to update your dependencies to only use"
+            " dependencies with pre-built wheels, or find a Linux environment to run ./pants"
+            " package. (See https://realpython.com/python-wheels/ for more about wheels.)\n\n(If"
+            " the build does not raise an exception, it's safe to use macOS.)"
         )
 
     output_filename = field_set.output_path.value_or_default(
