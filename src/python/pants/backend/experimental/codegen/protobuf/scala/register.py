@@ -7,7 +7,6 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
 )
-from pants.backend.experimental.scala.register import rules as all_scala_rules
 
 
 def target_types():
@@ -16,7 +15,6 @@ def target_types():
 
 def rules():
     return [
-        *all_scala_rules(),
         *scala_protobuf_rules.rules(),
         *protobuf_target_types.rules(),
         *protobuf_dependency_inference.rules(),

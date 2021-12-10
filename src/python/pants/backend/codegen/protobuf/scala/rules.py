@@ -127,6 +127,7 @@ async def generate_scala_from_protobuf(
         *target_sources_stripped.snapshot.files,
     ]
 
+    # TODO: Consider using nailgun or how to use the GraalVM-built native image for `scalapbc`.
     result = await Get(
         ProcessResult,
         Process(

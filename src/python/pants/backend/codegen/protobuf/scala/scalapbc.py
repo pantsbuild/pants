@@ -31,7 +31,9 @@ class ScalaPBSubsystem(JvmToolBase):
                 "A list of addresses to `jvm_artifact` targets for the runtime "
                 "dependencies needed for generated Scala code to work. For example, "
                 "`['3rdparty/jvm:scalapb-runtime']`. These dependencies will "
-                "be automatically added to every `protobuf_sources` target"
+                "be automatically added to every `protobuf_sources` target. At the very leasst, "
+                "this option must be set to a `jvm_artifact` for the "
+                f"`com.thesamet.scalapb:scalapb-runtime_SCALAVER:{cls.default_version}` runtime library."
             ),
         )
 
