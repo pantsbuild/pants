@@ -97,7 +97,7 @@ async def setup_google_java_format(
         ]
 
     args = [
-        *jdk_setup.args(bash, tool_classpath.classpath_entries()),
+        *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
         *maybe_java16_or_higher_options,
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),

@@ -42,9 +42,8 @@ impl ImmutableInputs {
     let value: Result<_, String> = cell
       .get_or_try_init(async {
         let digest_str = digest.hash.to_hex();
-        let digest_rel_dir = digest_str.chars().take(2).collect::<String>();
 
-        let path = self.workdir.path().join(digest_rel_dir).join(digest_str);
+        let path = self.workdir.path().join(digest_str);
         self
           .store
           .materialize_directory(path.clone(), digest, Permissions::ReadOnly)

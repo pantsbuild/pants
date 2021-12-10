@@ -194,13 +194,7 @@ pub struct WorkdirSymlink {
 ///
 /// The `complete` and `nailgun` Digests are the computed union of various inputs.
 ///
-/// TODO: Validate that `immutable_inputs` and `input_files` are disjoint in terms of created
-/// symlinks. Currently the local runner will fail to symlink if the `input_files` contain any
-/// directories/files which collide which the symlinks created for `immutable_inputs`, but we
-/// should fail earlier with an error message. One way to do that would be to create a synthetic
-/// Digest with the symlinks that we will create as files with content like `Symlink to $DIGEST`,
-/// and then merge that with the `input_files` Digest: that would trigger collisions for either
-/// directories or files at the location of the symlink.
+/// TODO: See `crate::local::prepare_workdir` regarding validation of overlapping inputs.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
 pub struct InputDigests {
   /// All of the input Digests, merged and relativized. Runners without the ability to consume the

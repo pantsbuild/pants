@@ -602,11 +602,17 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-///
 /// Prepares the given workdir for use by the given Process.
 ///
 /// Returns true if the executable for the Process was created in the workdir, indicating that
 /// `exclusive_spawn` is required.
+///
+/// TODO: Both the symlinks for named_caches/immutable_inputs and the empty output directories
+/// required by the spec should be created via a synthetic Digest containing SymlinkNodes and
+/// the empty output directories. That would:
+///   1. improve validation that nothing we create collides.
+///   2. allow for materialization to safely occur fully in parallel, rather than partially
+///      synchronously in the background.
 ///
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
@@ -638,7 +644,7 @@ pub async fn prepare_workdir(
 
   // Start with async materialization of input snapshots, followed by synchronous materialization
   // of other configured inputs. Note that we don't do this in parallel, as that might cause
-  // non-determinism when paths overlap.
+  // non-determinism when paths overlap: see the method doc.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
   in_workunit!(
@@ -672,10 +678,7 @@ pub async fn prepare_workdir(
       }
 
       // The bazel remote execution API specifies that the parent directories for output files and
-      // output directories should be created before execution completes: see
-      //   https://github.com/pantsbuild/pants/issues/7084.
-      // TODO: Creating a Digest containing all directories to create, and merging it into the
-      // `materialized` Digest above would allow these to be materialized in parallel.
+      // output directories should be created before execution completes: see the method doc.
       let parent_paths_to_create: HashSet<_> = output_file_paths
         .iter()
         .chain(output_dir_paths.iter())
