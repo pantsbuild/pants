@@ -8,9 +8,9 @@ from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
@@ -40,18 +40,22 @@ async def run_junit_test(
     test_subsystem: TestSubsystem,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
-    classpath = await Get(Classpath, Addresses([field_set.address]))
-    junit_classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__thirdpartycp",
-            lockfiles=(junit.resolved_lockfile(),),
+    classpath, junit_classpath = await MultiGet(
+        Get(Classpath, Addresses([field_set.address])),
+        Get(
+            MaterializedClasspath,
+            MaterializedClasspathRequest(
+                prefix="__thirdpartycp",
+                lockfiles=(junit.resolved_lockfile(),),
+            ),
         ),
     )
-    merged_digest = await Get(
-        Digest,
-        MergeDigests((classpath.content.digest, jdk_setup.digest, junit_classpath.digest)),
-    )
+
+    toolcp_relpath = "__toolcp"
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: junit_classpath.digest,
+    }
 
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
@@ -63,7 +67,11 @@ async def run_junit_test(
         Process(
             argv=[
                 *jdk_setup.args(
-                    bash, [*classpath.classpath_entries(), *junit_classpath.classpath_entries()]
+                    bash,
+                    [
+                        *classpath.classpath_entries(),
+                        *junit_classpath.classpath_entries(toolcp_relpath),
+                    ],
                 ),
                 "org.junit.platform.console.ConsoleLauncher",
                 *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
@@ -72,7 +80,8 @@ async def run_junit_test(
                 reports_dir,
                 *junit.options.args,
             ],
-            input_digest=merged_digest,
+            input_digest=classpath.content.digest,
+            immutable_input_digests=immutable_input_digests,
             output_directories=(reports_dir,),
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,

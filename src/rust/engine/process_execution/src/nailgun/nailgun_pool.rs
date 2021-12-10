@@ -22,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{Context, NamedCaches, Process, ProcessMetadata};
+use crate::{Context, ImmutableInputs, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -62,24 +62,16 @@ pub struct NailgunPool {
   size: usize,
   store: Store,
   executor: Executor,
-  named_caches: NamedCaches,
   processes: Arc<Mutex<Vec<PoolEntry>>>,
 }
 
 impl NailgunPool {
-  pub fn new(
-    workdir_base: PathBuf,
-    size: usize,
-    store: Store,
-    executor: Executor,
-    named_caches: NamedCaches,
-  ) -> Self {
+  pub fn new(workdir_base: PathBuf, size: usize, store: Store, executor: Executor) -> Self {
     NailgunPool {
       workdir_base,
       size,
       store,
       executor,
-      named_caches,
       processes: Arc::default(),
     }
   }
@@ -95,6 +87,8 @@ impl NailgunPool {
     &self,
     server_process: Process,
     context: Context,
+    named_caches: &NamedCaches,
+    immutable_inputs: &ImmutableInputs,
   ) -> Result<BorrowedNailgunProcess, String> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
@@ -138,7 +132,8 @@ impl NailgunPool {
         context,
         &self.store,
         self.executor.clone(),
-        &self.named_caches,
+        named_caches,
+        immutable_inputs,
         requested_fingerprint,
       )
       .await?,
@@ -346,6 +341,7 @@ impl NailgunProcess {
     store: &Store,
     executor: Executor,
     named_caches: &NamedCaches,
+    immutable_inputs: &ImmutableInputs,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
     let workdir = tempfile::Builder::new()
@@ -360,11 +356,12 @@ impl NailgunProcess {
     prepare_workdir(
       workdir.path().to_owned(),
       &startup_options,
-      startup_options.input_digests.use_nailgun,
+      startup_options.input_digests.input_files,
       context.clone(),
       store.clone(),
       executor.clone(),
       named_caches,
+      immutable_inputs,
     )
     .await?;
     let workdir_include_names = list_workdir(workdir.path()).await?;

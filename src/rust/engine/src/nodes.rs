@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -31,8 +31,7 @@ use fs::{
   Vfs,
 };
 use process_execution::{
-  self, CacheDest, CacheName, InputDigests, Platform, Process, ProcessCacheScope,
-  ProcessResultSource,
+  self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
@@ -291,10 +290,23 @@ impl ExecuteProcess {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
         .map_err(|err| format!("Error parsing input_digest {}", err))?;
-      let use_nailgun = lift_directory_digest(externs::getattr(value, "use_nailgun").unwrap())
-        .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
+      let immutable_inputs =
+        externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
+          .into_iter()
+          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
+          .collect::<Result<BTreeMap<_, _>, String>>()?;
+      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
+        .unwrap()
+        .into_iter()
+        .map(RelativePath::new)
+        .collect::<Result<Vec<_>, _>>()?;
 
-      Ok(InputDigests::new(store, input_files, use_nailgun))
+      Ok(InputDigests::new(
+        store,
+        input_files,
+        immutable_inputs,
+        use_nailgun,
+      ))
     });
 
     input_digests_fut?
@@ -333,10 +345,11 @@ impl ExecuteProcess {
     let py_level = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(py_level)?;
 
-    let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
-      .into_iter()
-      .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
-      .collect::<Result<_, String>>()?;
+    let append_only_caches =
+      externs::getattr_from_str_frozendict::<&str>(value, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
+        .collect::<Result<_, String>>()?;
 
     let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
 

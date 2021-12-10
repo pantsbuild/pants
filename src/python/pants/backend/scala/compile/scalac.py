@@ -110,11 +110,14 @@ async def compile_scala_source(
             exit_code=0,
         )
 
-    (tool_classpath, merged_transitive_dependency_classpath_entries_digest,) = await MultiGet(
+    toolcp_relpath = "__toolcp"
+    scalac_plugins_relpath = "__plugincp"
+    usercp = "__cp"
+
+    (tool_classpath, merged_transitive_dependency_classpath_entries_digest) = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                prefix="__toolcp",
                 artifact_requirements=(
                     ArtifactRequirements.from_coordinates(
                         [
@@ -143,31 +146,28 @@ async def compile_scala_source(
         ),
     )
 
-    usercp = "__cp"
     prefixed_transitive_dependency_classpath_digest = await Get(
         Digest, AddPrefix(merged_transitive_dependency_classpath_entries_digest, usercp)
     )
 
-    merged_tool_digest, merged_input_digest = await MultiGet(
-        Get(
-            Digest,
-            MergeDigests(
-                (tool_classpath.digest, scalac_plugins.classpath.digest, jdk_setup.digest)
-            ),
-        ),
-        Get(
-            Digest,
-            MergeDigests(
-                (
-                    prefixed_transitive_dependency_classpath_digest,
-                    *(
-                        sources.snapshot.digest
-                        for _, sources in component_members_and_scala_source_files
-                    ),
-                )
-            ),
+    merged_input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                prefixed_transitive_dependency_classpath_digest,
+                *(
+                    sources.snapshot.digest
+                    for _, sources in component_members_and_scala_source_files
+                ),
+            )
         ),
     )
+
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: tool_classpath.digest,
+        scalac_plugins_relpath: scalac_plugins.classpath.digest,
+    }
 
     classpath_arg = ClasspathEntry.arg(
         ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
@@ -178,11 +178,11 @@ async def compile_scala_source(
         FallibleProcessResult,
         Process(
             argv=[
-                *jdk_setup.args(bash, tool_classpath.classpath_entries()),
+                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
-                ":".join(tool_classpath.classpath_entries()),
-                *scalac_plugins.args(),
+                ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
+                *scalac_plugins.args(scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
@@ -194,7 +194,8 @@ async def compile_scala_source(
                 ),
             ],
             input_digest=merged_input_digest,
-            use_nailgun=merged_tool_digest,
+            immutable_input_digests=immutable_input_digests,
+            use_nailgun=immutable_input_digests.keys(),
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,

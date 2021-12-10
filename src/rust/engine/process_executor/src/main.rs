@@ -33,9 +33,9 @@ use std::process::exit;
 use std::time::Duration;
 
 use fs::{Permissions, RelativePath};
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use process_execution::{
-  Context, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
+  Context, ImmutableInputs, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -188,15 +188,6 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   cache_rpc_concurrency: usize,
 
-  /// If set, run the process through a Nailgun server with the given digest.
-  /// This will start a new Nailgun server as a side effect, but will tear it down on exit.
-  #[structopt(long)]
-  use_nailgun_digest: Option<Fingerprint>,
-
-  /// Length of the `use_nailgun_digest` digest.
-  #[structopt(long)]
-  use_nailgun_digest_length: Option<usize>,
-
   /// Overall timeout in seconds for each request from time of submission.
   #[structopt(long, default_value = "600")]
   overall_deadline_secs: u64,
@@ -278,6 +269,7 @@ async fn main() {
       .chain(request.argv.into_iter())
       .collect();
   }
+  let workdir = args.work_dir.unwrap_or_else(std::env::temp_dir);
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
@@ -319,12 +311,13 @@ async fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
-      args.work_dir.unwrap_or_else(std::env::temp_dir),
+      workdir.clone(),
       NamedCaches::new(
         args
           .named_cache_path
           .unwrap_or_else(NamedCaches::default_path),
       ),
+      ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
@@ -420,18 +413,8 @@ async fn make_request_from_flat_args(
     })
     .transpose()?;
 
-  let use_nailgun = match (args.use_nailgun_digest, args.use_nailgun_digest_length) {
-    (Some(d), Some(l)) => Digest::new(d, l),
-    (Some(_), None) | (None, Some(_)) => {
-      return Err(
-        "If either `use_nailgun_digest` or `use_nailgun_digest_length` are set, both must be."
-          .to_owned(),
-      )
-    }
-    _ => EMPTY_DIGEST,
-  };
-
-  let input_digests = InputDigests::new(store, input_files, use_nailgun)
+  // TODO: Add support for immutable inputs.
+  let input_digests = InputDigests::new(store, input_files, BTreeMap::default(), vec![])
     .await
     .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
 

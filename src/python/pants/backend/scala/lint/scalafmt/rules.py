@@ -91,7 +91,7 @@ class ScalafmtConfigFiles:
 class SetupScalafmtPartition:
     merged_sources_digest: Digest
     jdk_invoke_args: tuple[str, ...]
-    tool_digest: Digest
+    immutable_input_digests: FrozenDict[str, Digest]
     config_file: str
     files: tuple[str, ...]
     check_only: bool
@@ -162,8 +162,6 @@ async def setup_scalafmt_partition(
         ),
     )
 
-    input_digest = await Get(Digest, MergeDigests([sources_digest, request.tool_digest]))
-
     args = [
         *request.jdk_invoke_args,
         "org.scalafmt.cli.Cli",
@@ -176,9 +174,10 @@ async def setup_scalafmt_partition(
 
     process = Process(
         argv=args,
-        input_digest=input_digest,
+        input_digest=sources_digest,
         output_files=request.files,
         append_only_caches=jdk_setup.append_only_caches,
+        immutable_input_digests=request.immutable_input_digests,
         env=jdk_setup.env,
         description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
         level=LogLevel.DEBUG,
@@ -194,6 +193,7 @@ async def setup_scalafmt(
     jdk_setup: JdkSetup,
     bash: BashBinary,
 ) -> Setup:
+    toolcp_relpath = "__toolcp"
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
@@ -202,7 +202,6 @@ async def setup_scalafmt(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                prefix="__toolcp",
                 lockfiles=(tool.resolved_lockfile(),),
             ),
         ),
@@ -218,26 +217,19 @@ async def setup_scalafmt(
         ScalafmtConfigFiles, GatherScalafmtConfigFilesRequest(source_files_snapshot)
     )
 
-    merged_sources_digest, tool_digest = await MultiGet(
-        Get(
-            Digest,
-            MergeDigests(
-                [
-                    source_files_snapshot.digest,
-                    config_files.snapshot.digest,
-                ]
-            ),
-        ),
-        Get(
-            Digest,
-            MergeDigests(
-                [
-                    tool_classpath.digest,
-                    jdk_setup.digest,
-                ]
-            ),
+    merged_sources_digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                source_files_snapshot.digest,
+                config_files.snapshot.digest,
+            ]
         ),
     )
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: tool_classpath.digest,
+    }
 
     # Partition the work by which source files share the same config file (regardless of directory).
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
@@ -247,13 +239,13 @@ async def setup_scalafmt(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
-    jdk_invoke_args = jdk_setup.args(bash, tool_classpath.classpath_entries())
+    jdk_invoke_args = jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath))
     partitions = await MultiGet(
         Get(
             Partition,
             SetupScalafmtPartition(
                 merged_sources_digest=merged_sources_digest,
-                tool_digest=tool_digest,
+                immutable_input_digests=FrozenDict(immutable_input_digests),
                 jdk_invoke_args=jdk_invoke_args,
                 config_file=config_file,
                 files=tuple(sorted(files)),

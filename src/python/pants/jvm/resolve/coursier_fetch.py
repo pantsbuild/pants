@@ -433,8 +433,6 @@ async def coursier_resolve_lockfile(
         CoursierResolveInfo, ArtifactRequirements, artifact_requirements
     )
 
-    input_digest = await Get(Digest, MergeDigests([coursier_resolve_info.digest, coursier.digest]))
-
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
@@ -454,7 +452,8 @@ async def coursier_resolve_lockfile(
                 ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=input_digest,
+            input_digest=coursier_resolve_info.digest,
+            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
@@ -595,8 +594,6 @@ async def coursier_fetch_one_coord(
         ArtifactRequirements([req]),
     )
 
-    input_digest = await Get(Digest, MergeDigests([coursier.digest, coursier_resolve_info.digest]))
-
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
@@ -605,7 +602,8 @@ async def coursier_fetch_one_coord(
                 [coursier_report_file_name, "--intransitive", *coursier_resolve_info.coord_strings],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=input_digest,
+            input_digest=coursier_resolve_info.digest,
+            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,

@@ -122,8 +122,8 @@ class GlobalScalacPlugins:
     names: tuple[str, ...]
     classpath: MaterializedClasspath
 
-    def args(self) -> Iterator[str]:
-        scalac_plugins_arg = ":".join(self.classpath.classpath_entries())
+    def args(self, prefix: str | None = None) -> Iterator[str]:
+        scalac_plugins_arg = ":".join(self.classpath.classpath_entries(prefix))
         if scalac_plugins_arg:
             yield f"-Xplugin:{scalac_plugins_arg}"
         for name in self.names:
