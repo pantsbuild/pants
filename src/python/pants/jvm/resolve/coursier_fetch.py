@@ -266,8 +266,8 @@ class CoursierLockfileEntry:
                 fingerprint=entry["file_digest"]["fingerprint"],
                 serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
             ),
-            remote_url=entry["remote_url"],
-            pants_address=entry["pants_address"],
+            remote_url=entry.get("remote_url"),
+            pants_address=entry.get("pants_address"),
         )
 
     def to_json_dict(self) -> dict[str, Any]:
