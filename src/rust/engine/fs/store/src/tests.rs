@@ -8,7 +8,7 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
-use fs::{DigestEntry, FileEntry};
+use fs::{DigestEntry, FileEntry, Permissions};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -968,7 +968,7 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), false)
+    .materialize_file(file.clone(), TestData::roland().digest(), 0o644)
     .await
     .expect_err("Want unknown digest error");
 }
@@ -987,32 +987,11 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), false)
+    .materialize_file(file.clone(), testdata.digest(), 0o644)
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
   assert!(!is_executable(&file));
-}
-
-#[tokio::test]
-async fn materialize_file_executable() {
-  let materialize_dir = TempDir::new().unwrap();
-  let file = materialize_dir.path().join("file");
-
-  let testdata = TestData::roland();
-
-  let store_dir = TempDir::new().unwrap();
-  let store = new_local_store(store_dir.path());
-  store
-    .store_file_bytes(testdata.bytes(), false)
-    .await
-    .expect("Error saving bytes");
-  store
-    .materialize_file(file.clone(), testdata.digest(), true)
-    .await
-    .expect("Error materializing file");
-  assert_eq!(file_contents(&file), testdata.bytes());
-  assert!(is_executable(&file));
 }
 
 #[tokio::test]
@@ -1025,19 +1004,18 @@ async fn materialize_missing_directory() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().digest(),
+      Permissions::Writable,
     )
     .await
     .expect_err("Want unknown digest error");
 }
 
-#[tokio::test]
-async fn materialize_directory() {
+async fn materialize_directory(perms: Permissions, executable_file: bool) {
   let materialize_dir = TempDir::new().unwrap();
 
-  let roland = TestData::roland();
   let catnip = TestData::catnip();
-  let testdir = TestDirectory::containing_roland();
-  let recursive_testdir = TestDirectory::recursive();
+  let testdir = TestDirectory::with_maybe_executable_files(executable_file);
+  let recursive_testdir = TestDirectory::recursive_with(testdir.clone());
 
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
@@ -1050,22 +1028,20 @@ async fn materialize_directory() {
     .await
     .expect("Error saving Directory");
   store
-    .store_file_bytes(roland.bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-  store
     .store_file_bytes(catnip.bytes(), false)
     .await
-    .expect("Error saving catnip file bytes");
+    .expect("Error saving file bytes");
 
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.digest(),
+      perms,
     )
     .await
     .expect("Error materializing");
 
+  // Validate contents.
   assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
   assert_eq!(
     file_contents(&materialize_dir.path().join("treats.ext")),
@@ -1073,51 +1049,50 @@ async fn materialize_directory() {
   );
   assert_eq!(
     list_dir(&materialize_dir.path().join("cats")),
-    vec!["roland.ext"]
-  );
-  assert_eq!(
-    file_contents(&materialize_dir.path().join("cats").join("roland.ext")),
-    roland.bytes()
-  );
-}
-
-#[tokio::test]
-async fn materialize_directory_executable() {
-  let materialize_dir = TempDir::new().unwrap();
-
-  let catnip = TestData::catnip();
-  let testdir = TestDirectory::with_mixed_executable_files();
-
-  let store_dir = TempDir::new().unwrap();
-  let store = new_local_store(store_dir.path());
-  store
-    .record_directory(&testdir.directory(), false)
-    .await
-    .expect("Error saving Directory");
-  store
-    .store_file_bytes(catnip.bytes(), false)
-    .await
-    .expect("Error saving catnip file bytes");
-
-  store
-    .materialize_directory(materialize_dir.path().to_owned(), testdir.digest())
-    .await
-    .expect("Error materializing");
-
-  assert_eq!(
-    list_dir(materialize_dir.path()),
     vec!["feed.ext", "food.ext"]
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("feed.ext")),
+    file_contents(&materialize_dir.path().join("cats").join("feed.ext")),
     catnip.bytes()
   );
+
+  // Validate executability.
   assert_eq!(
-    file_contents(&materialize_dir.path().join("food.ext")),
-    catnip.bytes()
+    executable_file,
+    is_executable(&materialize_dir.path().join("cats").join("feed.ext"))
   );
-  assert!(is_executable(&materialize_dir.path().join("feed.ext")));
-  assert!(!is_executable(&materialize_dir.path().join("food.ext")));
+  assert!(!is_executable(
+    &materialize_dir.path().join("cats").join("food.ext")
+  ));
+
+  // Validate read/write permissions for a file, a nested directory, and the root.
+  let readonly = perms == Permissions::ReadOnly;
+  assert_eq!(
+    readonly,
+    is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
+  );
+  assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
+  assert_eq!(readonly, is_readonly(&materialize_dir.path()));
+}
+
+#[tokio::test]
+async fn materialize_directory_writable() {
+  materialize_directory(Permissions::Writable, false).await
+}
+
+#[tokio::test]
+async fn materialize_directory_writable_executable() {
+  materialize_directory(Permissions::Writable, true).await
+}
+
+#[tokio::test]
+async fn materialize_directory_readonly() {
+  materialize_directory(Permissions::ReadOnly, false).await
+}
+
+#[tokio::test]
+async fn materialize_directory_readonly_executable() {
+  materialize_directory(Permissions::Writable, true).await
 }
 
 #[tokio::test]
@@ -1365,6 +1340,13 @@ fn is_executable(path: &Path) -> bool {
     == 0o100
 }
 
+fn is_readonly(path: &Path) -> bool {
+  std::fs::metadata(path)
+    .expect("Getting metadata")
+    .permissions()
+    .readonly()
+}
+
 #[tokio::test]
 async fn returns_upload_summary_on_empty_cas() {
   let dir = TempDir::new().unwrap();
@@ -1513,7 +1495,11 @@ async fn explicitly_overwrites_already_existing_file() {
   let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
 
   let _ = store
-    .materialize_directory(dir_to_write_to.path().to_owned(), contents_dir.digest())
+    .materialize_directory(
+      dir_to_write_to.path().to_owned(),
+      contents_dir.digest(),
+      Permissions::Writable,
+    )
     .await
     .unwrap();
 

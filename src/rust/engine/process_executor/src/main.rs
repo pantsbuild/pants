@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
-use fs::RelativePath;
+use fs::{Permissions, RelativePath};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use process_execution::{
   Context, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
@@ -340,7 +340,7 @@ async fn main() {
 
   if let Some(output) = args.materialize_output_to {
     store
-      .materialize_directory(output, result.output_directory)
+      .materialize_directory(output, result.output_directory, Permissions::Writable)
       .await
       .unwrap();
   }

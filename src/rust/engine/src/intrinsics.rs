@@ -19,7 +19,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
+use fs::{safe_create_dir_all_ioerror, Permissions, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
@@ -604,7 +604,7 @@ fn interactive_process(
       context
         .core
         .store()
-        .materialize_directory(destination, input_digest)
+        .materialize_directory(destination, input_digest, Permissions::Writable)
         .await?;
     }
 
