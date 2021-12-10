@@ -12,11 +12,12 @@ from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
@@ -114,7 +115,8 @@ async def compile_scala_source(
     scalac_plugins_relpath = "__plugincp"
     usercp = "__cp"
 
-    (tool_classpath, merged_transitive_dependency_classpath_entries_digest) = await MultiGet(
+    user_classpath = Classpath(direct_dependency_classpath_entries)
+    tool_classpath, sources_digest = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
@@ -138,28 +140,9 @@ async def compile_scala_source(
         ),
         Get(
             Digest,
-            # Flatten the entire transitive classpath.
             MergeDigests(
-                classfiles.digest
-                for classfiles in ClasspathEntry.closure(direct_dependency_classpath_entries)
+                (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
             ),
-        ),
-    )
-
-    prefixed_transitive_dependency_classpath_digest = await Get(
-        Digest, AddPrefix(merged_transitive_dependency_classpath_entries_digest, usercp)
-    )
-
-    merged_input_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                prefixed_transitive_dependency_classpath_digest,
-                *(
-                    sources.snapshot.digest
-                    for _, sources in component_members_and_scala_source_files
-                ),
-            )
         ),
     )
 
@@ -168,12 +151,10 @@ async def compile_scala_source(
         toolcp_relpath: tool_classpath.digest,
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
     }
+    use_nailgun = tuple(immutable_input_digests.keys())
+    immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
 
-    classpath_arg = ":".join(
-        ClasspathEntry.args(
-            ClasspathEntry.closure(direct_dependency_classpath_entries), prefix=usercp
-        )
-    )
+    classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"
     process_result = await Get(
@@ -195,9 +176,9 @@ async def compile_scala_source(
                     )
                 ),
             ],
-            input_digest=merged_input_digest,
+            input_digest=sources_digest,
             immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests.keys(),
+            use_nailgun=use_nailgun,
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,

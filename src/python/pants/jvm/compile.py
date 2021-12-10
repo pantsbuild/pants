@@ -175,9 +175,35 @@ class ClasspathEntry:
     def args(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> Iterator[str]:
         """Returns the filenames for the given entries.
 
+        TODO: See whether this method can be completely eliminated in favor of
+        `immutable_inputs(_args)`.
+
         To compute transitive filenames, first expand the entries with `cls.closure()`.
         """
         return (os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
+
+    @classmethod
+    def immutable_inputs(
+        cls, entries: Iterable[ClasspathEntry], *, prefix: str = ""
+    ) -> Iterator[tuple[str, Digest]]:
+        """Returns (relpath, Digest) tuples for use with `Process.immutable_input_digests`.
+
+        To compute transitive input tuples, first expand the entries with `cls.closure()`.
+        """
+        return ((os.path.join(prefix, cpe.digest.fingerprint[:12]), cpe.digest) for cpe in entries)
+
+    @classmethod
+    def immutable_inputs_args(
+        cls, entries: Iterable[ClasspathEntry], *, prefix: str = ""
+    ) -> Iterator[str]:
+        """Returns the relative filenames for the given entries to be used as immutable_inputs.
+
+        To compute transitive input tuples, first expand the entries with `cls.closure()`.
+        """
+        for cpe in entries:
+            fingerprint_prefix = cpe.digest.fingerprint[:12]
+            for filename in cpe.filenames:
+                yield os.path.join(prefix, fingerprint_prefix, filename)
 
     @classmethod
     def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:

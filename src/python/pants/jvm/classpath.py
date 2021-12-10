@@ -20,6 +20,14 @@ logger = logging.getLogger(__name__)
 class Classpath(Collection[ClasspathEntry]):
     """A transitive classpath which is sufficient to launch the target(s) it was generated for.
 
+    There are two primary ways to consume a Classpath:
+        1. Using the `(root_)immutable_inputs` methods, which produce the argument to
+           `Process.immutable_input_digests` and adapted CLI args for use with that argument.
+        2. Using the `digests` and `(root_)args` methods, which can be merged to produce the
+           argument to `Process.input_digest` and CLI args for use with a digest.
+    The first approach should be preferred, because it allows for symlinking of inputs. If
+    possible, the latter method should be removed when consumers have migrated.
+
     This classpath is guaranteed to contain only JAR files.
     """
 
@@ -34,6 +42,22 @@ class Classpath(Collection[ClasspathEntry]):
     def digests(self) -> Iterator[Digest]:
         """All transitive Digests for this Classpath."""
         return (entry.digest for entry in ClasspathEntry.closure(self))
+
+    def immutable_inputs(self, *, prefix: str = "") -> Iterator[tuple[str, Digest]]:
+        """Returns (relpath, Digest) tuples for use with `Process.immutable_input_digests`."""
+        return ClasspathEntry.immutable_inputs(ClasspathEntry.closure(self), prefix=prefix)
+
+    def immutable_inputs_args(self, *, prefix: str = "") -> Iterator[str]:
+        """Returns relative filenames for the given entries to be used as immutable_inputs."""
+        return ClasspathEntry.immutable_inputs_args(ClasspathEntry.closure(self), prefix=prefix)
+
+    def root_immutable_inputs(self, *, prefix: str = "") -> Iterator[tuple[str, Digest]]:
+        """Returns root (relpath, Digest) tuples for use with `Process.immutable_input_digests`."""
+        return ClasspathEntry.immutable_inputs(self, prefix=prefix)
+
+    def root_immutable_inputs_args(self, *, prefix: str = "") -> Iterator[str]:
+        """Returns root relative filenames for the given entries to be used as immutable_inputs."""
+        return ClasspathEntry.immutable_inputs_args(self, prefix=prefix)
 
 
 @rule

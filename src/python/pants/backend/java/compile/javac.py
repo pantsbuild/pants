@@ -14,19 +14,12 @@ from pants.backend.java.dependency_inference.rules import rules as java_dep_infe
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
@@ -135,30 +128,14 @@ async def compile_java_source(
         )
 
     dest_dir = "classfiles"
-    (merged_direct_dependency_classpath_digest, dest_dir_digest) = await MultiGet(
-        Get(
-            Digest,
-            MergeDigests(classfiles.digest for classfiles in direct_dependency_classpath_entries),
-        ),
-        Get(
-            Digest,
-            CreateDigest([Directory(dest_dir)]),
-        ),
+    dest_dir_digest = await Get(
+        Digest,
+        CreateDigest([Directory(dest_dir)]),
     )
-
-    usercp = "__cp"
-    prefixed_direct_dependency_classpath_digest = await Get(
-        Digest, AddPrefix(merged_direct_dependency_classpath_digest, usercp)
-    )
-    classpath_arg = ":".join(
-        ClasspathEntry.args(direct_dependency_classpath_entries, prefix=usercp)
-    )
-
     merged_digest = await Get(
         Digest,
         MergeDigests(
             (
-                prefixed_direct_dependency_classpath_digest,
                 dest_dir_digest,
                 *(
                     sources.snapshot.digest
@@ -167,6 +144,14 @@ async def compile_java_source(
             )
         ),
     )
+
+    usercp = "__cp"
+    user_classpath = Classpath(direct_dependency_classpath_entries)
+    classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        **dict(user_classpath.root_immutable_inputs(prefix=usercp)),
+    }
 
     # Compile.
     compile_result = await Get(
@@ -186,7 +171,7 @@ async def compile_java_source(
                 ),
             ],
             input_digest=merged_digest,
-            immutable_input_digests=jdk_setup.immutable_input_digests,
+            immutable_input_digests=immutable_input_digests,
             use_nailgun=jdk_setup.immutable_input_digests.keys(),
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
