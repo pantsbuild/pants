@@ -695,16 +695,26 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     if fetch:
         extra_pex_args = [
-            f"--platform={plat}-{abi}"
-            for plat in ("linux_x86_64", "macosx_10.15_x86_64")
-            for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
+            "--python-shebang",
+            "/usr/bin/env python",
+            "--interpreter-constraint",
+            "CPython>=3.7,<3.10",
+            *(
+                f"--platform={plat}-{abi}"
+                for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+                for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
+            ),
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
-        extra_pex_args = [f"--python={sys.executable}"]
+        major, minor = sys.version_info[:2]
+        extra_pex_args = [
+            f"--interpreter-constraint=CPython=={major}.{minor}.*",
+            f"--python={sys.executable}",
+        ]
         plat = os.uname()[0].lower()
-        py = f"cp{''.join(map(str, sys.version_info[:2]))}"
+        py = f"cp{major}{minor}"
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.{plat}-{py}.pex"
         banner(f"Building {pex_name} by building wheels.")
 
@@ -744,6 +754,7 @@ def build_pex(fetch: bool) -> None:
                 "--console-script=pants",
                 *extra_pex_args,
                 f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
+                "--venv",
             ],
             env=env,
             check=True,
