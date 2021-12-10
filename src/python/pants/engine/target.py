@@ -2177,9 +2177,12 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
     sort_input = True
 
 
+SF = TypeVar("SF", bound="SourcesField")
+
+
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(EngineAwareParameter):
+class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
@@ -2209,8 +2212,8 @@ class InferDependenciesRequest(EngineAwareParameter):
             ]
     """
 
-    sources_field: SourcesField
-    infer_from: ClassVar[type[SourcesField]]
+    sources_field: SF
+    infer_from: ClassVar[Type[SF]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec

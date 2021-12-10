@@ -18,7 +18,7 @@ class AncestorFilesRequest:
     directories of, a `.py` or `.pyi` file in the input_files.
     """
 
-    input_files: tuple[str]
+    input_files: tuple[str, ...]
     requested: tuple[str, ...]
 
 
