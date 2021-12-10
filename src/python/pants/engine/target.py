@@ -1576,6 +1576,11 @@ class SourcesField(AsyncFieldMixin, Field):
         To enforce that there are only a certain number of resulting files, such as binary targets
         checking for only 0-1 sources, set the class property `expected_num_files`.
         """
+
+        if not self.required and not self.value:
+            # #13851 if value is not set, validation results are spurious
+            return None
+
         if self.expected_file_extensions is not None:
             bad_files = [
                 fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
