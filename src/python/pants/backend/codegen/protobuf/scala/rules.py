@@ -4,11 +4,15 @@ import textwrap
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.scala.scalapbc import ScalaPBSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufDependenciesField,
+    ProtobufSourceField,
+)
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -26,6 +30,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -145,6 +151,18 @@ async def generate_scala_from_protobuf(
         else await Get(Snapshot, Digest, normalized_digest)
     )
     return GeneratedSources(source_root_restored)
+
+
+class InjectScalaProtobufDependencies(InjectDependenciesRequest):
+    inject_for = ProtobufDependenciesField
+
+
+@rule
+async def inject_scalapb_dependencies(
+    _: InjectScalaProtobufDependencies, scalapb: ScalaPBSubsystem
+) -> InjectedDependencies:
+    addresses = await Get(Addresses, UnparsedAddressInputs, scalapb.runtime_dependencies)
+    return InjectedDependencies(addresses)
 
 
 @rule
