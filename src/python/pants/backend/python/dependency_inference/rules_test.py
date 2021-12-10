@@ -86,7 +86,7 @@ def test_infer_python_imports(caplog) -> None:
     def run_dep_inference(
         address: Address, *, enable_string_imports: bool = False
     ) -> InferredDependencies:
-        args = ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
+        args = ["--source-root-patterns=src/python"]
         if enable_string_imports:
             args.append("--python-infer-string-imports")
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -167,11 +167,7 @@ def test_infer_python_inits() -> None:
         target_types=[PythonSourcesGeneratorTarget],
     )
     rule_runner.set_options(
-        [
-            "--backend-packages=pants.backend.python",
-            "--python-infer-inits",
-            "--source-root-patterns=src/python",
-        ],
+        ["--python-infer-inits", "--source-root-patterns=src/python"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
@@ -184,6 +180,10 @@ def test_infer_python_inits() -> None:
     rule_runner.create_file("src/python/root/mid/leaf/__init__.py")
     rule_runner.create_file("src/python/root/mid/leaf/f.py")
     rule_runner.add_to_build_file("src/python/root/mid/leaf", "python_sources()")
+
+    rule_runner.create_file("src/python/type_stub/__init__.pyi")
+    rule_runner.create_file("src/python/type_stub/foo.pyi")
+    rule_runner.add_to_build_file("src/python/type_stub/BUILD", "python_sources()")
 
     def run_dep_inference(address: Address) -> InferredDependencies:
         target = rule_runner.get_target(address)
@@ -201,6 +201,9 @@ def test_infer_python_inits() -> None:
             Address("src/python/root/mid/leaf", relative_file_path="__init__.py"),
         ],
     )
+    assert run_dep_inference(
+        Address("src/python/type_stub", relative_file_path="foo.pyi")
+    ) == InferredDependencies([Address("src/python/type_stub", relative_file_path="__init__.pyi")])
 
 
 def test_infer_python_conftests() -> None:

@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List
+from __future__ import annotations
 
 import pytest
 
@@ -9,7 +9,7 @@ from pants.backend.python.util_rules import ancestor_files
 from pants.backend.python.util_rules.ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
-    identify_missing_ancestor_files,
+    putative_ancestor_files,
 )
 from pants.engine.fs import DigestContents
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -28,17 +28,18 @@ def rule_runner() -> RuleRunner:
 def assert_injected(
     rule_runner: RuleRunner,
     *,
-    source_roots: List[str],
-    original_declared_files: List[str],
-    original_undeclared_files: List[str],
-    expected_discovered: List[str],
+    source_roots: list[str],
+    original_declared_files: list[str],
+    original_undeclared_files: list[str],
+    expected_discovered: list[str],
 ) -> None:
     rule_runner.set_options([f"--source-root-patterns={source_roots}"])
     for f in original_undeclared_files:
         rule_runner.create_file(f, "# undeclared")
+    for f in original_declared_files:
+        rule_runner.create_file(f, "# declared")
     request = AncestorFilesRequest(
-        "__init__.py",
-        rule_runner.make_snapshot({fp: "# declared" for fp in original_declared_files}),
+        requested=("__init__.py",), input_files=tuple(original_declared_files)
     )
     result = rule_runner.request(AncestorFiles, [request]).snapshot
     assert list(result.files) == sorted(expected_discovered)
@@ -91,10 +92,14 @@ def test_unstripped_source_root_at_buildroot(rule_runner: RuleRunner) -> None:
 
 
 def test_identify_missing_ancestor_files() -> None:
-    assert {"__init__.py", "a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py"} == set(
-        identify_missing_ancestor_files(
-            "__init__.py", ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
-        )
+    assert {
+        "__init__.py",
+        "a/__init__.py",
+        "a/b/__init__.py",
+        "a/b/c/d/__init__.py",
+    } == putative_ancestor_files(
+        requested=("__init__.py",),
+        input_files=("a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"),
     )
 
     assert {
@@ -104,14 +109,22 @@ def test_identify_missing_ancestor_files() -> None:
         "src/python/a/__init__.py",
         "src/python/a/b/__init__.py",
         "src/python/a/b/c/d/__init__.py",
-    } == set(
-        identify_missing_ancestor_files(
-            "__init__.py",
-            [
-                "src/python/a/b/foo.py",
-                "src/python/a/b/c/__init__.py",
-                "src/python/a/b/c/d/bar.py",
-                "src/python/a/e/__init__.py",
-            ],
-        )
+    } == putative_ancestor_files(
+        requested=("__init__.py",),
+        input_files=(
+            "src/python/a/b/foo.py",
+            "src/python/a/b/c/__init__.py",
+            "src/python/a/b/c/d/bar.py",
+            "src/python/a/e/__init__.py",
+        ),
     )
+
+    assert putative_ancestor_files(requested=("f.py", "f.pyi"), input_files=("subdir/foo.py",)) == {
+        "f.py",
+        "f.pyi",
+        "subdir/f.py",
+        "subdir/f.pyi",
+    }
+    assert putative_ancestor_files(
+        requested=("f.py", "f.pyi"), input_files=("subdir/foo.pyi",)
+    ) == {"f.py", "f.pyi", "subdir/f.py", "subdir/f.pyi"}
