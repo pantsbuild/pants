@@ -73,6 +73,13 @@ pub fn default_cache_path() -> PathBuf {
   cache_path.join("pants")
 }
 
+/// Simplified filesystem Permissions.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum Permissions {
+  ReadOnly,
+  Writable,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
 pub struct RelativePath(PathBuf);
 

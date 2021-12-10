@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, safe_create_dir_all_ioerror, GlobExpansionConjunction, GlobMatching, PathGlobs,
-  RelativePath, StrictGlobMatching,
+  Permissions, RelativePath, StrictGlobMatching,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -640,7 +640,7 @@ pub async fn prepare_workdir(
     },
     |_workunit| async move {
       store2
-        .materialize_directory(workdir_path_2, input_digest)
+        .materialize_directory(workdir_path_2, input_digest, Permissions::Writable)
         .await
     },
   )

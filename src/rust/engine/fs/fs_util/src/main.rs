@@ -35,7 +35,8 @@ use std::time::Duration;
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
-  GlobExpansionConjunction, GlobMatching, PreparedPathGlobs, RelativePath, StrictGlobMatching,
+  GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs, RelativePath,
+  StrictGlobMatching,
 };
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
@@ -520,7 +521,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let output_digest =
           output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
         store
-          .materialize_directory(destination, output_digest)
+          .materialize_directory(destination, output_digest, Permissions::Writable)
           .await
           .map_err(|err| {
             if err.contains("not found") {
@@ -543,7 +544,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .expect("size_bytes must be a non-negative number");
         let digest = Digest::new(fingerprint, size_bytes);
         store
-          .materialize_directory(destination, digest)
+          .materialize_directory(destination, digest, Permissions::Writable)
           .await
           .map_err(|err| {
             if err.contains("not found") {

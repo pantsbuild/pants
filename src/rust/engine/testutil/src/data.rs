@@ -57,6 +57,7 @@ impl TestData {
   }
 }
 
+#[derive(Clone)]
 pub struct TestDirectory {
   pub directory: remexec::Directory,
 }
@@ -256,10 +257,18 @@ impl TestDirectory {
   // /cats/roland.ext
   // /treats.ext
   pub fn recursive() -> TestDirectory {
+    Self::recursive_with(TestDirectory::containing_roland())
+  }
+
+  // Directory structure:
+  //
+  // /cats/(param)
+  // /treats.ext
+  pub fn recursive_with(inner: TestDirectory) -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
         name: "cats".to_owned(),
-        digest: Some((&TestDirectory::containing_roland().digest()).into()),
+        digest: Some((&inner.digest()).into()),
       }],
       files: vec![remexec::FileNode {
         name: "treats.ext".to_owned(),
@@ -273,15 +282,15 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /feed.ext (executable)
-  // /food.ext
-  pub fn with_mixed_executable_files() -> TestDirectory {
+  // /feed.ext (is_executable=?)
+  // /food.ext (is_executable=False)
+  pub fn with_maybe_executable_files(is_executable: bool) -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![
         remexec::FileNode {
           name: "feed.ext".to_owned(),
           digest: Some((&TestData::catnip().digest()).into()),
-          is_executable: true,
+          is_executable,
           ..remexec::FileNode::default()
         },
         remexec::FileNode {
