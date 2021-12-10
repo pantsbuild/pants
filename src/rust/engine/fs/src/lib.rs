@@ -74,7 +74,7 @@ pub fn default_cache_path() -> PathBuf {
 }
 
 /// Simplified filesystem Permissions.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Permissions {
   ReadOnly,
   Writable,
