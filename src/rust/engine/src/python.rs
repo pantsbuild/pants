@@ -6,15 +6,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use fnv::FnvHasher;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::SmallVec;
 
 use crate::externs;
-
-pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
 
 ///
 /// Params represent a TypeId->Key map.
@@ -214,6 +211,7 @@ impl fmt::Display for Function {
 pub struct Key {
   id: Id,
   type_id: TypeId,
+  pub value: Value,
 }
 
 impl Eq for Key {}
@@ -243,8 +241,8 @@ impl fmt::Display for Key {
 }
 
 impl Key {
-  pub fn new(id: Id, type_id: TypeId) -> Key {
-    Key { id, type_id }
+  pub fn new(id: Id, type_id: TypeId, value: Value) -> Key {
+    Key { id, type_id, value }
   }
 
   pub fn id(&self) -> Id {
@@ -262,7 +260,7 @@ impl Key {
   }
 
   pub fn to_value(&self) -> Value {
-    Value::new(externs::INTERNS.key_get(self))
+    self.value.clone()
   }
 }
 
