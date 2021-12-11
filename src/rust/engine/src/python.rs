@@ -21,7 +21,6 @@ pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
 ///
 /// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds).
 ///
-#[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Params(SmallVec<[Key; 4]>);
 
@@ -178,8 +177,7 @@ impl rule_graph::TypeId for TypeId {
 }
 
 /// An identifier for a Python function.
-#[repr(C)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
@@ -212,8 +210,7 @@ impl fmt::Display for Function {
 }
 
 /// An interned key for a Value for use as a key in HashMaps and sets.
-#[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Key {
   id: Id,
   type_id: TypeId,

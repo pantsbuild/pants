@@ -63,12 +63,12 @@ impl Interns {
     py.allow_threads(|| {
       let mut forward_keys = self.forward_keys.lock();
       let key = if let Some(key) = forward_keys.get(&intern_key) {
-        *key
+        key.clone()
       } else {
         let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
         let key = Key::new(id, type_id);
-        self.reverse_keys.write().insert(key, v);
-        forward_keys.insert(intern_key, key);
+        self.reverse_keys.write().insert(key.clone(), v);
+        forward_keys.insert(intern_key, key.clone());
         key
       };
       Ok(key)

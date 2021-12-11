@@ -879,7 +879,7 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
@@ -1006,7 +1006,7 @@ impl Task {
             output: get.output,
             input: *get.input.type_id(),
           });
-          params.put(get.input);
+          params.put(get.input.clone());
 
           let edges = context
             .core
@@ -1148,7 +1148,7 @@ impl WrappedNode for Task {
       .await?
     };
 
-    let func = self.task.func;
+    let func = self.task.func.clone();
 
     let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
@@ -1180,7 +1180,7 @@ impl WrappedNode for Task {
     if result_type != self.product {
       return Err(throw(format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        func, result_val
+        self.task.func, result_val
       )));
     }
 
