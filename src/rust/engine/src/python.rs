@@ -264,8 +264,9 @@ impl Key {
   }
 }
 
-// TODO: simplify to use `PyObject` (aka `Py<PyAny>`) directly. There is no benefit to wrapping
-// this in an `Arc`, given that it's already GIL-independent.
+// NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
+// in `Arc` like this, because `Py<T>` internally acquires a (non-GIL) global lock during `Clone`
+// and `Drop`.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
 
