@@ -16,9 +16,9 @@
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
-flake8-2020==1.6.0; python_full_version >= "3.6.1" \
-    --hash=sha256:e464cef7889117e7ae7253e35fcb8272bd8ae68fc10bb3399ef85b036c092528 \
-    --hash=sha256:3e438d9d531577fbb9332bbd0bf394eca890f3b7a5311e2278fb3582381a2f13
+flake8-2020==1.6.1; python_full_version >= "3.6.1" \
+    --hash=sha256:efcc056fb723e1ea5307e3b663c7c328f1c23a5ff0a0fd3be695a918d8245c3a \
+    --hash=sha256:db523e3383befc17c895219551ff6c9b2f6e0a5cae4c7739ea65a2238bdc6f74
 flake8-pantsbuild==2.0.0; python_version >= "3.6" \
     --hash=sha256:1b72558db6d718c33f4410eff80f7afc2bc0300190a733d92b3cf05b231c2450 \
     --hash=sha256:8d45cf26a55fe7d66de944a6c93b64456852cfd3a7bea81640553081469129e7
@@ -37,9 +37,9 @@ pycodestyle==2.7.0; python_version >= "3.6" and python_full_version < "3.0.0" or
 pyflakes==2.3.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6" \
     --hash=sha256:7893783d01b8a89811dd72d7dfd4d84ff098e5eed95cfa8905b22bbffe52efc3 \
     --hash=sha256:f5bc8ecabc05bb9d291eb5203d6810b49040f6ff446a756326104746cc00c1db
-typing-extensions==4.0.0; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.6" \
-    --hash=sha256:829704698b22e13ec9eaf959122315eabb370b0884400e9818334d8b677023d9 \
-    --hash=sha256:2cdf80e4e04866a9b3689a51869016d36db0814d84b8d8a568d22781d45d27ed
+typing-extensions==4.0.1; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.6" \
+    --hash=sha256:7f001e5ac290a0c0401508864c7ec868be4e701886d5b573a9528ed3973d9d3b \
+    --hash=sha256:4ca091dea149f945ec56afb48dae714f21e8692ef22a395223bcd328961b6a0e
 zipp==3.6.0; python_version >= "3.6" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.6" \
     --hash=sha256:9fe5ea21568a0a70e50f273397638d39b03353731e6cbbb3fd8502a33fec40bc \
     --hash=sha256:71c644c5369f4a6e07636f0aa966270449561fcea2e3d6747b8d23efaa9d7832

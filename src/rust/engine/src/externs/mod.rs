@@ -132,8 +132,11 @@ pub fn collect_iterable(value: &PyAny) -> Result<Vec<&PyAny>, String> {
   }
 }
 
-/// Read a `FrozenDict[str, str]`.
-pub fn getattr_from_str_frozendict(value: &PyAny, field: &str) -> BTreeMap<String, String> {
+/// Read a `FrozenDict[str, T]`.
+pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
+  value: &'p PyAny,
+  field: &str,
+) -> BTreeMap<String, T> {
   let frozendict = getattr(value, field).unwrap();
   let pydict: &PyDict = getattr(frozendict, "_data").unwrap();
   pydict

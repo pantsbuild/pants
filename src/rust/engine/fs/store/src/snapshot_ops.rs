@@ -674,9 +674,8 @@ pub trait SnapshotOps: StoreWrapper + 'static {
   async fn add_prefix(
     &self,
     mut digest: Digest,
-    prefix: RelativePath,
+    prefix: &RelativePath,
   ) -> Result<Digest, SnapshotOpsError> {
-    let prefix: PathBuf = prefix.into();
     let mut prefix_iter = prefix.iter();
     while let Some(parent) = prefix_iter.next_back() {
       let dir_node = remexec::DirectoryNode {
@@ -780,7 +779,7 @@ pub trait SnapshotOps: StoreWrapper + 'static {
     snapshot_glob_match(self.clone(), digest, globs).await
   }
 
-  async fn create_empty_dir(&self, path: RelativePath) -> Result<Digest, SnapshotOpsError> {
+  async fn create_empty_dir(&self, path: &RelativePath) -> Result<Digest, SnapshotOpsError> {
     self.add_prefix(EMPTY_DIGEST, path).await
   }
 }

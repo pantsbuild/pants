@@ -216,11 +216,13 @@ async def update_build_files(
         if change_descriptions
     )
     if not changed_build_files:
-        logger.info(
-            "No required changes to BUILD files found. However, there may still be deprecations "
-            f"that `update-build-files` doesn't know how to fix. See {doc_url('upgrade-tips')} for "
-            f"upgrade tips."
-        )
+        msg = "No required changes to BUILD files found."
+        if not update_build_files_subsystem.check:
+            msg += (
+                " However, there may still be deprecations that `update-build-files` doesn't know "
+                f"how to fix. See {doc_url('upgrade-tips')} for upgrade tips."
+            )
+        logger.info(msg)
         return UpdateBuildFilesGoal(exit_code=0)
 
     if not update_build_files_subsystem.check:

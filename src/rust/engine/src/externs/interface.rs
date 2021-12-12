@@ -1442,9 +1442,11 @@ fn write_digest(
     destination.push(path_prefix);
 
     block_in_place_and_wait(py, || {
-      core
-        .store()
-        .materialize_directory(destination.clone(), lifted_digest)
+      core.store().materialize_directory(
+        destination.clone(),
+        lifted_digest,
+        fs::Permissions::Writable,
+      )
     })
     .map_err(PyValueError::new_err)
   })

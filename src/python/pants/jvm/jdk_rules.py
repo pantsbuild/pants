@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import textwrap
@@ -22,11 +23,13 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class JdkSetup:
-    digest: Digest
+    _digest: Digest
     nailgun_jar: str
     coursier: Coursier
     jre_major_version: int
-    jdk_preparation_script: ClassVar[str] = "__jdk.sh"
+
+    bin_dir: ClassVar[str] = "__jdk"
+    jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
     def args(self, bash: BashBinary, classpath_entries: Iterable[str]) -> tuple[str, ...]:
@@ -45,6 +48,10 @@ class JdkSetup:
     @property
     def append_only_caches(self) -> dict[str, str]:
         return self.coursier.append_only_caches
+
+    @property
+    def immutable_input_digests(self) -> dict[str, Digest]:
+        return {**self.coursier.immutable_input_digests, self.bin_dir: self._digest}
 
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
@@ -91,8 +98,8 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
                 "-c",
                 f"$({java_home_command})/bin/java -version",
             ),
-            input_digest=coursier.digest,
             append_only_caches=coursier.append_only_caches,
+            immutable_input_digests=coursier.immutable_input_digests,
             env=coursier.env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
@@ -132,7 +139,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         CreateDigest(
             [
                 FileContent(
-                    JdkSetup.jdk_preparation_script,
+                    os.path.basename(JdkSetup.jdk_preparation_script),
                     jdk_preparation_script.encode("utf-8"),
                     is_executable=True,
                 ),
@@ -140,17 +147,16 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         ),
     )
     return JdkSetup(
-        digest=await Get(
+        _digest=await Get(
             Digest,
             MergeDigests(
                 [
-                    coursier.digest,
                     jdk_preparation_script_digest,
                     nailgun.digest,
                 ]
             ),
         ),
-        nailgun_jar=nailgun.filenames[0],
+        nailgun_jar=os.path.join(JdkSetup.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
     )

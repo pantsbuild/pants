@@ -14,7 +14,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import SubsystemRule, rule
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import (
@@ -64,7 +64,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             generate_test_tool_lockfile_request,
             SubsystemRule(MockJvmTool),
             QueryRule(JvmToolLockfileRequest, (MockJvmToolLockfileSentinel,)),
-            QueryRule(Coordinates, (GatherJvmCoordinatesRequest,)),
+            QueryRule(ArtifactRequirements, (GatherJvmCoordinatesRequest,)),
             QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[JvmArtifact],
@@ -97,9 +97,10 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
         "org.hamcrest:hamcrest-core:1.3",
     ]
 
-    coordinates = rule_runner.request(
-        Coordinates, [GatherJvmCoordinatesRequest(lockfile_request.artifact_inputs, "")]
+    requirements = rule_runner.request(
+        ArtifactRequirements, [GatherJvmCoordinatesRequest(lockfile_request.artifact_inputs, "")]
     )
+    coordinates = [i.coordinate for i in requirements]
     assert sorted(coordinates, key=lambda c: (c.group, c.artifact, c.version)) == [
         Coordinate(group="junit", artifact="junit", version="4.13.2"),
         Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),

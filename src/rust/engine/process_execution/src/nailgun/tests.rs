@@ -7,25 +7,27 @@ use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::{Context, NamedCaches, Process};
+use crate::{Context, ImmutableInputs, NamedCaches, Process};
 
-fn pool(size: usize) -> NailgunPool {
+fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let _ = WorkunitStore::setup_for_tests();
   let named_caches_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
   let executor = Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  NailgunPool::new(
-    std::env::temp_dir(),
-    size,
-    store,
-    executor,
+  let base_dir = std::env::temp_dir();
+
+  let pool = NailgunPool::new(base_dir.clone(), size, store.clone(), executor);
+  (
+    pool,
     NamedCaches::new(named_caches_dir.path().to_owned()),
+    ImmutableInputs::new(store, &base_dir).unwrap(),
   )
 }
 
-async fn run(pool: &NailgunPool, port: u16) -> PathBuf {
+async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs), port: u16) -> PathBuf {
   let mut p = pool
+    .0
     .acquire(
       Process::new(owned_string_vec(&[
         "/bin/bash",
@@ -33,6 +35,8 @@ async fn run(pool: &NailgunPool, port: u16) -> PathBuf {
         &format!("echo Mock port {}.; sleep 10", port),
       ])),
       Context::default(),
+      &pool.1,
+      &pool.2,
     )
     .await
     .unwrap();
