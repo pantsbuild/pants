@@ -16,13 +16,21 @@ python_sources(
 
 python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
 
-pex_binary(name="changelog", entry_point="changelog.py")
-pex_binary(name="check_banned_imports", entry_point="check_banned_imports.py")
-pex_binary(name="check_inits", entry_point="check_inits.py")
-pex_binary(name="deploy_to_s3", entry_point="deploy_to_s3.py")
-pex_binary(name="generate_all_lockfiles_helper", entry_point="_generate_all_lockfiles_helper.py")
-pex_binary(name="generate_docs", entry_point="generate_docs.py")
-pex_binary(name="generate_github_workflows", entry_point="generate_github_workflows.py")
-pex_binary(name="generate_user_list", entry_point="generate_user_list.py")
-pex_binary(name="release_helper", entry_point="_release_helper.py")
-pex_binary(name="reversion", entry_point="reversion.py")
+pex_binaries_from_entry_points(
+    entry_points=[
+        "changelog.py",
+        "check_banned_imports.py",
+        "check_inits.py",
+        "deploy_to_s3.py",
+        "_generate_all_lockfiles_helper.py",
+        "generate_docs.py",
+        "generate_github_workflows.py",
+        "generate_user_list.py",
+        "_release_helper.py",
+        "reversion.py",
+    ],
+    overrides={
+        "_generate_all_lockfiles_helper.py": {"name": "generate_all_lockfiles_helper"},
+        "_release_helper.py": {"name": "release_helper"},
+    },
+)
