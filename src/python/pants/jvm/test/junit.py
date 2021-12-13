@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.backend.java.target_types import JunitTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -16,6 +15,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
+from pants.jvm.target_types import JunitTestSourceField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)

@@ -3,16 +3,21 @@
 
 from __future__ import annotations
 
+from abc import ABCMeta
+
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
     SingleSourceField,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
 )
 from pants.util.docutil import git_url
+
+# -----------------------------------------------------------------------------------------------
+# `jvm_artifact` targets
+# -----------------------------------------------------------------------------------------------
 
 _DEFAULT_PACKAGE_MAPPING_URL = git_url(
     "src/python/pants/jvm/dependency_inference/jvm_artifact_mappings.py"
@@ -123,6 +128,20 @@ class JvmArtifact(Target):
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# JUnit test support field(s)
+# -----------------------------------------------------------------------------------------------
+
+
+class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
+    """A marker that indicates that a source field represents a JUnit test."""
+
+
+# -----------------------------------------------------------------------------------------------
+# Generic resolve support fields
+# -----------------------------------------------------------------------------------------------
+
+
 class JvmCompatibleResolveNamesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
@@ -140,13 +159,4 @@ class JvmResolveNameField(StringField):
         "The name of the resolve to use when building this target. The name must be defined as "
         "one of the resolves in `--jvm-resolves`. If not supplied, the default resolve will be "
         "used, otherwise, one resolve that is compatible with all dependency targets will be used."
-    )
-
-
-class JvmRequirementsField(SpecialCasedDependencies):
-    alias = "requirements"
-    required = True
-    help = (
-        "A sequence of addresses to targets compatible with `jvm_artifact` that specify the coordinates for "
-        "third-party JVM dependencies."
     )

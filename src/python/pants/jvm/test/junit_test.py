@@ -11,8 +11,6 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
-from pants.backend.java.test.junit import JunitTestFieldSet
-from pants.backend.java.test.junit import rules as junit_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -31,6 +29,8 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifact
+from pants.jvm.test.junit import JunitTestFieldSet
+from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
