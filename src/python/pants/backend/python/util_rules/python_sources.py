@@ -96,12 +96,12 @@ async def prepare_python_sources(
 
     missing_init_files = await Get(
         AncestorFiles,
-        AncestorFilesRequest("__init__.py", sources.snapshot),
+        AncestorFilesRequest(
+            input_files=sources.snapshot.files, requested=("__init__.py", "__init__.pyi")
+        ),
     )
-
     init_injected = await Get(
-        Snapshot,
-        MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)),
+        Snapshot, MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest))
     )
 
     # Codegen is able to generate code in any arbitrary location, unlike sources normally being

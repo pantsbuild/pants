@@ -544,12 +544,12 @@ fn strongly_connected_components(
   for (node, adjacency_list) in adjacency_lists {
     let node_key = Key::from_value(node.into())?;
     let node_id = *node_ids
-      .entry(node_key)
+      .entry(node_key.clone())
       .or_insert_with(|| graph.add_node(node_key));
     for dependency in adjacency_list {
       let dependency_key = Key::from_value(dependency.into())?;
       let dependency_id = node_ids
-        .entry(dependency_key)
+        .entry(dependency_key.clone())
         .or_insert_with(|| graph.add_node(dependency_key));
       graph.add_edge(node_id, *dependency_id, ());
     }
@@ -1442,9 +1442,11 @@ fn write_digest(
     destination.push(path_prefix);
 
     block_in_place_and_wait(py, || {
-      core
-        .store()
-        .materialize_directory(destination.clone(), lifted_digest)
+      core.store().materialize_directory(
+        destination.clone(),
+        lifted_digest,
+        fs::Permissions::Writable,
+      )
     })
     .map_err(PyValueError::new_err)
   })

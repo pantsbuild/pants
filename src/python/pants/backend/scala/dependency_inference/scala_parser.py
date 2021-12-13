@@ -88,7 +88,7 @@ CIRCE_DEPENDENCIES = [
     ]
 ]
 
-SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements(
+SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
     SCALAMETA_DEPENDENCIES + CIRCE_DEPENDENCIES
 )
 
@@ -229,33 +229,23 @@ async def analyze_scala_source_dependencies(
     source_prefix = "__source_to_analyze"
     source_path = os.path.join(source_prefix, source_files.files[0])
     processorcp_relpath = "__processorcp"
+    toolcp_relpath = "__toolcp"
 
-    (
-        tool_classpath,
-        prefixed_processor_classfiles_digest,
-        prefixed_source_files_digest,
-    ) = await MultiGet(
+    (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                prefix="__toolcp",
                 artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,),
             ),
         ),
-        Get(Digest, AddPrefix(processor_classfiles.digest, processorcp_relpath)),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
-    tool_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                prefixed_processor_classfiles_digest,
-                tool_classpath.digest,
-                jdk_setup.digest,
-            )
-        ),
-    )
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: tool_classpath.digest,
+        processorcp_relpath: processor_classfiles.digest,
+    }
 
     analysis_output_path = "__source_analysis.json"
 
@@ -263,14 +253,17 @@ async def analyze_scala_source_dependencies(
         FallibleProcessResult,
         Process(
             argv=[
-                *jdk_setup.args(bash, [*tool_classpath.classpath_entries(), processorcp_relpath]),
+                *jdk_setup.args(
+                    bash, [*tool_classpath.classpath_entries(toolcp_relpath), processorcp_relpath]
+                ),
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
             ],
             input_digest=prefixed_source_files_digest,
+            immutable_input_digests=immutable_input_digests,
             output_files=(analysis_output_path,),
-            use_nailgun=tool_digest,
+            use_nailgun=immutable_input_digests.keys(),
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
             description=f"Analyzing {source_files.files[0]}",
@@ -323,7 +316,7 @@ async def setup_scala_parser_classfiles(
             MaterializedClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
-                    ArtifactRequirements(
+                    ArtifactRequirements.from_coordinates(
                         [
                             Coordinate(
                                 group="org.scala-lang",
@@ -368,7 +361,6 @@ async def setup_scala_parser_classfiles(
             (
                 tool_classpath.digest,
                 parser_classpath.digest,
-                jdk_setup.digest,
                 source_digest,
             )
         ),
@@ -391,6 +383,7 @@ async def setup_scala_parser_classfiles(
             ],
             input_digest=merged_digest,
             append_only_caches=jdk_setup.append_only_caches,
+            immutable_input_digests=jdk_setup.immutable_input_digests,
             env=jdk_setup.env,
             output_directories=(dest_dir,),
             description="Compile Scala parser for dependency inference with scalac",

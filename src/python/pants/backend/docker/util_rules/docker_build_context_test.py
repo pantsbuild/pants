@@ -23,6 +23,8 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
+from pants.backend.shell.target_types import rules as shell_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -41,13 +43,20 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
+            *shell_target_types_rules(),
             *target_types_rules.rules(),
             docker_build_args,
             docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
+        target_types=[
+            DockerImageTarget,
+            FilesGeneratorTarget,
+            PexBinary,
+            ShellSourcesGeneratorTarget,
+            ShellSourceTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
@@ -247,4 +256,33 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
         },
+    )
+
+
+def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(dependencies=[":entrypoint", ":shell"])
+                shell_source(name="entrypoint", source="entrypoint.sh")
+                shell_sources(name="shell", sources=["scripts/**/*.sh"])
+                """
+            ),
+            "src/docker/Dockerfile": "FROM base",
+            "src/docker/entrypoint.sh": "",
+            "src/docker/scripts/s01.sh": "",
+            "src/docker/scripts/s02.sh": "",
+            "src/docker/scripts/random.file": "",
+        }
+    )
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=[
+            "src/docker/Dockerfile",
+            "src/docker/entrypoint.sh",
+            "src/docker/scripts/s01.sh",
+            "src/docker/scripts/s02.sh",
+        ],
     )

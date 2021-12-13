@@ -8,6 +8,7 @@ target(
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
+        "src/python/pants/backend/experimental/codegen/protobuf/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
         "src/python/pants/backend/experimental/docker/lint/hadolint",
@@ -21,6 +22,7 @@ target(
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
+        "src/python/pants/backend/experimental/scala/lint/scalafmt",
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/google_cloud_function/python",
         "src/python/pants/backend/plugin_development",

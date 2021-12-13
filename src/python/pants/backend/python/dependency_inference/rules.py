@@ -28,8 +28,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    HydratedSources,
-    HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     WrappedTarget,
@@ -241,20 +239,13 @@ async def infer_python_init_dependencies(
     if not python_infer_subsystem.inits:
         return InferredDependencies([])
 
-    # Locate __init__.py files not already in the Snapshot.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    extra_init_files = await Get(
+    fp = request.sources_field.file_path
+    assert fp is not None
+    init_files = await Get(
         AncestorFiles,
-        AncestorFilesRequest("__init__.py", hydrated_sources.snapshot),
+        AncestorFilesRequest(input_files=(fp,), requested=("__init__.py", "__init__.pyi")),
     )
-
-    # And add dependencies on their owners.
-    # NB: Because the python_sources rules always locate __init__.py files, and will trigger an
-    # error for files that have content but have not already been included via a dependency, we
-    # don't need to error for unowned files here.
-    owners = await MultiGet(
-        Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
-    )
+    owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
     return InferredDependencies(itertools.chain.from_iterable(owners))
 
 
@@ -270,18 +261,17 @@ async def infer_python_conftest_dependencies(
     if not python_infer_subsystem.conftests:
         return InferredDependencies([])
 
-    # Locate conftest.py files not already in the Snapshot.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    extra_conftest_files = await Get(
+    fp = request.sources_field.file_path
+    assert fp is not None
+    conftest_files = await Get(
         AncestorFiles,
-        AncestorFilesRequest("conftest.py", hydrated_sources.snapshot),
+        AncestorFilesRequest(input_files=(fp,), requested=("conftest.py",)),
     )
-
-    # And add dependencies on their owners.
-    # NB: Because conftest.py files effectively always have content, we require an owning target.
     owners = await MultiGet(
+        # NB: Because conftest.py files effectively always have content, we require an
+        # owning target.
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
-        for f in extra_conftest_files.snapshot.files
+        for f in conftest_files.snapshot.files
     )
     return InferredDependencies(itertools.chain.from_iterable(owners))
 

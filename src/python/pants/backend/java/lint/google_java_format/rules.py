@@ -10,7 +10,7 @@ from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -69,7 +69,6 @@ async def setup_google_java_format(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                prefix="__toolcp",
                 lockfiles=(tool.resolved_lockfile(),),
             ),
         ),
@@ -81,10 +80,11 @@ async def setup_google_java_format(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests([source_files_snapshot.digest, tool_classpath.digest, jdk_setup.digest]),
-    )
+    toolcp_relpath = "__toolcp"
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: tool_classpath.digest,
+    }
 
     maybe_java16_or_higher_options = []
     if jdk_setup.jre_major_version >= 16:
@@ -96,22 +96,19 @@ async def setup_google_java_format(
             "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
         ]
 
-    maybe_aosp_option = []
-    if tool.aosp:
-        maybe_aosp_option = ["--aosp"]
-
     args = [
-        *jdk_setup.args(bash, tool_classpath.classpath_entries()),
+        *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
         *maybe_java16_or_higher_options,
         "com.google.googlejavaformat.java.Main",
-        *maybe_aosp_option,
+        *(["--aosp"] if tool.aosp else []),
         "--dry-run" if setup_request.check_only else "--replace",
         *source_files.files,
     ]
 
     process = Process(
         argv=args,
-        input_digest=input_digest,
+        input_digest=source_files_snapshot.digest,
+        immutable_input_digests=immutable_input_digests,
         output_files=source_files_snapshot.files,
         append_only_caches=jdk_setup.append_only_caches,
         env=jdk_setup.env,

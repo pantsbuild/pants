@@ -53,8 +53,8 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
                     *jdk_setup.args(bash, []),
                     "-version",
                 ],
-                input_digest=jdk_setup.digest,
                 append_only_caches=jdk_setup.append_only_caches,
+                immutable_input_digests=jdk_setup.immutable_input_digests,
                 env=jdk_setup.env,
                 description="",
             )

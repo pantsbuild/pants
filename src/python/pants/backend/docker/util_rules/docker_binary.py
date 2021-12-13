@@ -56,7 +56,7 @@ class DockerBinary(BinaryPath):
             argv=tuple(args),
             description=(
                 f"Building docker image {tags[0]}"
-                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else ".")
+                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
             ),
             env=env,
             input_digest=digest,

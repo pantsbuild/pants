@@ -15,7 +15,7 @@ use protos::gen::google::longrunning::Operation;
 use remexec::ExecutedActionMetadata;
 use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use store::Store;
+use store::{SnapshotOps, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -26,6 +26,7 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
   Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
+use fs::RelativePath;
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -533,6 +534,105 @@ async fn make_execute_request_with_timeout() {
         )
         .unwrap(),
         144,
+      ))
+        .into(),
+    ),
+    ..Default::default()
+  };
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
+async fn make_execute_request_using_immutable_inputs() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let prefix = RelativePath::new("cats").unwrap();
+  let input_directory = TestDirectory::containing_roland();
+  let input_digests = InputDigests::new(
+    &store,
+    EMPTY_DIGEST,
+    {
+      let mut map = BTreeMap::new();
+      map.insert(prefix.clone(), input_directory.digest());
+      map
+    },
+    vec![],
+  )
+  .await
+  .unwrap();
+
+  // The computed input root digest should be prefixed will be prefixed with the mount point.
+  let expected_digest = store
+    .add_prefix(input_directory.digest(), &prefix)
+    .await
+    .unwrap();
+
+  let req = Process {
+    argv: owned_string_vec(&["/bin/echo", "yo"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: None,
+    input_digests,
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
+    timeout: None,
+    description: "some description".to_owned(),
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    platform_constraint: None,
+    execution_slot_variable: None,
+    cache_scope: ProcessCacheScope::Always,
+  };
+
+  let want_command = remexec::Command {
+    arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "none".to_owned(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: "SOME".to_owned(),
+        value: "value".to_owned(),
+      },
+    ],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
+    output_directories: vec!["directory/name".to_owned()],
+    platform: Some(remexec::Platform::default()),
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "c426b29478ec1ddbd872fbfad63ae9151eb9196edcd1a10aa0aab3aa1b48eef8",
+        )
+        .unwrap(),
+        123,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some((&expected_digest).into()),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "2ec7e0e5e552ddf715ffec03d735ae4c3d6ccd4ad9647fb7aeaa43efec3450c4",
+        )
+        .unwrap(),
+        140,
       ))
         .into(),
     ),

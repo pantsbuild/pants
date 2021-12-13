@@ -84,6 +84,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *testutil.rules(),
             QueryRule(Classpath, (Addresses,)),
+            QueryRule(RenderedClasspath, (Addresses,)),
             QueryRule(UnexpandedTargets, (Addresses,)),
         ],
         target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifact],
@@ -221,17 +222,16 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
             "lib/C.java": java_lib_source(),
         }
     )
-    classpath = rule_runner.request(
-        Classpath, [Addresses([Address(spec_path="", target_name="main")])]
+    rendered_classpath = rule_runner.request(
+        RenderedClasspath, [Addresses([Address(spec_path="", target_name="main")])]
     )
-    rendered_classpath = rule_runner.request(RenderedClasspath, [classpath.content.digest])
     assert rendered_classpath.content == {
-        "__cp/.Example.scala.main.scalac.jar": {
+        ".Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         },
-        "__cp/lib.C.java.javac.jar": {
+        "lib.C.java.javac.jar": {
             "org/pantsbuild/example/lib/C.class",
         },
     }
