@@ -56,7 +56,7 @@ from pants.jvm.target_types import (
     JvmArtifactJarSourceField,
     JvmArtifactUrlField,
     JvmArtifactVersionField,
-    JvmCompatibleResolveNamesField,
+    JvmCompatibleResolvesField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
@@ -682,9 +682,9 @@ async def select_coursier_resolve_for_targets(
     )
 
     transitive_jvm_resolve_names = [
-        target[JvmCompatibleResolveNamesField].value
+        target[JvmCompatibleResolvesField].value
         for target in transitive_targets.closure
-        if target.has_field(JvmCompatibleResolveNamesField)
+        if target.has_field(JvmCompatibleResolvesField)
     ]
 
     any_unspecified_resolves = not transitive_jvm_resolve_names or any(

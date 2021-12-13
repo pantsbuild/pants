@@ -142,7 +142,7 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 # -----------------------------------------------------------------------------------------------
 
 
-class JvmCompatibleResolveNamesField(StringSequenceField):
+class JvmCompatibleResolvesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
     help = (
@@ -152,7 +152,7 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     )
 
 
-class JvmResolveNameField(StringField):
+class JvmResolveField(StringField):
     alias = "resolve"
     required = False
     help = (

@@ -29,7 +29,7 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolveNamesField
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolvesField
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
@@ -64,12 +64,12 @@ async def get_jvm_targets_by_resolve_name(
 ) -> JvmTargetsByResolveName:
     # Get all targets that depend on JVM resolves
 
-    targets = [tgt for tgt in all_targets if tgt.has_field(JvmCompatibleResolveNamesField)]
+    targets = [tgt for tgt in all_targets if tgt.has_field(JvmCompatibleResolvesField)]
 
     default_resolve: str | None = jvm.options.default_resolve
 
     # TODO: simplify this with Py3.9 walrus operator
-    flat_targets_ = ((tgt, tgt[JvmCompatibleResolveNamesField].value) for tgt in targets)
+    flat_targets_ = ((tgt, tgt[JvmCompatibleResolvesField].value) for tgt in targets)
     flat_targets__ = (
         (
             tgt,

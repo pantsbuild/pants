@@ -23,8 +23,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JvmCompatibleResolveNamesField,
+    JvmCompatibleResolvesField,
     JvmProvidesTypesField,
+    JvmResolveField,
 )
 
 
@@ -65,7 +66,7 @@ class ScalaJunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaTestSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with JUnit."
@@ -86,7 +87,7 @@ class ScalaJunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolveNamesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = (
@@ -127,7 +128,7 @@ class ScalaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "A single Scala source file containing application or library code."
@@ -148,7 +149,7 @@ class ScalaSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourcesGeneratorSourcesField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = (

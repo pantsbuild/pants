@@ -24,9 +24,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JvmCompatibleResolveNamesField,
+    JvmCompatibleResolvesField,
     JvmProvidesTypesField,
-    JvmResolveNameField,
+    JvmResolveField,
 )
 
 
@@ -67,7 +67,7 @@ class JunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
         Dependencies,
-        JvmCompatibleResolveNamesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Java test, run with JUnit."
@@ -83,7 +83,7 @@ class JunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         JavaTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolveNamesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
@@ -120,7 +120,7 @@ class JavaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "A single Java source file containing application or library code."
@@ -136,7 +136,7 @@ class JavaSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
@@ -183,7 +183,7 @@ class DeployJar(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassNameField,
-        JvmResolveNameField,
+        JvmResolveField,
     )
     help = (
         "A `jar` file that contains the compiled source code along with its dependency class "
