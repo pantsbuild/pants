@@ -99,17 +99,20 @@ class CoursierSubsystem(TemplatedExternalTool):
 
 @dataclass(frozen=True)
 class Coursier:
-    """The Coursier tool and various utilities, materialized to a `Digest` and ready to use."""
+    """The Coursier tool and various utilities, prepared for use via `immutable_input_digests`."""
 
     coursier: DownloadedExternalTool
-    digest: Digest
-    wrapper_script: ClassVar[str] = "coursier_wrapper_script.sh"
-    post_processing_script: ClassVar[str] = "coursier_post_processing_script.py"
+    _digest: Digest
+
+    bin_dir: ClassVar[str] = "__coursier"
+    wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_wrapper_script.sh"
+    post_processing_script: ClassVar[str] = f"{bin_dir}/coursier_post_processing_script.py"
     cache_name: ClassVar[str] = "coursier"
     cache_dir: ClassVar[str] = ".cache"
+    working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
-        return tuple((*wrapper, self.coursier.exe, *args))
+        return tuple((*wrapper, os.path.join(self.bin_dir, self.coursier.exe), *args))
 
     @property
     def env(self) -> dict[str, str]:
@@ -125,6 +128,10 @@ class Coursier:
     @property
     def append_only_caches(self) -> dict[str, str]:
         return {self.cache_name: self.cache_dir}
+
+    @property
+    def immutable_input_digests(self) -> dict[str, Digest]:
+        return {self.bin_dir: self._digest}
 
 
 @rule
@@ -142,10 +149,12 @@ async def setup_coursier(
         json_output_file="$1"
         shift
 
-        "$coursier_exe" fetch {repos_args} --json-output-file="$json_output_file" "$@"
-
+        working_dir="$(pwd)"
+        "$coursier_exe" fetch {repos_args} \
+          --json-output-file="$json_output_file" \
+          "${{@//{Coursier.working_directory_placeholder}/$working_dir}}"
         /bin/mkdir -p classpath
-        {python.path} coursier_post_processing_script.py "$json_output_file"
+        {python.path} {Coursier.bin_dir}/coursier_post_processing_script.py "$json_output_file"
         """
     )
 
@@ -159,12 +168,12 @@ async def setup_coursier(
         CreateDigest(
             [
                 FileContent(
-                    Coursier.wrapper_script,
+                    os.path.basename(Coursier.wrapper_script),
                     coursier_wrapper_script.encode("utf-8"),
                     is_executable=True,
                 ),
                 FileContent(
-                    Coursier.post_processing_script,
+                    os.path.basename(Coursier.post_processing_script),
                     COURSIER_POST_PROCESSING_SCRIPT.encode("utf-8"),
                     is_executable=True,
                 ),
@@ -178,7 +187,7 @@ async def setup_coursier(
 
     return Coursier(
         coursier=downloaded_coursier,
-        digest=await Get(
+        _digest=await Get(
             Digest,
             MergeDigests(
                 [

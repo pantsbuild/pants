@@ -10,4 +10,6 @@ python_tests(name="tests", timeout=240)
 scala_sources(
     name="scala_parser",
     compatible_resolves=["scala_parser"],
+    # TODO: Allow the parser files to be formatted.
+    skip_scalafmt=True,
 )

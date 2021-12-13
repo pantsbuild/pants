@@ -20,6 +20,7 @@ from pants.engine.internals.native_engine import (
     PyAddPrefix,
     PyDigest,
     PyFileDigest,
+    PyMergeDigests,
     PyRemovePrefix,
     PySnapshot,
 )
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
 Digest = PyDigest
 FileDigest = PyFileDigest
 Snapshot = PySnapshot
+MergeDigests = PyMergeDigests
 AddPrefix = PyAddPrefix
 RemovePrefix = PyRemovePrefix
 
@@ -214,23 +216,6 @@ class DigestSubset:
 
     digest: Digest
     globs: PathGlobs
-
-
-@dataclass(unsafe_hash=True)
-class MergeDigests:
-    digests: Tuple[Digest, ...]
-
-    def __init__(self, digests: Iterable[Digest]) -> None:
-        """A request to merge several digests into one single digest.
-
-        This will fail if there are any conflicting changes, such as two digests having the same
-        file but with different content.
-
-        Example:
-
-            result = await Get(Digest, MergeDigests([digest1, digest2])
-        """
-        self.digests = tuple(digests)
 
 
 @dataclass(frozen=True)

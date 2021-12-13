@@ -6,15 +6,16 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 
-def assert_logged(caplog, expect_logged: list[tuple[int, str]] | None = None):
-    if expect_logged:
-        assert len(caplog.records) == len(expect_logged)
-        for idx, (lvl, msg) in enumerate(expect_logged):
-            log_record = caplog.records[idx]
-            assert msg in log_record.message
-            assert lvl == log_record.levelno
-    else:
+def assert_logged(caplog, expect_logged: list[tuple[int, str]] | None = None) -> None:
+    if not expect_logged:
         assert not caplog.records
+        return
+
+    assert len(caplog.records) == len(expect_logged)
+    for idx, (lvl, msg) in enumerate(expect_logged):
+        log_record = caplog.records[idx]
+        assert msg in log_record.message
+        assert lvl == log_record.levelno
 
 
 @contextmanager

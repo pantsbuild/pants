@@ -9,22 +9,22 @@ use std::time::Duration;
 
 use crate::context::Context;
 use crate::externs;
-use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyRemovePrefix};
+use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, MultiPlatformExecuteProcess,
-  NodeResult, Paths, RunId, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
+  RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use fs::{safe_create_dir_all_ioerror, PreparedPathGlobs, RelativePath};
+use fs::{safe_create_dir_all_ioerror, Permissions, PreparedPathGlobs, RelativePath};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
-use process_execution::{CacheDest, CacheName, ManagedChild, NamedCaches};
-use pyo3::{PyAny, PyRef, Python};
+use process_execution::{CacheName, ManagedChild, NamedCaches};
+use pyo3::{PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 use tempfile::TempDir;
@@ -113,9 +113,9 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.process_result,
-        inputs: vec![types.multi_platform_process, types.platform],
+        inputs: vec![types.process],
       },
-      Box::new(multi_platform_process_request_to_process_result),
+      Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
       Intrinsic {
@@ -166,20 +166,14 @@ impl Intrinsics {
   }
 }
 
-fn multi_platform_process_request_to_process_result(
+fn process_request_to_process_result(
   context: Context,
-  args: Vec<Value>,
+  mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_request = Python::with_gil(|py| {
-      let py_process = (*args[0]).as_ref(py);
-      MultiPlatformExecuteProcess::lift(py_process).map_err(|str| {
-        throw(format!(
-          "Error lifting MultiPlatformExecuteProcess: {}",
-          str
-        ))
-      })
-    })?;
+    let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
+      .map_err(|e| throw(format!("Error lifting Process: {}", e)))
+      .await?;
 
     let result = context.get(process_request).await?.0;
 
@@ -343,7 +337,7 @@ fn add_prefix_request_to_digest(
     let digest = context
       .core
       .store()
-      .add_prefix(digest, prefix)
+      .add_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -374,16 +368,15 @@ fn merge_digests_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let digests: Result<Vec<hashing::Digest>, String> = Python::with_gil(|py| {
-      let py_merge_digests = (*args[0]).as_ref(py);
-      externs::getattr::<Vec<&PyAny>>(py_merge_digests, "digests")
-        .unwrap()
-        .into_iter()
-        .map(|val| lift_directory_digest(val))
-        .collect()
-    });
+    let digests = Python::with_gil(|py| {
+      (*args[0])
+        .as_ref(py)
+        .extract::<PyRef<PyMergeDigests>>()
+        .map(|py_merge_digests| py_merge_digests.0.clone())
+        .map_err(|e| throw(format!("{}", e)))
+    })?;
     let digest = store
-      .merge(digests.map_err(throw)?)
+      .merge(digests)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -497,7 +490,7 @@ fn create_digest_to_digest(
             res
           }
           CreateDigestItem::Dir(path) => store
-            .create_empty_dir(path)
+            .create_empty_dir(&path)
             .await
             .map_err(|e| format!("{:?}", e)),
         }
@@ -571,11 +564,11 @@ fn interactive_process(
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
       let input_digest: Digest = lift_directory_digest(py_input_digest)?;
-      let env = externs::getattr_from_str_frozendict(py_interactive_process, "env");
+      let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
-      let append_only_caches = externs::getattr_from_str_frozendict(py_interactive_process, "append_only_caches")
+      let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
         .into_iter()
-        .map(|(name, dest)| Ok((CacheName::new(name).unwrap(), CacheDest::new(dest).unwrap())))
+        .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
         .collect::<Result<BTreeMap<_, _>, String>>()?;
       if !append_only_caches.is_empty() && run_in_workspace {
         return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned());
@@ -611,43 +604,46 @@ fn interactive_process(
       context
         .core
         .store()
-        .materialize_directory(destination, input_digest)
+        .materialize_directory(destination, input_digest, Permissions::Writable)
         .await?;
     }
 
+    // TODO: `immutable_input_digests` are not supported for InteractiveProcess, but they would be
+    // materialized here.
+    //   see https://github.com/pantsbuild/pants/issues/13852
     if !append_only_caches.is_empty() {
        let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
        let named_cache_symlinks = named_caches
            .local_paths(&append_only_caches)
            .collect::<Vec<_>>();
 
-       let destination = match maybe_tempdir {
+       let workdir = match maybe_tempdir {
          Some(ref dir) => dir.path().to_path_buf(),
          None => unreachable!(),
        };
 
        for named_cache_symlink in named_cache_symlinks {
-         safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+         safe_create_dir_all_ioerror(&named_cache_symlink.dst).map_err(|err| {
            format!(
              "Error making {} for local execution: {:?}",
-             named_cache_symlink.src.display(),
+             named_cache_symlink.dst.display(),
              err
            )
          })?;
 
-         let dst = destination.join(&named_cache_symlink.dst);
-         if let Some(dir) = dst.parent() {
+         let src = workdir.join(&named_cache_symlink.src);
+         if let Some(dir) = src.parent() {
            safe_create_dir_all_ioerror(dir).map_err(|err| {
              format!(
                "Error making {} for local execution: {:?}", dir.display(), err
              )
            })?;
          }
-         symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+         symlink(&named_cache_symlink.dst, &src).map_err(|err| {
            format!(
              "Error linking {} -> {} for local execution: {:?}",
-             named_cache_symlink.src.display(),
-             dst.display(),
+             src.display(),
+             named_cache_symlink.dst.display(),
              err
            )
          })?;

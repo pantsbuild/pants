@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -19,6 +20,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
+from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -30,11 +32,14 @@ from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    GeneratedSources,
+    GenerateSourcesRequest,
     SourcesField,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,41 @@ class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
 
     def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
         return DockerVersionContext.from_dict({**self, **other})
+
+
+class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
+    """This is a meta field for the context files generator, to tell the codegen machinery what
+    source fields are good to use.
+
+    Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
+    that should be accepted.
+
+    This is implemented using the `ABC.register` from Python lib:
+    https://docs.python.org/3/library/abc.html#abc.ABCMeta.register
+    """
+
+
+DockerContextFilesAcceptableInputsField.register(FileSourceField)
+DockerContextFilesAcceptableInputsField.register(ShellSourceField)
+
+
+class DockerContextFilesSourcesField(SourcesField):
+    """This is just a type marker for the codegen machinery."""
+
+
+class GenerateDockerContextFiles(GenerateSourcesRequest):
+    """This translates all files from acceptable Source fields for the docker context using the
+    `codegen` machinery."""
+
+    input = DockerContextFilesAcceptableInputsField
+    output = DockerContextFilesSourcesField
+    exportable = False
+
+
+@rule
+async def hydrate_input_sources(request: GenerateDockerContextFiles) -> GeneratedSources:
+    # We simply pass the files on, as-is
+    return GeneratedSources(request.protocol_sources)
 
 
 @dataclass(frozen=True)
@@ -152,12 +192,13 @@ async def create_docker_build_context(
     # Get all dependencies for the root target.
     root_dependencies = await Get(Targets, DependenciesRequest(docker_image.get(Dependencies)))
 
-    # Get all sources from the root dependencies (i.e. files).
-    file_sources_request = Get(
+    # Get all file sources from the root dependencies. That includes any non-file sources that can
+    # be "codegen"ed into a file source.
+    sources_request = Get(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(FileSourceField,),
+            for_sources_types=(DockerContextFilesSourcesField,),
             enable_codegen=True,
         ),
     )
@@ -167,8 +208,8 @@ async def create_docker_build_context(
         FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
     )
 
-    file_sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
-        file_sources_request,
+    sources, embedded_pkgs_per_target, dockerfile_info = await MultiGet(
+        sources_request,
         embedded_pkgs_per_target_request,
         Get(DockerfileInfo, DockerfileInfoRequest(docker_image.address)),
     )
@@ -186,7 +227,7 @@ async def create_docker_build_context(
     logger.debug(f"Packages for Docker image: {packages_str}")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
-    all_digests = (dockerfile_info.digest, file_sources.snapshot.digest, *embedded_pkgs_digest)
+    all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
     context_request = Get(Digest, MergeDigests(d for d in all_digests if d))
@@ -207,4 +248,7 @@ async def create_docker_build_context(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateSourcesRequest, GenerateDockerContextFiles),
+    )

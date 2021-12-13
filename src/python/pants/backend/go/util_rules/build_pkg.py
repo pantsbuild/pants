@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import os.path
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
@@ -14,6 +12,7 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilationRequest,
     FallibleAssemblyPreCompilation,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -22,7 +21,6 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import path_safe
 
 
@@ -184,39 +182,6 @@ class BuiltGoPackage:
 
     digest: Digest
     import_paths_to_pkg_a_files: FrozenDict[str, str]
-
-
-@dataclass(unsafe_hash=True)
-@frozen_after_init
-class EmbedConfig:
-    patterns: FrozenDict[str, tuple[str, ...]]
-    files: FrozenDict[str, str]
-
-    def __init__(self, patterns: Mapping[str, Iterable[str]], files: Mapping[str, str]) -> None:
-        """Configuration passed to the Go compiler to configure file embedding. The compiler relies
-        entirely on the caller to map embed patterns to actual filesystem paths. All embed patterns
-        contained in the package must be mapped. Consult
-        `FirstPartyPkgInfo.{EmbedPatterns,TestEmbedPatterns,XTestEmbedPatterns}` for the embed
-        patterns obtained from analysis.
-
-        :param patterns: Maps each pattern provided via a //go:embed directive to a list of file paths relative to
-        the package directory for files to embed for that pattern. When the embedded variable is an `embed.FS`,
-        those relative file paths define the virtual directory hierarchy exposed by the embed.FS filesystem
-        abstraction. The relative file paths are resolved to actual filesystem paths for their content by consulting
-        the `files` dictionary.
-
-        :param files: Maps each virtual, relative file path used as a value in the `patterns` dictionary to the actual
-        filesystem path with that file's content.
-        """
-        self.patterns = FrozenDict({k: tuple(v) for k, v in patterns.items()})
-        self.files = FrozenDict(files)
-
-    def to_embedcfg(self) -> bytes:
-        data = {
-            "Patterns": self.patterns,
-            "Files": self.files,
-        }
-        return json.dumps(data).encode("utf-8")
 
 
 @dataclass(frozen=True)

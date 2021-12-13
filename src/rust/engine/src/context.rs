@@ -24,8 +24,8 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
-  RemoteCacheWarningsBehavior,
+  self, BoundedCommandRunner, CommandRunner, ImmutableInputs, NamedCaches, Platform,
+  ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -167,12 +167,14 @@ impl Core {
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
     exec_strategy_opts: &ExecutionStrategyOptions,
-  ) -> Box<dyn CommandRunner> {
+  ) -> Result<Box<dyn CommandRunner>, String> {
+    let immutable_inputs = ImmutableInputs::new(store.clone(), local_execution_root_dir)?;
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),
       executor.clone(),
       local_execution_root_dir.to_path_buf(),
       NamedCaches::new(named_caches_dir.to_path_buf()),
+      immutable_inputs,
       exec_strategy_opts.local_cleanup,
     );
 
@@ -183,18 +185,21 @@ impl Core {
           local_execution_root_dir.to_path_buf(),
           store.clone(),
           executor.clone(),
-          // TODO: The nailgun pool size should almost certainly be configurable independent
-          // of concurrency, along with per-instance memory usage.
-          exec_strategy_opts.local_parallelism,
+          // We set the nailgun pool size to twice the number that will ever be active in order to
+          // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
+          // while busy running scalac, keeping some javac processes idle).
+          // TODO: The nailgun pool size should be configurable independent of concurrency, along
+          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
+          exec_strategy_opts.local_parallelism * 2,
         ))
       } else {
         Box::new(local_command_runner)
       };
 
-    Box::new(BoundedCommandRunner::new(
+    Ok(Box::new(BoundedCommandRunner::new(
       maybe_nailgunnable_local_command_runner,
       exec_strategy_opts.local_parallelism,
-    ))
+    )))
   }
 
   fn make_command_runner(
@@ -228,7 +233,7 @@ impl Core {
       local_execution_root_dir,
       named_caches_dir,
       exec_strategy_opts,
-    );
+    )?;
 
     // Possibly either add the remote execution runner or the remote cache runner.
     // `global_options.py` already validates that both are not set at the same time.

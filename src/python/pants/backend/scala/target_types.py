@@ -16,6 +16,7 @@ from pants.engine.target import (
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
+    StringField,
     Target,
     generate_file_level_targets,
 )
@@ -27,7 +28,7 @@ class ScalaSourceField(SingleSourceField):
     expected_file_extensions = (".scala",)
 
 
-class ScalaGeneratorSources(MultipleSourcesField):
+class ScalaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".scala",)
 
 
@@ -40,9 +41,9 @@ class ScalaFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class ScalaGeneratorFieldSet(FieldSet):
-    required_fields = (ScalaGeneratorSources,)
+    required_fields = (ScalaGeneratorSourcesField,)
 
-    sources: ScalaGeneratorSources
+    sources: ScalaGeneratorSourcesField
 
 
 # -----------------------------------------------------------------------------------------------
@@ -71,7 +72,7 @@ class ScalaJunitTestTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaTestsGeneratorSourcesField(ScalaGeneratorSources):
+class ScalaTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
 
 
@@ -133,7 +134,7 @@ class ScalaSourceTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSources):
+class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*.scala",) + tuple(f"!{pat}" for pat in ScalaTestsGeneratorSourcesField.default)
 
 
@@ -171,6 +172,42 @@ async def generate_targets_from_scala_sources(
         union_membership,
         add_dependencies_on_all_siblings=True,
         use_source_field=True,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `scalac_plugin` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalacPluginArtifactField(StringField):
+    alias = "artifact"
+    required = True
+    help = "The address of a `jvm_artifact` that defines a plugin for `scalac`."
+
+
+class ScalacPluginNameField(StringField):
+    alias = "plugin_name"
+    help = (
+        "The name that `scalac` should use to load the plugin.\n\n"
+        "If not set, the plugin name defaults to the target name."
+    )
+
+
+class ScalacPluginTarget(Target):
+    alias = "scalac_plugin"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalacPluginArtifactField,
+        ScalacPluginNameField,
+    )
+    help = (
+        "A plugin for `scalac`.\n\n"
+        "Currently only thirdparty plugins are supported. To enable a plugin, define this "
+        "target type, and set the `artifact=` field to the address of a `jvm_artifact` that "
+        "provides the plugin.\n\n"
+        "If the `scalac`-loaded name of the plugin does not match the target's name, "
+        "additionally set the `plugin_name=` field."
     )
 
 

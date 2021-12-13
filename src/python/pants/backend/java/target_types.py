@@ -25,7 +25,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JvmCompatibleResolveNamesField,
     JvmProvidesTypesField,
-    JvmResolveName,
+    JvmResolveNameField,
 )
 
 
@@ -33,7 +33,7 @@ class JavaSourceField(SingleSourceField):
     expected_file_extensions = (".java",)
 
 
-class JavaGeneratorSources(MultipleSourcesField):
+class JavaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".java",)
 
 
@@ -46,9 +46,9 @@ class JavaFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class JavaGeneratorFieldSet(FieldSet):
-    required_fields = (JavaGeneratorSources,)
+    required_fields = (JavaGeneratorSourcesField,)
 
-    sources: JavaGeneratorSources
+    sources: JavaGeneratorSourcesField
 
 
 # -----------------------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class JunitTestTarget(Target):
     help = "A single Java test, run with JUnit."
 
 
-class JavaTestsGeneratorSourcesField(JavaGeneratorSources):
+class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
 
 
@@ -125,7 +125,7 @@ class JavaSourceTarget(Target):
     help = "A single Java source file containing application or library code."
 
 
-class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
+class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
 
 
@@ -166,7 +166,7 @@ async def generate_targets_from_java_sources(
 #
 
 
-class JvmMainClassName(StringField):
+class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
     help = (
@@ -181,8 +181,8 @@ class DeployJar(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         OutputPathField,
-        JvmMainClassName,
-        JvmResolveName,
+        JvmMainClassNameField,
+        JvmResolveNameField,
     )
     help = (
         "A `jar` file that contains the compiled source code along with its dependency class "

@@ -44,7 +44,7 @@ async def create_scala_repl_request(
             MaterializedClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
-                    ArtifactRequirements(
+                    ArtifactRequirements.from_coordinates(
                         [
                             Coordinate(
                                 group="org.scala-lang",
@@ -69,13 +69,20 @@ async def create_scala_repl_request(
     )
 
     user_classpath_prefix = "__cp"
-    prefixed_user_classpath = await Get(
-        Digest, AddPrefix(user_classpath.content.digest, user_classpath_prefix)
+    prefixed_user_classpath = await MultiGet(
+        Get(Digest, AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
+    )
+
+    # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
+    # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
+    jdk_setup_digests = await MultiGet(
+        Get(Digest, AddPrefix(digest, relpath))
+        for relpath, digest in jdk_setup.immutable_input_digests.items()
     )
 
     repl_digest = await Get(
         Digest,
-        MergeDigests([prefixed_user_classpath, tool_classpath.content.digest, jdk_setup.digest]),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_setup_digests]),
     )
 
     return ReplRequest(
@@ -85,7 +92,7 @@ async def create_scala_repl_request(
             "-Dscala.usejavacp=true",
             "scala.tools.nsc.MainGenericRunner",
             "-classpath",
-            ":".join(user_classpath.classpath_entries(user_classpath_prefix)),
+            ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
         extra_env=jdk_setup.env,
         run_in_workspace=False,

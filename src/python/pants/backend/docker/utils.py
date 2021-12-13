@@ -12,7 +12,7 @@ _T = TypeVar("_T", bound="KeyValueSequenceUtil")
 
 class KeyValueSequenceUtil(FrozenOrderedSet[str]):
     @classmethod
-    def from_strings(cls: type[_T], *strings: str, duplicates_must_match=False) -> _T:
+    def from_strings(cls: type[_T], *strings: str, duplicates_must_match: bool = False) -> _T:
         """Takes all `KEY`/`KEY=VALUE` strings and dedupes by `KEY`.
 
         The last seen `KEY` wins in case of duplicates, unless `duplicates_must_match` is `True`, in

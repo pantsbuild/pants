@@ -10,16 +10,12 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    ArtifactRequirements,
-    Coordinate,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -32,6 +28,10 @@ class JavaTestFieldSet(TestFieldSet):
     sources: JavaTestSourceField
 
 
+class JunitToolLockfileSentinel(JvmToolLockfileSentinel):
+    options_scope = JUnit.options_scope
+
+
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     bash: BashBinary,
@@ -40,50 +40,41 @@ async def run_junit_test(
     test_subsystem: TestSubsystem,
     field_set: JavaTestFieldSet,
 ) -> TestResult:
-    classpath = await Get(Classpath, Addresses([field_set.address]))
-    junit_classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__thirdpartycp",
-            artifact_requirements=(
-                ArtifactRequirements(
-                    [
-                        Coordinate(
-                            group="org.junit.platform",
-                            artifact="junit-platform-console",
-                            version="1.7.2",
-                        ),
-                        Coordinate(
-                            group="org.junit.jupiter",
-                            artifact="junit-jupiter-engine",
-                            version="5.7.2",
-                        ),
-                        Coordinate(
-                            group="org.junit.vintage",
-                            artifact="junit-vintage-engine",
-                            version="5.7.2",
-                        ),
-                    ]
-                ),
+    classpath, junit_classpath = await MultiGet(
+        Get(Classpath, Addresses([field_set.address])),
+        Get(
+            MaterializedClasspath,
+            MaterializedClasspathRequest(
+                prefix="__thirdpartycp",
+                lockfiles=(junit.resolved_lockfile(),),
             ),
         ),
     )
-    merged_digest = await Get(
-        Digest,
-        MergeDigests((classpath.content.digest, jdk_setup.digest, junit_classpath.digest)),
-    )
+
+    merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+
+    toolcp_relpath = "__toolcp"
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: junit_classpath.digest,
+    }
 
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
-    user_classpath_arg = ":".join(classpath.user_classpath_entries())
+    # Classfiles produced by the root `junit_test` targets are the only ones which should run.
+    user_classpath_arg = ":".join(classpath.root_args())
 
     process_result = await Get(
         FallibleProcessResult,
         Process(
             argv=[
                 *jdk_setup.args(
-                    bash, [*classpath.classpath_entries(), *junit_classpath.classpath_entries()]
+                    bash,
+                    [
+                        *classpath.args(),
+                        *junit_classpath.classpath_entries(toolcp_relpath),
+                    ],
                 ),
                 "org.junit.platform.console.ConsoleLauncher",
                 *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
@@ -92,7 +83,8 @@ async def run_junit_test(
                 reports_dir,
                 *junit.options.args,
             ],
-            input_digest=merged_digest,
+            input_digest=merged_classpath_digest,
+            immutable_input_digests=immutable_input_digests,
             output_directories=(reports_dir,),
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
@@ -120,8 +112,16 @@ async def setup_junit_debug_request(_field_set: JavaTestFieldSet) -> TestDebugRe
     raise NotImplementedError("TestDebugResult is not implemented for JUnit (yet?).")
 
 
+@rule
+async def generate_junit_lockfile_request(
+    _: JunitToolLockfileSentinel, junit: JUnit
+) -> JvmToolLockfileRequest:
+    return JvmToolLockfileRequest.from_tool(junit)
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(TestFieldSet, JavaTestFieldSet),
+        UnionRule(JvmToolLockfileSentinel, JunitToolLockfileSentinel),
     ]

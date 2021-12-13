@@ -42,7 +42,7 @@ class ShellSourceField(SingleSourceField):
     uses_source_roots = False
 
 
-class ShellGeneratingSourcesBases(MultipleSourcesField):
+class ShellGeneratingSourcesBase(MultipleSourcesField):
     uses_source_roots = False
 
 
@@ -150,7 +150,7 @@ class Shunit2TestTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBases):
+class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBase):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
 
 
@@ -229,7 +229,7 @@ class ShellSourceTarget(Target):
     help = "A single Bourne-based shell script, e.g. a Bash script."
 
 
-class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
+class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBase):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
 
 

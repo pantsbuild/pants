@@ -28,7 +28,7 @@
 extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -36,11 +36,14 @@ use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
-use hashing::{Digest, EMPTY_FINGERPRINT};
+use futures::future::try_join_all;
+use futures::try_join;
+use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
+use store::{SnapshotOps, SnapshotOpsError, Store};
 use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, WorkunitStore};
 
 pub mod cache;
@@ -49,9 +52,15 @@ mod cache_tests;
 
 pub mod children;
 
+pub mod immutable_inputs;
+
 pub mod local;
 #[cfg(test)]
 mod local_tests;
+
+pub mod nailgun;
+
+pub mod named_caches;
 
 pub mod remote;
 #[cfg(test)]
@@ -61,14 +70,11 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod nailgun;
-
-pub mod named_caches;
-
 extern crate uname;
 
 pub use crate::children::ManagedChild;
-pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+pub use crate::immutable_inputs::ImmutableInputs;
+pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -177,6 +183,150 @@ fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::
   s.serialize_str(&level.to_string())
 }
 
+/// A symlink from a relative src to an absolute dst (outside of the workdir).
+#[derive(Debug)]
+pub struct WorkdirSymlink {
+  pub src: RelativePath,
+  pub dst: PathBuf,
+}
+
+/// Input Digests for a process execution.
+///
+/// The `complete` and `nailgun` Digests are the computed union of various inputs.
+///
+/// TODO: See `crate::local::prepare_workdir` regarding validation of overlapping inputs.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
+pub struct InputDigests {
+  /// All of the input Digests, merged and relativized. Runners without the ability to consume the
+  /// Digests individually should directly consume this value.
+  pub complete: Digest,
+
+  /// The merged Digest of any `use_nailgun`-relevant Digests.
+  pub nailgun: Digest,
+
+  /// The input files for the process execution, which will be materialized as mutable inputs in a
+  /// sandbox for the process.
+  ///
+  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
+  pub input_files: Digest,
+
+  /// Immutable input digests to make available in the input root.
+  ///
+  /// These digests are intended for inputs that will be reused between multiple Process
+  /// invocations, without being mutated. This might be useful to provide the tools being executed,
+  /// but can also be used for tool inputs such as compilation artifacts.
+  ///
+  /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
+  /// The executor may choose how to make the digests available, including by just merging
+  /// the digest normally into the input root, creating a symlink to a persistent cache,
+  /// or bind mounting the directory read-only into a persistent cache. Consequently, the mount
+  /// point of each input must not overlap the `input_files`, even for directory entries.
+  ///
+  /// Assumes the build action does not modify the Digest as made available. This may be
+  /// enforced by an executor, for example by bind mounting the directory read-only.
+  pub immutable_inputs: BTreeMap<RelativePath, Digest>,
+
+  /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
+  /// as server inputs. All other keys (and the input_files) will be client inputs.
+  pub use_nailgun: Vec<RelativePath>,
+}
+
+impl InputDigests {
+  pub async fn new(
+    store: &Store,
+    input_files: Digest,
+    immutable_inputs: BTreeMap<RelativePath, Digest>,
+    use_nailgun: Vec<RelativePath>,
+  ) -> Result<Self, SnapshotOpsError> {
+    // Collect all digests into `complete`.
+    let mut complete_digests = try_join_all(
+      immutable_inputs
+        .iter()
+        .map(|(path, digest)| store.add_prefix(*digest, path))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    // And collect only the subset of the Digests which impact nailgun into `nailgun`.
+    let nailgun_digests = immutable_inputs
+      .keys()
+      .zip(complete_digests.iter())
+      .filter_map(|(path, digest)| {
+        if use_nailgun.contains(path) {
+          Some(*digest)
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
+    complete_digests.push(input_files);
+
+    let (complete, nailgun) =
+      try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
+    Ok(Self {
+      complete,
+      nailgun,
+      input_files,
+      immutable_inputs,
+      use_nailgun,
+    })
+  }
+
+  pub fn with_input_files(input_files: Digest) -> Self {
+    Self {
+      complete: input_files,
+      nailgun: hashing::EMPTY_DIGEST,
+      input_files,
+      immutable_inputs: BTreeMap::new(),
+      use_nailgun: Vec::new(),
+    }
+  }
+
+  /// Split the InputDigests into client and server subsets.
+  ///
+  /// TODO: The server subset will have an accurate `complete` Digest, but the client will not.
+  /// This is currently safe because the nailgun client code does not consume that field, but it
+  /// would be good to find a better factoring.
+  pub fn nailgun_client_and_server(&self) -> (InputDigests, InputDigests) {
+    let (server, client) = self
+      .immutable_inputs
+      .clone()
+      .into_iter()
+      .partition(|(path, _digest)| self.use_nailgun.contains(path));
+
+    (
+      // Client.
+      InputDigests {
+        // TODO: See method doc.
+        complete: hashing::EMPTY_DIGEST,
+        nailgun: hashing::EMPTY_DIGEST,
+        input_files: self.input_files,
+        immutable_inputs: client,
+        use_nailgun: vec![],
+      },
+      // Server.
+      InputDigests {
+        complete: self.nailgun,
+        nailgun: hashing::EMPTY_DIGEST,
+        input_files: hashing::EMPTY_DIGEST,
+        immutable_inputs: server,
+        use_nailgun: vec![],
+      },
+    )
+  }
+}
+
+impl Default for InputDigests {
+  fn default() -> Self {
+    Self {
+      complete: hashing::EMPTY_DIGEST,
+      nailgun: hashing::EMPTY_DIGEST,
+      input_files: hashing::EMPTY_DIGEST,
+      immutable_inputs: BTreeMap::new(),
+      use_nailgun: Vec::new(),
+    }
+  }
+}
+
 ///
 /// A process to be executed.
 ///
@@ -206,7 +356,10 @@ pub struct Process {
   ///
   pub working_directory: Option<RelativePath>,
 
-  pub input_files: hashing::Digest,
+  ///
+  /// All of the input digests for the process.
+  ///
+  pub input_digests: InputDigests,
 
   pub output_files: BTreeSet<RelativePath>,
 
@@ -237,7 +390,7 @@ pub struct Process {
   /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
   /// must never assume that it has exclusive access to the provided directory.
   ///
-  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
+  pub append_only_caches: BTreeMap<CacheName, RelativePath>,
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
@@ -250,14 +403,6 @@ pub struct Process {
   pub jdk_home: Option<PathBuf>,
 
   pub platform_constraint: Option<Platform>,
-
-  ///
-  /// If non-empty, the Digest of a nailgun server to use to attempt to spawn the Process.
-  ///
-  /// TODO: Currently this Digest must be a subset of the `input_digest`, but we should consider
-  /// making it disjoint, and then automatically merging it.
-  ///
-  pub use_nailgun: Digest,
 
   pub cache_scope: ProcessCacheScope,
 }
@@ -278,7 +423,7 @@ impl Process {
       argv,
       env: BTreeMap::new(),
       working_directory: None,
-      input_files: hashing::EMPTY_DIGEST,
+      input_digests: InputDigests::default(),
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: None,
@@ -287,7 +432,6 @@ impl Process {
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       platform_constraint: None,
-      use_nailgun: hashing::EMPTY_DIGEST,
       execution_slot_variable: None,
       cache_scope: ProcessCacheScope::Successful,
     }
@@ -322,55 +466,10 @@ impl Process {
   ///
   pub fn append_only_caches(
     mut self,
-    append_only_caches: BTreeMap<CacheName, CacheDest>,
+    append_only_caches: BTreeMap<CacheName, RelativePath>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
     self
-  }
-}
-
-impl TryFrom<MultiPlatformProcess> for Process {
-  type Error = String;
-
-  fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req.0.get(&None) {
-      Some(crossplatform_req) => Ok(crossplatform_req.clone()),
-      None => Err(String::from(
-        "Cannot coerce to a simple Process, no cross platform request exists.",
-      )),
-    }
-  }
-}
-
-///
-/// A container of platform constrained processes.
-///
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
-
-impl MultiPlatformProcess {
-  pub fn user_facing_name(&self) -> String {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.description.clone())
-      .unwrap_or_else(|| "<Unnamed process>".to_string())
-  }
-
-  pub fn workunit_level(&self) -> log::Level {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.level)
-      .unwrap_or(Level::Info)
-  }
-}
-
-impl From<Process> for MultiPlatformProcess {
-  fn from(proc: Process) -> Self {
-    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 
@@ -559,40 +658,15 @@ pub trait CommandRunner: Send + Sync {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String>;
-
-  ///
-  /// Given a multi platform request which may have some platform
-  /// constraints determine if any of the requests contained within are compatible
-  /// with the current command runners platform configuration. If so return the
-  /// first candidate that will be run if the multi platform request is submitted to
-  /// `fn run(..)`
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
-  let mut hashes: Vec<String> = req
-    .0
-    .values()
-    .map(|process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| {
-      er.action_digest
-        .map(|d| d.hash)
-        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
-    })
-    .collect();
-  hashes.sort();
-  Digest::of_bytes(
-    hashes
-      .iter()
-      .fold(String::new(), |mut acc, hash| {
-        acc.push_str(hash);
-        acc
-      })
-      .as_bytes(),
-  )
+pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+  let (_, _, execute_request) =
+    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+  execute_request.action_digest.unwrap().try_into().unwrap()
 }
 
 ///
@@ -617,7 +691,7 @@ impl CommandRunner for BoundedCommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    mut req: MultiPlatformProcess,
+    mut process: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let semaphore_acquisition = self.inner.1.acquire();
     let permit = in_workunit!(
@@ -636,24 +710,18 @@ impl CommandRunner for BoundedCommandRunner {
 
     log::debug!(
       "Running {} under semaphore with concurrency id: {}",
-      req.user_facing_name(),
+      process.description,
       permit.concurrency_slot()
     );
 
-    for (_, process) in req.0.iter_mut() {
-      if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-        process.env.insert(
-          execution_slot_env_var.clone(),
-          format!("{}", permit.concurrency_slot()),
-        );
-      }
+    if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+      process.env.insert(
+        execution_slot_env_var.clone(),
+        format!("{}", permit.concurrency_slot()),
+      );
     }
 
-    self.inner.0.run(context, workunit, req).await
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.inner.0.extract_compatible_request(req)
+    self.inner.0.run(context, workunit, process).await
   }
 }
 

@@ -31,15 +31,14 @@ use fs::{
   Vfs,
 };
 use process_execution::{
-  self, CacheDest, CacheName, MultiPlatformProcess, Platform, Process, ProcessCacheScope,
-  ProcessResultSource,
+  self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
-use store::{self, StoreFileByDigest};
+use store::{self, Store, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
   WorkunitMetadata,
@@ -275,25 +274,52 @@ pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
   Ok(py_file_digest.0)
 }
 
-/// A Node that represents a set of processes to execute on specific platforms.
+/// A Node that represents a process to execute.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess {
-  cache_scope: ProcessCacheScope,
-  process: MultiPlatformProcess,
+pub struct ExecuteProcess {
+  process: Process,
 }
 
-impl MultiPlatformExecuteProcess {
-  fn lift_process(value: &PyAny, platform_constraint: Option<Platform>) -> Result<Process, String> {
+impl ExecuteProcess {
+  async fn lift_process_input_digests(
+    store: &Store,
+    value: &Value,
+  ) -> Result<InputDigests, String> {
+    let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
+      let value = (**value).as_ref(py);
+      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
+        .map_err(|err| format!("Error parsing input_digest {}", err))?;
+      let immutable_inputs =
+        externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
+          .into_iter()
+          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
+          .collect::<Result<BTreeMap<_, _>, String>>()?;
+      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
+        .unwrap()
+        .into_iter()
+        .map(RelativePath::new)
+        .collect::<Result<Vec<_>, _>>()?;
+
+      Ok(InputDigests::new(
+        store,
+        input_files,
+        immutable_inputs,
+        use_nailgun,
+      ))
+    });
+
+    input_digests_fut?
+      .await
+      .map_err(|e| format!("Failed to merge input digests for process: {:?}", e))
+  }
+
+  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
       Some(dir) => Some(RelativePath::new(dir)?),
     };
-
-    let py_digest = externs::getattr(value, "input_digest").unwrap();
-    let digest = lift_directory_digest(py_digest)
-      .map_err(|err| format!("Error parsing input_digest {}", err))?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
       .unwrap()
@@ -319,16 +345,13 @@ impl MultiPlatformExecuteProcess {
     let py_level = externs::getattr(value, "level").unwrap();
     let level = externs::val_to_log_level(py_level)?;
 
-    let append_only_caches = externs::getattr_from_str_frozendict(value, "append_only_caches")
-      .into_iter()
-      .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
-      .collect::<Result<_, String>>()?;
+    let append_only_caches =
+      externs::getattr_from_str_frozendict::<&str>(value, "append_only_caches")
+        .into_iter()
+        .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
+        .collect::<Result<_, String>>()?;
 
     let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
-
-    let py_use_nailgun = externs::getattr(value, "use_nailgun").unwrap();
-    let use_nailgun = lift_directory_digest(py_use_nailgun)
-      .map_err(|err| format!("Error parsing use_nailgun {}", err))?;
 
     let execution_slot_variable =
       externs::getattr_as_optional_string(value, "execution_slot_variable");
@@ -340,11 +363,18 @@ impl MultiPlatformExecuteProcess {
         .try_into()?
     };
 
+    let platform_constraint =
+      if let Some(p) = externs::getattr_as_optional_string(value, "platform") {
+        Some(Platform::try_from(p)?)
+      } else {
+        None
+      };
+
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
       working_directory,
-      input_files: digest,
+      input_digests,
       output_files,
       output_directories,
       timeout,
@@ -353,56 +383,26 @@ impl MultiPlatformExecuteProcess {
       append_only_caches,
       jdk_home,
       platform_constraint,
-      use_nailgun,
       execution_slot_variable,
       cache_scope,
     })
   }
 
-  pub fn lift(value: &PyAny) -> Result<MultiPlatformExecuteProcess, String> {
-    let raw_constraints = externs::getattr::<Vec<Option<String>>>(value, "platform_constraints")?;
-    let constraints = raw_constraints
-      .into_iter()
-      .map(|maybe_plat| match maybe_plat {
-        Some(plat) => Platform::try_from(plat).map(Some),
-        None => Ok(None),
-      })
-      .collect::<Result<Vec<_>, _>>()?;
-    let processes = externs::getattr::<Vec<&PyAny>>(value, "processes")?;
-    if constraints.len() != processes.len() {
-      return Err(format!(
-        "Sizes of constraint keys and processes do not match: {} vs. {}",
-        constraints.len(),
-        processes.len()
-      ));
-    }
-
-    let mut request_by_constraint: BTreeMap<Option<Platform>, Process> = BTreeMap::new();
-    for (constraint, execute_process) in constraints.iter().zip(processes.into_iter()) {
-      let underlying_req = MultiPlatformExecuteProcess::lift_process(execute_process, *constraint)?;
-      request_by_constraint.insert(*constraint, underlying_req.clone());
-    }
-
-    let cache_scope = request_by_constraint
-      .values()
-      .next()
-      .map(|p| p.cache_scope)
-      .unwrap();
-    Ok(MultiPlatformExecuteProcess {
-      cache_scope,
-      process: MultiPlatformProcess(request_by_constraint),
-    })
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, String> {
+    let input_digests = Self::lift_process_input_digests(store, &value).await?;
+    let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
+    Ok(Self { process })
   }
 }
 
-impl From<MultiPlatformExecuteProcess> for NodeKey {
-  fn from(n: MultiPlatformExecuteProcess) -> Self {
-    NodeKey::MultiPlatformExecuteProcess(Box::new(n))
+impl From<ExecuteProcess> for NodeKey {
+  fn from(n: ExecuteProcess) -> Self {
+    NodeKey::ExecuteProcess(Box::new(n))
   }
 }
 
 #[async_trait]
-impl WrappedNode for MultiPlatformExecuteProcess {
+impl WrappedNode for ExecuteProcess {
   type Item = ProcessResult;
 
   async fn run_wrapped_node(
@@ -412,73 +412,62 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    if let Some(compatible_request) = context
-      .core
-      .command_runner
-      .extract_compatible_request(&request)
-    {
-      let command_runner = &context.core.command_runner;
+    let command_runner = &context.core.command_runner;
 
-      let execution_context = process_execution::Context::new(
-        context.session.workunit_store(),
-        context.session.build_id().to_string(),
-        context.session.run_id(),
-      );
+    let execution_context = process_execution::Context::new(
+      context.session.workunit_store(),
+      context.session.build_id().to_string(),
+      context.session.run_id(),
+    );
 
-      let res = command_runner
-        .run(execution_context, workunit, request)
-        .await
-        .map_err(throw)?;
+    let res = command_runner
+      .run(execution_context, workunit, request.clone())
+      .await
+      .map_err(throw)?;
 
-      let definition = serde_json::to_string(&compatible_request)
-        .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
-      workunit.update_metadata(|initial| WorkunitMetadata {
-        stdout: Some(res.stdout_digest),
-        stderr: Some(res.stderr_digest),
-        user_metadata: vec![
-          (
-            "definition".to_string(),
-            UserMetadataItem::ImmediateString(definition),
-          ),
-          (
-            "source".to_string(),
-            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
-          ),
-          (
-            "exit_code".to_string(),
-            UserMetadataItem::ImmediateInt(res.exit_code as i64),
-          ),
-        ],
-        ..initial
-      });
-      if let Some(total_elapsed) = res.metadata.total_elapsed {
-        let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
-        match res.metadata.source {
-          ProcessResultSource::RanLocally => {
-            workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
-            context
-              .session
-              .workunit_store()
-              .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
-          }
-          ProcessResultSource::RanRemotely => {
-            workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
-            context
-              .session
-              .workunit_store()
-              .record_observation(ObservationMetric::RemoteProcessTimeRunMs, total_elapsed);
-          }
-          _ => {}
+    let definition = serde_json::to_string(&request)
+      .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
+    workunit.update_metadata(|initial| WorkunitMetadata {
+      stdout: Some(res.stdout_digest),
+      stderr: Some(res.stderr_digest),
+      user_metadata: vec![
+        (
+          "definition".to_string(),
+          UserMetadataItem::ImmediateString(definition),
+        ),
+        (
+          "source".to_string(),
+          UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+        ),
+        (
+          "exit_code".to_string(),
+          UserMetadataItem::ImmediateInt(res.exit_code as i64),
+        ),
+      ],
+      ..initial
+    });
+    if let Some(total_elapsed) = res.metadata.total_elapsed {
+      let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
+      match res.metadata.source {
+        ProcessResultSource::RanLocally => {
+          workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
+          context
+            .session
+            .workunit_store()
+            .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
         }
+        ProcessResultSource::RanRemotely => {
+          workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
+          context
+            .session
+            .workunit_store()
+            .record_observation(ObservationMetric::RemoteProcessTimeRunMs, total_elapsed);
+        }
+        _ => {}
       }
-
-      Ok(ProcessResult(res))
-    } else {
-      Err(throw(format!(
-        "No compatible platform found for request: {:?}",
-        request
-      )))
     }
+
+    Ok(ProcessResult(res))
   }
 }
 
@@ -676,7 +665,7 @@ impl WrappedNode for SessionValues {
     context: Context,
     _workunit: &mut RunningWorkunit,
   ) -> NodeResult<Value> {
-    Ok(context.session.session_values())
+    Ok(Value::new(context.session.session_values()))
   }
 }
 
@@ -890,7 +879,7 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
@@ -1017,7 +1006,7 @@ impl Task {
             output: get.output,
             input: *get.input.type_id(),
           });
-          params.put(get.input);
+          params.put(get.input.clone());
 
           let edges = context
             .core
@@ -1159,7 +1148,7 @@ impl WrappedNode for Task {
       .await?
     };
 
-    let func = self.task.func;
+    let func = self.task.func.clone();
 
     let (mut result_val, mut result_type) =
       maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
@@ -1191,7 +1180,7 @@ impl WrappedNode for Task {
     if result_type != self.product {
       return Err(throw(format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        func, result_val
+        self.task.func, result_val
       )));
     }
 
@@ -1247,7 +1236,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
-  MultiPlatformExecuteProcess(Box<MultiPlatformExecuteProcess>),
+  ExecuteProcess(Box<ExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
   Select(Box<Select>),
@@ -1261,7 +1250,7 @@ pub enum NodeKey {
 impl NodeKey {
   fn product_str(&self) -> String {
     match self {
-      &NodeKey::MultiPlatformExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::SessionValues(_) => "SessionValues".to_string(),
@@ -1285,7 +1274,7 @@ impl NodeKey {
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
-      &NodeKey::MultiPlatformExecuteProcess { .. }
+      &NodeKey::ExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::SessionValues { .. }
       | &NodeKey::RunId { .. }
@@ -1299,7 +1288,7 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
-      NodeKey::MultiPlatformExecuteProcess(..) => {
+      NodeKey::ExecuteProcess(..) => {
         // NB: The Node for a Process is statically rendered at Debug (rather than at
         // Process.level) because it is very likely to wrap a BoundedCommandRunner which
         // will block the workunit. We don't want to render at the Process's actual level
@@ -1318,7 +1307,7 @@ impl NodeKey {
   fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::MultiPlatformExecuteProcess(..) => "multi_platform_process".to_string(),
+      NodeKey::ExecuteProcess(..) => "process".to_string(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
       NodeKey::Paths(..) => "paths".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
@@ -1343,9 +1332,9 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => {
+      NodeKey::ExecuteProcess(epr) => {
         // NB: See Self::workunit_level for more information on why this is prefixed.
-        Some(format!("Scheduling: {}", mp_epr.process.user_facing_name()))
+        Some(format!("Scheduling: {}", epr.process.description))
       }
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
@@ -1449,7 +1438,7 @@ impl Node for NodeKey {
               .map_ok(NodeOutput::Digest)
               .await
           }
-          NodeKey::MultiPlatformExecuteProcess(n) => {
+          NodeKey::ExecuteProcess(n) => {
             n.run_wrapped_node(context, workunit)
               .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
               .await
@@ -1560,16 +1549,15 @@ impl Node for NodeKey {
 
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match (self, output) {
-      (
-        NodeKey::MultiPlatformExecuteProcess(ref mp),
-        NodeOutput::ProcessResult(ref process_result),
-      ) => match mp.cache_scope {
-        ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
-        ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
-          process_result.0.exit_code == 0
+      (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
+        match ep.process.cache_scope {
+          ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
+          ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
+            process_result.0.exit_code == 0
+          }
+          ProcessCacheScope::PerSession => false,
         }
-        ProcessCacheScope::PerSession => false,
-      },
+      }
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -1585,8 +1573,8 @@ impl Display for NodeKey {
     match self {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
-      &NodeKey::MultiPlatformExecuteProcess(ref s) => {
-        write!(f, "Process({})", s.process.user_facing_name())
+      &NodeKey::ExecuteProcess(ref s) => {
+        write!(f, "Process({})", s.process.description)
       }
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).0.display()),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),

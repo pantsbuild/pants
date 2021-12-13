@@ -1164,6 +1164,15 @@ def test_single_source_path_globs(
             assert getattr(actual, attr) == expect
 
 
+def test_single_source_file_path() -> None:
+    class TestSingleSourceField(SingleSourceField):
+        required = False
+        expected_num_files = range(0, 2)
+
+    assert TestSingleSourceField(None, Address("project")).file_path is None
+    assert TestSingleSourceField("f.ext", Address("project")).file_path == "project/f.ext"
+
+
 def test_single_source_field_bans_globs() -> None:
     class TestSingleSourceField(SingleSourceField):
         pass

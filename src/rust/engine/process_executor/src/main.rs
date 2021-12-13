@@ -32,9 +32,11 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
-use fs::RelativePath;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
+use fs::{Permissions, RelativePath};
+use hashing::{Digest, Fingerprint};
+use process_execution::{
+  Context, ImmutableInputs, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
+};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
@@ -186,15 +188,6 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   cache_rpc_concurrency: usize,
 
-  /// If set, run the process through a Nailgun server with the given digest.
-  /// This will start a new Nailgun server as a side effect, but will tear it down on exit.
-  #[structopt(long)]
-  use_nailgun_digest: Option<Fingerprint>,
-
-  /// Length of the `use_nailgun_digest` digest.
-  #[structopt(long)]
-  use_nailgun_digest_length: Option<usize>,
-
   /// Overall timeout in seconds for each request from time of submission.
   #[structopt(long, default_value = "600")]
   overall_deadline_secs: u64,
@@ -276,6 +269,7 @@ async fn main() {
       .chain(request.argv.into_iter())
       .collect();
   }
+  let workdir = args.work_dir.unwrap_or_else(std::env::temp_dir);
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
@@ -317,12 +311,13 @@ async fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
-      args.work_dir.unwrap_or_else(std::env::temp_dir),
+      workdir.clone(),
       NamedCaches::new(
         args
           .named_cache_path
           .unwrap_or_else(NamedCaches::default_path),
       ),
+      ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
@@ -331,18 +326,14 @@ async fn main() {
     workunit_store.clone(),
     "process_executor".to_owned(),
     WorkunitMetadata::default(),
-    |workunit| async move {
-      runner
-        .run(Context::default(), workunit, request.into())
-        .await
-    }
+    |workunit| async move { runner.run(Context::default(), workunit, request).await }
   )
   .await
   .expect("Error executing");
 
   if let Some(output) = args.materialize_output_to {
     store
-      .materialize_directory(output, result.output_directory)
+      .materialize_directory(output, result.output_directory, Permissions::Writable)
       .await
       .unwrap();
   }
@@ -376,7 +367,7 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(args, Digest::new(input_digest, input_digest_length))
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length)).await
 
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
@@ -394,9 +385,10 @@ async fn make_request(
   }
 }
 
-fn make_request_from_flat_args(
+async fn make_request_from_flat_args(
+  store: &Store,
   args: &Opt,
-  input_root_digest: Digest,
+  input_files: Digest,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -421,22 +413,16 @@ fn make_request_from_flat_args(
     })
     .transpose()?;
 
-  let use_nailgun = match (args.use_nailgun_digest, args.use_nailgun_digest_length) {
-    (Some(d), Some(l)) => Digest::new(d, l),
-    (Some(_), None) | (None, Some(_)) => {
-      return Err(
-        "If either `use_nailgun_digest` or `use_nailgun_digest_length` are set, both must be."
-          .to_owned(),
-      )
-    }
-    _ => EMPTY_DIGEST,
-  };
+  // TODO: Add support for immutable inputs.
+  let input_digests = InputDigests::new(store, input_files, BTreeMap::default(), vec![])
+    .await
+    .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
 
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
     env: collection_from_keyvalues(args.command.env.iter()),
     working_directory,
-    input_files: input_root_digest,
+    input_digests,
     output_files,
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
@@ -445,7 +431,6 @@ fn make_request_from_flat_args(
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
     platform_constraint: None,
-    use_nailgun,
     execution_slot_variable: None,
     cache_scope: ProcessCacheScope::Always,
   };
@@ -496,12 +481,14 @@ async fn extract_request_from_action_digest(
     )
   };
 
-  let input_files = require_digest(&action.input_root_digest)
-    .map_err(|err| format!("Bad input root digest: {:?}", err))?;
+  let input_digests = InputDigests::with_input_files(
+    require_digest(&action.input_root_digest)
+      .map_err(|err| format!("Bad input root digest: {:?}", err))?,
+  );
 
   // In case the local Store doesn't have the input root Directory,
   // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
-  store.load_directory_or_err(input_files).await?;
+  store.load_directory_or_err(input_digests.complete).await?;
 
   let process = process_execution::Process {
     argv: command.arguments,
@@ -511,7 +498,7 @@ async fn extract_request_from_action_digest(
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
     working_directory,
-    input_files,
+    input_digests,
     output_files: command
       .output_files
       .iter()
@@ -531,7 +518,6 @@ async fn extract_request_from_action_digest(
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    use_nailgun: EMPTY_DIGEST,
     cache_scope: ProcessCacheScope::Always,
   };
 

@@ -204,7 +204,7 @@ class PexBinaryDefaults(Subsystem):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PexBinaryDependencies(Dependencies):
+class PexBinaryDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -521,7 +521,7 @@ class PexBinary(Target):
         OutputPathField,
         InterpreterConstraintsField,
         PythonResolveField,
-        PexBinaryDependencies,
+        PexBinaryDependenciesField,
         PexEntryPointField,
         PexScriptField,
         PexPlatformsField,
@@ -573,11 +573,11 @@ class PythonTestSourceField(PythonSourceField):
             )
 
 
-class PythonTestsDependencies(Dependencies):
+class PythonTestsDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonTestsTimeout(IntField):
+class PythonTestsTimeoutField(IntField):
     alias = "timeout"
     help = (
         "A timeout (in seconds) used by each test file belonging to this target.\n\n"
@@ -602,7 +602,7 @@ class PythonTestsTimeout(IntField):
         return result
 
 
-class PythonTestsExtraEnvVars(StringSequenceField):
+class PythonTestsExtraEnvVarsField(StringSequenceField):
     alias = "extra_env_vars"
     help = (
         "Additional environment variables to include in test processes. "
@@ -622,10 +622,10 @@ _PYTHON_TEST_COMMON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     InterpreterConstraintsField,
     PythonResolveField,
-    PythonTestsDependencies,
-    PythonTestsTimeout,
+    PythonTestsDependenciesField,
+    PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
-    PythonTestsExtraEnvVars,
+    PythonTestsExtraEnvVarsField,
     SkipPythonTestsField,
 )
 
@@ -954,14 +954,14 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
             )
 
 
-class PythonRequirementsFileSources(MultipleSourcesField):
+class PythonRequirementsFileSourcesField(MultipleSourcesField):
     required = True
     uses_source_roots = False
 
 
 class PythonRequirementsFile(Target):
     alias = "_python_requirements_file"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
     help = "A private helper target type for requirements.txt files."
 
 
@@ -971,7 +971,7 @@ class PythonRequirementsFile(Target):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PythonDistributionDependencies(Dependencies):
+class PythonDistributionDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -1162,7 +1162,7 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        PythonDistributionDependencies,
+        PythonDistributionDependenciesField,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
         GenerateSetupField,

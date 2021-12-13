@@ -15,7 +15,6 @@ from pants.backend.java.target_types import DeployJar, JavaSourcesGeneratorTarge
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
@@ -23,7 +22,7 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact, JvmDependencyLockfile
+from pants.jvm.target_types import JvmArtifact
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -48,7 +47,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
         ],
         target_types=[
-            JvmDependencyLockfile,
             JavaSourcesGeneratorTarget,
             JvmArtifact,
             DeployJar,
@@ -324,15 +322,15 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
     jdk_setup = rule_runner.request(JdkSetup, [])
     bash = rule_runner.request(BashBinary, [])
 
-    input_digests = rule_runner.request(Digest, [MergeDigests([jdk_setup.digest, fat_jar.digest])])
     process_result = rule_runner.request(
         ProcessResult,
         [
             Process(
                 argv=jdk_setup.args(bash, []) + ("-jar", "dave.jar"),
                 description="Run that test jar",
-                input_digest=input_digests,
+                input_digest=fat_jar.digest,
                 append_only_caches=jdk_setup.append_only_caches,
+                immutable_input_digests=jdk_setup.immutable_input_digests,
                 env=jdk_setup.env,
             )
         ],

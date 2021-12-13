@@ -48,7 +48,7 @@ def test_fingerprint_list() -> None:
 
 def test_fingerprint_file(rule_runner: RuleRunner) -> None:
     fp1, fp2, fp3 = (
-        OptionsFingerprinter().fingerprint(file_option, rule_runner.create_file(f, contents=c))
+        OptionsFingerprinter().fingerprint(file_option, rule_runner.write_files({f: c})[0])
         for (f, c) in (
             ("foo/bar.config", "blah blah blah"),
             ("foo/bar.config", "meow meow meow"),
@@ -61,14 +61,14 @@ def test_fingerprint_file(rule_runner: RuleRunner) -> None:
 
 
 def test_fingerprint_file_outside_buildroot(tmp_path: Path, rule_runner: RuleRunner) -> None:
-    outside_buildroot = rule_runner.create_file((tmp_path / "foobar").as_posix(), contents="foobar")
+    outside_buildroot = rule_runner.write_files({(tmp_path / "foobar").as_posix(): "foobar"})[0]
     with pytest.raises(ValueError):
         OptionsFingerprinter().fingerprint(file_option, outside_buildroot)
 
 
 def test_fingerprint_file_list(rule_runner: RuleRunner) -> None:
     f1, f2, f3 = (
-        rule_runner.create_file(f, contents=c)
+        rule_runner.write_files({f: c})[0]
         for (f, c) in (
             ("foo/bar.config", "blah blah blah"),
             ("foo/bar.config", "meow meow meow"),
@@ -98,14 +98,15 @@ def test_fingerprint_dir(rule_runner: RuleRunner) -> None:
     d2 = rule_runner.create_dir("b")
     d3 = rule_runner.create_dir("c")
 
-    for f, c in [
-        ("a/bar/bar.config", "blah blah blah"),
-        ("a/foo/foo.config", "meow meow meow"),
-        ("b/foo/foo.config", "meow meow meow"),
-        ("b/bar/bar.config", "blah blah blah"),
-        ("c/bar/bar.config", "blah meow blah"),
-    ]:
-        rule_runner.create_file(f, contents=c)
+    rule_runner.write_files(
+        {
+            "a/bar/bar.config": "blah blah blah",
+            "a/foo/foo.config": "meow meow meow",
+            "b/foo/foo.config": "meow meow meow",
+            "b/bar/bar.config": "blah blah blah",
+            "c/bar/bar.config": "blah meow blah",
+        }
+    )
 
     dp1 = OptionsFingerprinter().fingerprint(dir_option, [d1])
     dp2 = OptionsFingerprinter().fingerprint(dir_option, [d1, d2])
@@ -121,7 +122,7 @@ def test_fingerprint_dir(rule_runner: RuleRunner) -> None:
 
 def test_fingerprint_dict_with_files_order(rule_runner: RuleRunner) -> None:
     f1, f2 = (
-        rule_runner.create_file(f, contents=c)
+        rule_runner.write_files({f: c})[0]
         for (f, c) in (
             ("foo/bar.config", "blah blah blah"),
             ("foo/bar.config", "meow meow meow"),
@@ -134,7 +135,7 @@ def test_fingerprint_dict_with_files_order(rule_runner: RuleRunner) -> None:
 
 def test_fingerprint_dict_with_file_content_change(rule_runner: RuleRunner) -> None:
     f1, f2 = (
-        rule_runner.create_file(f, contents=c)
+        rule_runner.write_files({f: c})[0]
         for (f, c) in (
             ("foo/bar.config", "blah blah blah"),
             ("foo/bar.config", "meow meow meow"),

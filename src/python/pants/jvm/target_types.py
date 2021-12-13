@@ -46,6 +46,24 @@ class JvmArtifactVersionField(StringField):
     )
 
 
+class JvmArtifactUrlField(StringField):
+    alias = "url"
+    required = False
+    help = (
+        "A URL that points to the location of this artifact. If specified, Pants will not fetch this artifact "
+        "from default maven repositories, and instead fetch the artifact from this URL. To use default maven "
+        "repositories, do not set this value. \n\nNote that `file:` URLs are not supported due to Pants' "
+        "sandboxing feature. To use a local `JAR` file, use the `jar` field instead."
+    )
+
+
+class JvmArtifactJarSourceField(SingleSourceField):
+    alias = "jar"
+    expected_file_extensions = (".jar",)
+    required = False
+    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
+
+
 class JvmArtifactPackagesField(StringSequenceField):
     alias = "packages"
     help = (
@@ -81,6 +99,7 @@ class JvmArtifactFieldSet(FieldSet):
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
+    url: JvmArtifactUrlField
 
     required_fields = (
         JvmArtifactGroupField,
@@ -95,6 +114,8 @@ class JvmArtifact(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *JvmArtifactFieldSet.required_fields,
+        JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
+        JvmArtifactJarSourceField,
     )
     help = (
         "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
@@ -112,7 +133,7 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     )
 
 
-class JvmResolveName(StringField):
+class JvmResolveNameField(StringField):
     alias = "resolve"
     required = False
     help = (
@@ -129,27 +150,3 @@ class JvmRequirementsField(SpecialCasedDependencies):
         "A sequence of addresses to targets compatible with `jvm_artifact` that specify the coordinates for "
         "third-party JVM dependencies."
     )
-
-
-class JvmLockfileSources(SingleSourceField):
-    expected_file_extensions = (".lockfile",)
-    # Expect 0 or 1 files.
-    expected_num_files = range(0, 2)
-    required = False
-    help = (
-        "A single Pants Coursier Lockfile source.\n\n"
-        "Use `./pants coursier-resolve ...` to generate (or regenerate) the Lockfile."
-        " If the Lockfile doesn't exist on disk, the first run of `coursier-resolve` will attempt"
-        " to generate it for you to the default file name ('coursier_resolve.lockfile')."
-        " After running `coursier-resolve` for the first time, you should update this field's"
-        "`sources` to explicit take ownership of the generated lockfile."
-    )
-
-
-class JvmDependencyLockfile(Target):
-    alias = "coursier_lockfile"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        JvmLockfileSources,
-    )
-    help = "A Coursier lockfile along with references to the artifacts to use for the lockfile."

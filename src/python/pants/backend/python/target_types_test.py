@@ -20,17 +20,17 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
     PexBinary,
-    PexBinaryDependencies,
+    PexBinaryDependenciesField,
     PexEntryPointField,
     PexScriptField,
     PythonDistribution,
-    PythonDistributionDependencies,
+    PythonDistributionDependenciesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
-    PythonTestsTimeout,
+    PythonTestsTimeoutField,
     PythonTestTarget,
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
@@ -87,7 +87,7 @@ def test_timeout_calculation() -> None:
         global_max: int | None = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
+        field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -151,8 +151,12 @@ def test_resolve_pex_binary_entry_point() -> None:
         *, entry_point: str | None, expected: EntryPoint | None, is_file: bool
     ) -> None:
         addr = Address("src/python/project")
-        rule_runner.create_file("src/python/project/app.py")
-        rule_runner.create_file("src/python/project/f2.py")
+        rule_runner.write_files(
+            {
+                "src/python/project/app.py": "",
+                "src/python/project/f2.py": "",
+            }
+        )
         ep_field = PexEntryPointField(entry_point, addr)
         result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
@@ -249,7 +253,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependencies])],
+            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
         )
         assert injected == InjectedDependencies([expected] if expected else [])
 
@@ -396,95 +400,90 @@ def test_inject_python_distribution_dependencies() -> None:
         ],
         objects={"setup_py": PythonArtifact},
     )
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement(
-                name='ansicolors',
-                requirements=['ansicolors'],
-                modules=['colors'],
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("project/app.py")
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            pex_binary(name="my_binary", entry_point="who_knows.module:main")
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement(
+                    name='ansicolors',
+                    requirements=['ansicolors'],
+                    modules=['colors'],
+                )
+                """
+            ),
+            "project/app.py": "",
+            "project/BUILD": dedent(
+                """\
+                pex_binary(name="my_binary", entry_point="who_knows.module:main")
 
-            python_sources(name="my_library", sources=["app.py"])
+                python_sources(name="my_library", sources=["app.py"])
 
-            python_distribution(
-                name="dist-a",
-                provides=setup_py(
-                    name='my-dist-a'
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "my_cmd": ":my_binary",
-                    },
-                },
-            )
-
-            python_distribution(
-                name="dist-b",
-                provides=setup_py(
-                    name="my-dist-b"
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "b_cmd": "project.app:main",
-                        "cmd_2": "//project:my_binary",
-                    }
-                },
-            )
-
-            python_distribution(
-                name="third_dep",
-                provides=setup_py(name="my-third"),
-                entry_points={
-                    "color-plugins":{
-                        "my-ansi-colors": "colors",
-                    }
-                }
-            )
-
-            python_distribution(
-                name="third_dep2",
-                provides=setup_py(
-                    name="my-third",
+                python_distribution(
+                    name="dist-a",
+                    provides=setup_py(
+                        name='my-dist-a'
+                    ),
                     entry_points={
                         "console_scripts":{
-                            "my-cmd": ":my_binary",
-                            "main": "project.app:main",
+                            "my_cmd": ":my_binary",
                         },
+                    },
+                )
+
+                python_distribution(
+                    name="dist-b",
+                    provides=setup_py(
+                        name="my-dist-b"
+                    ),
+                    entry_points={
+                        "console_scripts":{
+                            "b_cmd": "project.app:main",
+                            "cmd_2": "//project:my_binary",
+                        }
+                    },
+                )
+
+                python_distribution(
+                    name="third_dep",
+                    provides=setup_py(name="my-third"),
+                    entry_points={
                         "color-plugins":{
                             "my-ansi-colors": "colors",
                         }
                     }
                 )
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("who_knows/module.py")
-    rule_runner.add_to_build_file(
-        "who_knows",
-        dedent(
-            """\
-            python_sources(name="random_lib", sources=["module.py"])
-            """
-        ),
+
+                python_distribution(
+                    name="third_dep2",
+                    provides=setup_py(
+                        name="my-third",
+                        entry_points={
+                            "console_scripts":{
+                                "my-cmd": ":my_binary",
+                                "main": "project.app:main",
+                            },
+                            "color-plugins":{
+                                "my-ansi-colors": "colors",
+                            }
+                        }
+                    )
+                )
+                """
+            ),
+            "who_knows/module.py": "",
+            "who_knows/BUILD": dedent(
+                """\
+                python_sources(name="random_lib", sources=["module.py"])
+                """
+            ),
+        }
     )
 
     def assert_injected(address: Address, expected: list[Address]) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
+            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
         )
         assert injected == InjectedDependencies(expected)
 

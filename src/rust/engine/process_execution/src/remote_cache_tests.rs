@@ -20,9 +20,9 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, Process, ProcessMetadata, ProcessResultMetadata,
-  ProcessResultSource, RemoteCacheWarningsBehavior,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  RemoteCacheWarningsBehavior,
 };
 
 /// A mock of the local runner used for better hermeticity of the tests.
@@ -60,15 +60,11 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     &self,
     _context: Context,
     _workunit: &mut RunningWorkunit,
-    _req: MultiPlatformProcess,
+    _req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    Some(req.0.get(&None).unwrap().clone())
   }
 }
 
@@ -549,13 +545,9 @@ async fn make_action_result_basic() {
       &self,
       _context: Context,
       _workunit: &mut RunningWorkunit,
-      _req: MultiPlatformProcess,
+      _req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, String> {
       unimplemented!()
-    }
-
-    fn extract_compatible_request(&self, _req: &MultiPlatformProcess) -> Option<Process> {
-      None
     }
   }
 

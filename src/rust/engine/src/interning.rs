@@ -1,15 +1,12 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
-use std::hash;
 use std::sync::atomic;
 
-use parking_lot::{Mutex, RwLock};
-use pyo3::prelude::{PyResult, Python};
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::externs;
-use crate::python::{Fnv, Key, Value};
+use crate::python::{Key, TypeId};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -39,72 +36,34 @@ use crate::python::{Fnv, Key, Value};
 /// it before acquiring inner locks. That way we can guarantee that these locks are always acquired
 /// before the GIL (Value equality in particular might re-acquire it).
 ///
-#[derive(Default)]
 pub struct Interns {
-  forward_keys: Mutex<HashMap<InternKey, Key, Fnv>>,
-  reverse_keys: RwLock<HashMap<Key, Value, Fnv>>,
+  // A mapping between Python objects and integer ids.
+  keys: Py<PyDict>,
   id_generator: atomic::AtomicU64,
 }
 
 impl Interns {
-  pub fn new() -> Interns {
-    Interns::default()
+  pub fn new() -> Self {
+    Self {
+      keys: Python::with_gil(|py| PyDict::new(py).into()),
+      id_generator: atomic::AtomicU64::default(),
+    }
   }
 
-  pub fn key_insert(&self, py: Python, v: Value) -> PyResult<Key> {
-    let (intern_key, type_id) = {
-      let obj = (*v).as_ref(py);
-      (InternKey(obj.hash()?, v.clone()), obj.get_type().into())
-    };
-
-    py.allow_threads(|| {
-      let mut forward_keys = self.forward_keys.lock();
-      let key = if let Some(key) = forward_keys.get(&intern_key) {
-        *key
+  pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
+    let (id, type_id): (u64, TypeId) = {
+      let v = v.as_ref(py);
+      let keys = self.keys.as_ref(py);
+      let id: u64 = if let Some(key) = keys.get_item(v) {
+        key.extract()?
       } else {
         let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
-        let key = Key::new(id, type_id);
-        self.reverse_keys.write().insert(key, v);
-        forward_keys.insert(intern_key, key);
-        key
+        keys.set_item(v, id)?;
+        id
       };
-      Ok(key)
-    })
-  }
+      (id, v.get_type().into())
+    };
 
-  pub fn key_get(&self, k: &Key) -> Value {
-    // NB: We do not need to acquire+release the GIL before getting a Value for a Key, because
-    // neither `Key::eq` nor `Value::clone` acquire the GIL.
-    self.reverse_keys.read().get(k).cloned().unwrap_or_else(|| {
-      // N.B.: This panic is effectively an assertion that `Key::new` is only ever called above in
-      // `key_insert` under an exclusive lock where it is then inserted in `reverse_keys` before
-      // exiting the lock and being returned to the caller. This ensures that all `Key`s in the
-      // wild _must_ be in `reverse_keys`. As such, the code involved in generating the panic
-      // message should be immaterial and never fire. If it does fire though, then the assertion
-      // was proven incorrect and the `Key` is not, in fact, in `reverse_keys`. Since the `Debug`
-      // impl for `Key` currently uses this very method to render the `Key` we avoid using the
-      // debug formatting for `Key` to avoid generating a panic while panicking.
-      panic!(
-        "Previously memoized object disappeared for Key {{ id: {}, type_id: {} }}!",
-        k.id(),
-        k.type_id()
-      )
-    })
-  }
-}
-
-struct InternKey(isize, Value);
-
-impl Eq for InternKey {}
-
-impl PartialEq for InternKey {
-  fn eq(&self, other: &InternKey) -> bool {
-    Python::with_gil(|py| externs::equals((*self.1).as_ref(py), (*other.1).as_ref(py)))
-  }
-}
-
-impl hash::Hash for InternKey {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
+    Ok(Key::new(id, type_id, v.into()))
   }
 }

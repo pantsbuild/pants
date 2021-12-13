@@ -6,7 +6,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use fnv::FnvHasher;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{FromPyObject, ToPyObject};
@@ -14,14 +13,11 @@ use smallvec::SmallVec;
 
 use crate::externs;
 
-pub type Fnv = hash::BuildHasherDefault<FnvHasher>;
-
 ///
 /// Params represent a TypeId->Key map.
 ///
 /// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds).
 ///
-#[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Params(SmallVec<[Key; 4]>);
 
@@ -178,8 +174,7 @@ impl rule_graph::TypeId for TypeId {
 }
 
 /// An identifier for a Python function.
-#[repr(C)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
@@ -212,11 +207,11 @@ impl fmt::Display for Function {
 }
 
 /// An interned key for a Value for use as a key in HashMaps and sets.
-#[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
+  pub value: Value,
 }
 
 impl Eq for Key {}
@@ -246,8 +241,8 @@ impl fmt::Display for Key {
 }
 
 impl Key {
-  pub fn new(id: Id, type_id: TypeId) -> Key {
-    Key { id, type_id }
+  pub fn new(id: Id, type_id: TypeId, value: Value) -> Key {
+    Key { id, type_id, value }
   }
 
   pub fn id(&self) -> Id {
@@ -260,16 +255,18 @@ impl Key {
 
   pub fn from_value(val: Value) -> PyResult<Key> {
     let gil = Python::acquire_gil();
-    externs::INTERNS.key_insert(gil.python(), val)
+    let py = gil.python();
+    externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
   }
 
   pub fn to_value(&self) -> Value {
-    externs::INTERNS.key_get(self)
+    self.value.clone()
   }
 }
 
-// TODO: simplify to use `PyObject` (aka `Py<PyAny>`) directly. There is no benefit to wrapping
-// this in an `Arc`, given that it's already GIL-independent.
+// NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
+// in `Arc` like this, because `Py<T>` internally acquires a (non-GIL) global lock during `Clone`
+// and `Drop`.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
 

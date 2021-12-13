@@ -24,6 +24,8 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
+from pants.backend.shell.target_types import rules as shell_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -44,13 +46,20 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
+            *shell_target_types_rules(),
             *target_types_rules.rules(),
             docker_build_args,
             docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
+        target_types=[
+            DockerImageTarget,
+            FilesGeneratorTarget,
+            PexBinary,
+            ShellSourcesGeneratorTarget,
+            ShellSourceTarget,
+        ],
     )
     return rule_runner
 
@@ -85,30 +94,38 @@ def assert_build_context(
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
-    # img_A -> files_A
-    # img_A -> img_B -> files_B
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
-            files(name="files_A", sources=["files/**"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            # img_A -> files_A
+            # img_A -> img_B
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+                files(name="files_A", sources=["files/**"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "src/a/files/a01": "",
+            "src/a/files/a02": "",
+            # img_B -> files_B
+            "src/b/BUILD": dedent(
+                """\
+                docker_image(name="img_B", dependencies=[":files_B"])
+                files(name="files_B", sources=["files/**"])
+                """
+            ),
+            "src/b/Dockerfile": "FROM base",
+            "src/b/files/b01": "",
+            "src/b/files/b02": "",
+            # Mixed
+            "src/c/BUILD": dedent(
+                """\
+                docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
+                """
+            ),
+            "src/c/Dockerfile": "FROM base",
+        }
     )
-    rule_runner.add_to_build_file(
-        "src/b",
-        dedent(
-            """\
-            docker_image(name="img_B", dependencies=[":files_B"])
-            files(name="files_B", sources=["files/**"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("src/a/files", ["a01", "a02"])
-    rule_runner.create_files("src/b", ["Dockerfile"])
-    rule_runner.create_files("src/b/files", ["b01", "b02"])
 
     # We want files_B in build context for img_B
     assert_build_context(
@@ -125,16 +142,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     # Mixed.
-    rule_runner.add_to_build_file(
-        "src/c",
-        dedent(
-            """\
-            docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/c", ["Dockerfile"])
-
     assert_build_context(
         rule_runner,
         Address("src/c", target_name="img_C"),
@@ -150,25 +157,24 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
 
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=["res/static:files"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=["res/static:files"])
+                """
+            ),
+            "res/static/BUILD": dedent(
+                """\
+                files(name="files", sources=["!BUILD", "**/*"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "res/static/s01": "",
+            "res/static/s02": "",
+            "res/static/sub/s03": "",
+        }
     )
-    rule_runner.add_to_build_file(
-        "res/static",
-        dedent(
-            """\
-            files(name="files", sources=["!BUILD", "**/*"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("res/static", ["s01", "s02"])
-    rule_runner.create_files("res/static/sub", ["s03"])
 
     assert_build_context(
         rule_runner,
@@ -259,6 +265,35 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
         },
+    )
+
+
+def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(dependencies=[":entrypoint", ":shell"])
+                shell_source(name="entrypoint", source="entrypoint.sh")
+                shell_sources(name="shell", sources=["scripts/**/*.sh"])
+                """
+            ),
+            "src/docker/Dockerfile": "FROM base",
+            "src/docker/entrypoint.sh": "",
+            "src/docker/scripts/s01.sh": "",
+            "src/docker/scripts/s02.sh": "",
+            "src/docker/scripts/random.file": "",
+        }
+    )
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=[
+            "src/docker/Dockerfile",
+            "src/docker/entrypoint.sh",
+            "src/docker/scripts/s01.sh",
+            "src/docker/scripts/s02.sh",
+        ],
     )
 
 
