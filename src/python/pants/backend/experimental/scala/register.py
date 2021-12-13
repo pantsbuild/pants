@@ -10,8 +10,11 @@ from pants.backend.scala.target_types import (
     ScalaJunitTestTarget,
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
+    ScalatestTestsGeneratorTarget,
+    ScalatestTestTarget,
 )
 from pants.backend.scala.target_types import rules as target_types_rules
+from pants.backend.scala.test import scalatest
 from pants.jvm import classpath, jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import coursier
@@ -28,12 +31,15 @@ def target_types():
         ScalaJunitTestsGeneratorTarget,
         ScalaSourceTarget,
         ScalaSourcesGeneratorTarget,
+        ScalatestTestTarget,
+        ScalatestTestsGeneratorTarget,
     ]
 
 
 def rules():
     return [
         *scalac.rules(),
+        *scalatest.rules(),
         *check.rules(),
         *tailor.rules(),
         *repl.rules(),

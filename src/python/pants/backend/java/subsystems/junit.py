@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.custom_types import shell_str
 from pants.util.docutil import git_url

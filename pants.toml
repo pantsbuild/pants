@@ -187,6 +187,9 @@ lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfi
 [scalapb]
 lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
 
+[scalatest]
+lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
+
 [toolchain-setup]
 repo = "pants"
 
