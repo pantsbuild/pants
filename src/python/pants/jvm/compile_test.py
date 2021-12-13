@@ -50,7 +50,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.target_types import JvmArtifact
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
@@ -87,7 +87,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(RenderedClasspath, (Addresses,)),
             QueryRule(UnexpandedTargets, (Addresses,)),
         ],
-        target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifact],
+        target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifactTarget],
     )
     rule_runner.set_options(
         args=[

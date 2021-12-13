@@ -23,8 +23,9 @@ class JvmArtifactGroupField(StringField):
     alias = "group"
     required = True
     help = (
-        "The 'group' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
-        "com.google.guava:guava:30.1.1-jre, the group is 'com.google.guava'."
+        "The 'group' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
+        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the group is "
+        "`com.google.guava`."
     )
 
 
@@ -32,8 +33,8 @@ class JvmArtifactArtifactField(StringField):
     alias = "artifact"
     required = True
     help = (
-        "The 'artifact' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
-        "com.google.guava:guava:30.1.1-jre, the artifact is 'guava'."
+        "The 'artifact' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
+        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the artifact is `guava`."
     )
 
 
@@ -41,8 +42,8 @@ class JvmArtifactVersionField(StringField):
     alias = "version"
     required = True
     help = (
-        "The 'version' part of a Maven-compatible coordinate to a third-party jar artifact. For the jar coordinate "
-        "com.google.guava:guava:30.1.1-jre, the version is '30.1.1-jre'."
+        "The 'version' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
+        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the version is `30.1.1-jre`."
     )
 
 
@@ -50,10 +51,11 @@ class JvmArtifactUrlField(StringField):
     alias = "url"
     required = False
     help = (
-        "A URL that points to the location of this artifact. If specified, Pants will not fetch this artifact "
-        "from default maven repositories, and instead fetch the artifact from this URL. To use default maven "
-        "repositories, do not set this value. \n\nNote that `file:` URLs are not supported due to Pants' "
-        "sandboxing feature. To use a local `JAR` file, use the `jar` field instead."
+        "A URL that points to the location of this artifact.\n\n"
+        "If specified, Pants will not fetch this artifact from default Maven repositories, and "
+        "will instead fetch the artifact from this URL. To use default maven "
+        "repositories, do not set this value.\n\n"
+        "Note that `file:` URLs are not supported. Instead, use the `jar` field."
     )
 
 
@@ -61,7 +63,11 @@ class JvmArtifactJarSourceField(SingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
     required = False
-    help = "A JAR file that provides this artifact to the lockfile resolver, instead of a maven repository."
+    help = (
+        "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
+        "Maven repository.\n\n"
+        "Path is relative to the BUILD file."
+    )
 
 
 class JvmArtifactPackagesField(StringSequenceField):
@@ -86,10 +92,12 @@ class JvmProvidesTypesField(StringSequenceField):
     alias = "experimental_provides_types"
     help = (
         "Signals that the specified types should be fulfilled by these source files during "
-        "dependency inference. This allows for specific types within packages that are otherwise "
-        "inferred as belonging to `jvm_artifact` targets to be unambiguously inferred as belonging "
-        "to this first-party source. If a given type is defined, at least one source file captured "
-        "by this target must actually provide that symbol."
+        "dependency inference.\n\n"
+        "This allows for specific types within packages that are otherwise inferred as "
+        "belonging to `jvm_artifact` targets to be unambiguously inferred as belonging "
+        "to this first-party source.\n\n"
+        "If a given type is defined, at least one source file captured by this target must "
+        "actually provide that symbol."
     )
 
 
@@ -109,7 +117,7 @@ class JvmArtifactFieldSet(FieldSet):
     )
 
 
-class JvmArtifact(Target):
+class JvmArtifactTarget(Target):
     alias = "jvm_artifact"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -118,8 +126,8 @@ class JvmArtifact(Target):
         JvmArtifactJarSourceField,
     )
     help = (
-        "Represents a third-party JVM artifact as identified by its Maven-compatible coordinate, "
-        "that is, its `group`, `artifact`, and `version` components."
+        "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
+        "That is, an artifact identified by its `group`, `artifact`, and `version` components."
     )
 
 
@@ -127,9 +135,11 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
     help = (
-        "The set of resolve names that this target is compatible with. Any targets which depend on "
-        "one another must have at least one compatible resolve in common. Which resolves are actually "
-        "used in a build is calculated based on a target's dependees."
+        "The set of resolve names that this target is compatible with.\n\n"
+        "The name must be defined as one of the resolves in `[jvm].resolves`.\n\n"
+        "Any targets which depend on one another must have at least one compatible resolve in "
+        "common. Which resolves are actually used in a build is calculated based on a target's "
+        "dependees."
     )
 
 
@@ -137,9 +147,10 @@ class JvmResolveNameField(StringField):
     alias = "resolve"
     required = False
     help = (
-        "The name of the resolve to use when building this target. The name must be defined as "
-        "one of the resolves in `--jvm-resolves`. If not supplied, the default resolve will be "
-        "used, otherwise, one resolve that is compatible with all dependency targets will be used."
+        "The name of the resolve to use when building this target.\n\n"
+        "The name must be defined as one of the resolves in `[jvm].resolves`.\n\n"
+        "If not supplied, the default resolve will be used. Otherwise, one resolve that is "
+        "compatible with all dependency targets will be used."
     )
 
 
