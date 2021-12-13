@@ -23,6 +23,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
+    JunitTestSourceField,
     JvmCompatibleResolveNamesField,
     JvmProvidesTypesField,
     JvmResolveNameField,
@@ -56,15 +57,15 @@ class JavaGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
-class JavaTestSourceField(JavaSourceField):
-    pass
+class JavaJunitTestSourceField(JavaSourceField, JunitTestSourceField):
+    """A JUnit test file written in Java."""
 
 
 class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JavaTestSourceField,
+        JavaJunitTestSourceField,
         Dependencies,
         JvmCompatibleResolveNamesField,
         JvmProvidesTypesField,
