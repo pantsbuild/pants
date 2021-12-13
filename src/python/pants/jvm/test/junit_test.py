@@ -11,6 +11,9 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
+from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
+from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
@@ -46,17 +49,19 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         preserve_tmpdirs=True,
         rules=[
-            *config_files.rules(),
             *classpath.rules(),
+            *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
-            *source_files.rules(),
+            *java_util_rules(),
             *javac_rules(),
             *junit_rules(),
-            *util_rules(),
-            *java_util_rules(),
+            *scala_target_types_rules(),
+            *scalac_rules(),
+            *source_files.rules(),
             *target_types_rules(),
+            *util_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
@@ -64,6 +69,7 @@ def rule_runner() -> RuleRunner:
             JvmArtifact,
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
+            ScalaJunitTestsGeneratorTarget,
         ],
     )
     rule_runner.set_options(
@@ -240,7 +246,6 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 
                 java_sources(
                     name='example-lib',
-
                 )
 
                 junit_tests(
@@ -282,6 +287,53 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     )
 
     test_result = run_junit_test(rule_runner, "example-test", "ExampleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@maybe_skip_jdk_test
+def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "BUILD": dedent(
+                """\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = 'junit',
+                  artifact = 'junit',
+                  version = '4.13.2',
+                )
+
+                scala_junit_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':junit_junit',
+                    ],
+                )
+                """
+            ),
+            "SimpleTest.scala": dedent(
+                """
+                package org.pantsbuild.example
+
+                import junit.framework.TestCase
+                import junit.framework.Assert._
+
+                class SimpleTest extends TestCase {
+                   def testHello(): Unit = {
+                      assertTrue("Hello!" == "Hello!")
+                   }
+                }
+                """
+            ),
+        }
+    )
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.scala")
 
     assert test_result.exit_code == 0
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
