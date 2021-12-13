@@ -20,7 +20,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
-from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
+from pants.jvm.compile import CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import (
     Coordinate,
     Coordinates,
@@ -57,9 +57,9 @@ def rule_runner() -> RuleRunner:
             *testutil.rules(),
             *util_rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
-            QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
-            QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
+            QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
+            QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
         ],
         target_types=[JvmArtifact, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
     )
@@ -123,12 +123,10 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
 
     print(coarsened_target)
 
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
-
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
             "META-INF/MANIFEST.MF",
@@ -179,8 +177,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             "lib/ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
-    compiled_classfiles = rule_runner.request(
-        ClasspathEntry,
+    classpath = rule_runner.request(
+        RenderedClasspath,
         [
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -190,7 +188,6 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",
@@ -281,14 +278,17 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    request = CompileScalaSourceRequest(
-        component=expect_single_expanded_coarsened_target(
-            rule_runner, Address(spec_path="", target_name="main")
-        ),
-        resolve=make_resolve(rule_runner),
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                ),
+                resolve=make_resolve(rule_runner),
+            )
+        ],
     )
-    compiled_classfiles = rule_runner.request(ClasspathEntry, [request])
-    classpath = rule_runner.request(RenderedClasspath, [compiled_classfiles.digest])
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
             "META-INF/MANIFEST.MF",

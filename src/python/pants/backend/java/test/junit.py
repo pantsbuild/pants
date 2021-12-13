@@ -8,7 +8,7 @@ from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.java.target_types import JavaTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestSubset, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -51,6 +51,8 @@ async def run_junit_test(
         ),
     )
 
+    merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+
     toolcp_relpath = "__toolcp"
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,
@@ -60,7 +62,8 @@ async def run_junit_test(
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
-    user_classpath_arg = ":".join(classpath.user_classpath_entries())
+    # Classfiles produced by the root `junit_test` targets are the only ones which should run.
+    user_classpath_arg = ":".join(classpath.root_args())
 
     process_result = await Get(
         FallibleProcessResult,
@@ -69,7 +72,7 @@ async def run_junit_test(
                 *jdk_setup.args(
                     bash,
                     [
-                        *classpath.classpath_entries(),
+                        *classpath.args(),
                         *junit_classpath.classpath_entries(toolcp_relpath),
                     ],
                 ),
@@ -80,7 +83,7 @@ async def run_junit_test(
                 reports_dir,
                 *junit.options.args,
             ],
-            input_digest=classpath.content.digest,
+            input_digest=merged_classpath_digest,
             immutable_input_digests=immutable_input_digests,
             output_directories=(reports_dir,),
             append_only_caches=jdk_setup.append_only_caches,

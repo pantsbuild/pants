@@ -15,7 +15,6 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ZipBinary
-from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -66,8 +65,7 @@ async def package_deploy_jar(
     # 1. Produce a thin JAR containing our first-party sources and other runtime dependencies
     #
 
-    dependencies = await Get(Addresses, DependenciesRequest(field_set.dependencies))
-    classpath = await Get(Classpath, Addresses, dependencies)
+    classpath = await Get(Classpath, DependenciesRequest(field_set.dependencies))
 
     #
     # 2. Produce JAR manifest, and output to a ZIP file that can be included with the JARs
@@ -122,7 +120,7 @@ async def package_deploy_jar(
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    input_filenames = " ".join(shlex.quote(i) for i in classpath.classpath_entries())
+    input_filenames = " ".join(shlex.quote(i) for i in classpath.args())
     _PANTS_BROKEN_DEPLOY_JAR = "pants_broken_deploy_jar.notajar"
     cat_and_repair_script = FileContent(
         _PANTS_CAT_AND_REPAIR_ZIP_FILENAME,
@@ -139,7 +137,7 @@ async def package_deploy_jar(
     cat_and_repair_script_digest = await Get(Digest, CreateDigest([cat_and_repair_script]))
     broken_deploy_jar_inputs_digest = await Get(
         Digest,
-        MergeDigests([classpath.content.digest, cat_and_repair_script_digest, manifest_jar]),
+        MergeDigests([*classpath.digests(), cat_and_repair_script_digest, manifest_jar]),
     )
 
     cat_and_repair = await Get(
