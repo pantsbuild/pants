@@ -8,6 +8,7 @@ target(
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
+        "src/python/pants/backend/experimental/codegen/protobuf/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
         "src/python/pants/backend/experimental/docker/lint/hadolint",

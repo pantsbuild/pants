@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from pants.backend.java.package import deploy_jar  # TODO: Should move to the JVM package.
 from pants.backend.java.target_types import (  # TODO: All of these should move to the JVM package.
     DeployJar,

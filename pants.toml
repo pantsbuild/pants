@@ -24,6 +24,7 @@ backend_packages.add = [
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.codegen.protobuf.scala",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
@@ -182,6 +183,9 @@ lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_fo
 
 [scalafmt]
 lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
+
+[scalapb]
+lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"
