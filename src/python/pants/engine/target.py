@@ -1717,6 +1717,20 @@ class SingleSourceField(SourcesField, StringField):
         return value_or_default
 
     @property
+    def file_path(self) -> str | None:
+        """The path to the file, relative to the build root.
+
+        This works without hydration because we validate that `*` globs and `!` ignores are not
+        used. However, consider still hydrating so that you verify the source file actually exists.
+
+        The return type is optional because it's possible to have 0-1 files. Most subclasses
+        will have 1 file, though.
+        """
+        if self.value is None:
+            return None
+        return os.path.join(self.address.spec_path, self.value)
+
+    @property
     def globs(self) -> tuple[str, ...]:
         # Subclasses might override `required = False`, so `self.value` could be `None`.
         if self.value is None:
@@ -2106,9 +2120,12 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
     sort_input = True
 
 
+SF = TypeVar("SF", bound="SourcesField")
+
+
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(EngineAwareParameter):
+class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
@@ -2138,8 +2155,8 @@ class InferDependenciesRequest(EngineAwareParameter):
             ]
     """
 
-    sources_field: SourcesField
-    infer_from: ClassVar[type[SourcesField]]
+    sources_field: SF
+    infer_from: ClassVar[Type[SF]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec
