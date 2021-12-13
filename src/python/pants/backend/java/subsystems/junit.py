@@ -15,8 +15,8 @@ class JUnit(JvmToolBase):
         "org.junit.jupiter:junit-jupiter-engine:{version}",
         "org.junit.vintage:junit-vintage-engine:{version}",
     )
-    default_lockfile_resource = ("pants.backend.java.test", "junit.default.lockfile.txt")
-    default_lockfile_url = git_url("src/python/pants/backend/java/test/junit.default.lockfile.txt")
+    default_lockfile_resource = ("pants.jvm.test", "junit.default.lockfile.txt")
+    default_lockfile_url = git_url("src/python/pants/jvm/test/junit.default.lockfile.txt")
 
     @classmethod
     def register_options(cls, register):

@@ -21,7 +21,11 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.target_types import JvmCompatibleResolveNamesField, JvmProvidesTypesField
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmCompatibleResolveNamesField,
+    JvmProvidesTypesField,
+)
 
 
 class ScalaSourceField(SingleSourceField):
@@ -47,11 +51,11 @@ class ScalaGeneratorFieldSet(FieldSet):
 
 
 # -----------------------------------------------------------------------------------------------
-# `junit_test` target
+# `scala_junit_test` target
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaTestSourceField(ScalaSourceField):
+class ScalaTestSourceField(ScalaSourceField, JunitTestSourceField):
     pass
 
 
