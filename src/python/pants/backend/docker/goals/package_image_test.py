@@ -550,7 +550,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
                   name="img1",
                   secrets={
                     "mysecret": "/var/run/secrets/mysecret",
-                    "password": "password",
+                    "project-secret": "project/secrets/mysecret",
                   }
                 )
                 """
@@ -563,7 +563,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--secret=id=mysecret,src=/var/run/secrets/mysecret",
-            f"--secret=id=password,src={rule_runner.build_root}/docker/test/password",
+            f"--secret=id=project-secret,src={rule_runner.build_root}/docker/test/project/secrets/mysecret",
             "-t",
             "img1:latest",
             "-f",

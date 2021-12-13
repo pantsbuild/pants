@@ -169,21 +169,30 @@ class DockerBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
-    help = "Secret file to expose to the build (only if BuildKit enabled).\n\n" + dedent(
-        """\
-        Example:
+    help = (
+        "Secret file to expose to the build (only if BuildKit enabled).\n\n"
+        "Secrets may use absolute paths, or paths relative to your BUILD file. The id should be "
+        "valid as used by the Docker build `--secret` option. "
+        "See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
+        "information.\n\n"
+        + dedent(
+            """\
+            Example:
 
-            docker_image(
-                secrets={
-                    "mysecret": "/local/secret",
-                }
-            )
-        """
+                docker_image(
+                    secrets={
+                        "mysecret": "/local/secret",
+                    }
+                )
+            """
+        )
     )
 
     docker_build_option = "--secret"
 
     def option_values(self) -> Iterator[str]:
+        # os.path.join() discards preceeding parts if encountering an abs path, e.g. if `spec_path`
+        # is an absolute path, the buildroot will not be considered.
         root = os.path.join(get_buildroot(), self.address.spec_path)
         for secret, path in (self.value or {}).items():
             yield f"id={secret},src={os.path.join(root, path)}"
