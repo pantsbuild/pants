@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.core.goals.package import OutputPathField
@@ -56,15 +57,19 @@ class JavaGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
-class JavaTestSourceField(JavaSourceField):
-    pass
+class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
+    """A marker that indicates that a source field represents a JUnit test."""
+
+
+class JavaJunitTestSourceField(JavaSourceField, JunitTestSourceField):
+    """A JUnit test file written in Java."""
 
 
 class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JavaTestSourceField,
+        JavaJunitTestSourceField,
         Dependencies,
         JvmCompatibleResolveNamesField,
         JvmProvidesTypesField,

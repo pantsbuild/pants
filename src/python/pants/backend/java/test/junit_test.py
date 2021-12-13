@@ -11,7 +11,7 @@ import pytest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
-from pants.backend.java.test.junit import JavaTestFieldSet
+from pants.backend.java.test.junit import JunitTestFieldSet
 from pants.backend.java.test.junit import rules as junit_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
@@ -58,7 +58,7 @@ def rule_runner() -> RuleRunner:
             *java_util_rules(),
             *target_types_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (JavaTestFieldSet,)),
+            QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
         target_types=[
             JvmArtifact,
@@ -560,4 +560,4 @@ def run_junit_test(
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )
-    return rule_runner.request(TestResult, [JavaTestFieldSet.create(tgt)])
+    return rule_runner.request(TestResult, [JunitTestFieldSet.create(tgt)])

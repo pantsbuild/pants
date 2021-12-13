@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.backend.java.target_types import JavaTestSourceField
+from pants.backend.java.target_types import JunitTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class JavaTestFieldSet(TestFieldSet):
-    required_fields = (JavaTestSourceField,)
+class JunitTestFieldSet(TestFieldSet):
+    required_fields = (JunitTestSourceField,)
 
-    sources: JavaTestSourceField
+    sources: JunitTestSourceField
 
 
 class JunitToolLockfileSentinel(JvmToolLockfileSentinel):
@@ -38,7 +38,7 @@ async def run_junit_test(
     jdk_setup: JdkSetup,
     junit: JUnit,
     test_subsystem: TestSubsystem,
-    field_set: JavaTestFieldSet,
+    field_set: JunitTestFieldSet,
 ) -> TestResult:
     classpath, junit_classpath = await MultiGet(
         Get(Classpath, Addresses([field_set.address])),
@@ -108,7 +108,7 @@ async def run_junit_test(
 
 # Required by standard test rules. Do nothing for now.
 @rule(level=LogLevel.DEBUG)
-async def setup_junit_debug_request(_field_set: JavaTestFieldSet) -> TestDebugRequest:
+async def setup_junit_debug_request(_field_set: JunitTestFieldSet) -> TestDebugRequest:
     raise NotImplementedError("TestDebugResult is not implemented for JUnit (yet?).")
 
 
@@ -122,6 +122,6 @@ async def generate_junit_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, JavaTestFieldSet),
+        UnionRule(TestFieldSet, JunitTestFieldSet),
         UnionRule(JvmToolLockfileSentinel, JunitToolLockfileSentinel),
     ]
