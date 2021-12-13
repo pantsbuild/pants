@@ -9,7 +9,6 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
@@ -30,7 +29,12 @@ lazy_static! {
 
 struct PoolEntry {
   fingerprint: NailgunProcessFingerprint,
-  last_used: Instant,
+  // Records the number of times that a pool entry has been used. JVM warmup can result in longer
+  // lived processes being significantly faster than shorter-lived ones.
+  //
+  // An even more useful heuristic might be to prefer processes that have the most CPU time or time
+  // checked out of the pool. But that's a bit harder to track than use-count.
+  use_count: u32,
   // Because `NailgunProcess` instances are started outside of the NailgunPool's lock, the inner
   // instance is an `Option`. But since they are started eagerly by the task that adds them to the
   // pool, any acquirer that encounters an empty instance here can assume that it died while
@@ -103,7 +107,7 @@ impl NailgunPool {
       // There wasn't a matching, valid, available process. We need to start one.
       if processes.len() >= self.size {
         // Find the oldest idle non-matching process and remove it.
-        let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
+        let idx = Self::find_lfu_idle(&mut *processes)?.ok_or_else(|| {
           // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
           // should be impossible.
           "No idle slots in nailgun pool.".to_owned()
@@ -117,7 +121,7 @@ impl NailgunPool {
       let process = Arc::new(Mutex::new(None));
       processes.push(PoolEntry {
         fingerprint: requested_fingerprint.clone(),
-        last_used: Instant::now(),
+        use_count: 0,
         process: process.clone(),
       });
       process.lock_arc().await
@@ -143,24 +147,30 @@ impl NailgunPool {
   }
 
   ///
-  /// Find a usable process in the pool that matches the given fingerprint.
+  /// Find the most frequently used usable process in the pool that matches the given fingerprint.
   ///
   fn find_usable(
     pool_entries: &mut Vec<PoolEntry>,
     fingerprint: &NailgunProcessFingerprint,
   ) -> Result<Option<(usize, NailgunProcessRef)>, String> {
-    let mut dead_processes = Vec::new();
-    for (idx, pool_entry) in pool_entries.iter_mut().enumerate() {
-      if &pool_entry.fingerprint != fingerprint {
-        continue;
-      }
+    // Collect processes matching the fingerprint.
+    let mut fingerprint_matches = pool_entries
+      .iter_mut()
+      .enumerate()
+      .filter(|(_idx, pool_entry)| pool_entry.fingerprint == *fingerprint)
+      .collect::<Vec<_>>();
 
+    // Sort them by use_count descending, and then take the first live entry.
+    fingerprint_matches.sort_by_key(|(_idx, pool_entry)| -(pool_entry.use_count as i64));
+    let mut dead_processes = Vec::new();
+    for (idx, pool_entry) in fingerprint_matches {
       match Self::try_use(pool_entry)? {
         TryUse::Usable(process) => return Ok(Some((idx, process))),
         TryUse::Dead => dead_processes.push(idx),
         TryUse::Busy => continue,
       }
     }
+
     // NB: We'll only prune dead processes if we don't find a live match, but that's fine.
     for dead_process_idx in dead_processes.into_iter().rev() {
       pool_entries.swap_remove(dead_process_idx);
@@ -169,19 +179,18 @@ impl NailgunPool {
   }
 
   ///
-  /// Find the least recently used idle (but not necessarily usable) process in the pool.
+  /// Find the least frequently used idle process in the pool.
   ///
-  fn find_lru_idle(pool_entries: &mut Vec<PoolEntry>) -> Result<Option<usize>, String> {
-    // 24 hours of clock skew would be surprising?
-    let mut lru_age = Instant::now() + Duration::from_secs(60 * 60 * 24);
-    let mut lru = None;
+  fn find_lfu_idle(pool_entries: &mut Vec<PoolEntry>) -> Result<Option<usize>, String> {
+    let mut use_count_min = u32::MAX;
+    let mut lfu = None;
     for (idx, pool_entry) in pool_entries.iter_mut().enumerate() {
-      if pool_entry.process.try_lock_arc().is_some() && pool_entry.last_used < lru_age {
-        lru = Some(idx);
-        lru_age = pool_entry.last_used;
+      if pool_entry.process.try_lock_arc().is_some() && pool_entry.use_count < use_count_min {
+        lfu = Some(idx);
+        use_count_min = pool_entry.use_count;
       }
     }
-    Ok(lru)
+    Ok(lfu)
   }
 
   fn try_use(pool_entry: &mut PoolEntry) -> Result<TryUse, String> {
@@ -195,8 +204,6 @@ impl NailgunPool {
     } else {
       return Ok(TryUse::Dead);
     };
-
-    pool_entry.last_used = Instant::now();
 
     debug!(
       "Checking if nailgun server {} is still alive at port {}...",
@@ -215,6 +222,7 @@ impl NailgunPool {
           "Found nailgun process {}, with fingerprint {:?}",
           process.name, process.fingerprint
         );
+        pool_entry.use_count += 1;
         Ok(TryUse::Usable(process_guard))
       }
       Some(status) => {
