@@ -187,7 +187,7 @@ async def build_docker_image(
             build_args=context.build_args,
             digest=context.digest,
             dockerfile=context.dockerfile,
-            env=context.env,
+            env=context.build_env.environment,
             tags=tags,
         ),
     )

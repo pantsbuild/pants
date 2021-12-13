@@ -312,7 +312,7 @@ class TailorSubsystem(GoalSubsystem):
             help=(
                 "Do not add these target definitions.\n\n"
                 "Expects a list of target addresses that would normally be added by `tailor`, "
-                "e.g. [`project:tgt']`. To find these names, you can run `tailor --check`, then "
+                "e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then "
                 "combine the BUILD file path with the target's name. For example, if `tailor` "
                 "would add the target `bin` to `project/BUILD`, then the address would be "
                 "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
