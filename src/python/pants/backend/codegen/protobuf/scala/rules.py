@@ -61,13 +61,13 @@ async def generate_scala_from_protobuf(
     bash: BashBinary,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
+    toolcp_relpath = "__toolcp"
 
     downloaded_protoc_binary, tool_classpath, empty_output_dir, transitive_targets = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                prefix="__toolcp",
                 lockfiles=(scalapbc.resolved_lockfile(),),
             ),
         ),
@@ -98,7 +98,7 @@ async def generate_scala_from_protobuf(
                         textwrap.dedent(
                             f"""\
                                        #!{bash.path}
-                                       exec {' '.join(jdk_setup.args(bash, tool_classpath.classpath_entries())[1:])} scalapb.ScalaPbCodeGenerator "$@"
+                                       exec {' '.join(jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath))[1:])} scalapb.ScalaPbCodeGenerator "$@"
                                        """
                         ).encode(),
                         is_executable=True,
@@ -111,11 +111,14 @@ async def generate_scala_from_protobuf(
     unmerged_digests = [
         all_sources_stripped.snapshot.digest,
         downloaded_protoc_binary.digest,
-        tool_classpath.content.digest,
         protoc_gen_scala_digest,
         empty_output_dir,
-        jdk_setup.digest,
     ]
+
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        toolcp_relpath: tool_classpath.digest,
+    }
 
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
@@ -133,6 +136,7 @@ async def generate_scala_from_protobuf(
         Process(
             args,
             input_digest=input_digest,
+            immutable_input_digests=immutable_input_digests,
             description=f"Generating Scala sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
