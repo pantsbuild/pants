@@ -658,19 +658,19 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
 async def select_coursier_resolve_for_targets(
     targets: Targets, jvm: JvmSubsystem
 ) -> CoursierResolveKey:
-    encountered_resolves = []
-    encountered_compatible_resolves = []
+    encountered_resolves: list[str] = []
+    encountered_compatible_resolves: list[str] = []
     for tgt in targets:
         if tgt.has_field(JvmResolveField):
             resolve = tgt[JvmResolveField].value or jvm.default_resolve
             # TODO: remove once we always have a default resolve.
-            if not resolve:
+            if resolve is None:
                 continue
             encountered_resolves.append(resolve)
         if tgt.has_field(JvmCompatibleResolvesField):
             encountered_compatible_resolves.extend(
                 tgt[JvmCompatibleResolvesField].value
-                or ([jvm.default_resolve] if jvm.default_resolve else [])
+                or ([jvm.default_resolve] if jvm.default_resolve is not None else [])
             )
 
     # TODO: validate that all specified resolves are defined in [jvm].resolves and that all

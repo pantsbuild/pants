@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Sequence
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
@@ -73,8 +74,8 @@ async def map_resolves_to_consuming_targets(
             resolve_to_addresses[resolve].add(tgt.address)
         elif tgt.has_field(JvmCompatibleResolvesField):
             # TODO: add a `default_compatible_resolves` field.
-            resolves = tgt[JvmCompatibleResolvesField].value or (
-                [jvm.default_resolve] if jvm.default_resolve else []
+            resolves: Sequence[str] = tgt[JvmCompatibleResolvesField].value or (
+                [jvm.default_resolve] if jvm.default_resolve is not None else []
             )
             for resolve in resolves:
                 resolve_to_addresses[resolve].add(tgt.address)
