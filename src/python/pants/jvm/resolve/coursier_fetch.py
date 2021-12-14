@@ -663,9 +663,7 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
 
 @rule
 async def select_coursier_resolve_for_targets(
-    targets: Targets,
-    jvm: JvmSubsystem,
-    coursier: Coursier,
+    targets: Targets, jvm: JvmSubsystem
 ) -> CoursierResolveKey:
     """Determine the lockfile that applies for given JVM targets and resolve configuration.
 
@@ -770,28 +768,13 @@ async def select_coursier_resolve_for_targets(
     return CoursierResolveKey(resolve_name, resolve_path, resolve_digest)
 
 
-@dataclass(frozen=True)
-class CoursierLockfileForTargetRequest:
-    targets: Targets
-
-
 @rule
 async def get_coursier_lockfile_for_resolve(
     coursier_resolve: CoursierResolveKey,
 ) -> CoursierResolvedLockfile:
-
     lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
-
     return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
-
-
-@rule
-async def get_coursier_lockfile_for_target(
-    request: CoursierLockfileForTargetRequest,
-) -> CoursierResolvedLockfile:
-    coursier_resolve = await Get(CoursierResolveKey, Targets, request.targets)
-    return await Get(CoursierResolvedLockfile, CoursierResolveKey, coursier_resolve)
 
 
 @dataclass(frozen=True)
