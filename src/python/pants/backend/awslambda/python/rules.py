@@ -53,10 +53,12 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
+    field_set: PythonAwsLambdaFieldSet,
+    lambdex: Lambdex,
+    platform: Platform,
+    union_membership: UnionMembership
 ) -> BuiltPackage:
-
-    if Platform.is_macos:
+    if platform.is_macos:
         logger.warning(
             "AWS Lambdas built on macOS may fail to build. If your lambda uses any third-party"
             " dependencies without binary wheels (bdist) for Linux available, it will fail to"
