@@ -23,7 +23,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JvmCompatibleResolveNamesField,
+    JvmCompatibleResolvesField,
     JvmProvidesTypesField,
 )
 
@@ -65,7 +65,7 @@ class ScalatestTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalatestTestSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with Scalatest."
@@ -81,7 +81,7 @@ class ScalatestTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = (
@@ -126,7 +126,7 @@ class ScalaJunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaJunitTestSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with JUnit."
@@ -142,7 +142,7 @@ class ScalaJunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
@@ -180,7 +180,7 @@ class ScalaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourceField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "A single Scala source file containing application or library code."
@@ -207,7 +207,7 @@ class ScalaSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourcesGeneratorSourcesField,
-        JvmCompatibleResolveNamesField,
+        JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
     help = "Generate a `scala_source` target for each file in the `sources` field."
