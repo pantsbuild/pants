@@ -57,10 +57,10 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
 async def package_python_google_cloud_function(
     field_set: PythonGoogleCloudFunctionFieldSet,
     lambdex: Lambdex,
+    platform: Platform,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
-
-    if Platform.is_macos:
+    if platform.is_macos:
         logger.warning(
             "Google Cloud Functions built on macOS may fail to build. If your function uses any"
             " third-party dependencies without binary wheels (bdist) for Linux available, it will"
