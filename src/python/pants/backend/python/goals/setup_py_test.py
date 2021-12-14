@@ -53,7 +53,8 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import dists, python_sources
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import FileTarget, ResourceTarget
+from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -73,6 +74,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             ResourceTarget,
+            ResourcesGeneratorTarget,
             FileTarget,
         ],
         objects={"setup_py": PythonArtifact},
@@ -98,6 +100,7 @@ def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
 def chroot_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
+            *core_target_types_rules(),
             determine_setup_kwargs,
             generate_chroot,
             generate_setup_py,
@@ -217,6 +220,69 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
             "foo/foo.py",
         ],
         None,
+        Address("src/python", target_name="foo-dist"),
+    )
+
+
+def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runner) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_sources(
+                    dependencies=[
+                        'src/python/resources',
+                    ]
+                )
+                """
+            ),
+            "src/python/foo/bar.py": "",
+            # Here we have a Python package of resources.js defined via files owned by a resources
+            # target. From a packaging perspective, we should be agnostic to what targets own a
+            # python package when calculating package_data, we just need to know which packages are
+            # defined by Python files in the distribution.
+            "src/python/resources/BUILD": 'resources(sources=["**/*.py", "**/*.js"])',
+            "src/python/resources/js/__init__.py": "",
+            "src/python/resources/js/code.js": "",
+            "src/python/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    dependencies=[
+                        'src/python/foo',
+                    ],
+                    generate_setup=True,
+                    provides=setup_py(
+                        name='foo', version='1.2.3',
+                    )
+                )
+                """
+            ),
+        }
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        [
+            "foo/bar.py",
+            "resources/js/__init__.py",
+            "resources/js/code.js",
+            "setup.py",
+            "MANIFEST.in",
+        ],
+        {
+            "name": "foo",
+            "version": "1.2.3",
+            "plugin_demo": "hello world",
+            "packages": ("foo", "resources.js"),
+            "namespace_packages": (),
+            "package_data": {
+                "resources.js": (
+                    "__init__.py",
+                    "code.js",
+                )
+            },
+            "install_requires": (),
+        },
         Address("src/python", target_name="foo-dist"),
     )
 
