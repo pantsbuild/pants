@@ -86,6 +86,8 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class MockDependencies(Dependencies):
     supports_transitive_excludes = True
+    deprecated_alias = "deprecated_field"
+    deprecated_alias_removal_version = "9.9.9.dev0"
 
 
 class SpecialCasedDeps1(SpecialCasedDependencies):
@@ -540,11 +542,18 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
     }
 
 
+def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
+    transitive_targets_rule_runner.write_files({"BUILD": "target(name='t', deprecated_field=[])"})
+    transitive_targets_rule_runner.get_target(Address("", target_name="t"))
+    assert len(caplog.records) == 1
+    assert "Instead, use `dependencies`" in caplog.text
+
+
 def test_resolve_deprecated_target_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
     transitive_targets_rule_runner.write_files({"BUILD": "deprecated_target(name='t')"})
     transitive_targets_rule_runner.get_target(Address("", target_name="t"))
     assert len(caplog.records) == 1
-    assert "Instead, use `target`"
+    assert "Instead, use `target`" in caplog.text
 
 
 def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) -> None:
@@ -1141,8 +1150,8 @@ def sources_rule_runner() -> RuleRunner:
 
 def test_sources_normal_hydration(sources_rule_runner: RuleRunner) -> None:
     addr = Address("src/fortran", target_name="lib")
-    sources_rule_runner.create_files(
-        "src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]
+    sources_rule_runner.write_files(
+        {f"src/fortran/{f}": "" for f in ["f1.f95", "f2.f95", "f1.f03", "ignored.f03"]}
     )
     sources = MultipleSourcesField(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], addr)
     hydrated_sources = sources_rule_runner.request(
@@ -1186,7 +1195,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
         pass
 
     addr = Address("", target_name="lib")
-    sources_rule_runner.create_files("", files=["f1.f95"])
+    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
 
     valid_sources = SourcesSubclass(["*"], addr)
     hydrated_valid_sources = sources_rule_runner.request(
@@ -1223,7 +1232,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
     sources_rule_runner.set_options(["--files-not-found-behavior=error"])
-    sources_rule_runner.create_files("", files=["f1.f95"])
+    sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
     sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
     with engine_error(contains="non_existent.f95"):
         sources_rule_runner.request(HydratedSources, [HydrateSourcesRequest(sources)])
@@ -1241,7 +1250,9 @@ def test_sources_default_globs(sources_rule_runner: RuleRunner) -> None:
     # NB: Not all globs will be matched with these files, specifically `default.f03` will not
     # be matched. This is intentional to ensure that we use `any` glob conjunction rather
     # than the normal `all` conjunction.
-    sources_rule_runner.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
+    sources_rule_runner.write_files(
+        {f"src/fortran/{f}": "" for f in ["default.f95", "f1.f08", "ignored.f08"]}
+    )
     sources = DefaultSources(None, addr)
     assert set(sources.value or ()) == set(DefaultSources.default)
 
@@ -1259,7 +1270,9 @@ def test_sources_expected_file_extensions(sources_rule_runner: RuleRunner) -> No
         expected_file_extensions = (".f95", ".f03", "")
 
     addr = Address("src/fortran", target_name="lib")
-    sources_rule_runner.create_files("src/fortran", ["s.f95", "s.f03", "s.f08", "s"])
+    sources_rule_runner.write_files(
+        {f"src/fortran/{f}": "" for f in ["s.f95", "s.f03", "s.f08", "s"]}
+    )
 
     def get_source(src: str) -> str:
         sources = sources_rule_runner.request(
@@ -1288,7 +1301,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         # We allow for 1 or 3 files
         expected_num_files = range(1, 4, 2)
 
-    sources_rule_runner.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
+    sources_rule_runner.write_files({f: "" for f in ["f1.txt", "f2.txt", "f3.txt", "f4.txt"]})
 
     def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
@@ -1311,17 +1324,6 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
         "f2.txt",
         "f3.txt",
     )
-
-    # `SingleSourceField` must have one file.
-    with engine_error(contains="must have 1 file"):
-        sources_rule_runner.request(
-            HydratedSources,
-            [
-                HydrateSourcesRequest(
-                    SingleSourceField("*.txt", Address("", target_name="example"))
-                ),
-            ],
-        )
 
 
 # -----------------------------------------------------------------------------------------------

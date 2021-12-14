@@ -32,7 +32,7 @@ def _load_javaparser_launcher_source() -> bytes:
 
 def java_parser_artifact_requirements() -> ArtifactRequirements:
     # Update in concert with the target definition for `java_parser`.
-    return ArtifactRequirements(
+    return ArtifactRequirements.from_coordinates(
         [
             Coordinate(
                 group="com.fasterxml.jackson.core", artifact="jackson-databind", version="2.12.4"
@@ -56,6 +56,7 @@ class JavaParserCompiledClassfiles:
     digest: Digest
 
 
+# TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserCompiledClassfiles:
     dest_dir = "classfiles"
@@ -87,7 +88,6 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
         MergeDigests(
             (
                 materialized_classpath.digest,
-                jdk_setup.digest,
                 source_digest,
             )
         ),
@@ -108,6 +108,7 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
             ],
             input_digest=merged_digest,
             append_only_caches=jdk_setup.append_only_caches,
+            immutable_input_digests=jdk_setup.immutable_input_digests,
             env=jdk_setup.env,
             output_directories=(dest_dir,),
             description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",

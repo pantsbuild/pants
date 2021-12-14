@@ -17,6 +17,8 @@ from pants.engine.fs import Digest, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
+from pants.jvm.classpath import Classpath
+from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.testutil.rule_runner import RuleRunner
 
@@ -54,7 +56,9 @@ class RenderedClasspath:
 
 
 @rule
-async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> RenderedClasspath:
+async def render_classpath_entry(
+    classpath_entry: ClasspathEntry, unzip_binary: UnzipBinary
+) -> RenderedClasspath:
     dest_dir = "dest"
     process_results = await MultiGet(
         Get(
@@ -66,12 +70,12 @@ async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> Ren
                     dest_dir,
                     filename,
                 ],
-                input_digest=snapshot.digest,
+                input_digest=classpath_entry.digest,
                 output_directories=(dest_dir,),
                 description=f"Extract {filename}",
             ),
         )
-        for filename in snapshot.files
+        for filename in classpath_entry.filenames
     )
 
     listing_snapshots = await MultiGet(
@@ -79,13 +83,26 @@ async def render_classpath(snapshot: Snapshot, unzip_binary: UnzipBinary) -> Ren
     )
 
     return RenderedClasspath(
-        {path: set(listing.files) for path, listing in zip(snapshot.files, listing_snapshots)}
+        {
+            path: set(listing.files)
+            for path, listing in zip(classpath_entry.filenames, listing_snapshots)
+        }
     )
+
+
+@rule
+async def render_classpath(classpath: Classpath) -> RenderedClasspath:
+    rendered_classpaths = await MultiGet(
+        Get(RenderedClasspath, ClasspathEntry, cpe) for cpe in ClasspathEntry.closure(classpath)
+    )
+    return RenderedClasspath({k: v for rc in rendered_classpaths for k, v in rc.content.items()})
 
 
 def rules():
     return [
         *collect_rules(),
         *archive.rules(),
-        QueryRule(RenderedClasspath, (Digest,)),
+        QueryRule(RenderedClasspath, (Classpath,)),
+        QueryRule(RenderedClasspath, (ClasspathEntry,)),
+        QueryRule(CoarsenedTargets, (Addresses,)),
     ]

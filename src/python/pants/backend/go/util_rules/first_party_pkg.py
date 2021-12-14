@@ -5,43 +5,73 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import pkgutil
 from dataclasses import dataclass
-from typing import ClassVar
 
-from pants.backend.go.target_types import (
-    GoFirstPartyPackageSourcesField,
-    GoFirstPartyPackageSubpathField,
-    GoImportPathField,
+from pants.backend.go.go_sources import load_go_binary
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
 )
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
-from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
-from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.build_graph.address import Address
+from pants.core.target_types import ResourceSourceField
+from pants.core.util_rules import source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Targets,
+    WrappedTarget,
+)
+from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class FirstPartyPkgInfo:
-    """All the info and digest needed to build a first-party Go package.
+class FirstPartyPkgImportPath:
+    """The derived import path of a first party package, based on its owning go.mod.
 
-    The digest does not strip its source files. You must set `working_dir` appropriately to use the
-    `go_first_party_package` target's `subpath` field.
+    Use `FirstPartyPkgAnalysis` instead for more detailed information like parsed imports. Use
+    `FirstPartyPkgDigest` for source files and embed config.
     """
 
-    digest: Digest
-    subpath: str
+    import_path: str
+    dir_path_rel_to_gomod: str
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgImportPathRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgAnalysis:
+    """All the metadata for a first-party Go package.
+
+    `dir_path` is relative to the build root.
+
+    Use `FirstPartyPkgImportPath` if you only need the derived import path. Use
+    `FirstPartyPkgDigest` for the source files and embed config.
+    """
 
     import_path: str
+    dir_path: str
 
     imports: tuple[str, ...]
     test_imports: tuple[str, ...]
@@ -61,17 +91,17 @@ class FirstPartyPkgInfo:
 
 
 @dataclass(frozen=True)
-class FallibleFirstPartyPkgInfo:
-    """Info needed to build a first-party Go package, but fallible if `go list` failed."""
+class FallibleFirstPartyPkgAnalysis:
+    """Metadata for a Go package, but fallible if our analysis failed."""
 
-    info: FirstPartyPkgInfo | None
+    analysis: FirstPartyPkgAnalysis | None
     import_path: str
     exit_code: int = 0
     stderr: str | None = None
 
 
 @dataclass(frozen=True)
-class FirstPartyPkgInfoRequest(EngineAwareParameter):
+class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
 
     def debug_hint(self) -> str:
@@ -79,50 +109,87 @@ class FirstPartyPkgInfoRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class PackageAnalyzerSetup:
+class FirstPartyPkgDigest:
+    """The source files needed to build the package."""
+
     digest: Digest
-    PATH: ClassVar[str] = "./_analyze_package"
+    embed_config: EmbedConfig | None
+    test_embed_config: EmbedConfig | None
+    xtest_embed_config: EmbedConfig | None
+
+
+@dataclass(frozen=True)
+class FallibleFirstPartyPkgDigest:
+    """The source files for a Go package, but fallible if embed preparation failed."""
+
+    pkg_digest: FirstPartyPkgDigest | None
+    exit_code: int = 0
+    stderr: str | None = None
+
+
+@dataclass(frozen=True)
+class FirstPartyPkgDigestRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @rule
-async def compute_first_party_package_info(
-    request: FirstPartyPkgInfoRequest, analyzer: PackageAnalyzerSetup
-) -> FallibleFirstPartyPkgInfo:
-    go_mod_address = request.address.maybe_convert_to_target_generator()
-    wrapped_target, go_mod_info = await MultiGet(
-        Get(WrappedTarget, Address, request.address),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+async def compute_first_party_package_import_path(
+    request: FirstPartyPkgImportPathRequest,
+) -> FirstPartyPkgImportPath:
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
+
+    # We validate that the sources are for the target's directory, e.g. don't use `**`, so we can
+    # simply look at the address to get the subpath.
+    dir_path_rel_to_gomod = fast_relpath(request.address.spec_path, owning_go_mod.address.spec_path)
+
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
+    import_path = (
+        f"{go_mod_info.import_path}/{dir_path_rel_to_gomod}"
+        if dir_path_rel_to_gomod
+        else go_mod_info.import_path
     )
-    target = wrapped_target.target
-    import_path = target[GoImportPathField].value
-    subpath = target[GoFirstPartyPackageSubpathField].value
+    return FirstPartyPkgImportPath(import_path, dir_path_rel_to_gomod)
+
+
+@rule
+async def analyze_first_party_package(
+    request: FirstPartyPkgAnalysisRequest,
+) -> FallibleFirstPartyPkgAnalysis:
+    analyzer, wrapped_target, import_path_info, owning_go_mod = await MultiGet(
+        Get(
+            LoadedGoBinary,
+            LoadedGoBinaryRequest("analyze_package", ("main.go", "read.go"), "./package_analyzer"),
+        ),
+        Get(WrappedTarget, Address, request.address),
+        Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
+        Get(OwningGoMod, OwningGoModRequest(request.address)),
+    )
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(owning_go_mod.address))
 
     pkg_sources = await Get(
-        HydratedSources, HydrateSourcesRequest(target[GoFirstPartyPackageSourcesField])
+        HydratedSources,
+        HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
     )
-    input_digest = await Get(
-        Digest,
-        MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]),
-    )
-    path = request.address.spec_path if request.address.spec_path else "."
-    path = os.path.join(path, subpath) if subpath else path
-    if not path:
-        path = "."
+
+    input_digest = await Get(Digest, MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]))
     result = await Get(
         FallibleProcessResult,
         Process(
-            (analyzer.PATH, path),
+            ("./package_analyzer", request.address.spec_path or "."),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
         ),
     )
     if result.exit_code != 0:
-        return FallibleFirstPartyPkgInfo(
-            info=None,
-            import_path=import_path,
+        return FallibleFirstPartyPkgAnalysis(
+            analysis=None,
+            import_path=import_path_info.import_path,
             exit_code=result.exit_code,
-            stderr=result.stderr.decode("utf-8"),
+            stderr=result.stdout.decode("utf-8"),
         )
 
     metadata = json.loads(result.stdout)
@@ -136,8 +203,8 @@ async def compute_first_party_package_info(
                 for filename, error in metadata.get("InvalidGoFiles", {}).items()
             )
             error += "\n"
-        return FallibleFirstPartyPkgInfo(
-            info=None, import_path=import_path, exit_code=1, stderr=error
+        return FallibleFirstPartyPkgAnalysis(
+            analysis=None, import_path=import_path_info.import_path, exit_code=1, stderr=error
         )
 
     if "CgoFiles" in metadata:
@@ -148,10 +215,9 @@ async def compute_first_party_package_info(
             "prioritize adding support."
         )
 
-    info = FirstPartyPkgInfo(
-        digest=pkg_sources.snapshot.digest,
-        subpath=os.path.join(target.address.spec_path, subpath),
-        import_path=import_path,
+    analysis = FirstPartyPkgAnalysis(
+        dir_path=request.address.spec_path,
+        import_path=import_path_info.import_path,
         imports=tuple(metadata.get("Imports", [])),
         test_imports=tuple(metadata.get("TestImports", [])),
         xtest_imports=tuple(metadata.get("XTestImports", [])),
@@ -164,56 +230,99 @@ async def compute_first_party_package_info(
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
     )
-    return FallibleFirstPartyPkgInfo(info, import_path)
+    return FallibleFirstPartyPkgAnalysis(analysis, import_path_info.import_path)
 
 
 @rule
-async def setup_analyzer() -> PackageAnalyzerSetup:
-    def get_file(filename: str) -> bytes:
-        content = pkgutil.get_data("pants.backend.go.util_rules", filename)
-        if not content:
-            raise AssertionError(f"Unable to find resource for `{filename}`.")
-        return content
-
-    analyer_sources_content = [
-        FileContent(filename, get_file(filename)) for filename in ("analyze_package.go", "read.go")
-    ]
-
-    source_digest, import_config = await MultiGet(
-        Get(Digest, CreateDigest(analyer_sources_content)),
-        Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
+async def setup_first_party_pkg_digest(
+    request: FirstPartyPkgDigestRequest,
+) -> FallibleFirstPartyPkgDigest:
+    embedder, wrapped_target, maybe_analysis = await MultiGet(
+        Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
+        Get(WrappedTarget, Address, request.address),
+        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
     )
+    if maybe_analysis.analysis is None:
+        return FallibleFirstPartyPkgDigest(
+            pkg_digest=None, exit_code=maybe_analysis.exit_code, stderr=maybe_analysis.stderr
+        )
+    analysis = maybe_analysis.analysis
 
-    built_analyzer_pkg = await Get(
-        BuiltGoPackage,
-        BuildGoPackageRequest(
-            import_path="main",
-            subpath="",
-            digest=source_digest,
-            go_file_names=tuple(fc.path for fc in analyer_sources_content),
-            s_file_names=(),
-            direct_dependencies=(),
-            minimum_go_version=None,
-        ),
-    )
-    main_pkg_a_file_path = built_analyzer_pkg.import_paths_to_pkg_a_files["main"]
-    input_digest = await Get(
-        Digest, MergeDigests([built_analyzer_pkg.digest, import_config.digest])
-    )
+    tgt = wrapped_target.target
+    pkg_sources = await Get(HydratedSources, HydrateSourcesRequest(tgt[GoPackageSourcesField]))
+    sources_digest = pkg_sources.snapshot.digest
 
-    analyzer = await Get(
-        LinkedGoBinary,
-        LinkGoBinaryRequest(
-            input_digest=input_digest,
-            archives=(main_pkg_a_file_path,),
-            import_config_path=import_config.CONFIG_PATH,
-            output_filename=PackageAnalyzerSetup.PATH,
-            description="Link Go package analyzer",
-        ),
-    )
+    embed_config = None
+    test_embed_config = None
+    xtest_embed_config = None
 
-    return PackageAnalyzerSetup(analyzer.digest)
+    # TODO(#13795): Error if you depend on resources without corresponding embed patterns?
+    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
+        dependencies = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
+        resources_sources = await Get(
+            SourceFiles,
+            SourceFilesRequest(
+                (
+                    t.get(SourcesField)
+                    for t in dependencies
+                    # You can only embed resources located at or below the directory of the
+                    # `go_package`. This is a restriction from Go.
+                    # TODO(#13795): Error if you depend on resources above the go_package?
+                    if t.address.spec_path.startswith(request.address.spec_path)
+                ),
+                for_sources_types=(ResourceSourceField,),
+                # TODO: Switch to True. We need to be confident though that the generated files
+                #  are located below the go_package.
+                enable_codegen=False,
+            ),
+        )
+        resources_digest = await Get(
+            Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
+        )
+        resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
+        sources_digest = await Get(Digest, MergeDigests((sources_digest, resources_digest)))
+
+        patterns_json = {
+            "EmbedPatterns": analysis.embed_patterns,
+            "TestEmbedPatterns": analysis.test_embed_patterns,
+            "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+        }
+        patterns_json_digest = await Get(
+            Digest,
+            CreateDigest([FileContent("patterns.json", json.dumps(patterns_json).encode("utf-8"))]),
+        )
+        input_digest = await Get(
+            Digest, MergeDigests((sources_digest, patterns_json_digest, embedder.digest))
+        )
+        embed_result = await Get(
+            FallibleProcessResult,
+            Process(
+                ("./embedder", "patterns.json"),
+                input_digest=input_digest,
+                description=f"Create embed mapping for {request.address}",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        if embed_result.exit_code != 0:
+            return FallibleFirstPartyPkgDigest(
+                pkg_digest=None,
+                exit_code=embed_result.exit_code,
+                stderr=embed_result.stdout.decode("utf-8"),
+            )
+        metadata = json.loads(embed_result.stdout)
+        embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+        test_embed_config = EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {}))
+        xtest_embed_config = EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {}))
+
+    return FallibleFirstPartyPkgDigest(
+        FirstPartyPkgDigest(
+            sources_digest,
+            embed_config=embed_config,
+            test_embed_config=test_embed_config,
+            xtest_embed_config=xtest_embed_config,
+        )
+    )
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules())

@@ -6,11 +6,9 @@ from __future__ import annotations
 import re
 from enum import Enum
 from textwrap import dedent
-from typing import Optional
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
-from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.process import BinaryPathTest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -21,7 +19,6 @@ from pants.engine.target import (
     GeneratedTargets,
     GenerateTargetsRequest,
     IntField,
-    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
@@ -30,6 +27,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    ValidNumbers,
     generate_file_based_overrides_field_help_message,
     generate_file_level_targets,
 )
@@ -44,7 +42,7 @@ class ShellSourceField(SingleSourceField):
     uses_source_roots = False
 
 
-class ShellGeneratingSourcesBases(MultipleSourcesField):
+class ShellGeneratingSourcesBase(MultipleSourcesField):
     uses_source_roots = False
 
 
@@ -102,19 +100,16 @@ class Shunit2TestDependenciesField(Dependencies):
 class Shunit2TestTimeoutField(IntField):
     alias = "timeout"
     help = (
-        "A timeout (in seconds) used by each test file belonging to this target. "
+        "A timeout (in seconds) used by each test file belonging to this target.\n\n"
         "If unset, the test will never time out."
     )
+    valid_numbers = ValidNumbers.positive_only
 
-    @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address)
-        if value is not None and value < 1:
-            raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{value}."
-            )
-        return value
+
+class SkipShunit2TestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this target's tests."
 
 
 class Shunit2TestSourceField(ShellSourceField):
@@ -134,6 +129,7 @@ class Shunit2TestTarget(Target):
         Shunit2TestSourceField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
+        SkipShunit2TestsField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
@@ -154,7 +150,7 @@ class Shunit2TestTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBases):
+class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBase):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
 
 
@@ -178,6 +174,7 @@ class Shunit2TestsGeneratorTarget(Target):
         Shunit2TestsGeneratorSourcesField,
         Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
+        SkipShunit2TestsField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
         Shunit2TestsOverrideField,
@@ -232,7 +229,7 @@ class ShellSourceTarget(Target):
     help = "A single Bourne-based shell script, e.g. a Bash script."
 
 
-class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBases):
+class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBase):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
 
 
@@ -328,16 +325,7 @@ class ShellCommandTimeoutField(IntField):
     alias = "timeout"
     default = 30
     help = "Command execution timeout (in seconds)."
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address)
-        if value is not None and value < 1:
-            raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{value}."
-            )
-        return value
+    valid_numbers = ValidNumbers.positive_only
 
 
 class ShellCommandToolsField(StringSequenceField):

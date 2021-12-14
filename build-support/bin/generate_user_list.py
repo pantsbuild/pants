@@ -69,6 +69,11 @@ _orgs = (
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
     Org("Ocrolus", "https://www.ocrolus.com/", "https://files.readme.io/ff166fa-ocrolus-small.png"),
     Org(
+        "Orca Security",
+        "https://orca.security/",
+        "https://files.readme.io/e87f6c5-Orca_Security-small.png",
+    ),
+    Org(
         "People Data Labs",
         "https://www.peopledatalabs.com/",
         "https://files.readme.io/8c4f5cd-peopledatalabs-small.png",
@@ -82,6 +87,11 @@ _orgs = (
         "Snowfall",
         "https://snowfalltravel.com/",
         "https://files.readme.io/13e796f-snowfall-small.png",
+    ),
+    Org(
+        "Tessian",
+        "https://www.tessian.com",
+        "https://files.readme.io/6ef9d57-tessian-small.png",
     ),
     Org(
         "Toolchain",
@@ -104,7 +114,7 @@ def main():
         orgs.append(Org("", "", ""))
     org_pairs = tuple(OrgPair(orgs[i], orgs[i + 1]) for i in range(0, len(orgs), 2))
     buf = pkgutil.get_data("generate_user_list", "user_list_templates/table.html.mustache")
-    print(chevron.render(buf.decode(), context={"org_pairs": org_pairs}))
+    print(chevron.render(buf.decode(), data={"org_pairs": org_pairs}))
 
 
 if __name__ == "__main__":

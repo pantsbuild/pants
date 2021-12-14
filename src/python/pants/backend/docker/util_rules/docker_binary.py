@@ -35,8 +35,9 @@ class DockerBinary(BinaryPath):
         dockerfile: str | None = None,
         build_args: DockerBuildArgs | None = None,
         env: Mapping[str, str] | None = None,
+        extra_args: tuple[str, ...] = (),
     ) -> Process:
-        args = [self.path, "build"]
+        args = [self.path, "build", *extra_args]
 
         for tag in tags:
             args.extend(["-t", tag])
@@ -55,21 +56,24 @@ class DockerBinary(BinaryPath):
             argv=tuple(args),
             description=(
                 f"Building docker image {tags[0]}"
-                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else ".")
+                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
             ),
             env=env,
             input_digest=digest,
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
-    def push_image(self, tags: tuple[str, ...]) -> Process | None:
-        if not tags:
-            return None
-
-        return Process(
-            argv=(self.path, "push", *tags),
-            cache_scope=ProcessCacheScope.PER_SESSION,
-            description=f"Pushing docker image {tags[0]}",
+    def push_image(
+        self, tags: tuple[str, ...], env: Mapping[str, str] | None = None
+    ) -> tuple[Process, ...]:
+        return tuple(
+            Process(
+                argv=(self.path, "push", tag),
+                cache_scope=ProcessCacheScope.PER_SESSION,
+                description=f"Pushing docker image {tag}",
+                env=env,
+            )
+            for tag in tags
         )
 
 

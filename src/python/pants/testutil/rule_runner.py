@@ -17,6 +17,7 @@ from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
+from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -197,10 +198,7 @@ class RuleRunner:
             root_dir = Path(mkdtemp(prefix="RuleRunner."))
             print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
             bootstrap_args.extend(
-                [
-                    "--no-process-execution-local-cleanup",
-                    f"--local-execution-root-dir={root_dir}",
-                ]
+                ["--no-process-cleanup", f"--local-execution-root-dir={root_dir}"]
             )
             build_root = (root_dir / "BUILD_ROOT").resolve()
             build_root.mkdir()
@@ -401,7 +399,25 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
+    @deprecated(
+        "2.10.0.dev0",
+        (
+            "Use `RuleRunner.write_files({<relpath>: <contents>}) instead of "
+            "`RuleRunner.create_file(<relpath>, <contents>)`"
+        ),
+    )
     def create_file(
+        self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
+    ) -> str:
+        """Writes to a file under the buildroot.
+
+        relpath: The relative path to the file from the build root.
+        contents: A string containing the contents of the file - '' by default..
+        mode: The mode to write to the file in - over-write by default.
+        """
+        return self._create_file(relpath, contents, mode)
+
+    def _create_file(
         self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
     ) -> str:
         """Writes to a file under the buildroot.
@@ -416,6 +432,14 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
+    @deprecated(
+        "2.10.0.dev0",
+        (
+            'Use `RuleRunner.write_files({"path/to/file": "file contents"})` instead of '
+            '`RuleRunner.create_files("path/to", ["file"])`.\n'
+            "This allows creating all files with specific content in one call."
+        ),
+    )
     def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
@@ -423,8 +447,15 @@ class RuleRunner:
         files: List of file names.
         """
         for f in files:
-            self.create_file(os.path.join(path, f), contents=f)
+            self._create_file(os.path.join(path, f), contents=f)
 
+    @deprecated(
+        "2.10.0.dev0",
+        (
+            'Use `RuleRunner.write_files({"<relpath>/BUILD": <contents>})` instead of '
+            "`RuleRunner.add_to_build_file(<relpath>, <contents>)`."
+        ),
+    )
     def add_to_build_file(
         self, relpath: str | PurePath, target: str, *, overwrite: bool = False
     ) -> str:
@@ -438,15 +469,20 @@ class RuleRunner:
             relpath if PurePath(relpath).name.startswith("BUILD") else PurePath(relpath, "BUILD")
         )
         mode = "w" if overwrite else "a"
-        return self.create_file(str(build_path), target, mode=mode)
+        return self._create_file(str(build_path), target, mode=mode)
 
-    def write_files(self, files: Mapping[str | PurePath, str]) -> None:
+    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public
+
+        files: A mapping of file names to contents.
+        returns: A tuple of absolute file paths created.
         """
+        paths = []
         for path, content in files.items():
-            self.create_file(path, content)
+            paths.append(self._create_file(path, content))
+        return tuple(paths)
 
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content.

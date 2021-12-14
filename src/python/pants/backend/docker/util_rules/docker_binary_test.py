@@ -27,10 +27,22 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         "test:0.1.0",
         "test:latest",
     )
-    build_request = docker.build_image(tags, digest, dockerfile)
+    build_request = docker.build_image(tags, digest, dockerfile, extra_args=("--pull", "--squash"))
 
     assert build_request == Process(
-        argv=(docker_path, "build", "-t", tags[0], "-t", tags[1], "-f", dockerfile, "."),
+        argv=(
+            docker_path,
+            "build",
+            "--pull",
+            "--squash",
+            "-t",
+            tags[0],
+            "-t",
+            tags[1],
+            "-f",
+            dockerfile,
+            ".",
+        ),
         input_digest=digest,
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
@@ -39,13 +51,15 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
 
 
 def test_docker_binary_push_image(docker_path: str, docker: DockerBinary) -> None:
-    assert docker.push_image(()) is None
+    assert docker.push_image(()) == ()
 
     image_ref = "registry/repo/name:tag"
     push_request = docker.push_image((image_ref,))
-    assert push_request == Process(
-        argv=(docker_path, "push", image_ref),
-        cache_scope=ProcessCacheScope.PER_SESSION,
-        description="",  # The description field is marked `compare=False`
+    assert push_request == (
+        Process(
+            argv=(docker_path, "push", image_ref),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description="",  # The description field is marked `compare=False`
+        ),
     )
-    assert push_request.description == f"Pushing docker image {image_ref}"
+    assert push_request[0].description == f"Pushing docker image {image_ref}"

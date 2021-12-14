@@ -50,6 +50,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    Field,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -141,6 +142,32 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
     return _WarnDeprecatedTarget()
 
 
+# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
+# offending field.
+class _WarnDeprecatedField:
+    pass
+
+
+@dataclass(frozen=True)
+class _WarnDeprecatedFieldRequest:
+    field_type: type[Field]
+
+
+@rule
+def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDeprecatedField:
+    field_type = request.field_type
+    assert field_type.deprecated_alias_removal_version is not None
+    warn_or_error(
+        removal_version=field_type.deprecated_alias_removal_version,
+        entity=f"the field name {field_type.deprecated_alias}",
+        hint=(
+            f"Instead, use `{field_type.alias}`, which behaves the same. Run `./pants "
+            "update-build-files` to automatically fix your BUILD files."
+        ),
+    )
+    return _WarnDeprecatedField()
+
+
 @rule
 async def resolve_target(
     address: Address,
@@ -162,6 +189,12 @@ async def resolve_target(
         ):
             await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
         target = target_type(target_adaptor.kwargs, address, union_membership)
+        for field_type in target.field_types:
+            if (
+                field_type.deprecated_alias is not None
+                and field_type.deprecated_alias in target_adaptor.kwargs
+            ):
+                await Get(_WarnDeprecatedField, _WarnDeprecatedFieldRequest(field_type))
         return WrappedTarget(target)
 
     wrapped_generator_tgt = await Get(
@@ -192,6 +225,7 @@ async def resolve_targets(
 ) -> Targets:
     # Replace all generating targets with what it generates. Otherwise, keep it. If a target
     # generator does not generate any targets, keep the target generator.
+    # TODO: This method does not preserve the order of inputs.
     expanded_targets: OrderedSet[Target] = OrderedSet()
     generator_targets = []
     generate_gets = []
@@ -940,7 +974,8 @@ async def resolve_dependencies(
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
-            if isinstance(sources_field, inference_request_type.infer_from)
+            # NB: `type: ignore`d due to https://github.com/python/mypy/issues/9815.
+            if isinstance(sources_field, inference_request_type.infer_from)  # type: ignore[misc]
         ]
         inferred = await MultiGet(
             Get(

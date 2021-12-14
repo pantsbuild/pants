@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, safe_create_dir_all_ioerror, GlobExpansionConjunction, GlobMatching, PathGlobs,
-  RelativePath, StrictGlobMatching,
+  Permissions, RelativePath, StrictGlobMatching,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -33,7 +33,7 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -44,6 +44,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
+  immutable_inputs: ImmutableInputs,
   cleanup_local_dirs: bool,
   platform: Platform,
   spawn_lock: RwLock<()>,
@@ -55,6 +56,7 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
+    immutable_inputs: ImmutableInputs,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
@@ -62,6 +64,7 @@ impl CommandRunner {
       executor,
       work_dir_base,
       named_caches,
+      immutable_inputs,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
@@ -124,6 +127,14 @@ impl CommandRunner {
       .await
     })
     .boxed()
+  }
+
+  pub fn named_caches(&self) -> &NamedCaches {
+    &self.named_caches
+  }
+
+  pub fn immutable_inputs(&self) -> &ImmutableInputs {
+    &self.immutable_inputs
   }
 }
 
@@ -234,15 +245,6 @@ impl ChildResults {
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
-  }
-
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
@@ -250,9 +252,8 @@ impl super::CommandRunner for CommandRunner {
     &self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
+    req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let req = self.extract_compatible_request(&req).unwrap();
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
       context.workunit_store.clone(),
@@ -292,6 +293,19 @@ impl super::CommandRunner for CommandRunner {
           }
         };
 
+        // Prepare the workdir.
+        let exclusive_spawn = prepare_workdir(
+          workdir_path.clone(),
+          &req,
+          req.input_digests.input_files,
+          context.clone(),
+          self.store.clone(),
+          self.executor.clone(),
+          &self.named_caches,
+          &self.immutable_inputs,
+        )
+        .await?;
+
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
         let res = self
           .run_and_capture_workdir(
@@ -301,6 +315,7 @@ impl super::CommandRunner for CommandRunner {
             self.executor.clone(),
             workdir_path.clone(),
             (),
+            exclusive_spawn,
             self.platform(),
           )
           .map_err(|msg| {
@@ -337,10 +352,6 @@ impl super::CommandRunner for CommandRunner {
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = ();
-
-  fn named_caches(&self) -> &NamedCaches {
-    &self.named_caches
-  }
 
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
@@ -463,20 +474,10 @@ pub trait CapturedWorkdir {
     executor: task_executor::Executor,
     workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
+    exclusive_spawn: bool,
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
-
-    // Prepare the workdir.
-    let exclusive_spawn = prepare_workdir(
-      workdir_path.clone(),
-      &req,
-      context.clone(),
-      store.clone(),
-      executor.clone(),
-      self.named_caches(),
-    )
-    .await?;
 
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
@@ -574,8 +575,6 @@ pub trait CapturedWorkdir {
     }
   }
 
-  fn named_caches(&self) -> &NamedCaches;
-
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
   ///
@@ -603,23 +602,34 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-///
 /// Prepares the given workdir for use by the given Process.
 ///
 /// Returns true if the executable for the Process was created in the workdir, indicating that
 /// `exclusive_spawn` is required.
 ///
+/// TODO: Both the symlinks for named_caches/immutable_inputs and the empty output directories
+/// required by the spec should be created via a synthetic Digest containing SymlinkNodes and
+/// the empty output directories. That would:
+///   1. improve validation that nothing we create collides.
+///   2. allow for materialization to safely occur fully in parallel, rather than partially
+///      synchronously in the background.
+///
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
+  materialized_input_digest: hashing::Digest,
   context: Context,
   store: Store,
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
+  immutable_inputs: &ImmutableInputs,
 ) -> Result<bool, String> {
-  // If named caches are configured, collect the symlinks to create.
-  let named_cache_symlinks = named_caches
-    .local_paths(&req.append_only_caches)
+  // Collect the symlinks to create for immutable inputs or named caches.
+  let workdir_symlinks = immutable_inputs
+    .local_paths(&req.input_digests.immutable_inputs)
+    .await?
+    .into_iter()
+    .chain(named_caches.local_paths(&req.append_only_caches))
     .collect::<Vec<_>>();
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
@@ -634,10 +644,9 @@ pub async fn prepare_workdir(
 
   // Start with async materialization of input snapshots, followed by synchronous materialization
   // of other configured inputs. Note that we don't do this in parallel, as that might cause
-  // non-determinism when paths overlap.
+  // non-determinism when paths overlap: see the method doc.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
-  let input_files = req.input_files;
   in_workunit!(
     context.workunit_store.clone(),
     "setup_sandbox".to_owned(),
@@ -647,7 +656,11 @@ pub async fn prepare_workdir(
     },
     |_workunit| async move {
       store2
-        .materialize_directory(workdir_path_2, input_files)
+        .materialize_directory(
+          workdir_path_2,
+          materialized_input_digest,
+          Permissions::Writable,
+        )
         .await
     },
   )
@@ -665,18 +678,12 @@ pub async fn prepare_workdir(
       }
 
       // The bazel remote execution API specifies that the parent directories for output files and
-      // output directories should be created before execution completes: see
-      //   https://github.com/pantsbuild/pants/issues/7084.
-      // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
-      // even more efficient to only retain the directories at greatest nesting depth, as
-      // create_dir_all() will ensure all parents are created. At that point, we might consider
-      // explicitly enumerating all the directories to be created and just using create_dir(),
-      // unless there is some optimization in create_dir_all() that makes that less efficient.
+      // output directories should be created before execution completes: see the method doc.
       let parent_paths_to_create: HashSet<_> = output_file_paths
         .iter()
         .chain(output_dir_paths.iter())
         .map(|relative_path| relative_path.as_ref())
-        .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
+        .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
         .filter_map(|rel_path| rel_path.parent())
         .map(|parent_relpath| workdir_path2.join(parent_relpath))
         .collect();
@@ -689,20 +696,21 @@ pub async fn prepare_workdir(
         })?;
       }
 
-      for named_cache_symlink in named_cache_symlinks {
-        safe_create_dir_all_ioerror(&named_cache_symlink.src).map_err(|err| {
+      for workdir_symlink in workdir_symlinks {
+        // TODO: Move initialization of the dst directory into NamedCaches.
+        safe_create_dir_all_ioerror(&workdir_symlink.dst).map_err(|err| {
           format!(
             "Error making {} for local execution: {:?}",
-            named_cache_symlink.src.display(),
+            workdir_symlink.dst.display(),
             err
           )
         })?;
-        let dst = workdir_path2.join(&named_cache_symlink.dst);
-        symlink(&named_cache_symlink.src, &dst).map_err(|err| {
+        let src = workdir_path2.join(&workdir_symlink.src);
+        symlink(&workdir_symlink.dst, &src).map_err(|err| {
           format!(
             "Error linking {} -> {} for local execution: {:?}",
-            named_cache_symlink.src.display(),
-            dst.display(),
+            src.display(),
+            workdir_symlink.dst.display(),
             err
           )
         })?;

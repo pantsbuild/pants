@@ -39,6 +39,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult, ProcessResultMetadata
+from pants.engine.target import WrappedTarget
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
@@ -71,9 +72,13 @@ def assert_build(
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
             digest=EMPTY_DIGEST,
-            dockerfile_info=DockerfileInfo(digest=EMPTY_DIGEST, source="docker/test/Dockerfile"),
+            dockerfile_info=DockerfileInfo(
+                request.address, digest=EMPTY_DIGEST, source="docker/test/Dockerfile"
+            ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
-            env=rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]),
+            build_env=rule_runner.request(
+                DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]
+            ),
         )
 
     def run_process_mock(process: Process) -> ProcessResult:
@@ -116,6 +121,11 @@ def assert_build(
                 output_type=DockerBuildContext,
                 input_type=DockerBuildContextRequest,
                 mock=build_context_mock,
+            ),
+            MockGet(
+                output_type=WrappedTarget,
+                input_type=Address,
+                mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
                 output_type=ProcessResult,
@@ -206,8 +216,8 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
 
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
-        r"docker/test:err1: '{bad_template}'\. Unknown placeholder: 'bad_template'\.\n\n"
-        r"You may only reference any of `name`, `directory` or `parent_directory`\."
+        r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
+        r"Try with one of: directory, name, parent_directory\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
@@ -347,8 +357,8 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     err_1 = (
         r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_1: '{unknown_stage}'\.\n\n"
-        r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, stage0, "
-        r"interim, stage2, output\."
+        r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, interim, "
+        r"output, stage0, stage2\."
     )
     with pytest.raises(DockerImageTagValueError, match=err_1):
         assert_tags("err_1")
@@ -457,7 +467,25 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_docker_build_args_field(rule_runner: RuleRunner) -> None:
+def test_docker_repository_from_build_arg(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="image", repository="{build_args.REPO}")'}
+    )
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_ARGS": '["REPO=test/image"]',
+        },
+    )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="image"),
+        "Built docker image: test/image:latest",
+    )
+
+
+def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
@@ -508,6 +536,43 @@ def test_docker_build_args_field(rule_runner: RuleRunner) -> None:
             {
                 "FROM_ENV": "env value",
             }
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  secrets={
+                    "mysecret": "/var/run/secrets/mysecret",
+                    "project-secret": "project/secrets/mysecret",
+                  }
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--secret=id=mysecret,src=/var/run/secrets/mysecret",
+            f"--secret=id=project-secret,src={rule_runner.build_root}/docker/test/project/secrets/mysecret",
+            "-t",
+            "img1:latest",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
         )
 
     assert_build(

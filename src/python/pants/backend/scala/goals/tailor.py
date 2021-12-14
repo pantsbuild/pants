@@ -7,7 +7,12 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
+from pants.backend.scala.target_types import (
+    ScalaJunitTestsGeneratorSourcesField,
+    ScalaJunitTestsGeneratorTarget,
+    ScalaSourcesGeneratorTarget,
+    ScalatestTestsGeneratorSourcesField,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -20,6 +25,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.source.filespec import Filespec, matches_filespec
 from pants.util.logging import LogLevel
 
 
@@ -30,9 +36,18 @@ class PutativeScalaTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    # TODO: Until https://github.com/pantsbuild/pants/issues/13332 is fixed, we classify all scala
-    # files as `scala_sources`, and none as tests.
-    return {ScalaSourcesGeneratorTarget: set(paths)}
+    tests_filespec = Filespec(
+        includes=[
+            *ScalaJunitTestsGeneratorSourcesField.default,
+            *ScalatestTestsGeneratorSourcesField.default,
+        ]
+    )
+    test_filenames = set(
+        matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
+    )
+    test_files = {path for path in paths if os.path.basename(path) in test_filenames}
+    sources_files = set(paths) - test_files
+    return {ScalaJunitTestsGeneratorTarget: test_files, ScalaSourcesGeneratorTarget: sources_files}
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Scala targets to create")

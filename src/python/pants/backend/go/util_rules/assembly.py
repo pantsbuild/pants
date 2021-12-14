@@ -37,7 +37,7 @@ class AssemblyPreCompilationRequest:
 
     compilation_input: Digest
     s_files: tuple[str, ...]
-    source_files_subpath: str
+    dir_path: str
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class AssemblyPostCompilationRequest:
     compilation_result: Digest
     assembly_digests: tuple[Digest, ...]
     s_files: tuple[str, ...]
-    source_files_subpath: str
+    dir_path: str
 
 
 @rule
@@ -84,11 +84,9 @@ async def setup_assembly_pre_compilation(
                 "-o",
                 "symabis",
                 "--",
-                *(f"./{request.source_files_subpath}/{name}" for name in request.s_files),
+                *(f"./{request.dir_path}/{name}" for name in request.s_files),
             ),
-            description=(
-                f"Generate symabis metadata for assembly files for {request.source_files_subpath}"
-            ),
+            description=f"Generate symabis metadata for assembly files for {request.dir_path}",
             output_files=("symabis",),
         ),
     )
@@ -113,13 +111,11 @@ async def setup_assembly_pre_compilation(
                     "-I",
                     os.path.join(goroot.path, "pkg", "include"),
                     "-o",
-                    f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
-                    f"./{request.source_files_subpath}/{s_file}",
+                    f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",
+                    f"./{request.dir_path}/{s_file}",
                 ),
                 description=f"Assemble {s_file} with Go",
-                output_files=(
-                    f"./{request.source_files_subpath}/{PurePath(s_file).with_suffix('.o')}",
-                ),
+                output_files=(f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",),
             ),
         )
         for s_file in request.s_files
@@ -156,13 +152,11 @@ async def link_assembly_post_compilation(
                 "r",
                 "__pkg__.a",
                 *(
-                    f"./{request.source_files_subpath}/{PurePath(name).with_suffix('.o')}"
+                    f"./{request.dir_path}/{PurePath(name).with_suffix('.o')}"
                     for name in request.s_files
                 ),
             ),
-            description=(
-                f"Link assembly files to Go package archive for {request.source_files_subpath}"
-            ),
+            description=f"Link assembly files to Go package archive for {request.dir_path}",
             output_files=("__pkg__.a",),
         ),
     )

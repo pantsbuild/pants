@@ -112,6 +112,10 @@ def main(cmd: str, args: list[str]) -> None:
                 for stage, name_parts in self.from_baseimages()
             )
 
+        def build_args(self) -> tuple[str, ...]:
+            """Return all defined build args, including any default values."""
+            return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
+
     for parsed in map(ParsedDockerfile.from_file, args):
         if cmd == "putative-targets":
             for addr in parsed.putative_target_addresses():
@@ -119,6 +123,9 @@ def main(cmd: str, args: list[str]) -> None:
         elif cmd == "version-tags":
             for tag in parsed.baseimage_tags():
                 print(tag)
+        elif cmd == "build-args":
+            for arg in parsed.build_args():
+                print(arg)
 
 
 if __name__ == "__main__":
@@ -126,7 +133,7 @@ if __name__ == "__main__":
         for idx, cmd in enumerate(sys.argv[1].split(",")):
             if idx:
                 print("---")
-            main(cmd, sys.argv[2:])
+            main(cmd.strip(), sys.argv[2:])
     else:
         print(f"Not enough arguments.\nUsage: {sys.argv[0]} [COMMAND,COMMAND,...] [DOCKERFILE ...]")
         sys.exit(1)

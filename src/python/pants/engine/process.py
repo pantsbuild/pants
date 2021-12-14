@@ -18,7 +18,7 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -56,6 +56,8 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
+    immutable_input_digests: FrozenDict[str, Digest]
+    use_nailgun: tuple[str, ...]
     working_directory: str | None
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
@@ -63,9 +65,9 @@ class Process:
     output_directories: tuple[str, ...]
     timeout_seconds: int | float
     jdk_home: str | None
-    use_nailgun: Digest
     execution_slot_variable: str | None
     cache_scope: ProcessCacheScope
+    platform: str | None
 
     def __init__(
         self,
@@ -74,6 +76,8 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        use_nailgun: Iterable[str] = (),
         working_directory: str | None = None,
         env: Mapping[str, str] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
@@ -81,9 +85,9 @@ class Process:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
-        use_nailgun: Digest = EMPTY_DIGEST,
         execution_slot_variable: str | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        platform: Platform | None = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -117,6 +121,8 @@ class Process:
         self.description = description
         self.level = level
         self.input_digest = input_digest
+        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
+        self.use_nailgun = tuple(use_nailgun)
         self.working_directory = working_directory
         self.env = FrozenDict(env or {})
         self.append_only_caches = FrozenDict(append_only_caches or {})
@@ -125,35 +131,9 @@ class Process:
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
-        self.use_nailgun = use_nailgun
         self.execution_slot_variable = execution_slot_variable
         self.cache_scope = cache_scope
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class MultiPlatformProcess:
-    platform_constraints: tuple[str | None, ...]
-    processes: tuple[Process, ...]
-
-    def __init__(self, request_dict: dict[Platform | None, Process]) -> None:
-        if len(request_dict) == 0:
-            raise ValueError("At least one platform-constrained Process must be passed.")
-        serialized_constraints = tuple(
-            constraint.value if constraint else None for constraint in request_dict
-        )
-        if len([req.description for req in request_dict.values()]) != 1:
-            raise ValueError(
-                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must "
-                f"be identical, but got: {list(request_dict.values())}."
-            )
-
-        self.platform_constraints = serialized_constraints
-        self.processes = tuple(request_dict.values())
-
-    @property
-    def product_description(self) -> ProductDescription:
-        return ProductDescription(self.processes[0].description)
+        self.platform = platform.value if platform is not None else None
 
 
 @dataclass(frozen=True)
@@ -228,7 +208,7 @@ class ProcessExecutionFailure(Exception):
         stderr: bytes,
         process_description: str,
         *,
-        local_cleanup: bool,
+        process_cleanup: bool,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -251,31 +231,23 @@ class ProcessExecutionFailure(Exception):
             "stderr:",
             try_decode(stderr),
         ]
-        if local_cleanup:
+        if process_cleanup:
             err_strings.append(
-                "\n\n"
-                "Use --no-process-execution-local-cleanup to preserve process chroots "
-                "for inspection."
+                "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
             )
         super().__init__("\n".join(err_strings))
 
 
 @rule
-def get_multi_platform_request_description(req: MultiPlatformProcess) -> ProductDescription:
-    return req.product_description
-
-
-@rule
-def upcast_process(req: Process) -> MultiPlatformProcess:
-    """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
-    return MultiPlatformProcess({None: req})
+def get_multi_platform_request_description(req: Process) -> ProductDescription:
+    return ProductDescription(req.description)
 
 
 @rule
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
-    global_options: GlobalOptions,
+    process_cleanup: ProcessCleanupOption,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -294,7 +266,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
-        local_cleanup=global_options.options.process_execution_local_cleanup,
+        process_cleanup=process_cleanup.val,
     )
 
 

@@ -39,7 +39,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -47,7 +47,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bytes::Bytes;
 use double_checked_cell_async::DoubleCheckedCell;
-use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, RelativePath};
+use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, Permissions, RelativePath};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -933,8 +933,9 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
+    perms: Permissions,
   ) -> BoxFuture<'static, Result<(), String>> {
-    self.materialize_directory_helper(destination, true, digest)
+    self.materialize_directory_helper(destination, true, digest, perms)
   }
 
   fn materialize_directory_helper(
@@ -942,6 +943,7 @@ impl Store {
     destination: PathBuf,
     is_root: bool,
     digest: Digest,
+    perms: Permissions,
   ) -> BoxFuture<'static, Result<(), String>> {
     let store = self.clone();
     async move {
@@ -975,9 +977,13 @@ impl Store {
           let store = store.clone();
           let path = destination.join(file_node.name.clone());
           let digest = try_future!(require_digest(file_node.digest.as_ref()));
-          store
-            .materialize_file(path, digest, file_node.is_executable)
-            .boxed()
+          let mode = match perms {
+            Permissions::ReadOnly if file_node.is_executable => 0o544,
+            Permissions::ReadOnly => 0o444,
+            Permissions::Writable if file_node.is_executable => 0o744,
+            Permissions::Writable => 0o644,
+          };
+          store.materialize_file(path, digest, mode).boxed()
         })
         .collect::<Vec<_>>();
       let directory_futures = directory
@@ -988,7 +994,7 @@ impl Store {
           let path = destination.join(directory_node.name.clone());
           let digest = try_future!(require_digest(directory_node.digest.as_ref()));
 
-          store.materialize_directory_helper(path, false, digest)
+          store.materialize_directory_helper(path, false, digest, perms)
         })
         .collect::<Vec<_>>();
       let _ = future::try_join(
@@ -997,6 +1003,17 @@ impl Store {
       )
       .map(|r| r.map(|_| ()))
       .await?;
+      if perms == Permissions::ReadOnly {
+        tokio::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o555))
+          .await
+          .map_err(|e| {
+            format!(
+              "Failed to set permissions for {}: {}",
+              destination.display(),
+              e
+            )
+          })?;
+      }
       Ok(())
     }
     .boxed()
@@ -1006,20 +1023,17 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
-    is_executable: bool,
+    mode: u32,
   ) -> BoxFuture<'static, Result<(), String>> {
     let store = self.clone();
     let res = async move {
       let write_result = store
         .load_file_bytes_with(digest, move |bytes| {
-          if destination.exists() {
-            std::fs::remove_file(&destination)
-              .map_err(|e| format!("Failed to overwrite {}: {:?}", destination.display(), e))?;
-          }
           let mut f = OpenOptions::new()
             .create(true)
             .write(true)
-            .mode(if is_executable { 0o755 } else { 0o644 })
+            .truncate(true)
+            .mode(mode)
             .open(&destination)
             .map_err(|e| {
               format!(
@@ -1062,7 +1076,7 @@ impl Store {
               let store = store.clone();
               let res = async move {
                 let maybe_bytes = store
-                  .load_file_bytes_with(file_node_digest, |b| Bytes::copy_from_slice(b))
+                  .load_file_bytes_with(file_node_digest, Bytes::copy_from_slice)
                   .await?;
                 maybe_bytes
                   .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))

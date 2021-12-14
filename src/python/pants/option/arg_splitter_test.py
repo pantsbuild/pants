@@ -19,7 +19,6 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture
@@ -69,7 +68,7 @@ def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: lis
     assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
 
 
-def test_is_spec(splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> None:
+def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> None:
     unambiguous_specs = [
         "a/b/c",
         "a/b/c/",
@@ -105,11 +104,11 @@ def test_is_spec(splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> N
         assert splitter.likely_a_spec(s) is True
 
     # With directories on disk to tiebreak.
-    with temporary_dir() as tmpdir:
-        splitter = ArgSplitter(known_scope_infos, tmpdir)
-        for d in directories_vs_goals:
-            Path(tmpdir, d).mkdir()
-            assert splitter.likely_a_spec(d) is True
+
+    splitter = ArgSplitter(known_scope_infos, tmp_path.as_posix())
+    for d in directories_vs_goals:
+        (tmp_path / d).mkdir()
+        assert splitter.likely_a_spec(d) is True
 
 
 def goal_split_test(command_line: str, **expected):

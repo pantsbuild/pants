@@ -260,7 +260,7 @@ class _MultiGet:
         return cast(Tuple, result)
 
 
-# These type variables are used to parameterize from 1 to 10 Gets when used in a tuple-style
+# These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style
 # MultiGet call.
 
 _Out0 = TypeVar("_Out0")

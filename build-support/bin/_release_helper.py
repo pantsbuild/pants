@@ -279,28 +279,17 @@ def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
 def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
     def run_venv_pants(args: list[str]) -> str:
         # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
-        # backend plugins so when we execute it at the repo build root, the root pants.toml will
-        # ask it to load internal backend packages and their dependencies which it doesn't have,
-        # and it'll fail. To solve that problem, we load the internal backend package dependencies
-        # into the pantsbuild.pants venv.
+        # backend plugins embedded (but it does have all other backends): to load only the internal
+        # packages, we override the `--python-path` to include them (and to implicitly exclude
+        # `src/python`).
         return (
             subprocess.run(
                 [
                     venv_dir / "bin/pants",
-                    "--no-verify-config",
                     "--no-remote-cache-read",
                     "--no-remote-cache-write",
                     "--no-pantsd",
                     "--pythonpath=['pants-plugins']",
-                    (
-                        "--backend-packages=["
-                        "'pants.backend.awslambda.python', "
-                        "'pants.backend.python', "
-                        "'pants.backend.shell', "
-                        "'pants.backend.experimental.java', "
-                        "'internal_plugins.releases'"
-                        "]"
-                    ),
                     *args,
                 ],
                 check=True,
@@ -706,16 +695,26 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     if fetch:
         extra_pex_args = [
-            f"--platform={plat}-{abi}"
-            for plat in ("linux_x86_64", "macosx_10.15_x86_64")
-            for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
+            "--python-shebang",
+            "/usr/bin/env python",
+            "--interpreter-constraint",
+            "CPython>=3.7,<3.10",
+            *(
+                f"--platform={plat}-{abi}"
+                for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+                for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
+            ),
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
-        extra_pex_args = [f"--python={sys.executable}"]
+        major, minor = sys.version_info[:2]
+        extra_pex_args = [
+            f"--interpreter-constraint=CPython=={major}.{minor}.*",
+            f"--python={sys.executable}",
+        ]
         plat = os.uname()[0].lower()
-        py = f"cp{''.join(map(str, sys.version_info[:2]))}"
+        py = f"cp{major}{minor}"
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.{plat}-{py}.pex"
         banner(f"Building {pex_name} by building wheels.")
 
@@ -755,6 +754,7 @@ def build_pex(fetch: bool) -> None:
                 "--console-script=pants",
                 *extra_pex_args,
                 f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
+                "--venv",
             ],
             env=env,
             check=True,

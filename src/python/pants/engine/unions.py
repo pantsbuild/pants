@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from typing import DefaultDict, Iterable, Mapping, TypeVar
 
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import decorated_type_checkable, frozen_after_init
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-@decorated_type_checkable
 def union(cls):
     """A class decorator to allow a class to be a union base in the engine's mechanism for
     polymorphism.
@@ -27,14 +26,15 @@ def union(cls):
 
     See https://www.pantsbuild.org/docs/rules-api-unions.
     """
-    # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
     assert isinstance(cls, type)
-    return union.define_instance_of(cls)
+    cls._is_union_for = cls
+    return cls
 
 
 def is_union(input_type: type) -> bool:
     """Return whether or not a type has been annotated with `@union`."""
-    return union.is_instance(input_type)
+    is_union: bool = input_type == getattr(input_type, "_is_union_for", None)
+    return is_union
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,12 @@ class UnionRule:
     union_member: type
 
     def __post_init__(self) -> None:
-        if not union.is_instance(self.union_base):
+        if not is_union(self.union_base):
             msg = (
                 f"The first argument must be a class annotated with @union "
                 f"(from pants.engine.unions), but was {self.union_base}."
             )
-            if union.is_instance(self.union_member):
+            if is_union(self.union_member):
                 msg += (
                     "\n\nHowever, the second argument was annotated with `@union`. Did you "
                     "switch the first and second arguments to `UnionRule()`?"

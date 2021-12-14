@@ -15,9 +15,12 @@ from pants.backend.python.target_types import (
     PexIgnoreErrorsField,
     PexIncludeToolsField,
     PexInheritPathField,
+    PexLayout,
+    PexLayoutField,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.target_types import (
+    PexResolveLocalPlatformsField,
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
@@ -62,6 +65,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     platforms: PythonPlatformsField
+    resolve_local_platforms: PexResolveLocalPlatformsField
+    layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_tools: PexIncludeToolsField
     resolve: PythonResolveField
@@ -74,6 +79,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
+        if self.resolve_local_platforms.value_or_global_default(pex_binary_defaults) is True:
+            args.append("--resolve-local-platforms")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
         if self.inherit_path.value is not None:
@@ -129,6 +136,7 @@ async def package_pex_binary(
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,
+            layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
             include_local_dists=True,
         ),

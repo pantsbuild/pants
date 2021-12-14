@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.java_parser import (
     FallibleJavaSourceDependencyAnalysisResult,
 )
@@ -27,7 +26,6 @@ from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmDependencyLockfile
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -43,7 +41,6 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *java_parser_launcher_rules(),
             *java_parser_rules(),
-            *javac_rules(),
             *source_files.rules(),
             *util_rules(),
             *jdk_rules.rules(),
@@ -51,7 +48,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(JavaSourceDependencyAnalysis, (SourceFiles,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[JvmDependencyLockfile, JavaSourceTarget],
+        target_types=[JavaSourceTarget],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner

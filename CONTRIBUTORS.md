@@ -116,6 +116,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jonathan Sokolowski
 + Josh Reed
 + Josh Soref
++ Joshua Cannon
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
@@ -231,6 +232,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
++ Yoav Alon
 + Yuhan GUO
 + Yujie Chen
 + billybecker

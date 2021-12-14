@@ -22,14 +22,19 @@ from pants.engine.target import (
     generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.target_types import JvmCompatibleResolveNamesField, JvmResolveName
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmCompatibleResolveNamesField,
+    JvmProvidesTypesField,
+    JvmResolveNameField,
+)
 
 
 class JavaSourceField(SingleSourceField):
     expected_file_extensions = (".java",)
 
 
-class JavaGeneratorSources(MultipleSourcesField):
+class JavaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".java",)
 
 
@@ -42,9 +47,9 @@ class JavaFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class JavaGeneratorFieldSet(FieldSet):
-    required_fields = (JavaGeneratorSources,)
+    required_fields = (JavaGeneratorSourcesField,)
 
-    sources: JavaGeneratorSources
+    sources: JavaGeneratorSourcesField
 
 
 # -----------------------------------------------------------------------------------------------
@@ -52,22 +57,23 @@ class JavaGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
-class JavaTestSourceField(JavaSourceField):
-    pass
+class JavaJunitTestSourceField(JavaSourceField, JunitTestSourceField):
+    """A JUnit test file written in Java."""
 
 
 class JunitTestTarget(Target):
     alias = "junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JavaTestSourceField,
+        JavaJunitTestSourceField,
         Dependencies,
         JvmCompatibleResolveNamesField,
+        JvmProvidesTypesField,
     )
     help = "A single Java test, run with JUnit."
 
 
-class JavaTestsGeneratorSourcesField(JavaGeneratorSources):
+class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
 
 
@@ -78,6 +84,7 @@ class JunitTestsGeneratorTarget(Target):
         JavaTestsGeneratorSourcesField,
         Dependencies,
         JvmCompatibleResolveNamesField,
+        JvmProvidesTypesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
 
@@ -114,11 +121,12 @@ class JavaSourceTarget(Target):
         Dependencies,
         JavaSourceField,
         JvmCompatibleResolveNamesField,
+        JvmProvidesTypesField,
     )
     help = "A single Java source file containing application or library code."
 
 
-class JavaSourcesGeneratorSourcesField(JavaGeneratorSources):
+class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
 
 
@@ -129,6 +137,7 @@ class JavaSourcesGeneratorTarget(Target):
         Dependencies,
         JavaSourcesGeneratorSourcesField,
         JvmCompatibleResolveNamesField,
+        JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
@@ -158,7 +167,7 @@ async def generate_targets_from_java_sources(
 #
 
 
-class JvmMainClassName(StringField):
+class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
     help = (
@@ -167,19 +176,19 @@ class JvmMainClassName(StringField):
     )
 
 
-class DeployJar(Target):
+class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         OutputPathField,
-        JvmMainClassName,
-        JvmResolveName,
+        JvmMainClassNameField,
+        JvmResolveNameField,
     )
     help = (
-        "A `jar` file that contains the compiled source code along with its dependency class "
-        "files, where the compiled class files from all dependency JARs, along with first-party "
-        "class files, exist in a common directory structure."
+        "A `jar` file with first and third-party code bundled for deploys.\n\n"
+        "The JAR will contain class files for both first-party code and "
+        "third-party dependencies, all in a common directory structure."
     )
 
 

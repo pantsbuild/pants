@@ -83,11 +83,11 @@ FIXED_BAD_SOURCE = FileContent(
 def make_target(
     rule_runner: RuleRunner, source_files: List[FileContent], *, target_name="target"
 ) -> Target:
-    for source_file in source_files:
-        rule_runner.create_file(f"{source_file.path}", source_file.content.decode())
-    rule_runner.add_to_build_file(
-        "",
-        f"terraform_module(name='{target_name}')\n",
+    rule_runner.write_files(
+        {
+            "BUILD": f"terraform_module(name='{target_name}')\n",
+            **{source_file.path: source_file.content.decode() for source_file in source_files},
+        }
     )
     return rule_runner.get_target(Address("", target_name=target_name))
 

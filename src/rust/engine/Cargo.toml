@@ -1,6 +1,6 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
@@ -26,7 +26,6 @@ members = [
   "cache",
   "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -68,7 +67,6 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -98,11 +96,11 @@ crate-type = ["cdylib"]
 
 [features]
 # NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
-# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# unfortunately, enabling `extension-module` causes tests linked against `pyo3` to fail. We
 # define a feature to enable that, but we do not enable it by default: someone building this module
 # in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
 #  see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["cpython/extension-module"]
+extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
@@ -114,8 +112,6 @@ protos = { path = "protos" }
 bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
-# TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
-cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
 crossbeam-channel = "0.4"
 derivative = "2.2"
 double-checked-cell-async = "2.0"
@@ -138,6 +134,7 @@ num_enum = "0.4"
 parking_lot = "0.11"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
+pyo3 = "0.15.1"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
@@ -149,7 +146,7 @@ serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
-time = "0.1.40"
+time = "0.3"
 tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
@@ -163,6 +160,5 @@ testutil = { path = "./testutil" }
 fs = { path = "./fs" }
 env_logger = "0.5.4"
 
-[patch.crates-io]
-# TODO: Waiting for release after https://github.com/mitsuhiko/console/pull/93.
-console = { git = "https://github.com/mitsuhiko/console", rev = "3232775295149e6f0aace26d4cfe61013ed3e2d8" }
+[build-dependencies]
+pyo3-build-config = "0.15.1"

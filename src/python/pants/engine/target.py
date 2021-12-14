@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import enum
 import itertools
 import logging
 import os.path
@@ -122,6 +123,9 @@ class Field:
     # Subclasses may define these.
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
+
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
 
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
@@ -313,11 +317,9 @@ class Target:
             target generator was explicitly defined. Target generators can, however, set this to
             the directory where the generated target provides metadata for. For example, a
             file-based target like `python_source` should set this to the parent directory of
-            its file. A directory-based target like `go_first_party_package` should set it to the
-            directory. A subtree-based target might set it to the root of the subtree. A file-less
-            target like `go_third_party_package` should keep the default of `address.spec_path`.
-            This field impacts how command line specs work, so that globs like `dir:` know whether
-            to match the target or not.
+            its file. A file-less target like `go_third_party_package` should keep the default of
+            `address.spec_path`. This field impacts how command line specs work, so that globs
+            like `dir:` know whether to match the target or not.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -328,37 +330,45 @@ class Target:
             warn_or_error(
                 self.removal_version,
                 entity=f"the {repr(self.alias)} target type",
-                hint=(
-                    f"Using the `{self.alias}` target type for {address}. " f"{self.removal_hint}"
-                ),
+                hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
-
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.field_values = self._calculate_field_values(unhydrated_values, address)
+        self.validate()
 
+    @final
+    def _calculate_field_values(
+        self, unhydrated_values: dict[str, Any], address: Address
+    ) -> FrozenDict[type[Field], Field]:
         field_values = {}
-        aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
+        valid_aliases = set()
+        aliases_to_field_types = {}
+        for field_type in self.field_types:
+            valid_aliases.add(field_type.alias)
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
                 raise InvalidFieldException(
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
-                    f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
+                    f"the target type `{self.alias}`: {sorted(valid_aliases)}.",
                 )
             field_type = aliases_to_field_types[alias]
             field_values[field_type] = field_type(value, address)
+
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
             field_values[field_type] = field_type(None, address)
-        self.field_values = FrozenDict(
+        return FrozenDict(
             sorted(
                 field_values.items(),
                 key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
             )
         )
-
-        self.validate()
 
     @final
     @property
@@ -1302,22 +1312,52 @@ class TriBoolField(ScalarField[bool]):
         return super().compute_value(raw_value, address)
 
 
+class ValidNumbers(Enum):
+    """What range of numbers are allowed for IntField and FloatField."""
+
+    positive_only = enum.auto()
+    positive_and_zero = enum.auto()
+    all = enum.auto()
+
+    def validate(self, num: float | int | None, alias: str, address: Address) -> None:
+        if num is None or self == self.all:  # type: ignore[comparison-overlap]
+            return
+        if self == self.positive_and_zero:  # type: ignore[comparison-overlap]
+            if num < 0:
+                raise InvalidFieldException(
+                    f"The {repr(alias)} field in target {address} must be greater than or equal to "
+                    f"zero, but was set to `{num}`."
+                )
+            return
+        if num <= 0:
+            raise InvalidFieldException(
+                f"The {repr(alias)} field in target {address} must be greater than zero, but was "
+                f"set to `{num}`."
+            )
+
+
 class IntField(ScalarField[int]):
     expected_type = int
     expected_type_description = "an integer"
+    valid_numbers: ClassVar[ValidNumbers] = ValidNumbers.all
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        cls.valid_numbers.validate(value_or_default, cls.alias, address)
+        return value_or_default
 
 
 class FloatField(ScalarField[float]):
     expected_type = float
     expected_type_description = "a float"
+    valid_numbers: ClassVar[ValidNumbers] = ValidNumbers.all
 
     @classmethod
     def compute_value(cls, raw_value: Optional[float], address: Address) -> Optional[float]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        cls.valid_numbers.validate(value_or_default, cls.alias, address)
+        return value_or_default
 
 
 class StringField(ScalarField[str]):
@@ -1536,6 +1576,12 @@ class SourcesField(AsyncFieldMixin, Field):
         To enforce that there are only a certain number of resulting files, such as binary targets
         checking for only 0-1 sources, set the class property `expected_num_files`.
         """
+
+        if not self.required and not self.value:
+            # If this field isn't required or set, validation is done against the default value
+            # which is probably not valuable (See #13851).
+            return None
+
         if self.expected_file_extensions is not None:
             bad_files = [
                 fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
@@ -1709,6 +1755,39 @@ class SingleSourceField(SourcesField, StringField):
     required = True
     expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
 
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default is None:
+            return None
+        if "*" in value_or_default:
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} should not include `*` globs, "
+                f"but was set to {value_or_default}. Instead, use a literal file path (relative "
+                "to the BUILD file)."
+            )
+        if value_or_default.startswith("!"):
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} should not start with `!`, which "
+                f"is usually used in the `sources` field to exclude certain files. Instead, use a "
+                "literal file path (relative to the BUILD file)."
+            )
+        return value_or_default
+
+    @property
+    def file_path(self) -> str | None:
+        """The path to the file, relative to the build root.
+
+        This works without hydration because we validate that `*` globs and `!` ignores are not
+        used. However, consider still hydrating so that you verify the source file actually exists.
+
+        The return type is optional because it's possible to have 0-1 files. Most subclasses
+        will have 1 file, though.
+        """
+        if self.value is None:
+            return None
+        return os.path.join(self.address.spec_path, self.value)
+
     @property
     def globs(self) -> tuple[str, ...]:
         # Subclasses might override `required = False`, so `self.value` could be `None`.
@@ -1789,6 +1868,9 @@ class GenerateSourcesRequest:
     The rule to actually implement the codegen should take the subclass as input, and it must
     return `GeneratedSources`.
 
+    The `exportable` attribute disables the use of this codegen by the `export-codegen` goal when
+    set to False.
+
     For example:
 
         class GenerateFortranFromAvroRequest:
@@ -1811,6 +1893,8 @@ class GenerateSourcesRequest:
 
     input: ClassVar[type[SourcesField]]
     output: ClassVar[type[SourcesField]]
+
+    exportable: ClassVar[bool] = True
 
 
 @dataclass(frozen=True)
@@ -2099,9 +2183,12 @@ class InjectedDependencies(DeduplicatedCollection[Address]):
     sort_input = True
 
 
+SF = TypeVar("SF", bound="SourcesField")
+
+
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(EngineAwareParameter):
+class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
@@ -2131,8 +2218,8 @@ class InferDependenciesRequest(EngineAwareParameter):
             ]
     """
 
-    sources_field: SourcesField
-    infer_from: ClassVar[type[SourcesField]]
+    sources_field: SF
+    infer_from: ClassVar[Type[SF]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec

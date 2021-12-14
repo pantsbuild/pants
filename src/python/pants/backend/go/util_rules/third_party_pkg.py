@@ -41,9 +41,9 @@ class ThirdPartyPkgInfo:
     """
 
     import_path: str
-    subpath: str
 
     digest: Digest
+    dir_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
@@ -64,10 +64,11 @@ class ThirdPartyPkgInfoRequest(EngineAwareParameter):
     """
 
     import_path: str
-    go_mod_stripped_digest: Digest
+    go_mod_digest: Digest
+    go_mod_path: str
 
     def debug_hint(self) -> str:
-        return self.import_path
+        return f"{self.import_path} from {self.go_mod_path}"
 
 
 @dataclass(frozen=True)
@@ -85,26 +86,30 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgInfo]):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackagesRequest:
-    go_mod_stripped_digest: Digest
+    go_mod_digest: Digest
+    go_mod_path: str
 
 
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    # NB: We download all modules to GOPATH=$(pwd)/gopath. Running `go list ...` from $(pwd) would
-    # naively try analyzing the contents of the GOPATH like they were first-party packages. This
-    # results in errors like this:
+    # NB: We download all modules to GOPATH={chroot}/gopath. Running `go list ...` from {chroot}
+    # would naively try analyzing the contents of the GOPATH like they were first-party packages.
+    # This results in errors like this:
     #
     #   package <import_path>/gopath/pkg/mod/golang.org/x/text@v0.3.0/unicode: can only use
     #   path@version syntax with 'go get' and 'go install' in module-aware mode
     #
-    # Instead, we run `go list` from a subdirectory of the chroot. It can still access the
-    # contents of `GOPATH`, but won't incorrectly treat its contents as first-party packages.
-    go_mod_prefix = "go_mod_prefix"
-    go_mod_prefixed_digest = await Get(
-        Digest, AddPrefix(request.go_mod_stripped_digest, go_mod_prefix)
-    )
+    # Instead, we make sure we run `go list` from a subdirectory of the chroot. It can still
+    # access the contents of `GOPATH`, but won't incorrectly treat its contents as
+    # first-party packages.
+    go_mod_dir = os.path.dirname(request.go_mod_path)
+    if not go_mod_dir:
+        go_mod_dir = "go_mod_prefix"
+        go_mod_digest = await Get(Digest, AddPrefix(request.go_mod_digest, go_mod_dir))
+    else:
+        go_mod_digest = request.go_mod_digest
 
     list_argv = (
         "list",
@@ -134,11 +139,10 @@ async def download_and_analyze_third_party_packages(
         ProcessResult,
         GoSdkProcess(
             command=list_argv,
-            # TODO: make this more descriptive: point to the actual `go_mod` target or path.
-            description="Run `go list` to download and analyze all third-party Go packages",
-            input_digest=go_mod_prefixed_digest,
+            description=f"Run `go list` to download {request.go_mod_path}",
+            input_digest=go_mod_digest,
             output_directories=("gopath/pkg/mod",),
-            working_dir=go_mod_prefix,
+            working_dir=go_mod_dir,
             allow_downloads=True,
         ),
     )
@@ -165,7 +169,7 @@ async def download_and_analyze_third_party_packages(
         all_pkg_info_kwargs.append(
             dict(
                 import_path=import_path,
-                subpath=dir_path,
+                dir_path=dir_path,
                 imports=tuple(pkg_json.get("Imports", ())),
                 go_files=tuple(pkg_json.get("GoFiles", ())),
                 s_files=tuple(pkg_json.get("SFiles", ())),
@@ -199,7 +203,8 @@ async def download_and_analyze_third_party_packages(
 @rule
 async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyPkgInfo:
     all_packages = await Get(
-        AllThirdPartyPackages, AllThirdPartyPackagesRequest(request.go_mod_stripped_digest)
+        AllThirdPartyPackages,
+        AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
@@ -244,7 +249,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
         )
         return None, ThirdPartyPkgInfo(
             import_path=import_path,
-            subpath="",
+            dir_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),

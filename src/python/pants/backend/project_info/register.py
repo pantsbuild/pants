@@ -11,6 +11,7 @@ from pants.backend.project_info import (
     filter_targets,
     list_roots,
     list_targets,
+    paths,
     peek,
     source_file_validator,
 )
@@ -25,6 +26,7 @@ def rules():
         *filter_targets.rules(),
         *list_roots.rules(),
         *list_targets.rules(),
+        *paths.rules(),
         *peek.rules(),
         *source_file_validator.rules(),
     ]

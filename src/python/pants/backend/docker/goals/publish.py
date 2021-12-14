@@ -19,8 +19,9 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +70,15 @@ async def push_docker_images(
             ]
         )
 
-    process = docker.push_image(tags)
+    env = await Get(Environment, EnvironmentRequest(options.env_vars))
+    processes = zip(tags, docker.push_image(tags, env))
     return PublishProcesses(
         [
             PublishPackages(
-                names=tags,
-                process=InteractiveProcess.from_process(process) if process else None,
-            ),
+                names=(tag,),
+                process=InteractiveProcess.from_process(process),
+            )
+            for tag, process in processes
         ]
     )
 

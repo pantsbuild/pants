@@ -77,4 +77,4 @@ def test_docker_build_environment_vars_rule(
         },
     )
     res = rule_runner.request(DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)])
-    assert res == DockerBuildEnvironment(expected_env_vars)
+    assert res == DockerBuildEnvironment.create(expected_env_vars)

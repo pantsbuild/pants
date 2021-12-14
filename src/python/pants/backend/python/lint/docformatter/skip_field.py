@@ -6,6 +6,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
 from pants.engine.target import BoolField
 
@@ -18,8 +19,9 @@ class SkipDocformatterField(BoolField):
 
 def rules():
     return [
-        PythonSourceTarget.register_plugin_field(SkipDocformatterField),
         PythonSourcesGeneratorTarget.register_plugin_field(SkipDocformatterField),
-        PythonTestTarget.register_plugin_field(SkipDocformatterField),
+        PythonSourceTarget.register_plugin_field(SkipDocformatterField),
         PythonTestsGeneratorTarget.register_plugin_field(SkipDocformatterField),
+        PythonTestTarget.register_plugin_field(SkipDocformatterField),
+        PythonTestUtilsGeneratorTarget.register_plugin_field(SkipDocformatterField),
     ]

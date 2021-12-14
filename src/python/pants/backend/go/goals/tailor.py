@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.go.target_types import (
     GoBinaryMainPackage,
@@ -13,6 +14,7 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageRequest,
     GoBinaryTarget,
     GoModTarget,
+    GoPackageTarget,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.tailor import (
@@ -47,8 +49,13 @@ async def find_putative_go_targets(
 ) -> PutativeTargets:
     putative_targets = []
 
+    all_go_mod_files, all_go_files, all_go_files_digest_contents = await MultiGet(
+        Get(Paths, PathGlobs, request.search_paths.path_globs("go.mod")),
+        Get(Paths, PathGlobs, request.search_paths.path_globs("*.go")),
+        Get(DigestContents, PathGlobs, request.search_paths.path_globs("*.go")),
+    )
+
     # Add `go_mod` targets.
-    all_go_mod_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("go.mod"))
     unowned_go_mod_files = set(all_go_mod_files.files) - set(all_owned_sources)
     for dirname, filenames in group_by_dir(unowned_go_mod_files).items():
         putative_targets.append(
@@ -60,11 +67,25 @@ async def find_putative_go_targets(
             )
         )
 
+    # Add `go_package` targets.
+    unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
+    for dirname, filenames in group_by_dir(unowned_go_files).items():
+        dir_path = PurePath(dirname)
+        if "testdata" in dir_path.parts:
+            continue
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path=dirname,
+                name=dir_path.name,
+                triggering_sources=sorted(filenames),
+            )
+        )
+
     # Add `go_binary` targets.
-    digest_contents = await Get(DigestContents, PathGlobs, request.search_paths.path_globs("*.go"))
     main_package_dirs = [
         os.path.dirname(file_content.path)
-        for file_content in digest_contents
+        for file_content in all_go_files_digest_contents
         if has_package_main(file_content.content)
     ]
     existing_targets = await Get(
@@ -76,10 +97,9 @@ async def find_putative_go_targets(
         if t.has_field(GoBinaryMainPackageField)
     )
     unowned_main_package_dirs = set(main_package_dirs) - {
-        # We can be confident `go_first_party_package` targets were generated, meaning that the
-        # below will get us the full path to the package's directory.
-        # TODO: generalize this
-        os.path.join(pkg.address.spec_path, pkg.address.generated_name[2:]).rstrip("/")  # type: ignore[index]
+        # NB: We assume the `go_package` lives in the directory it's defined, which we validate
+        # by e.g. banning `**` in its sources field.
+        pkg.address.spec_path
         for pkg in owned_main_packages
     }
     putative_targets.extend(

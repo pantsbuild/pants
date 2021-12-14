@@ -149,33 +149,31 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     # so we explicitly mention localhost.
     url_req = f"foorl@ git+file://localhost{foorl_dir.as_posix()}@9.8.7"
 
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            f"""
-            python_requirement(name="foo", requirements=["foo-bar>=0.1.2"])
-            python_requirement(name="bar", requirements=["bar==5.5.5"])
-            python_requirement(name="baz", requirements=["baz"])
-            python_requirement(name="foorl", requirements=["{url_req}"])
-            python_sources(name="util", sources=[], dependencies=[":foo", ":bar"])
-            python_sources(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
-            """
-        ),
-    )
-    rule_runner.create_file(
-        "constraints1.txt",
-        dedent(
-            """
-            # Comment.
-            --find-links=https://duckduckgo.com
-            Foo._-BAR==1.0.0  # Inline comment.
-            bar==5.5.5
-            baz==2.2.2
-            qux==3.4.5
-            # Note that pip does not allow URL requirements in constraints files,
-            # so there is no mention of foorl here.
-        """
-        ),
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                f"""
+                python_requirement(name="foo", requirements=["foo-bar>=0.1.2"])
+                python_requirement(name="bar", requirements=["bar==5.5.5"])
+                python_requirement(name="baz", requirements=["baz"])
+                python_requirement(name="foorl", requirements=["{url_req}"])
+                python_sources(name="util", sources=[], dependencies=[":foo", ":bar"])
+                python_sources(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
+                """
+            ),
+            "constraints1.txt": dedent(
+                """
+                # Comment.
+                --find-links=https://duckduckgo.com
+                Foo._-BAR==1.0.0  # Inline comment.
+                bar==5.5.5
+                baz==2.2.2
+                qux==3.4.5
+                # Note that pip does not allow URL requirements in constraints files,
+                # so there is no mention of foorl here.
+                """
+            ),
+        }
     )
 
     def get_pex_request(

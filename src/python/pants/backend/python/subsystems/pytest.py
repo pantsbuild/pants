@@ -17,9 +17,9 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     PythonResolveField,
-    PythonTestsExtraEnvVars,
+    PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
-    PythonTestsTimeout,
+    PythonTestsTimeoutField,
     SkipPythonTestsField,
     format_invalid_requirement_string_error,
 )
@@ -46,9 +46,9 @@ class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestSourceField,)
 
     source: PythonTestSourceField
-    timeout: PythonTestsTimeout
+    timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
-    extra_env_vars: PythonTestsExtraEnvVars
+    extra_env_vars: PythonTestsExtraEnvVarsField
     resolve: PythonResolveField
 
     @classmethod

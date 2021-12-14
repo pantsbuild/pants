@@ -35,7 +35,6 @@ Env = Dict[str, str]
 NATIVE_FILES = [
     ".pants",
     "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine_pyo3.so",
     "src/python/pants/engine/internals/native_engine.so.metadata",
 ]
 
@@ -607,7 +606,7 @@ def generate() -> dict[Path, str]:
                         *checkout(),
                         {
                             "name": "Cargo audit (for security vulnerabilities)",
-                            "run": "./cargo install --version 0.13.1 cargo-audit\n./cargo audit\n",
+                            "run": "./cargo install --version 0.16.0 cargo-audit\n./cargo audit\n",
                         },
                     ],
                 }

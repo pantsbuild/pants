@@ -107,7 +107,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     ("3rdparty/requirements-test.txt",),
                     ("3rdparty/requirements-test.txt",),
                     addressable=False,
-                    kwargs={"requirements_relpath": "requirements-test.txt"},
+                    kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget, "src/python/foo", "foo", ["__init__.py"]
@@ -194,10 +194,13 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
             for name in mains
         }
     )
-    rule_runner.add_to_build_file(
-        "src/python/foo",
-        "pex_binary(name='main1', entry_point='main1.py')\n"
-        "pex_binary(name='main2', entry_point='foo.main2')\n",
+    rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": (
+                "pex_binary(name='main1', entry_point='main1.py')\n"
+                "pex_binary(name='main2', entry_point='foo.main2')\n"
+            ),
+        }
     )
     pts = rule_runner.request(
         PutativeTargets,

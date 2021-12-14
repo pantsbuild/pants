@@ -53,6 +53,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TriBoolField,
+    ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
 from pants.option.subsystem import Subsystem
@@ -178,14 +179,32 @@ class PexBinaryDefaults(Subsystem):
                 "`pex_binary` targets"
             ),
         )
+        register(
+            "--resolve-local-platforms",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+                "interpreter is found, use the interpreter to resolve distributions and build any "
+                "that are only available in source distribution form. If no matching interpreter "
+                "is found (or if this option is `False`), resolve for the platform by accepting "
+                "only pre-built binary distributions (wheels)."
+            ),
+        )
 
     @property
     def emit_warnings(self) -> bool:
         return cast(bool, self.options.emit_warnings)
 
+    @property
+    def resolve_local_platforms(self) -> bool:
+        return cast(bool, self.options.resolve_local_platforms)
+
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PexBinaryDependencies(Dependencies):
+class PexBinaryDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -417,6 +436,22 @@ class PexEmitWarningsField(TriBoolField):
         return self.value
 
 
+class PexResolveLocalPlatformsField(TriBoolField):
+    alias = "resolve_local_platforms"
+    help = (
+        f"For each of the `{PexPlatformsField.alias}` specified, attempt to find a local "
+        "interpreter that matches.\n\nIf a matching interpreter is found, use the interpreter to "
+        "resolve distributions and build any that are only available in source distribution form. "
+        "If no matching interpreter is found (or if this option is `False`), resolve for the "
+        "platform by accepting only pre-built binary distributions (wheels)."
+    )
+
+    def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
+        if self.value is None:
+            return pex_binary_defaults.resolve_local_platforms
+        return self.value
+
+
 class PexExecutionMode(Enum):
     ZIPAPP = "zipapp"
     VENV = "venv"
@@ -440,6 +475,35 @@ class PexExecutionModeField(StringField):
     )
 
 
+class PexLayout(Enum):
+    ZIPAPP = "zipapp"
+    PACKED = "packed"
+    LOOSE = "loose"
+
+
+class PexLayoutField(StringField):
+    alias = "layout"
+    valid_choices = PexLayout
+    expected_type = str
+    default = PexLayout.ZIPAPP.value
+    help = (
+        "The layout used for the PEX binary.\n\nBy default, a PEX is created as a single file "
+        "zipapp, but either a packed or loose directory tree based layout can be chosen instead."
+        "\n\nA packed layout PEX is an executable directory structure designed to have "
+        "cache-friendly characteristics for syncing incremental updates to PEXed applications over "
+        "a network. At the top level of the packed directory tree there is an executable "
+        "`__main__.py` script. The directory can also be executed by passing its path to a Python "
+        "executable; e.g: `python packed-pex-dir/`. The Pex bootstrap code and all dependency code "
+        "are packed into individual zip files for efficient caching and syncing.\n\nA loose layout "
+        "PEX is similar to a packed PEX, except that neither the Pex bootstrap code nor the "
+        "dependency code are packed into zip files, but are instead present as collections of "
+        "loose files in the directory tree providing different caching and syncing tradeoffs.\n\n"
+        "Both zipapp and packed layouts install themselves in the `$PEX_ROOT` as loose apps by "
+        "default before executing, but these layouts compose with "
+        f"`{PexExecutionModeField.alias}='{PexExecutionMode.ZIPAPP.value}'` as well."
+    )
+
+
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
@@ -457,15 +521,17 @@ class PexBinary(Target):
         OutputPathField,
         InterpreterConstraintsField,
         PythonResolveField,
-        PexBinaryDependencies,
+        PexBinaryDependenciesField,
         PexEntryPointField,
         PexScriptField,
         PexPlatformsField,
+        PexResolveLocalPlatformsField,
         PexInheritPathField,
         PexStripEnvField,
         PexIgnoreErrorsField,
         PexShebangField,
         PexEmitWarningsField,
+        PexLayoutField,
         PexExecutionModeField,
         PexIncludeToolsField,
         RestartableField,
@@ -507,26 +573,19 @@ class PythonTestSourceField(PythonSourceField):
             )
 
 
-class PythonTestsDependencies(Dependencies):
+class PythonTestsDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class PythonTestsTimeout(IntField):
+class PythonTestsTimeoutField(IntField):
     alias = "timeout"
     help = (
         "A timeout (in seconds) used by each test file belonging to this target.\n\n"
-        "This only applies if the option `--pytest-timeouts` is set to True."
+        "If unset, will default to `[pytest].timeout_default`; if that option is also unset, "
+        "then the test will never time out. Will never exceed `[pytest].timeout_maximum`. Only "
+        "applies if the option `--pytest-timeouts` is set to true (the default)."
     )
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address)
-        if value is not None and value < 1:
-            raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{value}."
-            )
-        return value
+    valid_numbers = ValidNumbers.positive_only
 
     def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
@@ -543,7 +602,7 @@ class PythonTestsTimeout(IntField):
         return result
 
 
-class PythonTestsExtraEnvVars(StringSequenceField):
+class PythonTestsExtraEnvVarsField(StringSequenceField):
     alias = "extra_env_vars"
     help = (
         "Additional environment variables to include in test processes. "
@@ -563,10 +622,10 @@ _PYTHON_TEST_COMMON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     InterpreterConstraintsField,
     PythonResolveField,
-    PythonTestsDependencies,
-    PythonTestsTimeout,
+    PythonTestsDependenciesField,
+    PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
-    PythonTestsExtraEnvVars,
+    PythonTestsExtraEnvVarsField,
     SkipPythonTestsField,
 )
 
@@ -895,14 +954,14 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
             )
 
 
-class PythonRequirementsFileSources(MultipleSourcesField):
+class PythonRequirementsFileSourcesField(MultipleSourcesField):
     required = True
     uses_source_roots = False
 
 
 class PythonRequirementsFile(Target):
     alias = "_python_requirements_file"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
     help = "A private helper target type for requirements.txt files."
 
 
@@ -912,7 +971,7 @@ class PythonRequirementsFile(Target):
 
 
 # See `target_types_rules.py` for a dependency injection rule.
-class PythonDistributionDependencies(Dependencies):
+class PythonDistributionDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
@@ -1103,7 +1162,7 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        PythonDistributionDependencies,
+        PythonDistributionDependenciesField,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
         GenerateSetupField,

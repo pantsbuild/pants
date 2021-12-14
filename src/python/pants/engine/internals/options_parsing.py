@@ -3,10 +3,11 @@
 
 from dataclasses import dataclass
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
@@ -52,6 +53,19 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 def log_level(global_options: GlobalOptions) -> LogLevel:
     log_level: LogLevel = global_options.options.level
     return log_level
+
+
+@rule
+def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessCleanupOption:
+    cleanup = resolve_conflicting_options(
+        old_option="process_execution_local_cleanup",
+        new_option="process_cleanup",
+        old_scope="",
+        new_scope="",
+        old_container=global_options.options,
+        new_container=global_options.options,
+    )
+    return ProcessCleanupOption(cleanup)
 
 
 def rules():

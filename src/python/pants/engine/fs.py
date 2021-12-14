@@ -7,11 +7,23 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
-# Re-export GlobMatchErrorBehavior here as part of the public Plugin API.
+# Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.internals.native_engine import PyDigest, PySnapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
+from pants.engine.internals.native_engine import (  # noqa: F401
+    EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
+)
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
+from pants.engine.internals.native_engine import (
+    PyAddPrefix,
+    PyDigest,
+    PyFileDigest,
+    PyMergeDigests,
+    PyRemovePrefix,
+    PySnapshot,
+)
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
@@ -19,20 +31,14 @@ if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
 
 
-"""A Digest is a lightweight reference to a set of files known about by the engine.
-
-You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
-Get(DigestContents, Digest)` to see the actual file content.
-"""
+# Re-export. Note that because we rename the symbol, MyPy requires defining an alias like this,
+# rather than simply using `from mod import Bar as Baz`.
 Digest = PyDigest
-
-
-"""A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
-names/content.
-
-You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-"""
+FileDigest = PyFileDigest
 Snapshot = PySnapshot
+MergeDigests = PyMergeDigests
+AddPrefix = PyAddPrefix
+RemovePrefix = PyRemovePrefix
 
 
 @dataclass(frozen=True)
@@ -45,14 +51,6 @@ class Paths:
 
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class FileDigest:
-    """A FileDigest is a digest that refers to a file's content, without its name."""
-
-    fingerprint: str
-    serialized_bytes_length: int
 
 
 @dataclass(frozen=True)
@@ -220,52 +218,6 @@ class DigestSubset:
     globs: PathGlobs
 
 
-@dataclass(unsafe_hash=True)
-class MergeDigests:
-    digests: Tuple[Digest, ...]
-
-    def __init__(self, digests: Iterable[Digest]) -> None:
-        """A request to merge several digests into one single digest.
-
-        This will fail if there are any conflicting changes, such as two digests having the same
-        file but with different content.
-
-        Example:
-
-            result = await Get(Digest, MergeDigests([digest1, digest2])
-        """
-        self.digests = tuple(digests)
-
-
-@dataclass(frozen=True)
-class RemovePrefix:
-    """A request to remove the specified prefix path from every file and directory in the digest.
-
-    This will fail if there are any files or directories in the original input digest without the
-    specified prefix.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
-
-
-@dataclass(frozen=True)
-class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
-
-
 @dataclass(frozen=True)
 class DownloadFile:
     """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
@@ -300,12 +252,6 @@ class Workspace(SideEffecting):
         if side_effecting:
             self.side_effected()
         self._scheduler.write_digest(digest, path_prefix=path_prefix)
-
-
-_EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EMPTY_DIGEST: Digest = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_SNAPSHOT = Snapshot()
 
 
 @dataclass(frozen=True)

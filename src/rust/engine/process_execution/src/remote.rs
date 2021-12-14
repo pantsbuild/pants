@@ -43,8 +43,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -100,7 +100,6 @@ pub struct CommandRunner {
   metadata: ProcessMetadata,
   platform: Platform,
   store: Store,
-  headers: BTreeMap<String, String>,
   execution_client: Arc<ExecutionClient<LayeredService>>,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
@@ -153,7 +152,7 @@ impl CommandRunner {
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
-    let mut store_headers = headers.clone();
+    let mut store_headers = headers;
     let store_endpoint = grpc_util::create_endpoint(
       store_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
@@ -172,7 +171,6 @@ impl CommandRunner {
 
     let command_runner = CommandRunner {
       metadata,
-      headers,
       execution_client,
       action_cache_client,
       store,
@@ -734,19 +732,18 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
-  /// Run the given MultiPlatformProcess via the Remote Execution API.
+  /// Run the given Process via the Remote Execution API.
   async fn run(
     &self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-    request: MultiPlatformProcess,
+    request: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Retrieve capabilities for this server.
     let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self.extract_compatible_request(&request).unwrap();
     let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
@@ -792,7 +789,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_files),
+      Some(request.input_digests.complete),
     )
     .await?;
 
@@ -849,16 +846,6 @@ impl crate::CommandRunner for CommandRunner {
       },
     )
     .await
-  }
-
-  // TODO: This is a copy of the same method on crate::remote::CommandRunner.
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
   }
 }
 
@@ -1041,7 +1028,7 @@ pub fn make_execute_request(
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_files).into()),
+    input_root_digest: Some((&req.input_digests.complete).into()),
     ..remexec::Action::default()
   };
 

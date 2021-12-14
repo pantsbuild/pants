@@ -16,7 +16,6 @@ from typing_extensions import TypedDict
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
 from pants.engine.fs import (
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
@@ -27,11 +26,9 @@ from pants.engine.fs import (
     FileContent,
     FileDigest,
     FileEntry,
-    MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     Paths,
-    RemovePrefix,
     Snapshot,
 )
 from pants.engine.goal import Goal
@@ -56,7 +53,7 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
-    MultiPlatformProcess,
+    Process,
     ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
@@ -148,8 +145,6 @@ class Scheduler:
 
         # Create the native Scheduler and Session.
         types = PyTypes(
-            file_digest=FileDigest,
-            snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,
             file_entry=FileEntry,
@@ -157,14 +152,11 @@ class Scheduler:
             digest_contents=DigestContents,
             digest_entries=DigestEntries,
             path_globs=PathGlobs,
-            merge_digests=MergeDigests,
-            add_prefix=AddPrefix,
-            remove_prefix=RemovePrefix,
             create_digest=CreateDigest,
             digest_subset=DigestSubset,
             download_file=DownloadFile,
             platform=Platform,
-            multi_platform_process=MultiPlatformProcess,
+            process=Process,
             process_result=FallibleProcessResult,
             process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,
@@ -181,7 +173,7 @@ class Scheduler:
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
-            store_headers=tuple(execution_options.remote_store_headers.items()),
+            store_headers=execution_options.remote_store_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
@@ -194,7 +186,7 @@ class Scheduler:
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=tuple(execution_options.remote_execution_headers.items()),
+            execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
         )
@@ -207,10 +199,10 @@ class Scheduler:
             shard_count=local_store_options.shard_count,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
-            local_cache=execution_options.process_execution_local_cache,
+            local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
-            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_cleanup=execution_options.process_cleanup,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
@@ -281,7 +273,7 @@ class Scheduler:
         )
 
     def invalidate_files(self, filenames: Iterable[str]) -> int:
-        return native_engine.graph_invalidate_paths(self.py_scheduler, tuple(filenames))
+        return native_engine.graph_invalidate_paths(self.py_scheduler, filenames)
 
     def invalidate_all_files(self) -> int:
         return native_engine.graph_invalidate_all_paths(self.py_scheduler)
@@ -469,12 +461,12 @@ class SchedulerSession:
 
         states = [
             Throw(
-                raw_root.result(),
-                python_traceback=raw_root.python_traceback(),
-                engine_traceback=raw_root.engine_traceback(),
+                raw_root.result,
+                python_traceback=raw_root.python_traceback,
+                engine_traceback=raw_root.engine_traceback,
             )
-            if raw_root.is_throw()
-            else Return(raw_root.result())
+            if raw_root.is_throw
+            else Return(raw_root.result)
             for raw_root in raw_roots
         ]
 
@@ -575,9 +567,7 @@ class SchedulerSession:
         # order in output lists.
         return [ret.value for _, ret in returns]
 
-    def capture_snapshots(
-        self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
-    ) -> tuple[Snapshot, ...]:
+    def capture_snapshots(self, path_globs_and_roots: Iterable[PathGlobsAndRoot]) -> list[Snapshot]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
@@ -589,8 +579,8 @@ class SchedulerSession:
             _PathGlobsAndRootCollection(path_globs_and_roots),
         )
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
-        return tuple(native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests)))
+    def single_file_digests_to_bytes(self, digests: Sequence[FileDigest]) -> list[bytes]:
+        return native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests))
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
@@ -605,7 +595,7 @@ class SchedulerSession:
             self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
         )
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:

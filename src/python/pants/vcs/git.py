@@ -1,21 +1,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 import subprocess
+from dataclasses import dataclass
+from os import PathLike
+from pathlib import Path, PurePath
+from typing import Iterable
 
 from pants.util.contextutil import pushd
-
-# 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
-MAX_SYMLINKS_IN_REALPATH = 40
-GIT_HASH_LENGTH = 20
-
-NUL = b"\0"
-SPACE = b" "
-NEWLINE = b"\n"
-EMPTY_STRING = b""
-
+from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -24,102 +21,93 @@ class GitException(Exception):
     pass
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class Git:
-    @classmethod
-    def detect_worktree(cls, binary="git", subdir=None):
-        """Detect the git working tree above cwd and return it; else, return None.
+    worktree: PurePath
+    _gitdir: PurePath
+    _gitcmd: str
 
-        :param string binary: The path to the git binary to use, 'git' by default.
+    def __init__(
+        self,
+        worktree: PathLike[str] | None = None,
+        *,
+        gitdir: PathLike[str] | None = None,
+        binary: str = "git",
+    ) -> None:
+        """Creates a git object that assumes the git repository is in the cwd by default.
+
+        worktree:  The path to the git repository working tree directory (typically '.').
+        gitdir:    The path to the repository's git metadata directory (typically '.git').
+        binary:    The path to the git binary to use, 'git' by default.
+        """
+        self.worktree = Path(worktree or os.getcwd()).resolve()
+        self._gitdir = Path(gitdir).resolve() if gitdir else (self.worktree / ".git")
+        self._gitcmd = binary
+
+    @classmethod
+    def mount(cls, subdir: str | PurePath | None = None, *, binary: str | PurePath = "git") -> Git:
+        """Detect the git working tree above cwd and return it.
+
         :param string subdir: The path to start searching for a git repo.
-        :returns: path to the directory where the git working tree is rooted.
-        :rtype: string
+        :param string binary: The path to the git binary to use, 'git' by default.
+        :returns: a Git object that is configured to operate on the found git repo.
+        :raises: :class:`GitException` if no git repo could be found.
         """
-        # TODO(John Sirois): This is only used as a factory for a Git instance in
-        # pants.base.build_environment.get_scm, encapsulate in a true factory method.
-        cmd = [binary, "rev-parse", "--show-toplevel"]
+        cmd = [str(binary), "rev-parse", "--show-toplevel"]
+        if subdir:
+            with pushd(str(subdir)):
+                process, out, err = cls._invoke(cmd)
+        else:
+            process, out, err = cls._invoke(cmd)
+        cls._check_result(cmd, process.returncode, err.decode())
+        return cls(worktree=PurePath(cls._cleanse(out)))
+
+    @staticmethod
+    def _invoke(cmd: list[str]) -> tuple[subprocess.Popen, bytes, bytes]:
         try:
-            if subdir:
-                with pushd(subdir):
-                    process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
-            else:
-                process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
-            cls._check_result(cmd, process.returncode)
-        except GitException:
-            return None
-        return cls._cleanse(out)
-
-    @classmethod
-    def _invoke(cls, cmd, stderr=None):
-        """Invoke the given command, and return a tuple of process and raw binary output.
-
-        If stderr is defined as None, it will flow to wherever it is currently mapped
-        for the parent process, generally to the terminal where the user can see the error
-        (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
-        some cases we want to treat it specially, which is why it is exposed
-        in the signature of _invoke.
-
-        :param list cmd: The command in the form of a list of strings
-        :returns: The completed process object and its standard output.
-        :raises: Scm.LocalException if there was a problem exec'ing the command at all.
-        """
-        try:
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except OSError as e:
             # Binary DNE or is not executable
             cmd_str = " ".join(cmd)
             raise GitException(f"Failed to execute command {cmd_str}: {e!r}")
-        out, _ = process.communicate()
-        return process, out
+        out, err = process.communicate()
+        return process, out, err
 
     @classmethod
-    def _cleanse(cls, output, errors="strict"):
-        return output.strip().decode("utf-8", errors=errors)
+    def _cleanse(cls, output: bytes) -> str:
+        return output.decode().strip()
 
     @classmethod
-    def _check_result(cls, cmd, result, failure_msg=None):
+    def _check_result(cls, cmd: Iterable[str], result: int, failure_msg: str | None = None) -> None:
         if result != 0:
             cmd_str = " ".join(cmd)
             raise GitException(failure_msg or f"{cmd_str} failed with exit code {result}")
-
-    def __init__(self, binary="git", gitdir=None, worktree=None, remote=None, branch=None):
-        """Creates a git scm proxy that assumes the git repository is in the cwd by default.
-
-        binary:    The path to the git binary to use, 'git' by default.
-        gitdir:    The path to the repository's git metadata directory (typically '.git').
-        worktree:  The path to the git repository working tree directory (typically '.').
-        remote:    The default remote to use.
-        branch:    The default remote branch to use.
-        """
-        super().__init__()
-        self._gitcmd = binary
-        self._worktree = os.path.realpath(worktree or os.getcwd())
-        self._gitdir = os.path.realpath(gitdir) if gitdir else os.path.join(self._worktree, ".git")
-        self._remote = remote
-        self._branch = branch
 
     @property
     def current_rev_identifier(self):
         return "HEAD"
 
     @property
-    def worktree(self):
-        return self._worktree
-
-    @property
     def commit_id(self):
         return self._check_output(["rev-parse", "HEAD"])
 
     @property
-    def branch_name(self):
+    def branch_name(self) -> str | None:
         branch = self._check_output(["rev-parse", "--abbrev-ref", "HEAD"])
         return None if branch == "HEAD" else branch
 
-    def fix_git_relative_path(self, worktree_path, relative_to):
-        return os.path.relpath(os.path.join(self._worktree, worktree_path), relative_to)
+    def _fix_git_relative_path(self, worktree_path: str, relative_to: PurePath | str) -> str:
+        return str((self.worktree / worktree_path).relative_to(relative_to))
 
-    def changed_files(self, from_commit=None, include_untracked=False, relative_to=None):
-        relative_to = relative_to or self._worktree
-        rel_suffix = ["--", relative_to]
+    def changed_files(
+        self,
+        from_commit: str | None = None,
+        include_untracked: bool = False,
+        relative_to: PurePath | str | None = None,
+    ) -> set[str]:
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
+        rel_suffix = ["--", str(relative_to)]
         uncommitted_changes = self._check_output(["diff", "--name-only", "HEAD"] + rel_suffix)
 
         files = set(uncommitted_changes.splitlines())
@@ -139,40 +127,39 @@ class Git:
             untracked = self._check_output(untracked_cmd)
             files.update(untracked.split())
         # git will report changed files relative to the worktree: re-relativize to relative_to
-        return {self.fix_git_relative_path(f, relative_to) for f in files}
+        return {self._fix_git_relative_path(f, relative_to) for f in files}
 
-    def changes_in(self, diffspec, relative_to=None):
-        relative_to = relative_to or self._worktree
+    def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
         files = self._check_output(cmd).split()
-        return {self.fix_git_relative_path(f.strip(), relative_to) for f in files}
+        return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
-    def commit(self, message, verify=True):
-        cmd = ["commit", "--all", "--message=" + message]
-        if not verify:
-            cmd.append("--no-verify")
-        self._check_call(cmd)
+    # N.B.: Only used by tests.
+    def commit(self, message: str) -> None:
+        self._check_call(["commit", "--all", "--message", message])
 
-    def add(self, *paths):
-        self._check_call(["add"] + list(paths))
+    # N.B.: Only used by tests.
+    def add(self, *paths: PurePath) -> None:
+        self._check_call(["add", *(str(path) for path in paths)])
 
-    def _check_call(self, args, failure_msg=None):
+    def _check_call(self, args: Iterable[str]) -> None:
         cmd = self._create_git_cmdline(args)
         self._log_call(cmd)
         result = subprocess.call(cmd)
-        self._check_result(cmd, result, failure_msg)
+        self._check_result(cmd, result)
 
-    def _check_output(self, args, failure_msg=None, errors="strict"):
+    def _check_output(self, args: Iterable[str]) -> str:
         cmd = self._create_git_cmdline(args)
         self._log_call(cmd)
 
-        process, out = self._invoke(cmd)
+        process, out, err = self._invoke(cmd)
 
-        self._check_result(cmd, process.returncode, failure_msg)
-        return self._cleanse(out, errors=errors)
+        self._check_result(cmd, process.returncode, err.decode())
+        return self._cleanse(out)
 
-    def _create_git_cmdline(self, args):
-        return [self._gitcmd, "--git-dir=" + self._gitdir, "--work-tree=" + self._worktree] + args
+    def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
+        return [self._gitcmd, f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
 
-    def _log_call(self, cmd):
+    def _log_call(self, cmd: Iterable[str]) -> None:
         logger.debug("Executing: " + " ".join(cmd))

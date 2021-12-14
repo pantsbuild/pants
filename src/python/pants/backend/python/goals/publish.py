@@ -18,20 +18,31 @@ from pants.core.goals.publish import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, StringSequenceField
+from pants.option.global_options import GlobalOptions
 
 logger = logging.getLogger(__name__)
 
 
-class PyPiRepositories(StringSequenceField):
-    alias = "pypi_repositories"
-    help = "List of PyPi repositories to publish the target package to."
+class PythonRepositoriesField(StringSequenceField):
+    alias = "repositories"
+    help = (
+        "List of URL addresses or Twine repository aliases where to publish the Python package.\n\n"
+        "Twine is used for publishing Python packages, so the address to any kind of repository "
+        "that Twine supports may be used here.\n\n"
+        "Aliases are prefixed with `@` to refer to a config section in your Twine configuration, "
+        "such as a `.pypirc` file. Use `@pypi` to upload to the public PyPi repository, which is "
+        "the default when using Twine directly."
+    )
 
     # Twine uploads to 'pypi' by default, but we don't set default to ["@pypi"] here to make it
     # explicit in the BUILD file when a package is meant for public distribution.
+
+    deprecated_alias = "pypi_repositories"
+    deprecated_alias_removal_version = "2.10.0.dev0"
 
 
 class SkipTwineUploadField(BoolField):
@@ -40,16 +51,16 @@ class SkipTwineUploadField(BoolField):
     help = "If true, don't publish this target's packages using Twine."
 
 
-class PublishToPyPiRequest(PublishRequest):
+class PublishPythonPackageRequest(PublishRequest):
     pass
 
 
 @dataclass(frozen=True)
-class PublishToPyPiFieldSet(PublishFieldSet):
-    publish_request_type = PublishToPyPiRequest
-    required_fields = (PyPiRepositories,)
+class PublishPythonPackageFieldSet(PublishFieldSet):
+    publish_request_type = PublishPythonPackageRequest
+    required_fields = (PythonRepositoriesField,)
 
-    repositories: PyPiRepositories
+    repositories: PythonRepositoriesField
     skip_twine: SkipTwineUploadField
 
     def get_output_data(self) -> PublishOutputData:
@@ -65,13 +76,20 @@ class PublishToPyPiFieldSet(PublishFieldSet):
     #
     # @classmethod
     # def opt_out(cls, tgt: Target) -> bool:
-    #     return not tgt[PyPiRepositories].value
+    #     return not tgt[PythonRepositoriesField].value
 
 
 def twine_upload_args(
-    twine_subsystem: TwineSubsystem, config_files: ConfigFiles, repo: str, dists: tuple[str, ...]
+    twine_subsystem: TwineSubsystem,
+    config_files: ConfigFiles,
+    repo: str,
+    dists: tuple[str, ...],
+    ca_cert: Snapshot | None,
 ) -> tuple[str, ...]:
     args = ["upload", "--non-interactive"]
+
+    if ca_cert and ca_cert.files:
+        args.append(f"--cert={ca_cert.files[0]}")
 
     if config_files.snapshot.files:
         args.append(f"--config-file={config_files.snapshot.files[0]}")
@@ -101,7 +119,6 @@ def twine_env_request(repo: str) -> EnvironmentRequest:
                 "TWINE_USERNAME",
                 "TWINE_PASSWORD",
                 "TWINE_REPOSITORY_URL",
-                # "TWINE_CERT",  # Does the --cert arg to pex take care of this for us?
             ]
         ]
     )
@@ -118,7 +135,9 @@ def twine_env(env: Environment, repo: str) -> Environment:
 
 @rule
 async def twine_upload(
-    request: PublishToPyPiRequest, twine_subsystem: TwineSubsystem
+    request: PublishPythonPackageRequest,
+    twine_subsystem: TwineSubsystem,
+    global_options: GlobalOptions,
 ) -> PublishProcesses:
     dists = tuple(
         artifact.relpath
@@ -164,7 +183,13 @@ async def twine_upload(
         Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
     )
 
-    input_digest = await Get(Digest, MergeDigests((packages_digest, config_files.snapshot.digest)))
+    ca_cert_request = twine_subsystem.ca_certs_digest_request(global_options.options.ca_certs_path)
+    ca_cert = await Get(Snapshot, CreateDigest, ca_cert_request) if ca_cert_request else None
+    ca_cert_digest = (ca_cert.digest,) if ca_cert else ()
+
+    input_digest = await Get(
+        Digest, MergeDigests((packages_digest, config_files.snapshot.digest, *ca_cert_digest))
+    )
     pex_proc_requests = []
     twine_envs = await MultiGet(
         Get(Environment, EnvironmentRequest, twine_env_request(repo))
@@ -175,7 +200,7 @@ async def twine_upload(
         pex_proc_requests.append(
             VenvPexProcess(
                 twine_pex,
-                argv=twine_upload_args(twine_subsystem, config_files, repo, dists),
+                argv=twine_upload_args(twine_subsystem, config_files, repo, dists, ca_cert),
                 input_digest=input_digest,
                 extra_env=twine_env(env, repo),
                 description=repo,
@@ -200,7 +225,7 @@ async def twine_upload(
 def rules():
     return (
         *collect_rules(),
-        *PublishToPyPiFieldSet.rules(),
-        PythonDistribution.register_plugin_field(PyPiRepositories),
+        *PublishPythonPackageFieldSet.rules(),
+        PythonDistribution.register_plugin_field(PythonRepositoriesField),
         PythonDistribution.register_plugin_field(SkipTwineUploadField),
     )

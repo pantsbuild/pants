@@ -150,7 +150,7 @@ def test_generate_dockerfile_for_generated_target(rule_runner: RuleRunner) -> No
 
 
 def test_missing_dockerfile_is_error(rule_runner: RuleRunner) -> None:
-    rule_runner.add_to_build_file("test", "docker_image()")
+    rule_runner.write_files({"test/BUILD": "docker_image()"})
     with pytest.raises(ExecutionError, match=r"The `docker_image` test:test does not specify any"):
         assert_dockerfile(rule_runner, filename="", content="")
 

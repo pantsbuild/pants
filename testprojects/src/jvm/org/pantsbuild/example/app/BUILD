@@ -7,6 +7,4 @@ deploy_jar(
     dependencies=[":app"],
 )
 
-scala_sources(
-    compatible_resolves=["exampleapp"],
-)
+scala_sources()

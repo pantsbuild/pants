@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any, ContextManager
 
 import pytest
 
@@ -23,11 +24,15 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
+from pants.backend.shell.target_types import rules as shell_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
+from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -41,24 +46,37 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *parser_rules(),
             *pex_from_targets.rules(),
+            *shell_target_types_rules(),
             *target_types_rules.rules(),
             docker_build_args,
             docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
-        target_types=[DockerImageTarget, FilesGeneratorTarget, PexBinary],
+        target_types=[
+            DockerImageTarget,
+            FilesGeneratorTarget,
+            PexBinary,
+            ShellSourcesGeneratorTarget,
+            ShellSourceTarget,
+        ],
     )
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
 def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
+    *,
     expected_files: list[str],
     expected_version_context: dict[str, dict[str, str]] | None = None,
+    pants_args: list[str] | None = None,
+    runner_options: dict[str, Any] | None = None,
 ) -> None:
+    if runner_options is None:
+        runner_options = {}
+    runner_options.setdefault("env_inherit", set()).update({"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.set_options(pants_args or [], **runner_options)
     context = rule_runner.request(
         DockerBuildContext,
         [
@@ -76,30 +94,38 @@ def assert_build_context(
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
-    # img_A -> files_A
-    # img_A -> img_B -> files_B
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
-            files(name="files_A", sources=["files/**"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            # img_A -> files_A
+            # img_A -> img_B
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=[":files_A", "src/b:img_B"])
+                files(name="files_A", sources=["files/**"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "src/a/files/a01": "",
+            "src/a/files/a02": "",
+            # img_B -> files_B
+            "src/b/BUILD": dedent(
+                """\
+                docker_image(name="img_B", dependencies=[":files_B"])
+                files(name="files_B", sources=["files/**"])
+                """
+            ),
+            "src/b/Dockerfile": "FROM base",
+            "src/b/files/b01": "",
+            "src/b/files/b02": "",
+            # Mixed
+            "src/c/BUILD": dedent(
+                """\
+                docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
+                """
+            ),
+            "src/c/Dockerfile": "FROM base",
+        }
     )
-    rule_runner.add_to_build_file(
-        "src/b",
-        dedent(
-            """\
-            docker_image(name="img_B", dependencies=[":files_B"])
-            files(name="files_B", sources=["files/**"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("src/a/files", ["a01", "a02"])
-    rule_runner.create_files("src/b", ["Dockerfile"])
-    rule_runner.create_files("src/b/files", ["b01", "b02"])
 
     # We want files_B in build context for img_B
     assert_build_context(
@@ -116,16 +142,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     )
 
     # Mixed.
-    rule_runner.add_to_build_file(
-        "src/c",
-        dedent(
-            """\
-            docker_image(name="img_C", dependencies=["src/a:files_A", "src/b:files_B"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/c", ["Dockerfile"])
-
     assert_build_context(
         rule_runner,
         Address("src/c", target_name="img_C"),
@@ -141,25 +157,24 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
 
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
-    rule_runner.add_to_build_file(
-        "src/a",
-        dedent(
-            """\
-            docker_image(name="img_A", dependencies=["res/static:files"])
-            """
-        ),
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(name="img_A", dependencies=["res/static:files"])
+                """
+            ),
+            "res/static/BUILD": dedent(
+                """\
+                files(name="files", sources=["!BUILD", "**/*"])
+                """
+            ),
+            "src/a/Dockerfile": "FROM base",
+            "res/static/s01": "",
+            "res/static/s02": "",
+            "res/static/sub/s03": "",
+        }
     )
-    rule_runner.add_to_build_file(
-        "res/static",
-        dedent(
-            """\
-            files(name="files", sources=["!BUILD", "**/*"])
-            """
-        ),
-    )
-    rule_runner.create_files("src/a", ["Dockerfile"])
-    rule_runner.create_files("res/static", ["s01", "s02"])
-    rule_runner.create_files("res/static/sub", ["s03"])
 
     assert_build_context(
         rule_runner,
@@ -251,3 +266,157 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "output": {"tag": "1-1"},
         },
     )
+
+
+def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(dependencies=[":entrypoint", ":shell"])
+                shell_source(name="entrypoint", source="entrypoint.sh")
+                shell_sources(name="shell", sources=["scripts/**/*.sh"])
+                """
+            ),
+            "src/docker/Dockerfile": "FROM base",
+            "src/docker/entrypoint.sh": "",
+            "src/docker/scripts/s01.sh": "",
+            "src/docker/scripts/s02.sh": "",
+            "src/docker/scripts/random.file": "",
+        }
+    )
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=[
+            "src/docker/Dockerfile",
+            "src/docker/entrypoint.sh",
+            "src/docker/scripts/s01.sh",
+            "src/docker/scripts/s02.sh",
+        ],
+    )
+
+
+def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
+    # Test that only explicitly defined build args in the BUILD file or pants configuraiton use the
+    # environment for its values.
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  extra_build_args=[
+                    "base_version",
+                  ]
+                )
+                """
+            ),
+            "src/docker/Dockerfile": dedent(
+                """\
+                ARG base_name=python
+                ARG base_version=3.8
+                FROM ${base_name}:${base_version}
+                ARG NO_DEF
+                ENV opt=${NO_DEF}
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        runner_options={
+            "env": {
+                "base_name": "no-effect",
+                "base_version": "3.9",
+            },
+        },
+        expected_files=["src/docker/Dockerfile"],
+        expected_version_context={
+            "baseimage": {"tag": "${base_version}"},
+            "stage0": {"tag": "${base_version}"},
+            "build_args": {
+                # `base_name` is not listed here, as it was not an explicitly defined build arg.
+                "base_version": "3.9",
+            },
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "dockerfile_arg_value, extra_build_arg_value, expect",
+    [
+        pytest.param(None, None, no_exception(), id="No args defined"),
+        pytest.param(
+            None,
+            "",
+            pytest.raises(ExecutionError, match=r"variable 'MY_ARG' is undefined"),
+            id="No default value for build arg",
+        ),
+        pytest.param(None, "some default value", no_exception(), id="Default value for build arg"),
+        pytest.param("", None, no_exception(), id="No build arg defined, and ARG without default"),
+        pytest.param(
+            "",
+            "",
+            pytest.raises(ExecutionError, match=r"variable 'MY_ARG' is undefined"),
+            id="No default value from ARG",
+        ),
+        pytest.param(
+            "", "some default value", no_exception(), id="Default value for build arg, ARG present"
+        ),
+        pytest.param(
+            "some default value", None, no_exception(), id="No build arg defined, only ARG"
+        ),
+        pytest.param("some default value", "", no_exception(), id="Default value from ARG"),
+        pytest.param(
+            "some default value",
+            "some other default",
+            no_exception(),
+            id="Default value for build arg, ARG default",
+        ),
+    ],
+)
+def test_undefined_env_var_behavior(
+    rule_runner: RuleRunner,
+    dockerfile_arg_value: str | None,
+    extra_build_arg_value: str | None,
+    expect: ContextManager,
+) -> None:
+    dockerfile_arg = ""
+    if dockerfile_arg_value is not None:
+        dockerfile_arg = "ARG MY_ARG"
+        if dockerfile_arg_value:
+            dockerfile_arg += f"={dockerfile_arg_value}"
+
+    extra_build_args = ""
+    if extra_build_arg_value is not None:
+        extra_build_args = 'extra_build_args=["MY_ARG'
+        if extra_build_arg_value:
+            extra_build_args += f"={extra_build_arg_value}"
+        extra_build_args += '"],'
+
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                f"""\
+                docker_image(
+                  {extra_build_args}
+                )
+                """
+            ),
+            "src/docker/Dockerfile": dedent(
+                f"""\
+                FROM python:3.8
+                {dockerfile_arg}
+                """
+            ),
+        }
+    )
+
+    with expect:
+        assert_build_context(
+            rule_runner,
+            Address("src/docker"),
+            expected_files=["src/docker/Dockerfile"],
+        )

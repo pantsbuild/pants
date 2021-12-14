@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 import shutil
 import subprocess
 import unittest
@@ -49,7 +50,7 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
         subprocess.run(["git", "config", "user.name", "Your Name"], check=True)
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-am", "Add project files."], check=True)
-        yield Git(gitdir=git_dir, worktree=worktree)
+        yield Git.mount(subdir=worktree)
 
 
 def lines_to_set(str_or_list):
@@ -253,10 +254,9 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
                                 [f"--changed-dependees={dependee_type}", "--changed-since=HEAD"],
                             )
 
-                            self.assertEqual(
-                                lines_to_set(self.TEST_MAPPING[filename][dependee_type]),
-                                lines_to_set(stdout),
-                            )
+                            assert lines_to_set(
+                                self.TEST_MAPPING[filename][dependee_type]
+                            ) == lines_to_set(stdout)
 
                 cls.add_test(
                     f"test_changed_coverage_{dependee_type}_{safe_filename(filename)}",
@@ -294,10 +294,10 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
 
             pants_run.assert_success()
             for expected_item in expected_set:
-                self.assertIn(expected_item, pants_run.stdout)
+                assert expected_item in pants_run.stdout
 
             for excluded_item in excluded_set:
-                self.assertNotIn(excluded_item, pants_run.stdout)
+                assert excluded_item not in pants_run.stdout
 
     def test_changed_not_exclude_inner_targets(self):
         changed_src = "src/python/python_targets/test_library.py"
@@ -325,17 +325,17 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
 
             pants_run.assert_success()
             for expected_item in expected_set:
-                self.assertIn(expected_item, pants_run.stdout)
+                assert expected_item in pants_run.stdout
 
             for excluded_item in excluded_set:
-                self.assertNotIn(excluded_item, pants_run.stdout)
+                assert excluded_item not in pants_run.stdout
 
     def test_changed_with_multiple_build_files(self):
         new_build_file = "src/python/python_targets/BUILD.new"
         with create_isolated_git_repo() as worktree:
             touch(os.path.join(worktree, new_build_file))
             stdout_data = self.run_list()
-            self.assertEqual(stdout_data.strip(), "")
+            assert stdout_data.strip() == ""
 
     def test_changed_with_deleted_source(self):
         # TODO: Update to use multiple sources, with only one deleted.
@@ -343,14 +343,14 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:sources")
+            assert pants_run.stdout.strip() == "src/python/sources:sources"
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.txt"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:text")
+            assert pants_run.stdout.strip() == "src/python/sources:text"
 
     @pytest.mark.skip(reason="Unskip after rewriting these tests to stop using testprojects.")
     def test_changed_with_deleted_target_transitive(self):
@@ -362,8 +362,8 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
                 ["list", "--changed-since=HEAD", "--changed-dependees=transitive"]
             )
             pants_run.assert_failure()
-            self.assertRegex(
-                pants_run.stderr, "src/resources/org/pantsbuild/resourceonly:.*did not exist"
+            assert re.search(
+                "src/resources/org/pantsbuild/resourceonly:.*did not exist", pants_run.stderr
             )
 
     def test_changed_in_directory_without_build_file(self):
@@ -371,7 +371,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             create_file_in(worktree, "new-project/README.txt", "This is important.")
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "")
+            assert pants_run.stdout.strip() == ""
 
     def test_list_changed(self) -> None:
         deleted_file = "src/python/sources/sources.py"
@@ -380,7 +380,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, deleted_file))
             pants_run = self.run_pants(["--changed-since=HEAD", "list"])
             pants_run.assert_success()
-            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:sources")
+            assert pants_run.stdout.strip() == "src/python/sources:sources"
 
 
 ChangedIntegrationTest.generate_tests()

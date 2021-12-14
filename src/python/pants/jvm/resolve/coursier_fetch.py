@@ -3,17 +3,20 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import operator
 import os
 from dataclasses import dataclass
 from functools import reduce
-from pathlib import PurePath
-from typing import Any, Iterable, Iterator
+from itertools import chain
+from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
+from urllib.parse import quote_plus as url_quote_plus
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     AddPrefix,
@@ -28,7 +31,13 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    InvalidTargetException,
+    Target,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -40,14 +49,14 @@ from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
-    JvmArtifact,
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+    JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
-    JvmLockfileSources,
-    JvmRequirementsField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
@@ -72,6 +81,7 @@ class Coordinate:
     artifact: str
     version: str
     packaging: str = "jar"
+
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
     strict: bool = True
@@ -86,12 +96,13 @@ class Coordinate:
         )
 
     def to_json_dict(self) -> dict:
-        return {
+        ret = {
             "group": self.group,
             "artifact": self.artifact,
             "version": self.version,
             "packaging": self.packaging,
         }
+        return ret
 
     @classmethod
     def from_coord_str(cls, s: str) -> Coordinate:
@@ -103,49 +114,92 @@ class Coordinate:
             packaging=parts[3] if len(parts) == 4 else "jar",
         )
 
+    def as_requirement(self) -> ArtifactRequirement:
+        """Creates a `RequirementCoordinate` from a `Coordinate`."""
+        return ArtifactRequirement(coordinate=self)
+
     def to_coord_str(self, versioned: bool = True) -> str:
+        unversioned = f"{self.group}:{self.artifact}"
+        version_suffix = ""
         if versioned:
-            return f"{self.group}:{self.artifact}:{self.version}"
-        return f"{self.group}:{self.artifact}"
-
-    @staticmethod
-    def from_jvm_artifact_target(target: Target) -> Coordinate:
-        if not JvmArtifactFieldSet.is_applicable(target):
-            raise CoursierError(
-                "`Coordinate.from_jvm_artifact_target()` only works on targets with "
-                "`JvmArtifactFieldSet` fields present."
-            )
-
-        group = target[JvmArtifactGroupField].value
-        artifact = target[JvmArtifactArtifactField].value
-        version = target[JvmArtifactVersionField].value
-
-        # These are all required, but mypy doesn't think so.
-        assert group is not None and artifact is not None and version is not None
-        return Coordinate(group=group, artifact=artifact, version=version)
+            version_suffix = f":{self.version}"
+        return f"{unversioned}{version_suffix}"
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
+@dataclass(frozen=True)
+class ArtifactRequirement:
+    """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
+    the dependency if it is not to be fetched from a Maven repository."""
+
+    coordinate: Coordinate
+
+    url: str | None = None
+    jar: JvmArtifactJarSourceField | None = None
+
+    @classmethod
+    def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
+        if not JvmArtifactFieldSet.is_applicable(target):
+            raise CoursierError(
+                "`ArtifactRequirement.from_jvm_artifact_target()` only works on targets with "
+                "`JvmArtifactFieldSet` fields present."
+            )
+
+        group = target[JvmArtifactGroupField].value
+        if not group:
+            raise InvalidTargetException(
+                f"The `group` field of {target.alias} target {target.address} must be set."
+            )
+
+        artifact = target[JvmArtifactArtifactField].value
+        if not artifact:
+            raise InvalidTargetException(
+                f"The `artifact` field of {target.alias} target {target.address} must be set."
+            )
+
+        version = target[JvmArtifactVersionField].value
+        if not version:
+            raise InvalidTargetException(
+                f"The `version` field of {target.alias} target {target.address} must be set."
+            )
+
+        url = target[JvmArtifactUrlField].value
+        jar_ = target[JvmArtifactJarSourceField]
+        jar = jar_ if jar_.value else None
+
+        if url and url.startswith("file:"):
+            raise CoursierError(
+                "Pants does not support `file:` URLS. Instead, use the `jar` field to specify the "
+                "relative path to the local jar file."
+            )
+
+        if url and jar:
+            raise CoursierError(
+                "You cannot specify both a `url` and `jar` for the same `jvm_artifact`."
+            )
+
+        return ArtifactRequirement(
+            coordinate=Coordinate(group=group, artifact=artifact, version=version), url=url, jar=jar
+        )
+
+    def to_coord_str(self, versioned: bool = True) -> str:
+        without_url = self.coordinate.to_coord_str(versioned)
+        url_suffix = ""
+        if self.url:
+            url_suffix = f",url={url_quote_plus(self.url)}"
+        return f"{without_url}{url_suffix}"
+
+
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
-class ArtifactRequirements(DeduplicatedCollection[Coordinate]):
+class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
     """An ordered list of Coordinates used as requirements."""
 
     @classmethod
-    def create_from_maven_coordinates_fields(
-        cls,
-        fields: Iterable[JvmRequirementsField],
-        *,
-        additional_requirements: Iterable[Coordinate] = (),
-    ) -> ArtifactRequirements:
-        field_requirements = (
-            Coordinate.from_coord_str(str(maven_coord))
-            for field in fields
-            for maven_coord in (field.value or ())
-        )
-        return ArtifactRequirements((*field_requirements, *additional_requirements))
+    def from_coordinates(cls, coordinates: Iterable[Coordinate]) -> ArtifactRequirements:
+        return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
 
 
 @dataclass(frozen=True)
@@ -179,11 +233,14 @@ class CoursierLockfileEntry:
     CoursierLockfileEntry(
         coord="com.chuusai:shapeless_2.13:2.3.3", # identical
         file_name="shapeless_2.13-2.3.3.jar" # PurePath(entry["file"].name)
-        direct_dependencies=(MavenCoord("org.scala-lang:scala-library:2.13.0"),),
-        dependencies=(MavenCoord("org.scala-lang:scala-library:2.13.0"),),
+        direct_dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
+        dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
         file_digest=FileDigest(fingerprint=<sha256 of the jar>, ...),
     )
     ```
+
+    The fields `remote_url` and `pants_address` are set by Pants if the `coord` field matches a
+    `jvm_artifact` that had either the `url` or `jar` fields set.
     """
 
     coord: Coordinate
@@ -191,6 +248,8 @@ class CoursierLockfileEntry:
     direct_dependencies: Coordinates
     dependencies: Coordinates
     file_digest: FileDigest
+    remote_url: str | None = None
+    pants_address: str | None = None
 
     @classmethod
     def from_json_dict(cls, entry) -> CoursierLockfileEntry:
@@ -207,6 +266,8 @@ class CoursierLockfileEntry:
                 fingerprint=entry["file_digest"]["fingerprint"],
                 serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
             ),
+            remote_url=entry.get("remote_url"),
+            pants_address=entry.get("pants_address"),
         )
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -221,6 +282,8 @@ class CoursierLockfileEntry:
                 fingerprint=self.file_digest.fingerprint,
                 serialized_bytes_length=self.file_digest.serialized_bytes_length,
             ),
+            remote_url=self.remote_url,
+            pants_address=self.pants_address,
         )
 
 
@@ -240,8 +303,8 @@ class CoursierResolvedLockfile:
         # should become exact, and this error message will capture all cases of stale lockfiles.
         return CoursierError(
             f"{coord} was not present in resolve `{key.name}` at `{key.path}`.\n"
-            f"If you have recently added new `{JvmArtifact.alias}` targets, you might need to "
-            f"update your lockfile by running `coursier-resolve --names={key.name}`."
+            f"If you have recently added new `{JvmArtifactTarget.alias}` targets, you might "
+            f"need to update your lockfile by running `coursier-resolve --names={key.name}`."
         )
 
     def direct_dependencies(
@@ -283,6 +346,56 @@ class CoursierResolvedLockfile:
         )
 
 
+def classpath_dest_filename(coord: str, src_filename: str) -> str:
+    """Calculates the destination filename on the classpath for the given source filename and coord.
+
+    TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
+    """
+    dest_name = coord.replace(":", "_")
+    _, ext = os.path.splitext(src_filename)
+    return f"{dest_name}{ext}"
+
+
+@dataclass(frozen=True)
+class CoursierResolveInfo:
+    coord_strings: FrozenSet[str]
+    digest: Digest
+
+
+@rule
+async def prepare_coursier_resolve_info(
+    artifact_requirements: ArtifactRequirements,
+) -> CoursierResolveInfo:
+    # Transform requirements that correspond to local JAR files into coordinates with `file:/`
+    # URLs, and put the files in the place specified by the URLs.
+    no_jars: List[ArtifactRequirement] = []
+    jars: List[Tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
+
+    for req in artifact_requirements:
+        jar = req.jar
+        if not jar:
+            no_jars.append(req)
+        else:
+            jars.append((req, jar))
+
+    jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
+    jar_file_paths = jar_files.snapshot.files
+
+    resolvable_jar_requirements = [
+        dataclasses.replace(
+            req, jar=None, url=f"file:{Coursier.working_directory_placeholder}/{path}"
+        )
+        for req, path in zip((i[0] for i in jars), jar_file_paths)
+    ]
+
+    to_resolve = chain(no_jars, resolvable_jar_requirements)
+
+    return CoursierResolveInfo(
+        coord_strings=frozenset(req.to_coord_str() for req in to_resolve),
+        digest=jar_files.snapshot.digest,
+    )
+
+
 @rule(level=LogLevel.DEBUG)
 async def coursier_resolve_lockfile(
     bash: BashBinary,
@@ -316,6 +429,10 @@ async def coursier_resolve_lockfile(
     if len(artifact_requirements) == 0:
         return CoursierResolvedLockfile(entries=())
 
+    coursier_resolve_info = await Get(
+        CoursierResolveInfo, ArtifactRequirements, artifact_requirements
+    )
+
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
@@ -323,7 +440,7 @@ async def coursier_resolve_lockfile(
             argv=coursier.args(
                 [
                     coursier_report_file_name,
-                    *(req.to_coord_str() for req in artifact_requirements),
+                    *coursier_resolve_info.coord_strings,
                     # TODO(#13496): Disable --strict-include to work around Coursier issue
                     # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
                     # artifact rules as malformed.
@@ -335,7 +452,8 @@ async def coursier_resolve_lockfile(
                 ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=coursier.digest,
+            input_digest=coursier_resolve_info.digest,
+            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
@@ -354,7 +472,9 @@ async def coursier_resolve_lockfile(
     report_contents = await Get(DigestContents, Digest, report_digest)
     report = json.loads(report_contents[0].content)
 
-    artifact_file_names = tuple(PurePath(dep["file"]).name for dep in report["dependencies"])
+    artifact_file_names = tuple(
+        classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
+    )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
     artifact_digests = await MultiGet(
         Get(Digest, DigestSubset(process_result.output_digest, PathGlobs([output_path])))
@@ -370,7 +490,8 @@ async def coursier_resolve_lockfile(
             stripped_artifact_digests, artifact_file_names
         )
     )
-    return CoursierResolvedLockfile(
+
+    first_pass_lockfile = CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
                 coord=Coordinate.from_coord_str(dep["coord"]),
@@ -387,6 +508,18 @@ async def coursier_resolve_lockfile(
         )
     )
 
+    inverted_artifacts = {req.coordinate: req for req in artifact_requirements}
+    new_entries = []
+    for entry in first_pass_lockfile.entries:
+        req = inverted_artifacts.get(entry.coord)
+        if req:
+            address = req.jar.address if req.jar else None
+            address_spec = address.spec if address else None
+            entry = dataclasses.replace(entry, remote_url=req.url, pants_address=address_spec)
+        new_entries.append(entry)
+
+    return CoursierResolvedLockfile(entries=tuple(new_entries))
+
 
 @rule(desc="Fetch with coursier")
 async def fetch_with_coursier(
@@ -401,7 +534,8 @@ async def fetch_with_coursier(
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
-        request.resolve, Coordinate.from_jvm_artifact_target(request.component.representative)
+        request.resolve,
+        ArtifactRequirement.from_jvm_artifact_target(request.component.representative).coordinate,
     )
 
     classpath_entries = await MultiGet(
@@ -444,15 +578,32 @@ async def coursier_fetch_one_coord(
     confirm that what was downloaded matches exactly (by content digest) what
     was specified in the lockfile (what Coursier originally downloaded).
     """
+
+    # Prepare any URL- or JAR-specifying entries for use with Coursier
+    req: ArtifactRequirement
+    if request.pants_address:
+        targets = await Get(
+            Targets, UnparsedAddressInputs([request.pants_address], owning_address=None)
+        )
+        req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
+    else:
+        req = ArtifactRequirement(request.coord, url=request.remote_url)
+
+    coursier_resolve_info = await Get(
+        CoursierResolveInfo,
+        ArtifactRequirements([req]),
+    )
+
     coursier_report_file_name = "coursier_report.json"
     process_result = await Get(
         ProcessResult,
         Process(
             argv=coursier.args(
-                [coursier_report_file_name, "--intransitive", request.coord.to_coord_str()],
+                [coursier_report_file_name, "--intransitive", *coursier_resolve_info.coord_strings],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
-            input_digest=coursier.digest,
+            input_digest=coursier_resolve_info.digest,
+            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
             append_only_caches=coursier.append_only_caches,
@@ -483,8 +634,8 @@ async def coursier_fetch_one_coord(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
-    file_path = PurePath(dep["file"])
-    classpath_dest = f"classpath/{file_path.name}"
+    classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
+    classpath_dest = f"classpath/{classpath_dest_name}"
 
     resolved_file_digest = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
@@ -492,13 +643,13 @@ async def coursier_fetch_one_coord(
     stripped_digest = await Get(Digest, RemovePrefix(resolved_file_digest, "classpath"))
     file_digest = await Get(
         FileDigest,
-        ExtractFileDigest(stripped_digest, file_path.name),
+        ExtractFileDigest(stripped_digest, classpath_dest_name),
     )
     if file_digest != request.file_digest:
         raise CoursierError(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
-    return ClasspathEntry(digest=stripped_digest, filenames=(file_path.name,))
+    return ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,))
 
 
 @rule(level=LogLevel.DEBUG)
@@ -508,28 +659,6 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
         Get(ClasspathEntry, CoursierLockfileEntry, entry) for entry in lockfile.entries
     )
     return ResolvedClasspathEntries(classpath_entries)
-
-
-@rule(level=LogLevel.DEBUG)
-async def load_coursier_lockfile_from_source(
-    lockfile_field: JvmLockfileSources,
-) -> CoursierResolvedLockfile:
-    lockfile_sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [lockfile_field],
-            for_sources_types=[JvmLockfileSources],
-            enable_codegen=False,
-        ),
-    )
-    if len(lockfile_sources.files) != 1:
-        raise CoursierError("JvmLockfileSources must have exactly 1 source file")
-
-    source_lockfile_digest_contents = await Get(
-        DigestContents, Digest, lockfile_sources.snapshot.digest
-    )
-    source_lockfile_content = source_lockfile_digest_contents[0]
-    return CoursierResolvedLockfile.from_json_dict(json.loads(source_lockfile_content.content))
 
 
 @rule
@@ -558,7 +687,9 @@ async def select_coursier_resolve_for_targets(
         if target.has_field(JvmCompatibleResolveNamesField)
     ]
 
-    any_unspecified_resolves = any(i is None for i in transitive_jvm_resolve_names)
+    any_unspecified_resolves = not transitive_jvm_resolve_names or any(
+        i is None for i in transitive_jvm_resolve_names
+    )
 
     if not default_resolve_name and any_unspecified_resolves:
         raise CoursierError(
