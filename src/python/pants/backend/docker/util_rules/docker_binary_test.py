@@ -27,10 +27,22 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         "test:0.1.0",
         "test:latest",
     )
-    build_request = docker.build_image(tags, digest, dockerfile)
+    build_request = docker.build_image(tags, digest, dockerfile, extra_args=("--pull", "--squash"))
 
     assert build_request == Process(
-        argv=(docker_path, "build", "-t", tags[0], "-t", tags[1], "-f", dockerfile, "."),
+        argv=(
+            docker_path,
+            "build",
+            "--pull",
+            "--squash",
+            "-t",
+            tags[0],
+            "-t",
+            tags[1],
+            "-f",
+            dockerfile,
+            ".",
+        ),
         input_digest=digest,
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
