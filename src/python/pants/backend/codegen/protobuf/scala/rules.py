@@ -269,6 +269,7 @@ async def materialize_jvm_plugins(request: MaterializeJvmPluginsRequest) -> Mate
 SHIM_SCALA_VERSION = "2.13.7"
 
 
+# TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def setup_scalapb_shim_classfiles(
     scalapb: ScalaPBSubsystem, jdk_setup: JdkSetup, bash: BashBinary

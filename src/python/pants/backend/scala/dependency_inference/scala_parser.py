@@ -296,6 +296,7 @@ async def resolve_fallible_result_to_analysis(
     )
 
 
+# TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def setup_scala_parser_classfiles(
     bash: BashBinary, jdk_setup: JdkSetup

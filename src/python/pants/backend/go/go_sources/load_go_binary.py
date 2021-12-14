@@ -39,6 +39,7 @@ def setup_files(dir_name: str, file_names: tuple[str, ...]) -> tuple[FileContent
     return tuple(FileContent(f, get_file(f)) for f in file_names)
 
 
+# TODO(13879): Maybe see if can consolidate compilation of wrapper binaries to common rules with Scala/Java?
 @rule
 async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
     file_contents = setup_files(request.dir_name, request.file_names)
