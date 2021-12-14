@@ -7,7 +7,7 @@ from pants.backend.java.dependency_inference import rules as dependency_inferenc
 from pants.backend.java.goals import check, tailor
 from pants.backend.java.package import deploy_jar
 from pants.backend.java.target_types import (
-    DeployJar,
+    DeployJarTarget,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
     JunitTestsGeneratorTarget,
@@ -19,18 +19,18 @@ from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import coursier
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
-from pants.jvm.target_types import JvmArtifact
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test import junit
 
 
 def target_types():
     return [
-        DeployJar,
+        DeployJarTarget,
         JavaSourceTarget,
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
         JunitTestsGeneratorTarget,
-        JvmArtifact,
+        JvmArtifactTarget,
     ]
 
 

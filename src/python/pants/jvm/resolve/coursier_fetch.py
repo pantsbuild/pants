@@ -49,11 +49,11 @@ from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
-    JvmArtifact,
     JvmArtifactArtifactField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
     JvmArtifactJarSourceField,
+    JvmArtifactTarget,
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolveNamesField,
@@ -303,8 +303,8 @@ class CoursierResolvedLockfile:
         # should become exact, and this error message will capture all cases of stale lockfiles.
         return CoursierError(
             f"{coord} was not present in resolve `{key.name}` at `{key.path}`.\n"
-            f"If you have recently added new `{JvmArtifact.alias}` targets, you might need to "
-            f"update your lockfile by running `coursier-resolve --names={key.name}`."
+            f"If you have recently added new `{JvmArtifactTarget.alias}` targets, you might "
+            f"need to update your lockfile by running `coursier-resolve --names={key.name}`."
         )
 
     def direct_dependencies(

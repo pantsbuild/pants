@@ -31,7 +31,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifact
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestFieldSet
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -66,7 +66,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
         target_types=[
-            JvmArtifact,
+            JvmArtifactTarget,
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
             ScalaJunitTestsGeneratorTarget,

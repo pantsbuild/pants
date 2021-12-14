@@ -176,7 +176,7 @@ class JvmMainClassNameField(StringField):
     )
 
 
-class DeployJar(Target):
+class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -186,9 +186,9 @@ class DeployJar(Target):
         JvmResolveNameField,
     )
     help = (
-        "A `jar` file that contains the compiled source code along with its dependency class "
-        "files, where the compiled class files from all dependency JARs, along with first-party "
-        "class files, exist in a common directory structure."
+        "A `jar` file with first and third-party code bundled for deploys.\n\n"
+        "The JAR will contain class files for both first-party code and "
+        "third-party dependencies, all in a common directory structure."
     )
 
 
