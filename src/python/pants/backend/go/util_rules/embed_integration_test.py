@@ -22,6 +22,7 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourceTarget
@@ -53,7 +54,52 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.xfail
+def test_merge_embedcfg() -> None:
+    x = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.x": ["only_in_x"],
+        },
+        files={"foo.go": "path/to/foo.go", "bar.go": "path/to/bar.go", "only_in_x": "only_in_x"},
+    )
+    y = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.y": ["only_in_y"],
+        },
+        files={"foo.go": "path/to/foo.go", "bar.go": "path/to/bar.go", "only_in_y": "only_in_y"},
+    )
+    merged = x.merge(y)
+    assert merged == EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.x": ["only_in_x"],
+            "*.y": ["only_in_y"],
+        },
+        files={
+            "foo.go": "path/to/foo.go",
+            "bar.go": "path/to/bar.go",
+            "only_in_x": "only_in_x",
+            "only_in_y": "only_in_y",
+        },
+    )
+
+    a = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go"],
+        },
+        files={"foo.go": "path/to/foo.go"},
+    )
+    b = EmbedConfig(
+        patterns={
+            "*.go": ["bar.go"],
+        },
+        files={"bar.go": "path/to/bar.go"},
+    )
+    with pytest.raises(AssertionError):
+        _ = a.merge(b)
+
+
 def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

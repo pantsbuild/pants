@@ -56,3 +56,33 @@ class EmbedConfig:
 
     def __bool__(self) -> bool:
         return bool(self.patterns) or bool(self.files)
+
+    def merge(self, other: EmbedConfig) -> EmbedConfig:
+        """Merge two EmbedConfig's into one.
+
+        Overlapping keys must have the same values.
+        """
+        overlapping_patterns_keys = set(self.patterns.keys()) & set(other.patterns.keys())
+        for key in overlapping_patterns_keys:
+            if self.patterns[key] != other.patterns[key]:
+                raise AssertionError(
+                    "Unable to merge conflicting golang file embed configurations. This should not have occurred. "
+                    "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
+                    "with the following information: "
+                    f"Patterns Key: {key}; Left: {self.patterns[key]}; Right: {other.patterns[key]} "
+                )
+
+        overlapping_files_keys = set(self.files.keys()) & set(other.files.keys())
+        for key in overlapping_files_keys:
+            if self.files[key] != other.files[key]:
+                raise AssertionError(
+                    "Unable to merge conflicting golang file embed configurations. This should not have occurred. "
+                    "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
+                    "with the following information: "
+                    f"Files Key: {key}; Left: {self.patterns[key]}; Right: {other.patterns[key]} "
+                )
+
+        return EmbedConfig(
+            patterns={**self.patterns, **other.patterns},
+            files={**self.files, **other.files},
+        )
