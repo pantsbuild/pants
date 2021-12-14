@@ -56,6 +56,7 @@ class JavaParserCompiledClassfiles:
     digest: Digest
 
 
+# TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserCompiledClassfiles:
     dest_dir = "classfiles"
