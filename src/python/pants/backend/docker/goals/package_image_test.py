@@ -217,7 +217,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: directory, name, parent_directory\."
+        r"Try with one of: build_args, directory, name, parent_directory\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
