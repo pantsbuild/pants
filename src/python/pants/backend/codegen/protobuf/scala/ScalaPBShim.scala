@@ -12,7 +12,9 @@ import protocbridge.{ProtocBridge, ProtocCodeGenerator, ProtocRunner, SandboxedJ
 import scalapb.ScalaPbCodeGenerator
 
 
-// Derived in part from ScalaPBC under Apache License v2.0. Introduced errors are mine.
+// Derived from ScalaPBC under Apache License v2.0.
+// Forked from:
+// https://github.com/scalapb/ScalaPB/blob/d7e88f3783172f652d63229c7359a1de2e87eac6/scalapbc/src/main/scala/scalapb/ScalaPBC.scala
 
 case class Config(
   protocPath: Option[String] = None,
