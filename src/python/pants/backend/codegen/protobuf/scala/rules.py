@@ -1,11 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import os
 import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.scala.scalapbc import PluginArtifactSpec, ScalaPBSubsystem
+from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
@@ -81,6 +83,24 @@ class MaterializedJvmPlugin:
     name: str
     classpath: MaterializedClasspath
 
+    def setup_arg(self, plugin_relpath: str) -> str:
+        classpath_arg = ":".join(self.classpath.classpath_entries(plugin_relpath))
+        return f"--jvm-plugin={self.name}={classpath_arg}"
+
+
+@dataclass(frozen=True)
+class MaterializeJvmPluginsRequest:
+    plugins: tuple[PluginArtifactSpec, ...]
+
+
+@dataclass(frozen=True)
+class MaterializedJvmPlugins:
+    digest: Digest
+    plugins: tuple[MaterializedJvmPlugin, ...]
+
+    def setup_args(self, plugins_relpath: str) -> tuple[str, ...]:
+        return tuple(p.setup_arg(os.path.join(plugins_relpath, p.name)) for p in self.plugins)
+
 
 @rule(desc="Generate Scala from Protobuf", level=LogLevel.DEBUG)
 async def generate_scala_from_protobuf(
@@ -134,28 +154,18 @@ async def generate_scala_from_protobuf(
     )
 
     merged_jvm_plugins_digest = EMPTY_DIGEST
-    maybe_jvm_plugins_setup_args = []
-    maybe_jvm_plugins_other_args = []
-    jvm_plugin_artifacts = scalapb.jvm_plugin_artifacts
-    if jvm_plugin_artifacts:
-        materialized_jvm_plugins = await MultiGet(
-            Get(MaterializedJvmPlugin, MaterializeJvmPluginRequest(plugin))
-            for plugin in jvm_plugin_artifacts
+    maybe_jvm_plugins_setup_args: tuple[str, ...] = ()
+    maybe_jvm_plugins_output_args: tuple[str, ...] = ()
+    jvm_plugins = scalapb.jvm_plugins
+    if jvm_plugins:
+        materialized_jvm_plugins = await Get(
+            MaterializedJvmPlugins, MaterializeJvmPluginsRequest(jvm_plugins)
         )
-        jvm_plugin_digests = await MultiGet(
-            Get(Digest, AddPrefix(p.classpath.digest, p.name)) for p in materialized_jvm_plugins
+        merged_jvm_plugins_digest = materialized_jvm_plugins.digest
+        maybe_jvm_plugins_setup_args = materialized_jvm_plugins.setup_args(plugins_relpath)
+        maybe_jvm_plugins_output_args = tuple(
+            f"--{plugin.name}_out={output_dir}" for plugin in materialized_jvm_plugins.plugins
         )
-        merged_jvm_plugins_digest = await Get(Digest, MergeDigests(jvm_plugin_digests))
-
-        def make_jvm_plugin_arg(plugin):
-            classpath_arg = ":".join(
-                plugin.classpath.classpath_entries(f"{plugins_relpath}/{plugin.name}")
-            )
-            return f"--jvm-plugin={plugin.name}={classpath_arg}"
-
-        for plugin in materialized_jvm_plugins:
-            maybe_jvm_plugins_setup_args.append(make_jvm_plugin_arg(plugin))
-            maybe_jvm_plugins_other_args.append(f"--{plugin.name}_out={output_dir}")
 
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,
@@ -186,7 +196,7 @@ async def generate_scala_from_protobuf(
                 f"--protoc={os.path.join(protoc_relpath, downloaded_protoc_binary.exe)}",
                 *maybe_jvm_plugins_setup_args,
                 f"--scala_out={output_dir}",
-                *maybe_jvm_plugins_other_args,
+                *maybe_jvm_plugins_output_args,
                 *target_sources_stripped.snapshot.files,
             ],
             input_digest=input_digest,
@@ -241,6 +251,19 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         name=request.plugin.name,
         classpath=classpath,
     )
+
+
+@rule
+async def materialize_jvm_plugins(request: MaterializeJvmPluginsRequest) -> MaterializedJvmPlugins:
+    materialized_plugins = await MultiGet(
+        Get(MaterializedJvmPlugin, MaterializeJvmPluginRequest(plugin))
+        for plugin in request.plugins
+    )
+    plugin_digests = await MultiGet(
+        Get(Digest, AddPrefix(p.classpath.digest, p.name)) for p in materialized_plugins
+    )
+    merged_plugins_digest = await Get(Digest, MergeDigests(plugin_digests))
+    return MaterializedJvmPlugins(merged_plugins_digest, materialized_plugins)
 
 
 SHIM_SCALA_VERSION = "2.13.7"

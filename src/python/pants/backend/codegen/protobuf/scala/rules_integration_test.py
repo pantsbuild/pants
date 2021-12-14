@@ -246,7 +246,5 @@ def test_generates_fs2_grpc_via_jvm_plugin(rule_runner: RuleRunner) -> None:
             "service/service/TestMessage.scala",
             "service/service/TestServiceFs2Grpc.scala",
         ],
-        extra_args=[
-            "--scalapb-jvm-plugin-artifacts=+['fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1']"
-        ],
+        extra_args=["--scalapb-jvm-plugins=+['fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1']"],
     )

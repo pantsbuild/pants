@@ -58,15 +58,18 @@ class ScalaPBSubsystem(JvmToolBase):
             ),
         )
         register(
-            "--jvm-plugin-artifacts",
+            "--jvm-plugins",
             type=list,
             member_type=str,
-            # TODO: Add example of how to invoke a plugin like `fs2-grpc`.
             help=(
                 "A list of JVM-based `protoc` plugins to invoke when generating Scala code from protobuf files. "
                 "The format for each plugin specifier is `NAME=ARTIFACT` where NAME is the name of the "
                 "plugin and ARTIFACT is either the address of a `jvm_artifact` target or the colon-separated "
-                "Maven coordinate for the plugin's jar artifact."
+                "Maven coordinate for the plugin's jar artifact.\n\n"
+                "For example, to invoke the fs2-grpc protoc plugin, the following option would work: "
+                "`--scalapb-jvm-plugins=fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1`. "
+                "(Note: you would also need to set --scalapb-runtime-dependencies appropriately "
+                "to include the applicable runtime libraries for your chosen protoc plugins.)"
             ),
         )
 
@@ -75,7 +78,5 @@ class ScalaPBSubsystem(JvmToolBase):
         return UnparsedAddressInputs(self.options.runtime_dependencies, owning_address=None)
 
     @property
-    def jvm_plugin_artifacts(self) -> tuple[PluginArtifactSpec, ...]:
-        return tuple(
-            PluginArtifactSpec.from_str(pa_str) for pa_str in self.options.jvm_plugin_artifacts
-        )
+    def jvm_plugins(self) -> tuple[PluginArtifactSpec, ...]:
+        return tuple(PluginArtifactSpec.from_str(pa_str) for pa_str in self.options.jvm_plugins)
