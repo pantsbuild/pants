@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 import pkgutil
 from dataclasses import dataclass
 
@@ -94,6 +95,7 @@ async def generate_scala_from_protobuf(
     toolcp_relpath = "__toolcp"
     shimcp_relpath = "__shimcp"
     plugins_relpath = "__plugins"
+    protoc_relpath = "__protoc"
 
     (
         downloaded_protoc_binary,
@@ -155,22 +157,24 @@ async def generate_scala_from_protobuf(
             maybe_jvm_plugins_setup_args.append(make_jvm_plugin_arg(plugin))
             maybe_jvm_plugins_other_args.append(f"--{plugin.name}_out={output_dir}")
 
-    unmerged_digests = [
-        all_sources_stripped.snapshot.digest,
-        downloaded_protoc_binary.digest,
-        empty_output_dir,
-    ]
-
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,
         toolcp_relpath: tool_classpath.digest,
         shimcp_relpath: shim_classfiles.digest,
         plugins_relpath: merged_jvm_plugins_digest,
+        protoc_relpath: downloaded_protoc_binary.digest,
     }
 
-    input_digest = await Get(Digest, MergeDigests(unmerged_digests))
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                all_sources_stripped.snapshot.digest,
+                empty_output_dir,
+            ]
+        ),
+    )
 
-    # TODO: Use nailgun to invoke the shim..
     result = await Get(
         ProcessResult,
         Process(
@@ -179,7 +183,7 @@ async def generate_scala_from_protobuf(
                     bash, [*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath]
                 ),
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
-                f"--protoc={downloaded_protoc_binary.exe}",
+                f"--protoc={os.path.join(protoc_relpath, downloaded_protoc_binary.exe)}",
                 *maybe_jvm_plugins_setup_args,
                 f"--scala_out={output_dir}",
                 *maybe_jvm_plugins_other_args,
@@ -187,6 +191,7 @@ async def generate_scala_from_protobuf(
             ],
             input_digest=input_digest,
             immutable_input_digests=immutable_input_digests,
+            use_nailgun=immutable_input_digests,
             description=f"Generating Scala sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
