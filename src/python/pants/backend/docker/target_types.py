@@ -170,7 +170,7 @@ class DockerBuildSecretsOptionField(
 ):
     alias = "secrets"
     help = (
-        "Secret file to expose to the build (only if BuildKit enabled).\n\n"
+        "Secret files to expose to the build (only if BuildKit enabled).\n\n"
         "Secrets may use absolute paths, or paths relative to your BUILD file. The id should be "
         "valid as used by the Docker build `--secret` option. "
         "See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
@@ -181,7 +181,8 @@ class DockerBuildSecretsOptionField(
 
                 docker_image(
                     secrets={
-                        "mysecret": "/local/secret",
+                        "mysecret": "/var/secrets/some-secret",
+                        "repo-secret": "proj/path/some-secret",
                     }
                 )
             """
