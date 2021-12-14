@@ -26,5 +26,8 @@ class Scalatest(JvmToolBase):
             type=list,
             member_type=shell_str,
             passthrough=True,
-            help="Arguments to pass directly to Scalatest, e.g. `-t $testname`",
+            help=(
+                "Arguments to pass directly to Scalatest, e.g. `-t $testname`. See "
+                "https://www.scalatest.org/user_guide/using_the_runner for supported arguments."
+            ),
         )
