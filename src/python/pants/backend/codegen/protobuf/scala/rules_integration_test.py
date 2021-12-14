@@ -20,6 +20,7 @@ from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaS
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import classpath
@@ -71,6 +72,7 @@ def rule_runner() -> RuleRunner:
             *scala_protobuf_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateScalaFromProtobufRequest]),
+            QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -91,8 +93,9 @@ def assert_files_generated(
     *,
     expected_files: list[str],
     source_roots: list[str],
+    extra_args: Iterable[str] = (),
 ) -> None:
-    args = [f"--source-root-patterns={repr(source_roots)}"]
+    args = [f"--source-root-patterns={repr(source_roots)}", *extra_args]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(address)
     protocol_sources = rule_runner.request(
@@ -102,6 +105,9 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateScalaFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
+    sources_contents = rule_runner.request(DigestContents, [generated_sources.snapshot.digest])
+    for sc in sources_contents:
+        print(f"{sc.path}:\n{sc.content.decode()}")
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
@@ -204,4 +210,43 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
         Address("protos", relative_file_path="f.proto"),
         source_roots=["/"],
         expected_files=["protos/f/FProto.scala"],
+    )
+
+
+def test_generates_fs2_grpc_via_jvm_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "protos/BUILD": "protobuf_sources()",
+            "protos/service.proto": dedent(
+                """\
+            syntax = "proto3";
+
+            package service;
+
+            message TestMessage {
+              string foo = 1;
+            }
+
+            service TestService {
+              rpc noStreaming (TestMessage) returns (TestMessage);
+              rpc clientStreaming (stream TestMessage) returns (TestMessage);
+              rpc serverStreaming (TestMessage) returns (stream TestMessage);
+              rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
+            }
+            """
+            ),
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="service.proto"),
+        source_roots=["/"],
+        expected_files=[
+            "service/service/ServiceProto.scala",
+            "service/service/TestMessage.scala",
+            "service/service/TestServiceFs2Grpc.scala",
+        ],
+        extra_args=[
+            "--scalapb-jvm-plugin-artifacts=+['fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1']"
+        ],
     )

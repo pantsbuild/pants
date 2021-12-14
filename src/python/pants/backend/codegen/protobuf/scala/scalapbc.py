@@ -2,10 +2,29 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.custom_types import target_option
 from pants.util.docutil import git_url
+
+
+@dataclass(frozen=True)
+class PluginArtifactSpec:
+    name: str
+    artifact: str
+
+    @classmethod
+    def from_str(cls, s):
+        name, _, artifact = s.partition("=")
+        if name == "" or artifact == "":
+            # TODO: Improve error message.
+            raise ValueError(f"Plugin artifact `{s}` could not be parsed.")
+        return cls(
+            name=name,
+            artifact=artifact,
+        )
 
 
 class ScalaPBSubsystem(JvmToolBase):
@@ -38,7 +57,25 @@ class ScalaPBSubsystem(JvmToolBase):
                 f"`com.thesamet.scalapb:scalapb-runtime_SCALAVER:{cls.default_version}` runtime library."
             ),
         )
+        register(
+            "--jvm-plugin-artifacts",
+            type=list,
+            member_type=str,
+            # TODO: Add example of how to invoke a plugin like `fs2-grpc`.
+            help=(
+                "A list of JVM-based `protoc` plugins to invoke when generating Scala code from protobuf files. "
+                "The format for each plugin specifier is `NAME=ARTIFACT` where NAME is the name of the "
+                "plugin and ARTIFACT is either the address of a `jvm_artifact` target or the colon-separated "
+                "Maven coordinate for the plugin's jar artifact."
+            ),
+        )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
         return UnparsedAddressInputs(self.options.runtime_dependencies, owning_address=None)
+
+    @property
+    def jvm_plugin_artifacts(self) -> tuple[PluginArtifactSpec, ...]:
+        return tuple(
+            PluginArtifactSpec.from_str(pa_str) for pa_str in self.options.jvm_plugin_artifacts
+        )

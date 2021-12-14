@@ -1,9 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pkgutil
+from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.scala.scalapbc import ScalaPBSubsystem
+from pants.backend.codegen.protobuf.scala.scalapbc import PluginArtifactSpec, ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
@@ -24,6 +25,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -45,9 +47,14 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
+from pants.jvm.resolve.jvm_tool import (
+    GatherJvmCoordinatesRequest,
+    JvmToolLockfileRequest,
+    JvmToolLockfileSentinel,
+)
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
@@ -63,11 +70,22 @@ class ScalaPBShimCompiledClassfiles(ClasspathEntry):
     pass
 
 
+@dataclass(frozen=True)
+class MaterializeJvmPluginRequest:
+    plugin: PluginArtifactSpec
+
+
+@dataclass(frozen=True)
+class MaterializedJvmPlugin:
+    name: str
+    classpath: MaterializedClasspath
+
+
 @rule(desc="Generate Scala from Protobuf", level=LogLevel.DEBUG)
 async def generate_scala_from_protobuf(
     request: GenerateScalaFromProtobufRequest,
     protoc: Protoc,
-    scalapbc: ScalaPBSubsystem,
+    scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
     jdk_setup: JdkSetup,
     bash: BashBinary,
@@ -75,6 +93,7 @@ async def generate_scala_from_protobuf(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
     shimcp_relpath = "__shimcp"
+    plugins_relpath = "__plugins"
 
     (
         downloaded_protoc_binary,
@@ -87,7 +106,7 @@ async def generate_scala_from_protobuf(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(scalapbc.resolved_lockfile(),),
+                lockfiles=(scalapb.resolved_lockfile(),),
             ),
         ),
         Get(Digest, CreateDigest([Directory(output_dir)])),
@@ -112,6 +131,30 @@ async def generate_scala_from_protobuf(
         ),
     )
 
+    merged_jvm_plugins_digest = EMPTY_DIGEST
+    maybe_jvm_plugins_setup_args = []
+    maybe_jvm_plugins_other_args = []
+    jvm_plugin_artifacts = scalapb.jvm_plugin_artifacts
+    if jvm_plugin_artifacts:
+        materialized_jvm_plugins = await MultiGet(
+            Get(MaterializedJvmPlugin, MaterializeJvmPluginRequest(plugin))
+            for plugin in jvm_plugin_artifacts
+        )
+        jvm_plugin_digests = await MultiGet(
+            Get(Digest, AddPrefix(p.classpath.digest, p.name)) for p in materialized_jvm_plugins
+        )
+        merged_jvm_plugins_digest = await Get(Digest, MergeDigests(jvm_plugin_digests))
+
+        def make_jvm_plugin_arg(plugin):
+            classpath_arg = ":".join(
+                plugin.classpath.classpath_entries(f"{plugins_relpath}/{plugin.name}")
+            )
+            return f"--jvm-plugin={plugin.name}={classpath_arg}"
+
+        for plugin in materialized_jvm_plugins:
+            maybe_jvm_plugins_setup_args.append(make_jvm_plugin_arg(plugin))
+            maybe_jvm_plugins_other_args.append(f"--{plugin.name}_out={output_dir}")
+
     unmerged_digests = [
         all_sources_stripped.snapshot.digest,
         downloaded_protoc_binary.digest,
@@ -122,6 +165,7 @@ async def generate_scala_from_protobuf(
         **jdk_setup.immutable_input_digests,
         toolcp_relpath: tool_classpath.digest,
         shimcp_relpath: shim_classfiles.digest,
+        plugins_relpath: merged_jvm_plugins_digest,
     }
 
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
@@ -136,7 +180,9 @@ async def generate_scala_from_protobuf(
                 ),
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
                 f"--protoc={downloaded_protoc_binary.exe}",
+                *maybe_jvm_plugins_setup_args,
                 f"--scala_out={output_dir}",
+                *maybe_jvm_plugins_other_args,
                 *target_sources_stripped.snapshot.files,
             ],
             input_digest=input_digest,
@@ -172,6 +218,24 @@ async def inject_scalapb_dependencies(
 ) -> InjectedDependencies:
     addresses = await Get(Addresses, UnparsedAddressInputs, scalapb.runtime_dependencies)
     return InjectedDependencies(addresses)
+
+
+@rule
+async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> MaterializedJvmPlugin:
+    requirements = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(
+            artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
+            option_name="--scalapb-plugin-artifacts",
+        ),
+    )
+    classpath = await Get(
+        MaterializedClasspath, MaterializedClasspathRequest(artifact_requirements=(requirements,))
+    )
+    return MaterializedJvmPlugin(
+        name=request.plugin.name,
+        classpath=classpath,
+    )
 
 
 SHIM_SCALA_VERSION = "2.13.7"

@@ -19,12 +19,15 @@ case class Config(
   throwException: Boolean = false,
   args: Seq[String] = Seq.empty,
   namedGenerators: Seq[(String, ProtocCodeGenerator)] = Seq("scala" -> ScalaPbCodeGenerator),
+  executableArtifacts: Seq[String] = Seq.empty,
+  jvmPlugins: Seq[(String, String)] = Seq.empty
 )
 
 class ScalaPbcException(msg: String) extends RuntimeException(msg)
 
 object ScalaPBShim {
-  private val ProtocPathArgument     = "--protoc="
+  private val ProtocPathArgument = "--protoc="
+  private val JvmPluginArgument = "--jvm-plugin="
 
   def processArgs(args: Array[String]): Config = {
     case class State(cfg: Config, passThrough: Boolean)
@@ -38,6 +41,11 @@ object ScalaPBShim {
             state.copy(
               cfg = state.cfg
                 .copy(protocPath = Some(p.substring(ProtocPathArgument.length)))
+            )
+          case (false, p) if p.startsWith(JvmPluginArgument) =>
+            val Array(genName, classpath) = p.substring(JvmPluginArgument.length).split('=')
+            state.copy(
+              cfg = state.cfg.copy(jvmPlugins = state.cfg.jvmPlugins :+ (genName -> classpath))
             )
           case (_, other) =>
             state.copy(passThrough = true, cfg = state.cfg.copy(args = state.cfg.args :+ other))
@@ -59,18 +67,50 @@ object ScalaPBShim {
   }
 
   private[scalapb] def runProtoc(config: Config): Int = {
+    if (
+      config.namedGenerators
+        .map(_._1)
+        .toSet
+        .intersect(config.jvmPlugins.map(_._1).toSet)
+        .nonEmpty
+    ) {
+      throw new RuntimeException(
+        s"Plugin name conflict with $JvmPluginArgument"
+      )
+    }
+
+    def fatalError(err: String): Nothing = {
+      if (config.throwException) {
+        throw new ScalaPbcException(s"Error: $err")
+      } else {
+        System.err.println(err)
+        sys.exit(1)
+      }
+    }
+
+    val jvmGenerators = config.jvmPlugins.map({ case (name, classpath) =>
+      val files = classpath.split(':').map(f => new File(f))
+      val urls = files.map(_.toURI().toURL()).toArray
+      val loader = new URLClassLoader(urls, null)
+      val mainClass = findMainClass(files.last) match {
+        case Right(v)  => v
+        case Left(err) => fatalError(err)
+      }
+      name -> SandboxedJvmGenerator.load(mainClass, loader)
+    })
+
     val protoc = config.protocPath.getOrElse(throw new RuntimeException("--protoc not specified"))
 
     ProtocBridge.runWithGenerators(
       ProtocRunner(protoc),
-      namedGenerators = config.namedGenerators,
+      namedGenerators = config.namedGenerators ++ jvmGenerators,
       params = config.args
     )
   }
 
   def main(args: Array[String]): Unit = {
     val config = processArgs(args)
-    val code   = runProtoc(config)
+    val code = runProtoc(config)
 
     if (!config.throwException) {
       sys.exit(code)
