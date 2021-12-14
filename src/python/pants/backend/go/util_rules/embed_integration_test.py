@@ -53,6 +53,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.xfail
 def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
