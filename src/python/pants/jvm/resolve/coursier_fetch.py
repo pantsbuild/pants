@@ -6,10 +6,8 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
-import operator
 import os
 from dataclasses import dataclass
-from functools import reduce
 from itertools import chain
 from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 from urllib.parse import quote_plus as url_quote_plus
@@ -31,13 +29,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    InvalidTargetException,
-    Target,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import InvalidTargetException, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -57,6 +49,7 @@ from pants.jvm.target_types import (
     JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmCompatibleResolvesField,
+    JvmResolveField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.logging import LogLevel
@@ -665,107 +658,44 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
 async def select_coursier_resolve_for_targets(
     targets: Targets, jvm: JvmSubsystem
 ) -> CoursierResolveKey:
-    """Determine the lockfile that applies for given JVM targets and resolve configuration.
+    encountered_resolves = []
+    encountered_compatible_resolves = []
+    for tgt in targets:
+        if tgt.has_field(JvmResolveField):
+            resolve = tgt[JvmResolveField].value or jvm.default_resolve
+            # TODO: remove once we always have a default resolve.
+            if not resolve:
+                continue
+            encountered_resolves.append(resolve)
+        if tgt.has_field(JvmCompatibleResolvesField):
+            encountered_compatible_resolves.extend(
+                tgt[JvmCompatibleResolvesField].value
+                or ([jvm.default_resolve] if jvm.default_resolve else [])
+            )
 
-    This walks the target's transitive dependencies to find the set of resolve names that are
-    compatible with the entirety of this build (defined as the intersection of all
-    `compatible_resolves` fields). This is then compared with the JVM subsystem's `resolves` flag to
-    determine which resolve to use for this scenario.
-    """
+    # TODO: validate that all specified resolves are defined in [jvm].resolves and that all
+    #  encountered resolves are compatible with each other. Note that we don't validate that
+    #  dependencies are compatible, just the specified targets.
 
-    default_resolve_name: str | None = jvm.options.default_resolve
-
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(target.address for target in targets)
-    )
-
-    transitive_jvm_resolve_names = [
-        target[JvmCompatibleResolvesField].value
-        for target in transitive_targets.closure
-        if target.has_field(JvmCompatibleResolvesField)
-    ]
-
-    any_unspecified_resolves = not transitive_jvm_resolve_names or any(
-        i is None for i in transitive_jvm_resolve_names
-    )
-
-    if not default_resolve_name and any_unspecified_resolves:
-        raise CoursierError(
-            "Either the `--jvm-default-resolve` must be set, or all JVM source targets must "
-            "specify their `compatible_resolves` in order to materialize the classpath."
-        )
-
-    transitive_jvm_resolve_names_ = (
-        # If any resolves are unspecified, the only acceptable resolve will be the default one,
-        # but individual targets must also support the default resolve if they specify _any_
-        # compatible resolves.
-        set(resolves)
-        if resolves is not None
-        else {default_resolve_name}
-        if default_resolve_name is not None
-        else set()
-        for resolves in transitive_jvm_resolve_names
-    )
-    compatible_resolves = reduce(operator.iand, transitive_jvm_resolve_names_)
-
-    if not compatible_resolves:
-        raise CoursierError(
-            "There are no resolve names that are compatible with all of the targets in this build. "
-            f"The targets are {targets}.  At least one resolve must be compatible with every "
-            "target -- including dependencies and transitive dependencies in order to complete the "
-            "build."
-        )
-
-    available_resolves = jvm.options.resolves
-    if not available_resolves:
-        raise CoursierError(
-            "No values were set for `--jvm-resolves`, so we can't fulfil any dependencies for the "
-            "build. You can fix this by specifying `--jvm-resolves`."
-        )
-    available_resolve_names = set(available_resolves.keys())
-    usable_resolve_names = compatible_resolves & available_resolve_names
-
-    if not usable_resolve_names:
-        raise CoursierError(
-            "None of the resolves specified in the `--jvm-resolves` option are compatible with "
-            "all of the targets (including dependencies) in this build. You supplied the following "
-            f"resolve names: {available_resolve_names}, but the compatible resolve names are: "
-            f"{compatible_resolves}."
-        )
-
-    # Resolve to use is:
-    # - The resolve name that is specifically requested (by `--jvm-use-resolve`; eventually by
-    #     the `deploy_jar` target, but not yet)
-    # - The default resolve name
-
-    # See if any target has a specified resolve:
-
-    specified_resolve: str | None = jvm.options.use_resolve
-    if specified_resolve is not None and specified_resolve not in available_resolve_names:
-        raise CoursierError(
-            f"You specified the resolve name `{specified_resolve}`, however, that resolve does not "
-            f"exist. The available resolve names are `{available_resolve_names}`."
-        )
-
-    resolve_name: str
-    if specified_resolve:
-        resolve_name = specified_resolve
-    if default_resolve_name is not None and default_resolve_name in usable_resolve_names:
-        resolve_name = default_resolve_name
+    if len(encountered_resolves) > 1:
+        raise AssertionError(f"Encountered >1 `resolve` field, which was not expected. {targets}")
+    elif len(encountered_resolves) == 1:
+        resolve = encountered_resolves[0]
+    elif encountered_compatible_resolves:
+        resolve = min(encountered_compatible_resolves)
     else:
-        # Pick a consistent default resolve name
-        resolve_name = min(usable_resolve_names)
+        raise AssertionError(
+            f"No `resolve` or `compatible_resolves` specified for these targets: {targets}"
+        )
 
-    resolve_path = available_resolves[resolve_name]
-
+    resolve_path = jvm.resolves[resolve]
     lockfile_source = PathGlobs(
         [resolve_path],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        description_of_origin=f"Path associated with the JVM resolve with name '{resolve_name}'",
+        description_of_origin=f"The resolve `{resolve}` from `[jvm].resolves`",
     )
     resolve_digest = await Get(Digest, PathGlobs, lockfile_source)
-
-    return CoursierResolveKey(resolve_name, resolve_path, resolve_digest)
+    return CoursierResolveKey(resolve, resolve_path, resolve_digest)
 
 
 @rule
