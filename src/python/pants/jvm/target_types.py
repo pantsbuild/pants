@@ -60,7 +60,8 @@ class JvmArtifactUrlField(StringField):
         "If specified, Pants will not fetch this artifact from default Maven repositories, and "
         "will instead fetch the artifact from this URL. To use default maven "
         "repositories, do not set this value.\n\n"
-        "Note that `file:` URLs are not supported. Instead, use the `jar` field."
+        "Note that `file:` URLs are not supported. Instead, use the `jar` field for local "
+        "artifacts."
     )
 
 
@@ -71,7 +72,8 @@ class JvmArtifactJarSourceField(SingleSourceField):
     help = (
         "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
         "Maven repository.\n\n"
-        "Path is relative to the BUILD file."
+        "Path is relative to the BUILD file.\n\n"
+        "Use the `url` field for remote artifacts."
     )
 
 
@@ -155,7 +157,7 @@ class JvmCompatibleResolveNamesField(StringSequenceField):
     required = False
     help = (
         "The set of resolve names that this target is compatible with.\n\n"
-        "The name must be defined as one of the resolves in `[jvm].resolves`.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         "Any targets which depend on one another must have at least one compatible resolve in "
         "common. Which resolves are actually used in a build is calculated based on a target's "
         "dependees."
@@ -167,7 +169,7 @@ class JvmResolveNameField(StringField):
     required = False
     help = (
         "The name of the resolve to use when building this target.\n\n"
-        "The name must be defined as one of the resolves in `[jvm].resolves`.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         "If not supplied, the default resolve will be used. Otherwise, one resolve that is "
         "compatible with all dependency targets will be used."
     )

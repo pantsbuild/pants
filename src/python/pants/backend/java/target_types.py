@@ -187,8 +187,8 @@ class DeployJarTarget(Target):
     )
     help = (
         "A `jar` file with first and third-party code bundled for deploys.\n\n"
-        "The JAR will contain compiled first-party code and class files for "
-        "third-party dependencies. All class files exist in a common directory structure."
+        "The JAR will contain class files for both first-party code and "
+        "third-party dependencies, all in a common directory structure."
     )
 
 
