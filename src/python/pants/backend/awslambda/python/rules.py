@@ -56,7 +56,7 @@ async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet,
     lambdex: Lambdex,
     platform: Platform,
-    union_membership: UnionMembership
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
     if platform.is_macos:
         logger.warning(
