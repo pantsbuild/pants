@@ -5,4 +5,7 @@ python_sources()
 
 python_tests(
     name="tests",
+    overrides={
+        "java_scala_interop_test.py": {"timeout": 120},
+    },
 )
