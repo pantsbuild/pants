@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.scala.target_types import (
+    ScalaJunitTestsGeneratorSourcesField,
     ScalaJunitTestsGeneratorTarget,
     ScalaSourcesGeneratorTarget,
-    ScalaTestsGeneratorSourcesField,
+    ScalatestTestsGeneratorSourcesField,
 )
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -35,7 +36,12 @@ class PutativeScalaTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(ScalaTestsGeneratorSourcesField.default))
+    tests_filespec = Filespec(
+        includes=[
+            *ScalaJunitTestsGeneratorSourcesField.default,
+            *ScalatestTestsGeneratorSourcesField.default,
+        ]
+    )
     test_filenames = set(
         matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
     )

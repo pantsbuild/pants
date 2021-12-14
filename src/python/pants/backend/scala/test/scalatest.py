@@ -4,7 +4,8 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.java.subsystems.junit import JUnit
+from pants.backend.scala.subsystems.scalatest import Scalatest
+from pants.backend.scala.target_types import ScalatestTestSourceField
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -15,36 +16,35 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
-from pants.jvm.target_types import JunitTestSourceField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class JunitTestFieldSet(TestFieldSet):
-    required_fields = (JunitTestSourceField,)
+class ScalatestTestFieldSet(TestFieldSet):
+    required_fields = (ScalatestTestSourceField,)
 
-    sources: JunitTestSourceField
-
-
-class JunitToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = JUnit.options_scope
+    sources: ScalatestTestSourceField
 
 
-@rule(desc="Run JUnit", level=LogLevel.DEBUG)
-async def run_junit_test(
+class ScalatestToolLockfileSentinel(JvmToolLockfileSentinel):
+    options_scope = Scalatest.options_scope
+
+
+@rule(desc="Run Scalatest", level=LogLevel.DEBUG)
+async def run_scalatest_test(
     bash: BashBinary,
     jdk_setup: JdkSetup,
-    junit: JUnit,
+    scalatest: Scalatest,
     test_subsystem: TestSubsystem,
-    field_set: JunitTestFieldSet,
+    field_set: ScalatestTestFieldSet,
 ) -> TestResult:
-    classpath, junit_classpath = await MultiGet(
+    classpath, scalatest_classpath = await MultiGet(
         Get(Classpath, Addresses([field_set.address])),
         Get(
             MaterializedClasspath,
-            MaterializedClasspathRequest(lockfiles=(junit.resolved_lockfile(),)),
+            MaterializedClasspathRequest(lockfiles=(scalatest.resolved_lockfile(),)),
         ),
     )
 
@@ -53,13 +53,13 @@ async def run_junit_test(
     toolcp_relpath = "__toolcp"
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,
-        toolcp_relpath: junit_classpath.digest,
+        toolcp_relpath: scalatest_classpath.digest,
     }
 
     reports_dir_prefix = "__reports_dir"
     reports_dir = f"{reports_dir_prefix}/{field_set.address.path_safe_spec}"
 
-    # Classfiles produced by the root `junit_test` targets are the only ones which should run.
+    # Classfiles produced by the root `scalatest_test` targets are the only ones which should run.
     user_classpath_arg = ":".join(classpath.root_args())
 
     process_result = await Get(
@@ -70,22 +70,25 @@ async def run_junit_test(
                     bash,
                     [
                         *classpath.args(),
-                        *junit_classpath.classpath_entries(toolcp_relpath),
+                        *scalatest_classpath.classpath_entries(toolcp_relpath),
                     ],
                 ),
-                "org.junit.platform.console.ConsoleLauncher",
-                *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
-                *(("--scan-class-path", user_classpath_arg) if user_classpath_arg else ()),
-                "--reports-dir",
+                "org.scalatest.tools.Runner",
+                # TODO: We currently give the entire user classpath to the JVM for startup (which
+                # mixes it with the user classpath), and then only specify the roots to run here.
+                #   see https://github.com/pantsbuild/pants/issues/13871
+                *(("-R", user_classpath_arg) if user_classpath_arg else ()),
+                "-o",
+                "-u",
                 reports_dir,
-                *junit.options.args,
+                *scalatest.options.args,
             ],
             input_digest=merged_classpath_digest,
             immutable_input_digests=immutable_input_digests,
             output_directories=(reports_dir,),
             append_only_caches=jdk_setup.append_only_caches,
             env=jdk_setup.env,
-            description=f"Run JUnit 5 ConsoleLauncher against {field_set.address}",
+            description=f"Run Scalatest runner for {field_set.address}",
             level=LogLevel.DEBUG,
         ),
     )
@@ -105,20 +108,20 @@ async def run_junit_test(
 
 # Required by standard test rules. Do nothing for now.
 @rule(level=LogLevel.DEBUG)
-async def setup_junit_debug_request(_field_set: JunitTestFieldSet) -> TestDebugRequest:
-    raise NotImplementedError("TestDebugResult is not implemented for JUnit (yet?).")
+async def setup_scalatest_debug_request(_field_set: ScalatestTestFieldSet) -> TestDebugRequest:
+    raise NotImplementedError("TestDebugResult is not implemented for Scalatest (yet?).")
 
 
 @rule
-async def generate_junit_lockfile_request(
-    _: JunitToolLockfileSentinel, junit: JUnit
+async def generate_scalatest_lockfile_request(
+    _: ScalatestToolLockfileSentinel, scalatest: Scalatest
 ) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(junit)
+    return JvmToolLockfileRequest.from_tool(scalatest)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, JunitTestFieldSet),
-        UnionRule(JvmToolLockfileSentinel, JunitToolLockfileSentinel),
+        UnionRule(TestFieldSet, ScalatestTestFieldSet),
+        UnionRule(JvmToolLockfileSentinel, ScalatestToolLockfileSentinel),
     ]

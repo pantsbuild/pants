@@ -176,7 +176,7 @@ java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lo
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
 
 [junit]
-lockfile = "src/python/pants/jvm/junit.default.lockfile.txt"
+lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"
 
 [google-java-format]
 lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
@@ -186,6 +186,9 @@ lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfi
 
 [scalapb]
 lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
+
+[scalatest]
+lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"
