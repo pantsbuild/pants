@@ -29,7 +29,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidTargetException, Target, Targets
+from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -140,25 +140,18 @@ class ArtifactRequirement:
                 "`ArtifactRequirement.from_jvm_artifact_target()` only works on targets with "
                 "`JvmArtifactFieldSet` fields present."
             )
-
-        url = target[JvmArtifactUrlField].value
-        jar_field = (
-            target[JvmArtifactJarSourceField] if target[JvmArtifactJarSourceField].value else None
-        )
-        if url and jar_field:
-            raise InvalidTargetException(
-                f"You cannot specify both the `url` and `jar` fields, but both were set on the "
-                f"`{target.alias}` target {target.address}."
-            )
-
         return ArtifactRequirement(
             coordinate=Coordinate(
                 group=target[JvmArtifactGroupField].value,
                 artifact=target[JvmArtifactArtifactField].value,
                 version=target[JvmArtifactVersionField].value,
             ),
-            url=url,
-            jar=jar_field,
+            url=target[JvmArtifactUrlField].value,
+            jar=(
+                target[JvmArtifactJarSourceField]
+                if target[JvmArtifactJarSourceField].value
+                else None
+            ),
         )
 
     def to_coord_str(self, versioned: bool = True) -> str:

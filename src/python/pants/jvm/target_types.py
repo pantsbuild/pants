@@ -11,6 +11,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
     InvalidFieldException,
+    InvalidTargetException,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -180,6 +181,13 @@ class JvmArtifactTarget(Target):
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
         "That is, an artifact identified by its `group`, `artifact`, and `version` components."
     )
+
+    def validate(self) -> None:
+        if self[JvmArtifactJarSourceField].value and self[JvmArtifactUrlField].value:
+            raise InvalidTargetException(
+                f"You cannot specify both the `url` and `jar` fields, but both were set on the "
+                f"`{self.alias}` target {self.address}."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
