@@ -3,15 +3,24 @@
 
 from __future__ import annotations
 
+import os
+import shlex
+from abc import ABC, abstractmethod
 from textwrap import dedent
+from typing import ClassVar, Iterator
+
+from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
+from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -140,6 +149,55 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
+class DockerBuildOptionFieldMixin(ABC):
+    """Inherit this mixin class to provide options to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @abstractmethod
+    def option_values(self) -> Iterator[str]:
+        """Subclasses must implement this, to turn their `self.value` into none, one or more option
+        values."""
+
+    @final
+    def options(self) -> Iterator[str]:
+        for value in self.option_values():
+            yield f"{self.docker_build_option}={shlex.quote(value)}"
+
+
+class DockerBuildSecretsOptionField(
+    AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
+):
+    alias = "secrets"
+    help = (
+        "Secret file to expose to the build (only if BuildKit enabled).\n\n"
+        "Secrets may use absolute paths, or paths relative to your BUILD file. The id should be "
+        "valid as used by the Docker build `--secret` option. "
+        "See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
+        "information.\n\n"
+        + dedent(
+            """\
+            Example:
+
+                docker_image(
+                    secrets={
+                        "mysecret": "/local/secret",
+                    }
+                )
+            """
+        )
+    )
+
+    docker_build_option = "--secret"
+
+    def option_values(self) -> Iterator[str]:
+        # os.path.join() discards preceeding parts if encountering an abs path, e.g. if `spec_path`
+        # is an absolute path, the buildroot will not be considered.
+        root = os.path.join(get_buildroot(), self.address.spec_path)
+        for secret, path in (self.value or {}).items():
+            yield f"id={secret},src={os.path.join(root, path)}"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -151,6 +209,7 @@ class DockerImageTarget(Target):
         DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
+        DockerBuildSecretsOptionField,
         DockerSkipPushField,
         RestartableField,
     )

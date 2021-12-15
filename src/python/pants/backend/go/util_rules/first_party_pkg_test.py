@@ -367,7 +367,6 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.xfail
 def test_missing_embeds(rule_runner: RuleRunner) -> None:
     """Failing to set up embeds should not crash Pants."""
     rule_runner.write_files(
@@ -401,4 +400,4 @@ def test_missing_embeds(rule_runner: RuleRunner) -> None:
     assert maybe_digest.pkg_digest is None
     assert maybe_digest.exit_code == 1
     assert maybe_digest.stderr is not None
-    assert "Failed to find embedded resources: could not embed grok.txt" in maybe_digest.stderr
+    assert "Failed to find embedded resources: could not embed fake.txt" in maybe_digest.stderr

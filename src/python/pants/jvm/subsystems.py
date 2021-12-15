@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import logging
+from typing import cast
 
 from pants.option.subsystem import Subsystem
-
-logger = logging.getLogger(__name__)
 
 
 class JvmSubsystem(Subsystem):
@@ -20,25 +18,20 @@ class JvmSubsystem(Subsystem):
         register(
             "--resolves",
             type=dict,
-            help=("A dictionary, mapping resolve names to the path of their lockfile. "),
+            help="A dictionary mapping resolve names to the path of their lockfile.",
         )
-
         register(
             "--default-resolve",
             type=str,
-            help=(
-                "The name of the resolve to use by default, if a specific one is not specified "
-                "using `--jvm-use-resolve`. This name must be one of the keys specified in "
-                "`--jvm-resolves`."
-            ),
+            # TODO: Default this to something like `jvm-default`.
+            default=None,
+            help="The name of the resolve to use by default.",
         )
 
-        register(
-            "--use-resolve",
-            type=str,
-            help=(
-                "The name of the resolve to use for this build. This name must be one of the keys "
-                "specified in `--jvm-resolves`. If this or `--default-resolve` is not specified, "
-                "one compatible resolve will be used instead."
-            ),
-        )
+    @property
+    def resolves(self) -> dict[str, str]:
+        return cast("dict[str, str]", self.options.resolves)
+
+    @property
+    def default_resolve(self) -> str | None:
+        return cast(str, self.options.default_resolve)

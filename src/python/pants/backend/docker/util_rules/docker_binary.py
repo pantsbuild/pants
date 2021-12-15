@@ -35,8 +35,9 @@ class DockerBinary(BinaryPath):
         dockerfile: str | None = None,
         build_args: DockerBuildArgs | None = None,
         env: Mapping[str, str] | None = None,
+        extra_args: tuple[str, ...] = (),
     ) -> Process:
-        args = [self.path, "build"]
+        args = [self.path, "build", *extra_args]
 
         for tag in tags:
             args.extend(["-t", tag])

@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet
-from pants.backend.go.goals.test import rules as test_rules
+from pants.backend.go.goals.test import rules as _test_rules
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -22,6 +22,7 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourceTarget
@@ -33,7 +34,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *test_rules(),
+            *_test_rules(),
             *assembly.rules(),
             *build_pkg.rules(),
             *build_pkg_target.rules(),
@@ -53,16 +54,60 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
+def test_merge_embedcfg() -> None:
+    x = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.x": ["only_in_x"],
+        },
+        files={"foo.go": "path/to/foo.go", "bar.go": "path/to/bar.go", "only_in_x": "only_in_x"},
+    )
+    y = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.y": ["only_in_y"],
+        },
+        files={"foo.go": "path/to/foo.go", "bar.go": "path/to/bar.go", "only_in_y": "only_in_y"},
+    )
+    merged = x.merge(y)
+    assert merged == EmbedConfig(
+        patterns={
+            "*.go": ["foo.go", "bar.go"],
+            "*.x": ["only_in_x"],
+            "*.y": ["only_in_y"],
+        },
+        files={
+            "foo.go": "path/to/foo.go",
+            "bar.go": "path/to/bar.go",
+            "only_in_x": "only_in_x",
+            "only_in_y": "only_in_y",
+        },
+    )
+
+    a = EmbedConfig(
+        patterns={
+            "*.go": ["foo.go"],
+        },
+        files={"foo.go": "path/to/foo.go"},
+    )
+    b = EmbedConfig(
+        patterns={
+            "*.go": ["bar.go"],
+        },
+        files={"bar.go": "path/to/bar.go"},
+    )
+    with pytest.raises(AssertionError):
+        _ = a.merge(b)
+
+
+def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """
                 go_mod(name='mod')
-                go_package(name='pkg', dependencies=[":grok", ":test_grok", ":xtest_grok"])
-                resource(name='grok', source='grok.txt')
-                resource(name='test_grok', source='test_grok.txt')
-                resource(name='xtest_grok', source='xtest_grok.txt')
+                go_package(name='pkg', dependencies=[":hello"])
+                resource(name='hello', source='hello.txt')
                 """
             ),
             "go.mod": dedent(
@@ -71,15 +116,54 @@ def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
                 go 1.17
                 """
             ),
-            "grok.txt": "hello",
-            "test_grok.txt": "world",
-            "xtest_grok.txt": "xtest",
+            "hello.txt": "hello",
             "foo.go": dedent(
                 """\
                 package foo
                 import _ "embed"
-                //go:embed grok.txt
+                //go:embed hello.txt
                 var message string
+                """
+            ),
+            "foo_test.go": dedent(
+                """\
+                package foo
+                import "testing"
+
+                func TestFoo(t *testing.T) {
+                  if message != "hello" {
+                    t.Fatalf("message mismatch: want=%s; got=%s", "hello", message)
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+
+
+def test_embed_in_internal_test(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":hello"])
+                resource(name='hello', source='hello.txt')
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "hello.txt": "hello",
+            "foo.go": dedent(
+                """\
+                package foo
                 """
             ),
             "foo_test.go": dedent(
@@ -89,17 +173,43 @@ def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
                   _ "embed"
                   "testing"
                 )
-                //go:embed test_grok.txt
+                //go:embed hello.txt
                 var testMessage string
 
                 func TestFoo(t *testing.T) {
-                  if message != "hello" {
-                    t.Fatalf("message mismatch: want=%s; got=%s", "hello", message)
-                  }
-                  if testMessage != "world" {
-                    t.Fatalf("testMessage mismatch: want=%s; got=%s", "world", testMessage)
+                  if testMessage != "hello" {
+                    t.Fatalf("testMessage mismatch: want=%s; got=%s", "hello", testMessage)
                   }
                 }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+
+
+def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":hello"])
+                resource(name='hello', source='hello.txt')
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "hello.txt": "hello",
+            "foo.go": dedent(
+                """\
+                package foo
                 """
             ),
             "bar_test.go": dedent(
@@ -109,12 +219,12 @@ def test_embeds_integration_test(rule_runner: RuleRunner) -> None:
                   _ "embed"
                   "testing"
                 )
-                //go:embed xtest_grok.txt
+                //go:embed hello.txt
                 var testMessage string
 
                 func TestBar(t *testing.T) {
-                  if testMessage != "xtest" {
-                    t.Fatalf("testMessage mismatch: want=%s; got=%s", "xtest", testMessage)
+                  if testMessage != "hello" {
+                    t.Fatalf("testMessage mismatch: want=%s; got=%s", "hello", testMessage)
                   }
                 }
                 """

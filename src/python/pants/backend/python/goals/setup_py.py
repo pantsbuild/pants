@@ -845,14 +845,14 @@ def find_packages(
     Returns a tuple (packages, namespace_packages, package_data), suitable for use as setup()
     kwargs.
     """
-    # Find all packages implied by the sources.
+    # Find all packages implied by all the sources.
     packages: set[str] = set()
     package_data: DefaultDict[str, list[str]] = defaultdict(list)
-    for python_file in python_files:
+    for file_path in itertools.chain(python_files, resource_files):
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
-        if not py2 or os.path.basename(python_file) == "__init__.py":
-            packages.add(os.path.dirname(python_file).replace(os.path.sep, "."))
+        if (file_path.endswith(".py") and not py2) or os.path.basename(file_path) == "__init__.py":
+            packages.add(os.path.dirname(file_path).replace(os.path.sep, "."))
 
     # Now find all package_data.
     for resource_file in resource_files:

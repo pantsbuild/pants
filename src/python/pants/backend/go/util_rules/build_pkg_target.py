@@ -90,7 +90,11 @@ async def setup_build_go_package_target_request(
             # TODO: The `go` tool changes the displayed import path for the package when it has
             #  test files. Do we need to do something similar?
             go_file_names += _first_party_pkg_analysis.test_files
-            embed_config = _first_party_pkg_digest.test_embed_config
+            if _first_party_pkg_digest.test_embed_config:
+                if embed_config:
+                    embed_config = embed_config.merge(_first_party_pkg_digest.test_embed_config)
+                else:
+                    embed_config = _first_party_pkg_digest.test_embed_config
         s_file_names = _first_party_pkg_analysis.s_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):

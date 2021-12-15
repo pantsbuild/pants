@@ -52,11 +52,72 @@ class ScalaGeneratorFieldSet(FieldSet):
 
 
 # -----------------------------------------------------------------------------------------------
-# `scala_junit_test` target
+# `scalatest_tests`
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaTestSourceField(ScalaSourceField, JunitTestSourceField):
+class ScalatestTestSourceField(ScalaSourceField):
+    pass
+
+
+class ScalatestTestTarget(Target):
+    alias = "scalatest_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        ScalatestTestSourceField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    help = "A single Scala test, run with Scalatest."
+
+
+class ScalatestTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
+    default = ("*Spec.scala", "*Suite.scala")
+
+
+class ScalatestTestsGeneratorTarget(Target):
+    alias = "scalatest_tests"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalatestTestsGeneratorSourcesField,
+        Dependencies,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    help = (
+        "Generate a `scalatest_test` target for each file in the `sources` field (defaults to "
+        f"all files in the directory matching {ScalatestTestsGeneratorSourcesField.default})."
+    )
+
+
+class GenerateTargetsFromScalatestTests(GenerateTargetsRequest):
+    generate_from = ScalatestTestsGeneratorTarget
+
+
+@rule
+async def generate_targets_from_scala_scalatest_tests(
+    request: GenerateTargetsFromScalatestTests, union_membership: UnionMembership
+) -> GeneratedTargets:
+    paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[ScalatestTestsGeneratorSourcesField])
+    )
+    return generate_file_level_targets(
+        ScalatestTestTarget,
+        request.generator,
+        paths.files,
+        union_membership,
+        add_dependencies_on_all_siblings=True,
+        use_source_field=True,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `scala_junit_tests`
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalaJunitTestSourceField(ScalaSourceField, JunitTestSourceField):
     pass
 
 
@@ -65,19 +126,14 @@ class ScalaJunitTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        ScalaTestSourceField,
+        ScalaJunitTestSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with JUnit."
 
 
-# -----------------------------------------------------------------------------------------------
-# `scala_junit_tests` target generator
-# -----------------------------------------------------------------------------------------------
-
-
-class ScalaTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
+class ScalaJunitTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
 
 
@@ -85,15 +141,12 @@ class ScalaJunitTestsGeneratorTarget(Target):
     alias = "scala_junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ScalaTestsGeneratorSourcesField,
+        ScalaJunitTestsGeneratorSourcesField,
         Dependencies,
         JvmResolveField,
         JvmProvidesTypesField,
     )
-    help = (
-        "Generate a `junit_test` target for each file in the `sources` field (defaults to "
-        "all files in the directory that end in `Test.scala` )."
-    )
+    help = "Generate a `scala_junit_test` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromScalaJunitTests(GenerateTargetsRequest):
@@ -105,7 +158,7 @@ async def generate_targets_from_scala_junit_tests(
     request: GenerateTargetsFromScalaJunitTests, union_membership: UnionMembership
 ) -> GeneratedTargets:
     paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ScalaTestsGeneratorSourcesField])
+        SourcesPaths, SourcesPathsRequest(request.generator[ScalaJunitTestsGeneratorSourcesField])
     )
     return generate_file_level_targets(
         ScalaJunitTestTarget,
@@ -140,7 +193,13 @@ class ScalaSourceTarget(Target):
 
 
 class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
-    default = ("*.scala",) + tuple(f"!{pat}" for pat in ScalaTestsGeneratorSourcesField.default)
+    default = tuple(
+        (
+            "*.scala",
+            *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
+            *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
+        )
+    )
 
 
 class ScalaSourcesGeneratorTarget(Target):
@@ -152,11 +211,7 @@ class ScalaSourcesGeneratorTarget(Target):
         JvmCompatibleResolvesField,
         JvmProvidesTypesField,
     )
-    help = (
-        "Generate a `scala_source` target for each file in the `sources` field (defaults to "
-        "all files named in the directory whose names end in `.scala` except for those which "
-        "end in `Test.scala`)."
-    )
+    help = "Generate a `scala_source` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromScalaSources(GenerateTargetsRequest):
@@ -221,4 +276,5 @@ def rules():
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalaJunitTests),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalaSources),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalatestTests),
     )
