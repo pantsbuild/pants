@@ -25,6 +25,7 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JvmCompatibleResolvesField,
     JvmProvidesTypesField,
+    JvmResolveField,
 )
 
 
@@ -65,7 +66,7 @@ class ScalatestTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalatestTestSourceField,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with Scalatest."
@@ -81,7 +82,7 @@ class ScalatestTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = (
@@ -126,7 +127,7 @@ class ScalaJunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaJunitTestSourceField,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Scala test, run with JUnit."
@@ -142,10 +143,10 @@ class ScalaJunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
-    help = "Generate a `junit_test` target for each file in the `sources` field."
+    help = "Generate a `scala_junit_test` target for each file in the `sources` field."
 
 
 class GenerateTargetsFromScalaJunitTests(GenerateTargetsRequest):

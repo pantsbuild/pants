@@ -67,7 +67,7 @@ class JunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Java test, run with JUnit."
@@ -83,7 +83,7 @@ class JunitTestsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         JavaTestsGeneratorSourcesField,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
