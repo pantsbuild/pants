@@ -7,7 +7,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Sequence
 
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -47,7 +46,9 @@ class CoursierResolveSubsystem(GoalSubsystem):
             "--names",
             type=list,
             help=(
-                "A list of resolve names to resolve. If not provided, resolve all known resolves."
+                "A list of resolve names to resolve.\n\n"
+                "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
+                "If not provided, resolve all known resolves."
             ),
         )
 
@@ -123,55 +124,23 @@ async def coursier_generate_lockfile(
     )
 
     resolved_lockfile = await Get(
-        CoursierResolvedLockfile,
-        ArtifactRequirements,
-        artifact_requirements,
+        CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements
     )
     resolved_lockfile_json = resolved_lockfile.to_json()
+    lockfile_path = jvm.resolves[request.resolve]
 
-    lockfile_path = jvm.options.resolves[request.resolve]
+    # If the lockfile hasn't changed, don't overwrite it.
+    existing_lockfile_digest_contents = await Get(DigestContents, PathGlobs([lockfile_path]))
+    if (
+        existing_lockfile_digest_contents
+        and resolved_lockfile_json == existing_lockfile_digest_contents[0].content
+    ):
+        return CoursierGenerateLockfileResult(EMPTY_DIGEST)
 
-    # Materialise the existing lockfile, and check for changes. We don't want to re-write
-    # identical lockfiles
-    existing_lockfile_source = PathGlobs(
-        [lockfile_path],
-        glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+    new_lockfile = await Get(
+        Digest, CreateDigest((FileContent(lockfile_path, resolved_lockfile_json),))
     )
-    existing_lockfile_digest_contents = await Get(
-        DigestContents, PathGlobs, existing_lockfile_source
-    )
-
-    if not existing_lockfile_digest_contents:
-        # The user defined the target and resolved it, but hasn't created a lockfile yet.
-        # For convenience, create the initial lockfile for them in the specified path.
-        return CoursierGenerateLockfileResult(
-            digest=await Get(
-                Digest,
-                CreateDigest(
-                    (
-                        FileContent(
-                            path=lockfile_path,
-                            content=resolved_lockfile_json,
-                        ),
-                    )
-                ),
-            )
-        )
-
-    existing_lockfile_json = existing_lockfile_digest_contents[0].content
-
-    if resolved_lockfile_json != existing_lockfile_json:
-        # The generated lockfile differs from the existing one, so return the digest of the generated one.
-        return CoursierGenerateLockfileResult(
-            digest=await Get(
-                Digest,
-                CreateDigest((FileContent(path=lockfile_path, content=resolved_lockfile_json),)),
-            )
-        )
-    # The generated lockfile didn't change, so return an empty digest.
-    return CoursierGenerateLockfileResult(
-        digest=EMPTY_DIGEST,
-    )
+    return CoursierGenerateLockfileResult(new_lockfile)
 
 
 @goal_rule
@@ -181,34 +150,33 @@ async def coursier_resolve_lockfiles(
     jvm: JvmSubsystem,
     workspace: Workspace,
 ) -> CoursierResolve:
-
     resolves = resolve_subsystem.options.names
-    available_resolves = set(jvm.options.resolves.keys())
+    available_resolves = set(jvm.resolves.keys())
     if not resolves:
-        # Default behaviour is to reconcile every known resolve (this is expensive, but *shrug*)
+        # Default behaviour is to resolve everything.
         resolves = available_resolves
     else:
         invalid_resolve_names = set(resolves) - available_resolves
         if invalid_resolve_names:
             raise CoursierError(
-                "The following resolve names are not names of actual resolves: "
-                f"{invalid_resolve_names}. The valid resolve names are {available_resolves}."
+                "The following resolve names are not defined in `[jvm].resolves`: "
+                f"{invalid_resolve_names}\n\n"
+                f"The valid resolve names are: {available_resolves}"
             )
 
     results = await MultiGet(
-        Get(CoursierGenerateLockfileResult, CoursierGenerateLockfileRequest(resolve=resolve))
+        Get(CoursierGenerateLockfileResult, CoursierGenerateLockfileRequest(resolve))
         for resolve in resolves
     )
 
     # For performance reasons, avoid writing out files to the workspace that haven't changed.
     results_to_write = tuple(result for result in results if result.digest != EMPTY_DIGEST)
     if results_to_write:
-        merged_digest = await Get(
-            Digest, MergeDigests(result.digest for result in results_to_write)
+        merged_snapshot = await Get(
+            Snapshot, MergeDigests(result.digest for result in results_to_write)
         )
-        workspace.write_digest(merged_digest)
-        merged_digest_snapshot = await Get(Snapshot, Digest, merged_digest)
-        for path in merged_digest_snapshot.files:
+        workspace.write_digest(merged_snapshot.digest)
+        for path in merged_snapshot.files:
             console.print_stderr(f"Updated lockfile at: {path}")
 
     return CoursierResolve(exit_code=0)

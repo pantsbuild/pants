@@ -136,46 +136,29 @@ class ArtifactRequirement:
     @classmethod
     def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
         if not JvmArtifactFieldSet.is_applicable(target):
-            raise CoursierError(
+            raise AssertionError(
                 "`ArtifactRequirement.from_jvm_artifact_target()` only works on targets with "
                 "`JvmArtifactFieldSet` fields present."
             )
 
-        group = target[JvmArtifactGroupField].value
-        if not group:
-            raise InvalidTargetException(
-                f"The `group` field of {target.alias} target {target.address} must be set."
-            )
-
-        artifact = target[JvmArtifactArtifactField].value
-        if not artifact:
-            raise InvalidTargetException(
-                f"The `artifact` field of {target.alias} target {target.address} must be set."
-            )
-
-        version = target[JvmArtifactVersionField].value
-        if not version:
-            raise InvalidTargetException(
-                f"The `version` field of {target.alias} target {target.address} must be set."
-            )
-
         url = target[JvmArtifactUrlField].value
-        jar_ = target[JvmArtifactJarSourceField]
-        jar = jar_ if jar_.value else None
-
-        if url and url.startswith("file:"):
-            raise CoursierError(
-                "Pants does not support `file:` URLS. Instead, use the `jar` field to specify the "
-                "relative path to the local jar file."
-            )
-
-        if url and jar:
-            raise CoursierError(
-                "You cannot specify both a `url` and `jar` for the same `jvm_artifact`."
+        jar_field = (
+            target[JvmArtifactJarSourceField] if target[JvmArtifactJarSourceField].value else None
+        )
+        if url and jar_field:
+            raise InvalidTargetException(
+                f"You cannot specify both the `url` and `jar` fields, but both were set on the "
+                f"`{target.alias}` target {target.address}."
             )
 
         return ArtifactRequirement(
-            coordinate=Coordinate(group=group, artifact=artifact, version=version), url=url, jar=jar
+            coordinate=Coordinate(
+                group=target[JvmArtifactGroupField].value,
+                artifact=target[JvmArtifactArtifactField].value,
+                version=target[JvmArtifactVersionField].value,
+            ),
+            url=url,
+            jar=jar_field,
         )
 
     def to_coord_str(self, versioned: bool = True) -> str:
