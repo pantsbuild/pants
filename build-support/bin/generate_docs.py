@@ -330,7 +330,9 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
-            escaped_default_str = html.escape(default_str, quote=False)
+            escaped_default_str = (
+                html.escape(default_str, quote=False).replace("*", "&ast;").replace("_", "&lowbar;")
+            )
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
@@ -352,7 +354,11 @@ class ReferenceGenerator:
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = html.escape(str(field["default"]))
+                default_str = (
+                    html.escape(str(field["default"]))
+                    .replace("*", "&ast;")
+                    .replace("_", "&lowbar;")
+                )
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
