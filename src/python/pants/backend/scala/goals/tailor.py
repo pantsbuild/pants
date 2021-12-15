@@ -12,6 +12,7 @@ from pants.backend.scala.target_types import (
     ScalaJunitTestsGeneratorTarget,
     ScalaSourcesGeneratorTarget,
     ScalatestTestsGeneratorSourcesField,
+    ScalatestTestsGeneratorTarget,
 )
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -36,18 +37,28 @@ class PutativeScalaTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(
-        includes=[
-            *ScalaJunitTestsGeneratorSourcesField.default,
-            *ScalatestTestsGeneratorSourcesField.default,
-        ]
-    )
-    test_filenames = set(
-        matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
-    )
-    test_files = {path for path in paths if os.path.basename(path) in test_filenames}
-    sources_files = set(paths) - test_files
-    return {ScalaJunitTestsGeneratorTarget: test_files, ScalaSourcesGeneratorTarget: sources_files}
+    scalatest_filespec = Filespec(includes=list(ScalatestTestsGeneratorSourcesField.default))
+    junit_filespec = Filespec(includes=list(ScalaJunitTestsGeneratorSourcesField.default))
+    scalatest_files = {
+        path
+        for path in paths
+        if os.path.basename(path)
+        in set(
+            matches_filespec(scalatest_filespec, paths=[os.path.basename(path) for path in paths])
+        )
+    }
+    junit_files = {
+        path
+        for path in paths
+        if os.path.basename(path)
+        in set(matches_filespec(junit_filespec, paths=[os.path.basename(path) for path in paths]))
+    }
+    sources_files = set(paths) - scalatest_files - junit_files
+    return {
+        ScalaJunitTestsGeneratorTarget: junit_files,
+        ScalaSourcesGeneratorTarget: sources_files,
+        ScalatestTestsGeneratorTarget: scalatest_files,
+    }
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Scala targets to create")
