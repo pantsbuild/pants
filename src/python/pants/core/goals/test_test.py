@@ -43,7 +43,8 @@ from pants.engine.fs import (
     Snapshot,
     Workspace,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.session import RunId
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
 from pants.engine.target import (
     MultipleSourcesField,
     Target,
@@ -96,6 +97,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             address=self.address,
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
+            result_metadata=ProcessResultMetadata(999, "ran_locally", 0),
         )
 
 
@@ -132,6 +134,7 @@ def run_test_rule(
     xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
+    run_id: RunId = RunId(999),
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
@@ -179,6 +182,7 @@ def run_test_rule(
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),
+                run_id,
             ],
             mock_gets=[
                 MockGet(
@@ -248,8 +252,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ //:good succeeded.
-        𐄂 //:bad failed.
+        ✓ //:good succeeded in 999 ms (memoized).
+        𐄂 //:bad failed in 999 ms (memoized).
         """
     )
 
@@ -324,6 +328,7 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
+    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
@@ -333,6 +338,7 @@ def assert_streaming_output(
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         address=Address("demo_test"),
+        result_metadata=result_metadata,
     )
     assert result.level() == expected_level
     assert result.message() == expected_message
