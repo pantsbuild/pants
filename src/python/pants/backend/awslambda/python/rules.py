@@ -27,6 +27,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -52,8 +53,21 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet, lambdex: Lambdex, union_membership: UnionMembership
+    field_set: PythonAwsLambdaFieldSet,
+    lambdex: Lambdex,
+    platform: Platform,
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
+    if platform.is_macos:
+        logger.warning(
+            "AWS Lambdas built on macOS may fail to build. If your lambda uses any third-party"
+            " dependencies without binary wheels (bdist) for Linux available, it will fail to"
+            " build. If this happens, you will either need to update your dependencies to only use"
+            " dependencies with pre-built wheels, or find a Linux environment to run ./pants"
+            " package. (See https://realpython.com/python-wheels/ for more about wheels.)\n\n(If"
+            " the build does not raise an exception, it's safe to use macOS.)"
+        )
+
     output_filename = field_set.output_path.value_or_default(
         # Lambdas typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
@@ -63,12 +77,12 @@ async def package_python_awslambda(
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
     py_major, py_minor = field_set.runtime.to_interpreter_version()
-    platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+    platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
     # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
     if py_major <= 3 and py_minor < 8:
-        platform += "m"
+        platform_str += "m"
     if (py_major, py_minor) == (2, 7):
-        platform += "u"
+        platform_str += "u"
 
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -81,7 +95,7 @@ async def package_python_awslambda(
         addresses=[field_set.address],
         internal_only=False,
         output_filename=output_filename,
-        platforms=PexPlatforms([platform]),
+        platforms=PexPlatforms([platform_str]),
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
