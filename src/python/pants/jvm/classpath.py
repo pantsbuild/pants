@@ -66,9 +66,7 @@ async def classpath(
     union_membership: UnionMembership,
 ) -> Classpath:
     resolve = await Get(
-        CoursierResolveKey,
-        Targets,
-        Targets(t for ct in coarsened_targets.closure() for t in ct.members),
+        CoursierResolveKey, Targets(t for ct in coarsened_targets.closure() for t in ct.members)
     )
 
     classpath_entries = await MultiGet(

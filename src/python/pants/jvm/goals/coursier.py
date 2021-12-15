@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
-from itertools import groupby
+from typing import Sequence
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -21,7 +23,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -29,7 +31,9 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolveNamesField
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolvesField, JvmResolveField
+from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
@@ -52,44 +56,33 @@ class CoursierResolve(Goal):
     subsystem_cls = CoursierResolveSubsystem
 
 
-@dataclass(frozen=True)
-class JvmTargetsByResolveName:
-    targets_by_resolve_name: dict[str, Targets]
+class JvmResolvesToAddresses(FrozenDict[str, FrozenOrderedSet[Address]]):
+    pass
 
 
 @rule
-async def get_jvm_targets_by_resolve_name(
-    all_targets: AllTargets,
-    jvm: JvmSubsystem,
-) -> JvmTargetsByResolveName:
-    # Get all targets that depend on JVM resolves
-
-    targets = [tgt for tgt in all_targets if tgt.has_field(JvmCompatibleResolveNamesField)]
-
-    default_resolve: str | None = jvm.options.default_resolve
-
-    # TODO: simplify this with Py3.9 walrus operator
-    flat_targets_ = ((tgt, tgt[JvmCompatibleResolveNamesField].value) for tgt in targets)
-    flat_targets__ = (
-        (
-            tgt,
-            names
-            if names is not None
-            else (default_resolve,)
-            if default_resolve is not None
-            else None,
-        )
-        for (tgt, names) in flat_targets_
+async def map_resolves_to_consuming_targets(
+    all_targets: AllTargets, jvm: JvmSubsystem
+) -> JvmResolvesToAddresses:
+    resolve_to_addresses = defaultdict(set)
+    for tgt in all_targets:
+        if tgt.has_field(JvmResolveField):
+            resolve = tgt[JvmResolveField].value or jvm.default_resolve
+            # TODO: remove once we always have a default resolve.
+            if not resolve:
+                continue
+            resolve_to_addresses[resolve].add(tgt.address)
+        elif tgt.has_field(JvmCompatibleResolvesField):
+            # TODO: add a `default_compatible_resolves` field.
+            resolves: Sequence[str] = tgt[JvmCompatibleResolvesField].value or (
+                [jvm.default_resolve] if jvm.default_resolve is not None else []
+            )
+            for resolve in resolves:
+                resolve_to_addresses[resolve].add(tgt.address)
+    return JvmResolvesToAddresses(
+        (resolve, FrozenOrderedSet(addresses))
+        for resolve, addresses in resolve_to_addresses.items()
     )
-    flat_targets = [
-        (name, tgt) for (tgt, names) in flat_targets__ if names is not None for name in names
-    ]
-
-    targets_by_resolve_name = {
-        i: Targets(k[1] for k in j) for (i, j) in groupby(flat_targets, lambda x: x[0])
-    }
-
-    return JvmTargetsByResolveName(targets_by_resolve_name)
 
 
 @dataclass(frozen=True)
@@ -116,28 +109,17 @@ class CoursierGenerateLockfileResult:
 async def coursier_generate_lockfile(
     request: CoursierGenerateLockfileRequest,
     jvm: JvmSubsystem,
-    targets_by_resolve_name: JvmTargetsByResolveName,
+    resolves_to_addresses: JvmResolvesToAddresses,
 ) -> CoursierGenerateLockfileResult:
-
-    # `targets_by_resolve_name` supplies all of the targets that depend on each JVM resolve, so
-    # no need to find transitive deps?
-
-    # This task finds all of the sources that depend on this lockfile, and then resolves
-    # a lockfile that satisfies all of their `jvm_artifact` dependencies.
-
-    targets = targets_by_resolve_name.targets_by_resolve_name.get(request.resolve, ())
-
     # Find JVM artifacts in the dependency tree of the targets that depend on this lockfile.
     # These artifacts constitute the requirements that will be resolved for this lockfile.
     dependee_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(tgt.address for tgt in targets)
+        TransitiveTargets, TransitiveTargetsRequest(resolves_to_addresses.get(request.resolve, ()))
     )
-    resolvable_dependencies = [
-        tgt for tgt in dependee_targets.closure if JvmArtifactFieldSet.is_applicable(tgt)
-    ]
-
     artifact_requirements = ArtifactRequirements(
-        [ArtifactRequirement.from_jvm_artifact_target(tgt) for tgt in resolvable_dependencies]
+        ArtifactRequirement.from_jvm_artifact_target(tgt)
+        for tgt in dependee_targets.closure
+        if JvmArtifactFieldSet.is_applicable(tgt)
     )
 
     resolved_lockfile = await Get(
