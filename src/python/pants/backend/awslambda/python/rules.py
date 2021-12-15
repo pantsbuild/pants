@@ -77,12 +77,12 @@ async def package_python_awslambda(
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
     py_major, py_minor = field_set.runtime.to_interpreter_version()
-    platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+    platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
     # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
     if py_major <= 3 and py_minor < 8:
-        platform += "m"
+        platform_str += "m"
     if (py_major, py_minor) == (2, 7):
-        platform += "u"
+        platform_str += "u"
 
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -95,7 +95,7 @@ async def package_python_awslambda(
         addresses=[field_set.address],
         internal_only=False,
         output_filename=output_filename,
-        platforms=PexPlatforms([platform]),
+        platforms=PexPlatforms([platform_str]),
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
