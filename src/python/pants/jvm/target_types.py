@@ -29,10 +29,9 @@ class JvmCompatibleResolvesField(StringSequenceField):
     required = False
     help = (
         "The set of resolve names that this target is compatible with.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
-        "Any targets which depend on one another must have at least one compatible resolve in "
-        "common. Which resolves are actually used in a build is calculated based on a target's "
-        "dependees."
+        "If not defined, will default to `[jvm].default_compatible_resolves`.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`."
+        # TODO: Document expectations for dependencies once we validate that.
     )
 
 
@@ -41,9 +40,9 @@ class JvmResolveField(StringField):
     required = False
     help = (
         "The name of the resolve to use when building this target.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
-        "If not supplied, the default resolve will be used. Otherwise, one resolve that is "
-        "compatible with all dependency targets will be used."
+        "If not defined, will default to `[jvm].default_resolve`.\n\n"
+        "The name must be defined as a resolve in `[jvm].resolves`."
+        # TODO: Document expectations for dependencies once we validate that.
     )
 
 
@@ -157,8 +156,7 @@ class JvmProvidesTypesField(StringSequenceField):
 class JvmArtifactCompatibleResolvesField(JvmCompatibleResolvesField):
     help = (
         "The resolves that this artifact should be included in.\n\n"
-        # TODO: Switch to `[jvm].default_compatible_resolves`.
-        "If not defined, will default to `[jvm].default_resolve`.\n\n"
+        "If not defined, will default to `[jvm].default_compatible_resolves`.\n\n"
         "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
         "it will include all artifacts that are declared compatible with that resolve. First-party "

@@ -642,8 +642,7 @@ async def select_coursier_resolve_for_targets(
             encountered_resolves.append(resolve)
         if tgt.has_field(JvmCompatibleResolvesField):
             encountered_compatible_resolves.extend(
-                tgt[JvmCompatibleResolvesField].value
-                or ([jvm.default_resolve] if jvm.default_resolve is not None else [])
+                tgt[JvmCompatibleResolvesField].value or jvm.default_compatible_resolves
             )
 
     # TODO: validate that all specified resolves are defined in [jvm].resolves and that all

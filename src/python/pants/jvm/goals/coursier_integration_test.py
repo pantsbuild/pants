@@ -58,7 +58,7 @@ HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
 
 ARGS = [
     "--jvm-resolves={'test': 'coursier_resolve.lockfile'}",
-    "--jvm-default-resolve=test",
+    "--jvm-default-compatible-resolves=test",
     "--coursier-resolve-names=test",
 ]
 

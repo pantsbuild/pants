@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Sequence
 
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -67,13 +66,10 @@ async def map_resolves_to_consuming_targets(
     for tgt in all_targets:
         if not tgt.has_field(JvmArtifactCompatibleResolvesField):
             continue
-        # TODO: add a `default_compatible_resolves` field.
+        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
         # TODO: error if no resolves for the target. Wait to change until we automatically set a
         #  default resolve.
-        resolves: Sequence[str] = tgt[JvmArtifactCompatibleResolvesField].value or (
-            [jvm.default_resolve] if jvm.default_resolve is not None else []
-        )
-        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
+        resolves = tgt[JvmArtifactCompatibleResolvesField].value or jvm.default_compatible_resolves
         for resolve in resolves:
             resolve_to_artifacts[resolve].add(artifact)
     return JvmResolvesToArtifacts(
