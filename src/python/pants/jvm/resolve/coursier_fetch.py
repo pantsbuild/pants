@@ -651,14 +651,18 @@ async def select_coursier_resolve_for_targets(
     #  dependencies are compatible, just the specified targets.
 
     if len(encountered_resolves) > 1:
-        raise AssertionError(f"Encountered >1 `resolve` field, which was not expected. {targets}")
+        raise AssertionError(
+            "Encountered >1 `resolve` field, which was not expected: "
+            f"{sorted(tgt.address for tgt in targets)}"
+        )
     elif len(encountered_resolves) == 1:
         resolve = encountered_resolves[0]
     elif encountered_compatible_resolves:
         resolve = min(encountered_compatible_resolves)
     else:
         raise AssertionError(
-            f"No `resolve` or `compatible_resolves` specified for these targets: {targets}"
+            f"No `resolve` or `compatible_resolves` specified for these targets: "
+            f"{sorted(tgt.address for tgt in targets)}"
         )
 
     resolve_path = jvm.resolves[resolve]

@@ -18,6 +18,8 @@ class JvmSubsystem(Subsystem):
         register(
             "--resolves",
             type=dict,
+            # TODO: Default this to something like {'jvm-default': '3rdparty/jvm/default.lockfile'}.
+            # TODO: expand help message
             help="A dictionary mapping resolve names to the path of their lockfile.",
         )
         register(
@@ -25,7 +27,10 @@ class JvmSubsystem(Subsystem):
             type=str,
             # TODO: Default this to something like `jvm-default`.
             default=None,
-            help="The name of the resolve to use by default.",
+            help=(
+                "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
+                "The name must be defined as a resolve in `[jvm].resolves`.",
+            ),
         )
 
     @property
