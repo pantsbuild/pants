@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Tuple
 
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.build_graph.address import Address
@@ -23,8 +22,6 @@ from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
-logger = logging.getLogger(__name__)
-
 
 @dataclass(frozen=True)
 class UnversionedCoordinate:
@@ -39,21 +36,10 @@ class UnversionedCoordinate:
         return UnversionedCoordinate(group=coordinate_parts[0], artifact=coordinate_parts[1])
 
 
-@dataclass(frozen=True)
-class AvailableThirdPartyArtifacts:
+class AvailableThirdPartyArtifacts(
+    FrozenDict[UnversionedCoordinate, Tuple[Tuple[Address, ...], Tuple[str, ...]]]
+):
     """Maps JVM unversioned coordinates to target `Address`es and declared packages."""
-
-    artifacts: FrozenDict[UnversionedCoordinate, tuple[tuple[Address, ...], tuple[str, ...]]]
-
-    def addresses_for_coordinates(
-        self, coordinates: Iterable[UnversionedCoordinate]
-    ) -> OrderedSet[Address]:
-        candidate_artifact_addresses: OrderedSet[Address] = OrderedSet()
-        for coordinate in coordinates:
-            candidates = self.artifacts.get(coordinate)
-            if candidates:
-                candidate_artifact_addresses.update(address for address in candidates[0])
-        return candidate_artifact_addresses
 
 
 class MutableTrieNode:
@@ -156,42 +142,57 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
 class ThirdPartyPackageToArtifactMapping:
     mapping_root: FrozenTrieNode
 
+    def addresses_for_symbol(self, symbol: str) -> FrozenOrderedSet[Address]:
+        imp_parts = symbol.split(".")
+        current_node = self.mapping_root
+
+        found_nodes = []
+        for imp_part in imp_parts:
+            child_node_opt = current_node.find_child(imp_part)
+            if not child_node_opt:
+                break
+            found_nodes.append(child_node_opt)
+            current_node = child_node_opt
+
+        if not found_nodes:
+            return FrozenOrderedSet()
+
+        # If the length of the found nodes equals the number of parts of the package path, then
+        # there is an exact match.
+        if len(found_nodes) == len(imp_parts):
+            best_match = found_nodes[-1]
+            if best_match.first_party:
+                return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
+            return found_nodes[-1].addresses
+
+        # Otherwise, check for the first found node (in reverse order) to match recursively, and
+        # use its coordinate.
+        for found_node in reversed(found_nodes):
+            if found_node.recursive:
+                return found_node.addresses
+
+        # Nothing matched so return no match.
+        return FrozenOrderedSet()
+
 
 @rule
 async def find_available_third_party_artifacts(
     all_jvm_artifact_tgts: AllJvmArtifactTargets,
 ) -> AvailableThirdPartyArtifacts:
-
     address_mapping: dict[UnversionedCoordinate, OrderedSet[Address]] = defaultdict(OrderedSet)
     package_mapping: dict[UnversionedCoordinate, OrderedSet[str]] = defaultdict(OrderedSet)
     for tgt in all_jvm_artifact_tgts:
-        group = tgt[JvmArtifactGroupField].value
-        if not group:
-            raise ValueError(
-                f"The {JvmArtifactGroupField.alias} field of target {tgt.address} must be set."
-            )
-
-        artifact = tgt[JvmArtifactArtifactField].value
-        if not artifact:
-            raise ValueError(
-                f"The {JvmArtifactArtifactField.alias} field of target {tgt.address} must be set."
-            )
-        packages: tuple[str, ...] = ()
-        declared_packages = tgt[JvmArtifactPackagesField].value
-        if declared_packages:
-            packages = tuple(declared_packages)
-
-        key = UnversionedCoordinate(group=group, artifact=artifact)
+        key = UnversionedCoordinate(
+            group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value
+        )
         address_mapping[key].add(tgt.address)
-        package_mapping[key].update(packages)
+        package_mapping[key].update(tgt[JvmArtifactPackagesField].value or ())
 
     return AvailableThirdPartyArtifacts(
-        FrozenDict(
-            {
-                key: (tuple(addresses), tuple(package_mapping[key]))
-                for key, addresses in address_mapping.items()
-            }
-        )
+        {
+            key: (tuple(addresses), tuple(package_mapping[key]))
+            for key, addresses in address_mapping.items()
+        }
     )
 
 
@@ -238,7 +239,7 @@ async def compute_java_third_party_artifact_mapping(
 
     # Build the mapping from packages to addresses.
     mapping = MutableTrieNode()
-    for coord, (addresses, packages) in available_artifacts.artifacts.items():
+    for coord, (addresses, packages) in available_artifacts.items():
         if not packages:
             # If no packages were explicitly defined, fall back to our default mapping.
             packages = tuple(default_coords_to_packages[coord])
@@ -254,41 +255,6 @@ async def compute_java_third_party_artifact_mapping(
             insert(mapping, provides_type, [], True)
 
     return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
-
-
-def find_artifact_mapping(
-    import_name: str,
-    mapping: ThirdPartyPackageToArtifactMapping,
-) -> FrozenOrderedSet[Address]:
-    imp_parts = import_name.split(".")
-    current_node = mapping.mapping_root
-
-    found_nodes = []
-    for imp_part in imp_parts:
-        child_node_opt = current_node.find_child(imp_part)
-        if not child_node_opt:
-            break
-        found_nodes.append(child_node_opt)
-        current_node = child_node_opt
-
-    if not found_nodes:
-        return FrozenOrderedSet()
-
-    # If the length of the found nodes equals the number of parts of the package path, then there
-    # is an exact match.
-    if len(found_nodes) == len(imp_parts):
-        best_match = found_nodes[-1]
-        if best_match.first_party:
-            return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
-        return found_nodes[-1].addresses
-
-    # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
-    for found_node in reversed(found_nodes):
-        if found_node.recursive:
-            return found_node.addresses
-
-    # Nothing matched so return no match.
-    return FrozenOrderedSet()
 
 
 def rules():

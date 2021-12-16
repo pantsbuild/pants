@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -27,14 +26,9 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import (
-    ThirdPartyPackageToArtifactMapping,
-    find_artifact_mapping,
-)
+from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-logger = logging.getLogger(__name__)
 
 
 class InferJavaSourceDependencies(InferDependenciesRequest):
@@ -130,9 +124,11 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     for typ in types:
         first_party_matches = dep_map.addresses_for_symbol(typ)
-        third_party_matches: FrozenOrderedSet[Address] = FrozenOrderedSet()
-        if java_infer_subsystem.third_party_imports:
-            third_party_matches = find_artifact_mapping(typ, third_party_artifact_mapping)
+        third_party_matches = (
+            third_party_artifact_mapping.addresses_for_symbol(typ)
+            if java_infer_subsystem.third_party_imports
+            else FrozenOrderedSet()
+        )
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
