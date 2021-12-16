@@ -164,6 +164,7 @@ custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [jvm]
 default_resolve = "jvm_testprojects"
+default_compatible_resolves = ["jvm_testprojects"]
 
 [jvm.resolves]
 # A shared resolve for all testproject/example code. Because this is not shipped with Pants
