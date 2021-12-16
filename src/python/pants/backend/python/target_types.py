@@ -504,6 +504,15 @@ class PexLayoutField(StringField):
     )
 
 
+class PexIncludeRequirementsField(BoolField):
+    alias = "include_requirements"
+    default = True
+    help = (
+        "Whether to include the third party requirements the binary depends on in the "
+        "packaged PEX file."
+    )
+
+
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
@@ -533,6 +542,7 @@ class PexBinary(Target):
         PexEmitWarningsField,
         PexLayoutField,
         PexExecutionModeField,
+        PexIncludeRequirementsField,
         PexIncludeToolsField,
         RestartableField,
     )
