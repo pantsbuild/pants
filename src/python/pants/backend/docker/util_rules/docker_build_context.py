@@ -20,12 +20,13 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
+from pants.backend.docker.utils import suggest_renames
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -125,12 +126,13 @@ class DockerBuildContext:
     build_env: DockerBuildEnvironment
     dockerfile: str
     version_context: DockerVersionContext
+    copy_source_vs_context_source: tuple[tuple[str, str], ...]
 
     @classmethod
     def create(
         cls,
         build_args: DockerBuildArgs,
-        digest: Digest,
+        snapshot: Snapshot,
         build_env: DockerBuildEnvironment,
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
@@ -174,10 +176,13 @@ class DockerBuildContext:
 
         return cls(
             build_args=build_args,
-            digest=digest,
+            digest=snapshot.digest,
             dockerfile=dockerfile_info.source,
             build_env=build_env,
             version_context=DockerVersionContext.from_dict(version_context),
+            copy_source_vs_context_source=tuple(
+                suggest_renames(dockerfile_info.copy_sources, snapshot.files)
+            ),
         )
 
 
@@ -230,7 +235,7 @@ async def create_docker_build_context(
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
-    context_request = Get(Digest, MergeDigests(d for d in all_digests if d))
+    context_request = Get(Snapshot, MergeDigests(d for d in all_digests if d))
 
     # Requests for build args and env
     build_args_request = Get(DockerBuildArgs, DockerBuildArgsRequest(docker_image))
@@ -241,7 +246,7 @@ async def create_docker_build_context(
 
     return DockerBuildContext.create(
         build_args=build_args,
-        digest=context,
+        snapshot=context,
         dockerfile_info=dockerfile_info,
         build_env=build_env,
     )

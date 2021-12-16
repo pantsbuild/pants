@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from os import path
+from textwrap import dedent
 from typing import Any, Iterator, Mapping
 
 from pants.backend.docker.registries import DockerRegistries
@@ -22,13 +23,15 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
     DockerVersionContext,
 )
+from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
@@ -173,7 +176,9 @@ def get_build_options(target: Target) -> Iterator[str]:
 async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
+    global_options: GlobalOptions,
     docker: DockerBinary,
+    process_cleanup: ProcessCleanupOption,
 ) -> BuiltPackage:
     context, wrapped_target = await MultiGet(
         Get(
@@ -192,29 +197,89 @@ async def build_docker_image(
         version_context=context.version_context,
     )
 
-    result = await Get(
-        ProcessResult,
-        Process,
-        docker.build_image(
-            build_args=context.build_args,
-            digest=context.digest,
-            dockerfile=context.dockerfile,
-            env=context.build_env.environment,
-            tags=tags,
-            extra_args=tuple(get_build_options(wrapped_target.target)),
-        ),
+    process = docker.build_image(
+        build_args=context.build_args,
+        digest=context.digest,
+        dockerfile=context.dockerfile,
+        env=context.build_env.environment,
+        tags=tags,
+        extra_args=tuple(get_build_options(wrapped_target.target)),
     )
+    result = await Get(FallibleProcessResult, Process, process)
+
+    if result.exit_code != 0:
+        docker_build_failed(field_set.address, context, global_options.options.colors)
+        raise ProcessExecutionFailure(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            process.description,
+            process_cleanup=process_cleanup.val,
+        )
 
     logger.debug(
-        f"Docker build output for {tags[0]}:\n"
-        f"{result.stdout.decode()}\n"
-        f"{result.stderr.decode()}"
+        dedent(
+            f"""\
+            Docker build output for {tags[0]}:
+            stdout:
+            {result.stdout.decode()}
+
+            stderr:
+            {result.stderr.decode()}
+            """
+        )
     )
 
     return BuiltPackage(
         result.output_digest,
         (BuiltDockerImage.create(tags),),
     )
+
+
+def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> None:
+    if not context.copy_source_vs_context_source:
+        return
+
+    msg = (
+        f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY`"
+        "instructions where the source files may not have been found in the Docker build context."
+        "\n\n"
+    )
+
+    renames = [
+        format_rename_suggestion(src, dst, colors=colors)
+        for src, dst in context.copy_source_vs_context_source
+        if src and dst
+    ]
+    if renames:
+        legend = [
+            "`{x => y}`: replace `x` with `y`",
+            "`(x)`: insert `x`",
+            "`[x]`: remove `x`",
+        ]
+        msg += (
+            f"However there are possible matches. Please review the following list of suggested "
+            f"renames:\n\n{bullet_list(renames)}\n\n"
+            f"Renames legend:\n{bullet_list(legend)}\n\n"
+        )
+
+    unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]
+    if unknown:
+        msg += (
+            f"The following files where not found in the Docker build context:\n\n"
+            f"{bullet_list(unknown)}\n\n"
+        )
+
+    unreferenced = [dst for src, dst in context.copy_source_vs_context_source if not src]
+    if unreferenced:
+        if len(unreferenced) > 10:
+            unreferenced = unreferenced[:9] + [f"... and {len(unreferenced)-9} more"]
+        msg += (
+            f"There are additional files in the Docker build context that were not referenced by "
+            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced)}\n\n"
+        )
+
+    logger.info(msg)
 
 
 def rules():
