@@ -68,7 +68,8 @@ async def map_resolves_to_consuming_targets(
         if not tgt.has_field(JvmArtifactCompatibleResolvesField):
             continue
         # TODO: add a `default_compatible_resolves` field.
-        # TODO: error if no resolves for the target? Which would mean it's practically invisible.
+        # TODO: error if no resolves for the target. Wait to change until we automatically set a
+        #  default resolve.
         resolves: Sequence[str] = tgt[JvmArtifactCompatibleResolvesField].value or (
             [jvm.default_resolve] if jvm.default_resolve is not None else []
         )
@@ -109,9 +110,8 @@ async def coursier_generate_lockfile(
 ) -> CoursierGenerateLockfileResult:
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
-        ArtifactRequirements,
-        # TODO: error if no artifacts associated with a resolve?
-        resolves_to_artifacts.get(request.resolve, ()),
+        # Note that it's legal to have a resolve with no artifacts.
+        ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ())),
     )
     resolved_lockfile_json = resolved_lockfile.to_json()
     lockfile_path = jvm.resolves[request.resolve]
