@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.java.target_types import (
+    JavaJunitTestSourceField,
     JavaSourceField,
     JavaSourceTarget,
-    JunitTestSourceField,
     JunitTestTarget,
 )
 from pants.core.target_types import GenericTarget
@@ -49,16 +49,17 @@ def test_resolves_for_targets() -> None:
 
     assert jvm.resolves_for_target(
         JunitTestTarget(
-            {JunitTestSourceField.alias: "foo", JvmResolveField.alias: "a"}, Address("dir")
+            {JavaJunitTestSourceField.alias: "foo", JvmResolveField.alias: "a"}, Address("dir")
         )
     ) == ("a",)
     assert jvm.resolves_for_target(
-        JunitTestTarget({JunitTestSourceField.alias: "foo"}, Address("dir"))
+        JunitTestTarget({JavaJunitTestSourceField.alias: "foo"}, Address("dir"))
     ) == ("default",)
     with pytest.raises(InvalidFieldException):
         jvm.resolves_for_target(
             JunitTestTarget(
-                {JunitTestSourceField.alias: "foo", JvmResolveField.alias: "bad"}, Address("dir")
+                {JavaJunitTestSourceField.alias: "foo", JvmResolveField.alias: "bad"},
+                Address("dir"),
             )
         )
 
