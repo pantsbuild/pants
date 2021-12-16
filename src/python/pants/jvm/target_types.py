@@ -154,6 +154,21 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
+class JvmArtifactCompatibleResolvesField(JvmCompatibleResolvesField):
+    help = (
+        "The resolves that this artifact should be included in.\n\n"
+        # TODO: Switch to `[jvm].default_compatible_resolves`.
+        "If not defined, will default to `[jvm].default_resolve`.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
+        "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
+        "it will include all artifacts that are declared compatible with that resolve. First-party "
+        "targets like `java_source` and `scala_source` then declare which resolve(s) they use "
+        "via the `resolve` and `compatible_resolves` field; so, for your first-party code to use "
+        "a particular `jvm_artifact` target, that artifact must be included in the resolve(s) "
+        "used by that code."
+    )
+
+
 class JvmArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
@@ -176,10 +191,14 @@ class JvmArtifactTarget(Target):
         *JvmArtifactFieldSet.required_fields,
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
+        JvmArtifactCompatibleResolvesField,
     )
     help = (
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
-        "That is, an artifact identified by its `group`, `artifact`, and `version` components."
+        "That is, an artifact identified by its `group`, `artifact`, and `version` components.\n\n"
+        "Each artifact is associated with one or more resolves (a logical name you give to a "
+        "lockfile). For this artifact to be used by your first-party code, it must be "
+        "associated with the resolve(s) used by that code. See the `compatible_resolves` field."
     )
 
     def validate(self) -> None:
