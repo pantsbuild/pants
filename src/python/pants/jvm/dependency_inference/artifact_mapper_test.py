@@ -7,7 +7,11 @@ import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JavaSourceTarget
+from pants.backend.java.target_types import (
+    JavaSourcesGeneratorTarget,
+    JavaSourceTarget,
+    JunitTestsGeneratorTarget,
+)
 from pants.backend.java.target_types import rules as java_target_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -24,12 +28,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import (
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    logging,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, logging
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
 DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
@@ -52,7 +51,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ThirdPartyPackageToArtifactMapping, []),
         ],
-        target_types=[JavaSourceTarget, JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifactTarget],
+        target_types=[
+            JavaSourceTarget,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+            JvmArtifactTarget,
+        ],
     )
     rule_runner.set_options(
         args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit={"PATH"}
@@ -181,7 +185,9 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
 
     def assert_inferred(lib_name: str, expected: list[str]) -> None:
         lib = rule_runner.get_target(Address("", target_name=lib_name))
-        assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(Address("", target_name=name) for name in expected)
+        assert rule_runner.request(
+            Addresses, [DependenciesRequest(lib[Dependencies])]
+        ) == Addresses(Address("", target_name=name) for name in expected)
 
     assert_inferred("lib_a", ["artifact_a"])
     assert_inferred("lib_b", ["artifact_b"])
