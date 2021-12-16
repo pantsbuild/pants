@@ -199,6 +199,7 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/13900")
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
 
