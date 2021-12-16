@@ -53,7 +53,11 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        args=['--jvm-resolves={"test": "coursier_resolve.lockfile"}', "--jvm-default-resolve=test"],
+        args=[
+            '--jvm-resolves={"test": "coursier_resolve.lockfile"}',
+            "--jvm-default-resolve=test",
+            "--jvm-default-compatible-resolves=test",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner

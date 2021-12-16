@@ -60,7 +60,7 @@ from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
+DEFAULT_RESOLVE_OPTION = "--jvm-default-compatible-resolves=test"
 
 
 @pytest.fixture
