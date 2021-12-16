@@ -34,6 +34,10 @@ class ClasspathSourceAmbiguity(Exception):
     """Too many compiler instances were compatible with a CoarsenedTarget."""
 
 
+class ClasspathSourceRootOnlyWasInner(Exception):
+    """A root_only request type was used as an inner node in a compile graph."""
+
+
 class _ClasspathEntryRequestClassification(Enum):
     COMPATIBLE = auto()
     PARTIAL = auto()
@@ -66,11 +70,23 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
     # `cls.field_sets`.
     field_sets_consume_only: ClassVar[tuple[type[FieldSet], ...]] = ()
 
+    # True if this request type is only valid at the root of a compile graph.
+    root_only: ClassVar[bool] = False
+
     @staticmethod
     def for_targets(
-        union_membership: UnionMembership, component: CoarsenedTarget, resolve: CoursierResolveKey
+        union_membership: UnionMembership,
+        component: CoarsenedTarget,
+        resolve: CoursierResolveKey,
+        *,
+        root: bool = False,
     ) -> ClasspathEntryRequest:
-        """Constructs a subclass compatible with the members of the CoarsenedTarget."""
+        """Constructs a subclass compatible with the members of the CoarsenedTarget.
+
+        If the CoarsenedTarget is a root of a compile graph, pass `root=True` to allow usage of
+        request types which are marked `root_only`.
+        """
+
         compatible = []
         partial = []
         consume_only = []
@@ -87,6 +103,11 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
                 consume_only.append(impl)
 
         if len(compatible) == 1:
+            if not root and impl.root_only:
+                raise ClasspathSourceRootOnlyWasInner(
+                    "The following targets had dependees, but can only be used as roots in a "
+                    f"build graph:\n{component.bullet_list()}"
+                )
             return compatible[0](component, resolve, None)
 
         # No single request can handle the entire component: see whether there are exactly one
@@ -97,13 +118,10 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
                 return partial[0](component, resolve, consume_only[0](component, resolve, None))
 
         impls_str = ", ".join(sorted(impl.__name__ for impl in impls))
-        targets_str = "\n  ".join(
-            sorted(f"{t.address.spec}\t({type(t).alias})" for t in component.members)
-        )
         if compatible:
             raise ClasspathSourceAmbiguity(
                 f"More than one JVM classpath provider ({impls_str}) was compatible with "
-                f"the inputs:\n  {targets_str}"
+                f"the inputs:\n{component.bullet_list()}"
             )
         else:
             # TODO: There is more subtlety of error messages possible here if there are multiple
@@ -111,7 +129,7 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
             # compiler implementations, for example).
             raise ClasspathSourceMissing(
                 f"No JVM classpath providers (from: {impls_str}) were compatible with the "
-                f"combination of inputs:\n  {targets_str}"
+                f"combination of inputs:\n{component.bullet_list()}"
             )
 
     @staticmethod

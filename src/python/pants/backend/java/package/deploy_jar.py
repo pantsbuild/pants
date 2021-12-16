@@ -15,13 +15,20 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ZipBinary
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.addresses import Addresses
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm import classpath
 from pants.jvm.classpath import Classpath
+from pants.jvm.compile import (
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    CompileResult,
+    FallibleClasspathEntry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,52 @@ class DeployJarFieldSet(PackageFieldSet):
     dependencies: Dependencies
 
 
+class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
+    field_sets = (DeployJarFieldSet,)
+    # A `deploy_jar` can have a Classpath requested for it, but should not be used as a dependency.
+    root_only = True
+
+
+@rule
+async def deploy_jar_classpath(
+    request: DeployJarClasspathEntryRequest,
+    union_membership: UnionMembership,
+) -> FallibleClasspathEntry:
+    if len(request.component.members) > 1:
+        # If multiple DeployJar targets were coarsened into a single instance, it's because they
+        # formed a cycle among themselves... but at a high level, they shouldn't have dependencies
+        # on one another anyway.
+        raise Exception(
+            "`deploy_jar` targets should not depend on one another:\n"
+            f"{request.component.bullet_list()}"
+        )
+    classpath_entries = FallibleClasspathEntry.if_all_succeeded(
+        await MultiGet(
+            Get(
+                FallibleClasspathEntry,
+                ClasspathEntryRequest,
+                ClasspathEntryRequest.for_targets(
+                    union_membership, component=coarsened_dep, resolve=request.resolve
+                ),
+            )
+            for coarsened_dep in request.component.dependencies
+        )
+    )
+    if classpath_entries is None:
+        return FallibleClasspathEntry(
+            description=str(request.component),
+            result=CompileResult.DEPENDENCY_FAILED,
+            output=None,
+            exit_code=1,
+        )
+    return FallibleClasspathEntry(
+        description=str(request.component),
+        result=CompileResult.SUCCEEDED,
+        output=ClasspathEntry(EMPTY_DIGEST, dependencies=classpath_entries),
+        exit_code=0,
+    )
+
+
 @rule
 async def package_deploy_jar(
     bash: BashBinary,
@@ -50,8 +103,8 @@ async def package_deploy_jar(
     field_set: DeployJarFieldSet,
 ) -> BuiltPackage:
     """
-    Constructs a deploy ("fat") JAR file (currently from Java sources only) by
-    1. Resolving/compiling a classpath for the `root_address` target,
+    Constructs a deploy ("fat") JAR file by
+    1. Resolving/compiling a Classpath for the `root_address` target,
     2. Producing a ZIP file containing _only_ the JAR manifest file for the `main_class`
     3. Creating a deploy jar with a broken ZIP index by concatenating all dependency JARs together,
        followed by the thin JAR we created
@@ -62,10 +115,10 @@ async def package_deploy_jar(
         raise Exception("Needs a `main` argument")
 
     #
-    # 1. Produce a thin JAR containing our first-party sources and other runtime dependencies
+    # 1. Produce thin JARs containing the transitive classpath
     #
 
-    classpath = await Get(Classpath, DependenciesRequest(field_set.dependencies))
+    classpath = await Get(Classpath, Addresses([field_set.address]))
 
     #
     # 2. Produce JAR manifest, and output to a ZIP file that can be included with the JARs
@@ -164,4 +217,5 @@ def rules():
         *collect_rules(),
         *classpath.rules(),
         UnionRule(PackageFieldSet, DeployJarFieldSet),
+        UnionRule(ClasspathEntryRequest, DeployJarClasspathEntryRequest),
     ]

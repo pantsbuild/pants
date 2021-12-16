@@ -54,7 +54,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -672,6 +672,10 @@ class CoarsenedTarget(EngineAwareParameter):
     def representative(self) -> Target:
         """A stable "representative" target in the cycle."""
         return next(iter(self.members))
+
+    def bullet_list(self) -> str:
+        """The addresses and type aliases of all members of the cycle."""
+        return bullet_list(sorted(f"{t.address.spec}\t({type(t).alias})" for t in self.members))
 
     def __hash__(self) -> int:
         return self._hashcode

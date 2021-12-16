@@ -65,15 +65,20 @@ async def classpath(
     coarsened_targets: CoarsenedTargets,
     union_membership: UnionMembership,
 ) -> Classpath:
+    # Compute a single shared resolve for all of the roots, which will validate that they
+    # are compatible.
     resolve = await Get(
-        CoursierResolveKey, Targets(t for ct in coarsened_targets.closure() for t in ct.members)
+        CoursierResolveKey, Targets(t for ct in coarsened_targets for t in ct.members)
     )
 
+    # Then request classpath entries for each root.
     classpath_entries = await MultiGet(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(union_membership, component=t, resolve=resolve),
+            ClasspathEntryRequest.for_targets(
+                union_membership, component=t, resolve=resolve, root=True
+            ),
         )
         for t in coarsened_targets
     )
