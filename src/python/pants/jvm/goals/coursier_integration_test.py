@@ -8,10 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget
-from pants.core.target_types import ResourcesGeneratorTarget
-from pants.core.target_types import rules as core_rules
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.jvm.goals.coursier import CoursierResolve
@@ -27,19 +24,42 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.rule_runner import RuleRunner
 
-HAMCREST_COORD = Coordinate(
-    group="org.hamcrest",
-    artifact="hamcrest-core",
-    version="1.3",
+HAMCREST_BUILD_FILE = dedent(
+    """\
+    jvm_artifact(
+        name='hamcrest',
+        group='org.hamcrest',
+        artifact='hamcrest-core',
+        version="1.3",
+    )
+    """
+)
+HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
+    entries=(
+        CoursierLockfileEntry(
+            coord=Coordinate(
+                group="org.hamcrest",
+                artifact="hamcrest-core",
+                version="1.3",
+            ),
+            file_name="org.hamcrest_hamcrest-core_1.3.jar",
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
+            file_digest=FileDigest(
+                fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
+                serialized_bytes_length=45024,
+            ),
+        ),
+    )
 )
 
 
 ARGS = [
-    """--jvm-resolves={"test": "coursier_resolve.lockfile"}""",
-    """--jvm-default-resolve=test""",
-    """--coursier-resolve-names=["test"]""",
+    "--jvm-resolves={'test': 'coursier_resolve.lockfile'}",
+    "--jvm-default-resolve=test",
+    "--coursier-resolve-names=test",
 ]
 
 
@@ -47,8 +67,6 @@ ARGS = [
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *core_rules(),
-            *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_goal_rules(),
             *coursier_setup_rules(),
@@ -56,196 +74,125 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *util_rules(),
         ],
-        target_types=[
-            JvmArtifactTarget,
-            ResourcesGeneratorTarget,
-            JavaSourcesGeneratorTarget,
-        ],
+        target_types=[JvmArtifactTarget],
     )
-    rule_runner.set_options(args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(args=ARGS, env_inherit={"PATH"})
     return rule_runner
 
 
 @maybe_skip_jdk_test
-def test_coursier_resolve_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'here_to_provide_dependencies',
-                    dependencies = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
-                )
-
-                jvm_artifact(
-                    name = 'org.hamcrest_hamcrest-core',
-                    group = 'org.hamcrest',
-                    artifact = 'hamcrest-core',
-                    version = "1.3",
-                )
-                """
-            ),
-        }
-    )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
+def test_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"BUILD": HAMCREST_BUILD_FILE})
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
-    expected_lockfile = CoursierResolvedLockfile(
-        entries=(
-            CoursierLockfileEntry(
-                coord=HAMCREST_COORD,
-                file_name="org.hamcrest_hamcrest-core_1.3.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
-                    serialized_bytes_length=45024,
-                ),
-            ),
-        )
-    )
     assert (
         Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
-        == expected_lockfile.to_json()
+        == HAMCREST_EXPECTED_LOCKFILE.to_json()
     )
 
 
 @maybe_skip_jdk_test
-def test_coursier_resolve_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
-    expected_lockfile = CoursierResolvedLockfile(
-        entries=(
-            CoursierLockfileEntry(
-                coord=HAMCREST_COORD,
-                file_name="org.hamcrest_hamcrest-core_1.3.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
-                    serialized_bytes_length=45024,
-                ),
-            ),
-        )
-    )
+def test_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'here_to_provide_dependencies',
-                    dependencies = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
-                )
-
-                jvm_artifact(
-                    name = 'org.hamcrest_hamcrest-core',
-                    group = 'org.hamcrest',
-                    artifact = 'hamcrest-core',
-                    version = "1.3",
-                )
-                """
-            ),
-            "coursier_resolve.lockfile": expected_lockfile.to_json().decode("utf-8"),
+            "BUILD": HAMCREST_BUILD_FILE,
+            "coursier_resolve.lockfile": HAMCREST_EXPECTED_LOCKFILE.to_json().decode("utf-8"),
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == ""
-
-
-@maybe_skip_jdk_test
-def test_coursier_resolve_updates_lockfile(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'here_to_provide_dependencies',
-                    dependencies = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
-                    sources = ["*.txt"],
-                )
-
-                jvm_artifact(
-                    name = 'org.hamcrest_hamcrest-core',
-                    group = 'org.hamcrest',
-                    artifact = 'hamcrest-core',
-                    version = "1.3",
-                )
-                """
-            ),
-            "coursier_resolve.lockfile": "[]",
-        }
-    )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert result.exit_code == 0
-    assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
-    expected_lockfile = CoursierResolvedLockfile(
-        entries=(
-            CoursierLockfileEntry(
-                coord=HAMCREST_COORD,
-                file_name="org.hamcrest_hamcrest-core_1.3.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
-                    serialized_bytes_length=45024,
-                ),
-            ),
-        )
-    )
     assert (
         Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
-        == expected_lockfile.to_json()
+        == HAMCREST_EXPECTED_LOCKFILE.to_json()
     )
 
 
 @maybe_skip_jdk_test
-def test_coursier_resolve_updates_bogus_lockfile(rule_runner: RuleRunner) -> None:
+def test_updates_lockfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"BUILD": HAMCREST_BUILD_FILE, "coursier_resolve.lockfile": "[]"})
+    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
+    assert result.exit_code == 0
+    assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
+    assert (
+        Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
+        == HAMCREST_EXPECTED_LOCKFILE.to_json()
+    )
+
+
+@maybe_skip_jdk_test
+def test_multiple_resolves(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                java_sources(
-                    name = 'here_to_provide_dependencies',
-                    dependencies = [
-                        ':org.hamcrest_hamcrest-core',
-                    ],
-                    sources = ["*.txt"],
-                )
-
                 jvm_artifact(
-                    name = 'org.hamcrest_hamcrest-core',
-                    group = 'org.hamcrest',
-                    artifact = 'hamcrest-core',
-                    version = "1.3",
+                    name='hamcrest',
+                    group='org.hamcrest',
+                    artifact='hamcrest-core',
+                    version="1.3",
+                    compatible_resolves=["a", "b"],
+                )
+                jvm_artifact(
+                    name='opentest4j',
+                    group='org.opentest4j',
+                    artifact='opentest4j',
+                    version='1.2.0',
+                    compatible_resolves=["a"],
+                )
+                jvm_artifact(
+                    name='apiguardian-api',
+                    group='org.apiguardian',
+                    artifact='apiguardian-api',
+                    version='1.1.0',
+                    compatible_resolves=["b"],
                 )
                 """
             ),
-            "coursier_resolve.lockfile": "]bad json[",
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit=PYTHON_BOOTSTRAP_ENV)
+    result = rule_runner.run_goal_rule(
+        CoursierResolve,
+        args=["--jvm-resolves={'a': 'a.lockfile', 'b': 'b.lockfile'}"],
+        env_inherit={"PATH"},
+    )
     assert result.exit_code == 0
-    assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
-    expected_lockfile = CoursierResolvedLockfile(
+    assert "Updated lockfile at: a.lockfile" in result.stderr
+    assert "Updated lockfile at: b.lockfile" in result.stderr
+
+    expected_lockfile_a = CoursierResolvedLockfile(
         entries=(
+            HAMCREST_EXPECTED_LOCKFILE.entries[0],
             CoursierLockfileEntry(
-                coord=HAMCREST_COORD,
-                file_name="org.hamcrest_hamcrest-core_1.3.jar",
+                coord=Coordinate(group="org.opentest4j", artifact="opentest4j", version="1.2.0"),
+                file_name="org.opentest4j_opentest4j_1.2.0.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
                 file_digest=FileDigest(
-                    fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
-                    serialized_bytes_length=45024,
+                    fingerprint="58812de60898d976fb81ef3b62da05c6604c18fd4a249f5044282479fc286af2",
+                    serialized_bytes_length=7653,
                 ),
             ),
         )
     )
-    assert (
-        Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
-        == expected_lockfile.to_json()
+    assert Path(rule_runner.build_root, "a.lockfile").read_bytes() == expected_lockfile_a.to_json()
+
+    expected_lockfile_b = CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"
+                ),
+                file_name="org.apiguardian_apiguardian-api_1.1.0.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    fingerprint="a9aae9ff8ae3e17a2a18f79175e82b16267c246fbbd3ca9dfbbb290b08dcfdd4",
+                    serialized_bytes_length=2387,
+                ),
+            ),
+            HAMCREST_EXPECTED_LOCKFILE.entries[0],
+        )
     )
+    assert Path(rule_runner.build_root, "b.lockfile").read_bytes() == expected_lockfile_b.to_json()
