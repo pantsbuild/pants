@@ -29,7 +29,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets
+from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -37,6 +37,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
+from pants.jvm.resolve import coursier_setup
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -48,12 +49,11 @@ from pants.jvm.target_types import (
     JvmArtifactTarget,
     JvmArtifactUrlField,
     JvmArtifactVersionField,
-    JvmCompatibleResolvesField,
-    JvmResolveField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,23 @@ class CoursierFetchRequest(ClasspathEntryRequest):
 
 class CoursierError(Exception):
     """An exception relating to invoking Coursier or processing its output."""
+
+
+class NoCompatibleResolve(Exception):
+    """No compatible resolve could be found for a set of targets."""
+
+    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
+        targets_and_resolves_str = bullet_list(
+            f"{t.address.spec}\t{jvm.resolves_for_target(t)}" for t in incompatible_targets
+        )
+        super().__init__(
+            f"{msg_prefix}:\n"
+            f"{targets_and_resolves_str}\n"
+            "Targets which will be merged onto the same classpath must have at least one compatible "
+            f"resolve (from the [resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) or "
+            f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
+            "fields) in common."
+        )
 
 
 @dataclass(frozen=True)
@@ -629,34 +646,51 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
 
 @rule
 async def select_coursier_resolve_for_targets(
-    targets: Targets, jvm: JvmSubsystem
+    coarsened_targets: CoarsenedTargets, jvm: JvmSubsystem
 ) -> CoursierResolveKey:
-    encountered_resolves: list[str] = []
-    encountered_compatible_resolves: list[str] = []
-    for tgt in targets:
-        if tgt.has_field(JvmResolveField):
-            encountered_resolves.extend(jvm.resolves_for_target(tgt))
-        if tgt.has_field(JvmCompatibleResolvesField):
-            encountered_compatible_resolves.extend(jvm.resolves_for_target(tgt))
+    """Selects and validates (transitively) a single resolve for a set of roots in a compile graph.
 
-    # TODO: validate that all resolves are compatible with each other. Note that we don't validate
-    #  that dependencies are compatible, just the specified targets.
+    In most cases, a `CoursierResolveKey` should be requested for a single `CoarsenedTarget` root,
+    which avoids coupling un-related roots unnecessarily. But in other cases, a single compatible
+    resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
+    in that case there might be multiple CoarsenedTargets.
+    """
+    root_targets = [t for ct in coarsened_targets for t in ct.members]
 
-    if len(encountered_resolves) > 1:
-        raise AssertionError(
-            "Encountered >1 `resolve` field, which was not expected: "
-            f"{sorted(tgt.address for tgt in targets)}"
+    # Find the set of resolves that are compatible with all roots by ANDing them all together.
+    compatible_resolves: set[str] | None = None
+    for tgt in root_targets:
+        current_resolves = set(jvm.resolves_for_target(tgt))
+        if compatible_resolves is None:
+            compatible_resolves = current_resolves
+        else:
+            compatible_resolves &= current_resolves
+
+    # Select a resolve from the compatible set.
+    if not compatible_resolves:
+        raise NoCompatibleResolve(
+            jvm, "The selected targets did not have a resolve in common", root_targets
         )
-    elif len(encountered_resolves) == 1:
-        resolve = encountered_resolves[0]
-    elif encountered_compatible_resolves:
-        resolve = min(encountered_compatible_resolves)
     else:
-        raise AssertionError(
-            f"No `resolve` or `compatible_resolves` specified for these targets: "
-            f"{sorted(tgt.address for tgt in targets)}"
+        # Take the first compatible resolve.
+        resolve = min(compatible_resolves)
+
+    # Validate that the selected resolve is compatible with all transitive dependencies.
+    incompatible_targets = []
+    for ct in coarsened_targets.closure():
+        for t in ct.members:
+            target_resolves = jvm.resolves_for_target(t)
+            if target_resolves is not None and resolve not in target_resolves:
+                incompatible_targets.append(t)
+    if incompatible_targets:
+        raise NoCompatibleResolve(
+            jvm,
+            f"The resolve chosen for the root targets was {resolve}, but some of their "
+            "dependencies were not compatible with that resolve",
+            incompatible_targets,
         )
 
+    # Load the resolve.
     resolve_path = jvm.resolves[resolve]
     lockfile_source = PathGlobs(
         [resolve_path],
@@ -753,5 +787,6 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
 def rules():
     return [
         *collect_rules(),
+        *coursier_setup.rules(),
         UnionRule(ClasspathEntryRequest, CoursierFetchRequest),
     ]
