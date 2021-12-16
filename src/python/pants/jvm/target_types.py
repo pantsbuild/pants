@@ -4,16 +4,48 @@
 from __future__ import annotations
 
 from abc import ABCMeta
+from typing import Optional
 
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSet,
+    InvalidFieldException,
+    InvalidTargetException,
     SingleSourceField,
     StringField,
     StringSequenceField,
     Target,
 )
 from pants.util.docutil import git_url
+
+# -----------------------------------------------------------------------------------------------
+# Generic resolve support fields
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmCompatibleResolvesField(StringSequenceField):
+    alias = "compatible_resolves"
+    required = False
+    help = (
+        "The set of resolve names that this target is compatible with.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
+        "Any targets which depend on one another must have at least one compatible resolve in "
+        "common. Which resolves are actually used in a build is calculated based on a target's "
+        "dependees."
+    )
+
+
+class JvmResolveField(StringField):
+    alias = "resolve"
+    required = False
+    help = (
+        "The name of the resolve to use when building this target.\n\n"
+        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
+        "If not supplied, the default resolve will be used. Otherwise, one resolve that is "
+        "compatible with all dependency targets will be used."
+    )
+
 
 # -----------------------------------------------------------------------------------------------
 # `jvm_artifact` targets
@@ -27,6 +59,7 @@ _DEFAULT_PACKAGE_MAPPING_URL = git_url(
 class JvmArtifactGroupField(StringField):
     alias = "group"
     required = True
+    value: str
     help = (
         "The 'group' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
         "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the group is "
@@ -37,6 +70,7 @@ class JvmArtifactGroupField(StringField):
 class JvmArtifactArtifactField(StringField):
     alias = "artifact"
     required = True
+    value: str
     help = (
         "The 'artifact' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
         "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the artifact is `guava`."
@@ -46,6 +80,7 @@ class JvmArtifactArtifactField(StringField):
 class JvmArtifactVersionField(StringField):
     alias = "version"
     required = True
+    value: str
     help = (
         "The 'version' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
         "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the version is `30.1.1-jre`."
@@ -75,6 +110,17 @@ class JvmArtifactJarSourceField(SingleSourceField):
         "Path is relative to the BUILD file.\n\n"
         "Use the `url` field for remote artifacts."
     )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and value_or_default.startswith("file:"):
+            raise InvalidFieldException(
+                f"The `{cls.alias}` field does not support `file:` URLS, but the target "
+                f"{address} sets the field to `{value_or_default}`.\n\n"
+                "Instead, use the `jar` field to specify the relative path to the local jar file."
+            )
+        return value_or_default
 
 
 class JvmArtifactPackagesField(StringSequenceField):
@@ -109,7 +155,6 @@ class JvmProvidesTypesField(StringSequenceField):
 
 
 class JvmArtifactFieldSet(FieldSet):
-
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
@@ -137,6 +182,13 @@ class JvmArtifactTarget(Target):
         "That is, an artifact identified by its `group`, `artifact`, and `version` components."
     )
 
+    def validate(self) -> None:
+        if self[JvmArtifactJarSourceField].value and self[JvmArtifactUrlField].value:
+            raise InvalidTargetException(
+                f"You cannot specify both the `url` and `jar` fields, but both were set on the "
+                f"`{self.alias}` target {self.address}."
+            )
+
 
 # -----------------------------------------------------------------------------------------------
 # JUnit test support field(s)
@@ -145,31 +197,3 @@ class JvmArtifactTarget(Target):
 
 class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
-
-
-# -----------------------------------------------------------------------------------------------
-# Generic resolve support fields
-# -----------------------------------------------------------------------------------------------
-
-
-class JvmCompatibleResolvesField(StringSequenceField):
-    alias = "compatible_resolves"
-    required = False
-    help = (
-        "The set of resolve names that this target is compatible with.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
-        "Any targets which depend on one another must have at least one compatible resolve in "
-        "common. Which resolves are actually used in a build is calculated based on a target's "
-        "dependees."
-    )
-
-
-class JvmResolveField(StringField):
-    alias = "resolve"
-    required = False
-    help = (
-        "The name of the resolve to use when building this target.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
-        "If not supplied, the default resolve will be used. Otherwise, one resolve that is "
-        "compatible with all dependency targets will be used."
-    )
