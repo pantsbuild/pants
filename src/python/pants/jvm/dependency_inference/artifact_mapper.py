@@ -142,6 +142,38 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
 class ThirdPartyPackageToArtifactMapping:
     mapping_root: FrozenTrieNode
 
+    def addresses_for_symbol(self, symbol: str) -> FrozenOrderedSet[Address]:
+        imp_parts = symbol.split(".")
+        current_node = self.mapping_root
+
+        found_nodes = []
+        for imp_part in imp_parts:
+            child_node_opt = current_node.find_child(imp_part)
+            if not child_node_opt:
+                break
+            found_nodes.append(child_node_opt)
+            current_node = child_node_opt
+
+        if not found_nodes:
+            return FrozenOrderedSet()
+
+        # If the length of the found nodes equals the number of parts of the package path, then
+        # there is an exact match.
+        if len(found_nodes) == len(imp_parts):
+            best_match = found_nodes[-1]
+            if best_match.first_party:
+                return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
+            return found_nodes[-1].addresses
+
+        # Otherwise, check for the first found node (in reverse order) to match recursively, and
+        # use its coordinate.
+        for found_node in reversed(found_nodes):
+            if found_node.recursive:
+                return found_node.addresses
+
+        # Nothing matched so return no match.
+        return FrozenOrderedSet()
+
 
 @rule
 async def find_available_third_party_artifacts(
@@ -223,41 +255,6 @@ async def compute_java_third_party_artifact_mapping(
             insert(mapping, provides_type, [], True)
 
     return ThirdPartyPackageToArtifactMapping(FrozenTrieNode(mapping))
-
-
-def find_artifact_mapping(
-    import_name: str,
-    mapping: ThirdPartyPackageToArtifactMapping,
-) -> FrozenOrderedSet[Address]:
-    imp_parts = import_name.split(".")
-    current_node = mapping.mapping_root
-
-    found_nodes = []
-    for imp_part in imp_parts:
-        child_node_opt = current_node.find_child(imp_part)
-        if not child_node_opt:
-            break
-        found_nodes.append(child_node_opt)
-        current_node = child_node_opt
-
-    if not found_nodes:
-        return FrozenOrderedSet()
-
-    # If the length of the found nodes equals the number of parts of the package path, then there
-    # is an exact match.
-    if len(found_nodes) == len(imp_parts):
-        best_match = found_nodes[-1]
-        if best_match.first_party:
-            return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
-        return found_nodes[-1].addresses
-
-    # Otherwise, check for the first found node (in reverse order) to match recursively, and use its coordinate.
-    for found_node in reversed(found_nodes):
-        if found_node.recursive:
-            return found_node.addresses
-
-    # Nothing matched so return no match.
-    return FrozenOrderedSet()
 
 
 def rules():

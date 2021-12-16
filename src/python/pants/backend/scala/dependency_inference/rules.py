@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import logging
-
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
@@ -22,14 +20,9 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import (
-    ThirdPartyPackageToArtifactMapping,
-    find_artifact_mapping,
-)
+from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.util.ordered_set import OrderedSet
-
-logger = logging.getLogger(__name__)
 
 
 class InferScalaSourceDependencies(InferDependenciesRequest):
@@ -62,7 +55,7 @@ async def infer_scala_dependencies_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
         first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(symbol)
-        third_party_matches = find_artifact_mapping(symbol, third_party_artifact_mapping)
+        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
