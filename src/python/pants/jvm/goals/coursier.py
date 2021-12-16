@@ -66,13 +66,8 @@ async def map_resolves_to_consuming_targets(
     for tgt in all_targets:
         if not tgt.has_field(JvmArtifactCompatibleResolvesField):
             continue
-        # TODO: error if no resolves for the target. Wait to change until we automatically set a
-        #  default resolve.
-        resolves = tgt[JvmArtifactCompatibleResolvesField].value or (
-            (jvm.default_resolve,) if jvm.default_resolve is not None else ()
-        )
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        for resolve in resolves:
+        for resolve in jvm.resolves_for_target(tgt):
             resolve_to_artifacts[resolve].add(artifact)
     return JvmResolvesToArtifacts(
         (resolve, ArtifactRequirements(artifacts))

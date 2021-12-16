@@ -635,20 +635,12 @@ async def select_coursier_resolve_for_targets(
     encountered_compatible_resolves: list[str] = []
     for tgt in targets:
         if tgt.has_field(JvmResolveField):
-            resolve = tgt[JvmResolveField].value or jvm.default_resolve
-            # TODO: remove once we always have a default resolve.
-            if resolve is None:
-                continue
-            encountered_resolves.append(resolve)
+            encountered_resolves.extend(jvm.resolves_for_target(tgt))
         if tgt.has_field(JvmCompatibleResolvesField):
-            encountered_compatible_resolves.extend(
-                tgt[JvmCompatibleResolvesField].value
-                or ([jvm.default_resolve] if jvm.default_resolve is not None else [])
-            )
+            encountered_compatible_resolves.extend(jvm.resolves_for_target(tgt))
 
-    # TODO: validate that all specified resolves are defined in [jvm].resolves and that all
-    #  encountered resolves are compatible with each other. Note that we don't validate that
-    #  dependencies are compatible, just the specified targets.
+    # TODO: validate that all resolves are compatible with each other. Note that we don't validate
+    #  that dependencies are compatible, just the specified targets.
 
     if len(encountered_resolves) > 1:
         raise AssertionError(
