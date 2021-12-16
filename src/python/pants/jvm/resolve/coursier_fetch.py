@@ -491,10 +491,7 @@ async def coursier_resolve_lockfile(
 
 
 @rule(desc="Fetch with coursier")
-async def fetch_with_coursier(
-    coursier: Coursier,
-    request: CoursierFetchRequest,
-) -> FallibleClasspathEntry:
+async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
     # TODO: Loading this per JvmArtifact.
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
