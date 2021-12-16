@@ -199,7 +199,6 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
         )
 
 
-@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/13900")
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
 
@@ -209,7 +208,7 @@ def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
             artifact="commons-collections",
             version="1.0.0_JAR_LOCAL",
         ),
-        url="https://search.maven.org/remotecontent?filepath=org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
+        url="https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
     )
 
     resolved_lockfile = rule_runner.request(
