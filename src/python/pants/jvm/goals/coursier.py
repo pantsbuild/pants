@@ -57,7 +57,7 @@ class CoursierResolve(Goal):
     subsystem_cls = CoursierResolveSubsystem
 
 
-class JvmResolvesToArtifacts(FrozenDict[str, FrozenOrderedSet[Address]]):
+class JvmResolvesToArtifacts(FrozenDict[str, ArtifactRequirements]):
     pass
 
 
