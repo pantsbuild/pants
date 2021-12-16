@@ -7,7 +7,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Sequence
 
-from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -32,7 +31,6 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
