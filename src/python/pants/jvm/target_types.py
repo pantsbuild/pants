@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from dataclasses import dataclass
 from typing import Optional
 
-from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -218,22 +216,3 @@ class JvmArtifactTarget(Target):
 
 class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
-
-
-# -----------------------------------------------------------------------------------------------
-# Jvm Resources Fields
-# -----------------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class JvmResourcesFieldSet(FieldSet):
-    required_fields = (ResourceSourceField,)
-
-    sources: ResourceSourceField
-
-
-@dataclass(frozen=True)
-class JvmResourcesGeneratorFieldSet(FieldSet):
-    required_fields = (ResourcesGeneratingSourcesField,)
-
-    sources: ResourcesGeneratingSourcesField

@@ -25,6 +25,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
@@ -314,6 +315,20 @@ class ResourcesGeneratorTarget(Target):
 
 class GenerateTargetsFromResources(GenerateTargetsRequest):
     generate_from = ResourcesGeneratorTarget
+
+
+@dataclass(frozen=True)
+class ResourcesFieldSet(FieldSet):
+    required_fields = (ResourceSourceField,)
+
+    sources: ResourceSourceField
+
+
+@dataclass(frozen=True)
+class ResourcesGeneratorFieldSet(FieldSet):
+    required_fields = (ResourcesGeneratingSourcesField,)
+
+    sources: ResourcesGeneratingSourcesField
 
 
 @rule
