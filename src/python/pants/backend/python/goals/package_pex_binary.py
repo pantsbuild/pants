@@ -13,6 +13,7 @@ from pants.backend.python.target_types import (
     PexExecutionMode,
     PexExecutionModeField,
     PexIgnoreErrorsField,
+    PexIncludeRequirementsField,
     PexIncludeToolsField,
     PexInheritPathField,
     PexLayout,
@@ -68,6 +69,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     resolve_local_platforms: PexResolveLocalPlatformsField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
+    include_requirements: PexIncludeRequirementsField
     include_tools: PexIncludeToolsField
     resolve: PythonResolveField
 
@@ -138,6 +140,7 @@ async def package_pex_binary(
             output_filename=output_filename,
             layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
+            include_requirements=field_set.include_requirements.value,
             include_local_dists=True,
         ),
     )
