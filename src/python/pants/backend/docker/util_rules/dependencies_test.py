@@ -12,8 +12,9 @@ from pants.backend.docker.util_rules.dependencies import (
     inject_docker_dependencies,
 )
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
+from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
-from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules import pex
 from pants.engine.addresses import Address
 from pants.engine.target import InjectedDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -24,8 +25,9 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *dockerfile_rules(),
+            *package_pex_binary.rules(),
             *parser_rules(),
-            *pex_rules(),
+            *pex.rules(),
             inject_docker_dependencies,
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
         ],
