@@ -50,13 +50,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ProtobufSourcesGeneratorTarget,
                     path="protos/foo",
-                    name="foo",
+                    name=None,
                     triggering_sources=["f.proto"],
                 ),
                 PutativeTarget.for_target_type(
                     ProtobufSourcesGeneratorTarget,
                     path="protos/foo/bar",
-                    name="bar",
+                    name=None,
                     triggering_sources=["baz2.proto", "baz3.proto"],
                 ),
             ]
@@ -90,13 +90,13 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ProtobufSourcesGeneratorTarget,
                     path="protos/foo/bar",
-                    name="bar",
+                    name=None,
                     triggering_sources=["bar.proto"],
                 ),
                 PutativeTarget.for_target_type(
                     ProtobufSourcesGeneratorTarget,
                     path="protos/foo/qux",
-                    name="qux",
+                    name=None,
                     triggering_sources=["qux.proto"],
                 ),
             ]
