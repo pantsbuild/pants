@@ -252,15 +252,9 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
         if src and dst
     ]
     if renames:
-        legend = [
-            "`{x => y}`: replace `x` with `y`",
-            "`(x)`: insert `x`",
-            "`[x]`: remove `x`",
-        ]
         msg += (
             f"However there are possible matches. Please review the following list of suggested "
             f"renames:\n\n{bullet_list(renames)}\n\n"
-            f"Renames legend:\n{bullet_list(legend)}\n\n"
         )
 
     unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]

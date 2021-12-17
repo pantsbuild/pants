@@ -53,7 +53,7 @@ class KeyValueSequenceUtil(FrozenOrderedSet[str]):
 
 
 def suggest_renames(
-    tentative_paths: Iterable[str], actual_paths: Sequence[str]
+    tentative_paths: Iterable[str], actual_files: Sequence[str], actual_dirs: Sequence[str]
 ) -> Iterator[tuple[str, str]]:
     """Return each pair of `tentative_paths` matched to the best possible match of `actual_paths`
     that are not an exact match.
@@ -63,29 +63,62 @@ def suggest_renames(
     is not taking part in any `COPY` instruction.
     """
 
-    # TODO: handle globs in some sensiblish way...
+    actual_paths = (*actual_files, *actual_dirs)
+    referenced: dict[str, set[str] | bool] = {}
 
-    referenced = set()
-    for path in tentative_paths:
-        if path in actual_paths:
-            referenced.add(path)
-            continue
-        best_match = ""
-        name = os.path.basename(path)
-        for suggestion in difflib.get_close_matches(path, actual_paths, n=5, cutoff=0.6):
-            if os.path.basename(suggestion) == name:
-                referenced.add(suggestion)
-                yield path, suggestion
-                break
-            if not best_match:
-                best_match = suggestion
+    def reference(path: str, *, recursive: bool) -> None:
+        """Track which actual files has been referenced either explicitly by a tentative path, or as
+        a suggested rename.
+
+        The `recursive` flag indicates whether to flag all child nodes of the directory `path` as
+        referenced.
+        """
+        if path in actual_dirs:
+            if recursive:
+                referenced[path] = True
+            else:
+                referenced[path] = {p for p in actual_files if os.path.dirname(p) == path}
         else:
-            if best_match:
-                referenced.add(best_match)
-            yield path, best_match
+            dirname = os.path.dirname(path)
+            refs = referenced.setdefault(dirname, set())
+            if isinstance(refs, set):
+                refs.add(path)
 
-    for path in actual_paths:
-        if path not in referenced:
+    def is_referenced(path: str) -> bool:
+        """Check the list of referenced files to see if `path` has been flagged.
+
+        Walks up the directory tree in case there is a recursive flag on one of the parent
+        directories.
+        """
+        dirname = os.path.dirname(path)
+        refs = referenced.get(dirname, set())
+        if isinstance(refs, bool):
+            return refs
+        if path in refs:
+            return True
+        if dirname:
+            return is_referenced(dirname)
+        return False
+
+    # List unknown files, possibly with a rename suggestion.
+    for path in tentative_paths:
+        recursive = True
+        if path in actual_paths:
+            # Match, no need rename.
+            reference(path, recursive=recursive)
+            continue
+        for suggestion in difflib.get_close_matches(path, actual_paths, n=1, cutoff=0.1):
+            # Suggest rename to match what files there are.
+            reference(suggestion, recursive=recursive)
+            yield path, suggestion
+            break
+        else:
+            # No match for this path.
+            yield path, ""
+
+    # List unused files.
+    for path in actual_files:
+        if not is_referenced(path):
             yield "", path
 
 
@@ -97,14 +130,8 @@ def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> s
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
             parts.append(dst_path[j1:j2])
-        elif tag == "replace":
+        elif tag in ["replace", "delete", "insert"]:
             rem = color.maybe_red(src_path[i1:i2])
             add = color.maybe_green(dst_path[j1:j2])
             parts.append(f"{{{rem} => {add}}}")
-        elif tag == "delete":
-            rem = color.maybe_red(src_path[i1:i2])
-            parts.append(f"[{rem}]")
-        elif tag == "insert":
-            add = color.maybe_green(dst_path[j1:j2])
-            parts.append(f"({add})")
     return "".join(parts)

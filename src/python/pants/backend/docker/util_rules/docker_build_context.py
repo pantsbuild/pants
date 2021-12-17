@@ -181,7 +181,11 @@ class DockerBuildContext:
             build_env=build_env,
             version_context=DockerVersionContext.from_dict(version_context),
             copy_source_vs_context_source=tuple(
-                suggest_renames(dockerfile_info.copy_sources, snapshot.files)
+                suggest_renames(
+                    tentative_paths=dockerfile_info.copy_sources,
+                    actual_files=snapshot.files,
+                    actual_dirs=snapshot.dirs,
+                )
             ),
         )
 
