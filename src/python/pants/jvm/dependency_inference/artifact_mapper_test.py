@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
@@ -28,7 +30,13 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, logging
+from pants.testutil.rule_runner import (
+    PYTHON_BOOTSTRAP_ENV,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    logging,
+)
 
 NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
 DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
@@ -59,7 +67,7 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit={"PATH"}
+        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
     )
     return rule_runner
 
@@ -73,7 +81,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
@@ -155,7 +163,7 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
             "--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}",
             "--jvm-resolves={'a': '', 'b': '', 'c': ''}",
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
@@ -203,7 +211,7 @@ def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
@@ -250,7 +258,7 @@ def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
@@ -331,7 +339,7 @@ def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> Non
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
@@ -400,7 +408,7 @@ def test_third_party_dep_inference_with_incorrect_provides(rule_runner: RuleRunn
             NAMED_RESOLVE_OPTIONS,
             DEFAULT_RESOLVE_OPTION,
         ],
-        env_inherit={"PATH"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
