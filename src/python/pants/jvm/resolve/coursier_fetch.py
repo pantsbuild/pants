@@ -491,10 +491,7 @@ async def coursier_resolve_lockfile(
 
 
 @rule(desc="Fetch with coursier")
-async def fetch_with_coursier(
-    coursier: Coursier,
-    request: CoursierFetchRequest,
-) -> FallibleClasspathEntry:
+async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspathEntry:
     # TODO: Loading this per JvmArtifact.
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
@@ -638,30 +635,26 @@ async def select_coursier_resolve_for_targets(
     encountered_compatible_resolves: list[str] = []
     for tgt in targets:
         if tgt.has_field(JvmResolveField):
-            resolve = tgt[JvmResolveField].value or jvm.default_resolve
-            # TODO: remove once we always have a default resolve.
-            if resolve is None:
-                continue
-            encountered_resolves.append(resolve)
+            encountered_resolves.extend(jvm.resolves_for_target(tgt))
         if tgt.has_field(JvmCompatibleResolvesField):
-            encountered_compatible_resolves.extend(
-                tgt[JvmCompatibleResolvesField].value
-                or ([jvm.default_resolve] if jvm.default_resolve is not None else [])
-            )
+            encountered_compatible_resolves.extend(jvm.resolves_for_target(tgt))
 
-    # TODO: validate that all specified resolves are defined in [jvm].resolves and that all
-    #  encountered resolves are compatible with each other. Note that we don't validate that
-    #  dependencies are compatible, just the specified targets.
+    # TODO: validate that all resolves are compatible with each other. Note that we don't validate
+    #  that dependencies are compatible, just the specified targets.
 
     if len(encountered_resolves) > 1:
-        raise AssertionError(f"Encountered >1 `resolve` field, which was not expected. {targets}")
+        raise AssertionError(
+            "Encountered >1 `resolve` field, which was not expected: "
+            f"{sorted(tgt.address for tgt in targets)}"
+        )
     elif len(encountered_resolves) == 1:
         resolve = encountered_resolves[0]
     elif encountered_compatible_resolves:
         resolve = min(encountered_compatible_resolves)
     else:
         raise AssertionError(
-            f"No `resolve` or `compatible_resolves` specified for these targets: {targets}"
+            f"No `resolve` or `compatible_resolves` specified for these targets: "
+            f"{sorted(tgt.address for tgt in targets)}"
         )
 
     resolve_path = jvm.resolves[resolve]
