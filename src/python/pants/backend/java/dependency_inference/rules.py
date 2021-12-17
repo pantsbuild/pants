@@ -28,6 +28,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
@@ -62,6 +63,7 @@ async def infer_java_dependencies_via_source_analysis(
 async def infer_java_dependencies_and_exports_via_source_analysis(
     request: JavaInferredDependenciesAndExportsRequest,
     java_infer_subsystem: JavaInferSubsystem,
+    jvm: JvmSubsystem,
     first_party_dep_map: FirstPartySymbolMapping,
     third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
 ) -> JavaInferredDependencies:
@@ -75,10 +77,11 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     address = request.source.address
 
     wrapped_tgt = await Get(WrappedTarget, Address, address)
-    source_files = await Get(SourceFiles, SourceFilesRequest([wrapped_tgt.target[JavaSourceField]]))
+    tgt = wrapped_tgt.target
+    source_files = await Get(SourceFiles, SourceFilesRequest([tgt[JavaSourceField]]))
 
     explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
         Get(
             JavaSourceDependencyAnalysis,
             JavaSourceDependencyAnalysisRequest(source_files=source_files),
@@ -118,6 +121,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     export_types.update(typ for typ in analysis.export_types if "." in typ)
 
     dep_map = first_party_dep_map.symbols
+    resolves = jvm.resolves_for_target(tgt)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
@@ -125,7 +129,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     for typ in types:
         first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches = (
-            third_party_artifact_mapping.addresses_for_symbol(typ)
+            third_party_artifact_mapping.addresses_for_symbol(typ, resolves)
             if java_infer_subsystem.third_party_imports
             else FrozenOrderedSet()
         )

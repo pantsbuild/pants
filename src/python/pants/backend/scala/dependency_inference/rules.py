@@ -8,8 +8,7 @@ from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -22,6 +21,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.ordered_set import OrderedSet
 
 
@@ -33,6 +33,7 @@ class InferScalaSourceDependencies(InferDependenciesRequest):
 async def infer_scala_dependencies_via_source_analysis(
     request: InferScalaSourceDependencies,
     scala_infer_subsystem: ScalaInferSubsystem,
+    jvm: JvmSubsystem,
     first_party_symbol_map: FirstPartySymbolMapping,
     third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
 ) -> InferredDependencies:
@@ -41,10 +42,13 @@ async def infer_scala_dependencies_via_source_analysis(
 
     address = request.sources_field.address
     wrapped_tgt = await Get(WrappedTarget, Address, address)
+    tgt = wrapped_tgt.target
     explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
         Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
     )
+
+    resolves = jvm.resolves_for_target(tgt)
 
     symbols: OrderedSet[str] = OrderedSet()
     if scala_infer_subsystem.imports:
@@ -55,7 +59,7 @@ async def infer_scala_dependencies_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
         first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(symbol)
-        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol)
+        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol, resolves)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
