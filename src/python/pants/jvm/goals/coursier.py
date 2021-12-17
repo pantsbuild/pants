@@ -5,9 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Sequence
 
-from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -22,7 +20,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import AllTargets
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -30,9 +28,8 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmCompatibleResolvesField, JvmResolveField
+from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class CoursierResolveSubsystem(GoalSubsystem):
@@ -57,38 +54,30 @@ class CoursierResolve(Goal):
     subsystem_cls = CoursierResolveSubsystem
 
 
-class JvmResolvesToAddresses(FrozenDict[str, FrozenOrderedSet[Address]]):
+class JvmResolvesToArtifacts(FrozenDict[str, ArtifactRequirements]):
     pass
 
 
 @rule
 async def map_resolves_to_consuming_targets(
     all_targets: AllTargets, jvm: JvmSubsystem
-) -> JvmResolvesToAddresses:
-    resolve_to_addresses = defaultdict(set)
+) -> JvmResolvesToArtifacts:
+    resolve_to_artifacts = defaultdict(set)
     for tgt in all_targets:
-        if tgt.has_field(JvmResolveField):
-            resolve = tgt[JvmResolveField].value or jvm.default_resolve
-            # TODO: remove once we always have a default resolve.
-            if not resolve:
-                continue
-            resolve_to_addresses[resolve].add(tgt.address)
-        elif tgt.has_field(JvmCompatibleResolvesField):
-            # TODO: add a `default_compatible_resolves` field.
-            resolves: Sequence[str] = tgt[JvmCompatibleResolvesField].value or (
-                [jvm.default_resolve] if jvm.default_resolve is not None else []
-            )
-            for resolve in resolves:
-                resolve_to_addresses[resolve].add(tgt.address)
-    return JvmResolvesToAddresses(
-        (resolve, FrozenOrderedSet(addresses))
-        for resolve, addresses in resolve_to_addresses.items()
+        if not tgt.has_field(JvmArtifactCompatibleResolvesField):
+            continue
+        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
+        for resolve in jvm.resolves_for_target(tgt):
+            resolve_to_artifacts[resolve].add(artifact)
+    return JvmResolvesToArtifacts(
+        (resolve, ArtifactRequirements(artifacts))
+        for resolve, artifacts in resolve_to_artifacts.items()
     )
 
 
 @dataclass(frozen=True)
 class CoursierGenerateLockfileRequest:
-    """Regenerate a coursier_lockfile target's lockfile from its JVM requirements.
+    """Regenerate a lockfile from its JVM requirements.
 
     This request allows a user to manually regenerate their lockfile. This is done for a few reasons: to
     generate the lockfile for the first time, to regenerate it because the input JVM requirements
@@ -110,21 +99,12 @@ class CoursierGenerateLockfileResult:
 async def coursier_generate_lockfile(
     request: CoursierGenerateLockfileRequest,
     jvm: JvmSubsystem,
-    resolves_to_addresses: JvmResolvesToAddresses,
+    resolves_to_artifacts: JvmResolvesToArtifacts,
 ) -> CoursierGenerateLockfileResult:
-    # Find JVM artifacts in the dependency tree of the targets that depend on this lockfile.
-    # These artifacts constitute the requirements that will be resolved for this lockfile.
-    dependee_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(resolves_to_addresses.get(request.resolve, ()))
-    )
-    artifact_requirements = ArtifactRequirements(
-        ArtifactRequirement.from_jvm_artifact_target(tgt)
-        for tgt in dependee_targets.closure
-        if JvmArtifactFieldSet.is_applicable(tgt)
-    )
-
     resolved_lockfile = await Get(
-        CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements
+        CoursierResolvedLockfile,
+        # Note that it's legal to have a resolve with no artifacts.
+        ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ())),
     )
     resolved_lockfile_json = resolved_lockfile.to_json()
     lockfile_path = jvm.resolves[request.resolve]

@@ -208,7 +208,7 @@ def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
             artifact="commons-collections",
             version="1.0.0_JAR_LOCAL",
         ),
-        url="https://search.maven.org/remotecontent?filepath=org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
+        url="https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.2/commons-collections4-4.2.jar",
     )
 
     resolved_lockfile = rule_runner.request(

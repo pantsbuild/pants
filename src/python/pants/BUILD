@@ -19,7 +19,8 @@ python_distribution(
     sdist=False,
     provides=setup_py(
         name="pantsbuild.pants",
-        description="A scalable build tool for large, complex, heterogeneous repos.",
+        description="The ergonomic and hermetic software build system for Python, Java, Scala, "
+        "Go, and Shell. Pants lets you fearlessly scale up your codebase.",
         # NB: by setting `ext_modules`, we signal to setup_py and bdist_wheel that this library
         # has native code. As a consequence, bdist_wheel pins the ABI (application binary interface)
         # used when creating the wheel, which is a good thing. We should be setting this ABI to ensure
