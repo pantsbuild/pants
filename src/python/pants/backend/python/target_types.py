@@ -232,7 +232,7 @@ class EntryPoint(MainSpecification):
             raise ValueError(
                 f"The {given} cannot be blank. It must indicate a Python module by name or path "
                 f"and an optional nullary function in that module separated by a colon, i.e.: "
-                f"module_namegenerate_file_level_targets_or_path(':'function_name)?"
+                f"module_name_or_path(':'function_name)?"
             )
         module_or_path, sep, func = entry_point.partition(":")
         if not module_or_path:
