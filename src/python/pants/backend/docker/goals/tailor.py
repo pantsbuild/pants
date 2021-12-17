@@ -34,12 +34,13 @@ async def find_putative_targets(
     pts = []
     for dockerfile in sorted(unowned_dockerfiles):
         dirname, filename = os.path.split(dockerfile)
-        kwargs = {}
+        target_name = "docker"
+        kwargs = {"name": target_name}
         if filename != DockerImageSourceField.default:
             kwargs["source"] = filename
         pts.append(
             PutativeTarget.for_target_type(
-                DockerImageTarget, dirname, "docker", [filename], kwargs=kwargs
+                DockerImageTarget, dirname, target_name, [filename], kwargs=kwargs
             )
         )
     return PutativeTargets(pts)
