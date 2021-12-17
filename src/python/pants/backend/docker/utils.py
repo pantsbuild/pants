@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import difflib
 import os.path
+from fnmatch import fnmatch
 from typing import Iterable, Iterator, Sequence, TypeVar
 
 from pants.help.maybe_color import MaybeColor
@@ -66,50 +67,76 @@ def suggest_renames(
     actual_paths = (*actual_files, *actual_dirs)
     referenced: dict[str, set[str] | bool] = {}
 
-    def reference(path: str, *, recursive: bool) -> None:
+    def reference(path: str) -> None:
         """Track which actual files has been referenced either explicitly by a tentative path, or as
-        a suggested rename.
-
-        The `recursive` flag indicates whether to flag all child nodes of the directory `path` as
-        referenced.
-        """
+        a suggested rename."""
         if path in actual_dirs:
-            if recursive:
-                referenced[path] = True
-            else:
-                referenced[path] = {p for p in actual_files if os.path.dirname(p) == path}
+            referenced[path] = True
         else:
             dirname = os.path.dirname(path)
             refs = referenced.setdefault(dirname, set())
             if isinstance(refs, set):
                 refs.add(path)
 
-    def is_referenced(path: str) -> bool:
+        # Recalculate possible matches, to avoid suggesting the same file twice.
+        nonlocal actual_paths
+        actual_paths = tuple(get_unreferenced(actual_files, actual_dirs))
+
+    def is_referenced(path: str, dirname: str | None = None) -> bool:
         """Check the list of referenced files to see if `path` has been flagged.
 
         Walks up the directory tree in case there is a recursive flag on one of the parent
         directories.
         """
-        dirname = os.path.dirname(path)
+        if dirname is None:
+            dirname = os.path.dirname(path)
         refs = referenced.get(dirname, set())
         if isinstance(refs, bool):
             return refs
         if path in refs:
             return True
-        if dirname:
-            return is_referenced(dirname)
+        parentdir = os.path.dirname(dirname)
+        if parentdir:
+            return is_referenced(path, parentdir)
         return False
 
-    # List unknown files, possibly with a rename suggestion.
+    def get_matches(path: str) -> tuple[str, ...]:
+        is_pattern = any(all(c in path for c in cs) for cs in ["*", "?", "[]"])
+        if not is_pattern:
+            return (path,) if path in actual_paths else ()
+        #
+        # NOTICE: There is a slight difference in the pattern syntax used for the Dockerfile `COPY`
+        # instruction, than what is implmented by the `fnmatch` function in Python.
+        # https://docs.docker.com/engine/reference/builder/#copy which is implemented using
+        # https://golang.org/pkg/path/filepath#Match compared to
+        # https://docs.python.org/3/library/fnmatch.html#fnmatch.fnmatch
+        #
+        # For best experience when using globs, this should be addressed, but for now, I'll settle
+        # for a "close enough" approximation to get this moving.
+        return tuple(p for p in actual_paths if fnmatch(p, path))
+
+    def get_unreferenced(files: Sequence[str] = (), dirs: Sequence[str] = ()) -> Iterator[str]:
+        for path in files:
+            if not is_referenced(path):
+                yield path
+        for path in dirs:
+            if not is_referenced(path, path):
+                yield path
+
+    # Go over exact matches first, so we don't target them as possible matches for renames.
+    unmatched_paths = set()
     for path in tentative_paths:
-        recursive = True
-        if path in actual_paths:
-            # Match, no need rename.
-            reference(path, recursive=recursive)
-            continue
+        matches = get_matches(path)
+        for match in matches:
+            reference(match)
+        if not matches:
+            unmatched_paths.add(path)
+
+    # List unknown files, possibly with a rename suggestion.
+    for path in unmatched_paths:
         for suggestion in difflib.get_close_matches(path, actual_paths, n=1, cutoff=0.1):
             # Suggest rename to match what files there are.
-            reference(suggestion, recursive=recursive)
+            reference(suggestion)
             yield path, suggestion
             break
         else:
@@ -117,9 +144,8 @@ def suggest_renames(
             yield path, ""
 
     # List unused files.
-    for path in actual_files:
-        if not is_referenced(path):
-            yield "", path
+    for path in get_unreferenced(actual_files):
+        yield "", path
 
 
 def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> str:

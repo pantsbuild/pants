@@ -27,8 +27,7 @@ from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
                 ("src/project/cmd.pex", "src/unrelated/file.py"),
             ],
         ),
-        (
-            # Copy'ing a folder, includes the entire tree below it.
+        pytest.param(
             ("files",),
             (
                 "src/docker/files/a.txt",
@@ -41,6 +40,58 @@ from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
                 ("files", "src/docker/files"),
                 ("", "src/docker/config.ini"),
             ],
+            id="Copy'ing a folder, includes the entire tree below it",
+        ),
+        pytest.param(
+            (
+                "src.proj/bin_a.pex",
+                "src.proj/binb.pex",
+            ),
+            ("src.proj/bin_a.pex",),
+            ("src.proj",),
+            [
+                ("src.proj/binb.pex", "src.proj"),
+            ],
+            id="Should not suggest renaming to a file we already reference",
+        ),
+        pytest.param(
+            (
+                "src.proj/binb.pex",
+                "src.proj/bin_a.pex",
+            ),
+            ("src.proj/bin_a.pex",),
+            ("src.proj",),
+            [
+                ("src.proj/binb.pex", "src.proj"),
+            ],
+            id="Should not suggest renaming to a file we already reference, order should not matter",
+        ),
+        pytest.param(
+            # I'm not entirely sure if `fnmatch` treats the ../*.pex the same as golangs
+            # filepath.Match does. See notice comment in
+            # pants.backend.docker.utils.suggest_renames().get_matches()
+            (
+                "src.proj/*.pex",
+                "src.proj/config.ini",
+            ),
+            (
+                "src.proj/bin_a.pex",
+                "src.proj/bin_b.pex",
+                "src.proj/other.txt",
+                "src.proj/nested/file.txt",
+                "src/proj/config.ini",
+            ),
+            (
+                "src.proj",
+                "src/proj",
+                "src.proj/nested",
+            ),
+            [
+                ("src.proj/config.ini", "src/proj/config.ini"),
+                ("", "src.proj/other.txt"),
+                ("", "src.proj/nested/file.txt"),
+            ],
+            id="Glob pattern captures matching files only",
         ),
     ],
 )
