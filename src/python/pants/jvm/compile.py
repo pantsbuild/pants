@@ -34,7 +34,7 @@ class ClasspathSourceAmbiguity(Exception):
     """Too many compiler instances were compatible with a CoarsenedTarget."""
 
 
-class ClasspathSourceRootOnlyWasInner(Exception):
+class ClasspathRootOnlyWasInner(Exception):
     """A root_only request type was used as an inner node in a compile graph."""
 
 
@@ -104,7 +104,7 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
 
         if len(compatible) == 1:
             if not root and impl.root_only:
-                raise ClasspathSourceRootOnlyWasInner(
+                raise ClasspathRootOnlyWasInner(
                     "The following targets had dependees, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
                 )

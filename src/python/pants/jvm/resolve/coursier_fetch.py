@@ -671,9 +671,8 @@ async def select_coursier_resolve_for_targets(
         raise NoCompatibleResolve(
             jvm, "The selected targets did not have a resolve in common", root_targets
         )
-    else:
-        # Take the first compatible resolve.
-        resolve = min(compatible_resolves)
+    # Take the first compatible resolve.
+    resolve = min(compatible_resolves)
 
     # Validate that the selected resolve is compatible with all transitive dependencies.
     incompatible_targets = []
