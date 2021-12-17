@@ -19,6 +19,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
+    PexBinariesFromEntryPointsGeneratorTarget,
     PexBinary,
     PexBinaryDependenciesField,
     PexEntryPointField,
@@ -41,6 +42,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
+    GenerateTargetsFromPexBinariesFromEntryPoints,
     GenerateTargetsFromPythonSources,
     GenerateTargetsFromPythonTests,
     GenerateTargetsFromPythonTestUtils,
@@ -565,11 +567,13 @@ def test_generate_source_and_test_targets() -> None:
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTests]),
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonSources]),
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTestUtils]),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromPexBinariesFromEntryPoints]),
         ],
         target_types=[
             PythonTestsGeneratorTarget,
             PythonSourcesGeneratorTarget,
             PythonTestUtilsGeneratorTarget,
+            PexBinariesFromEntryPointsGeneratorTarget,
         ],
     )
     rule_runner.write_files(
@@ -593,6 +597,20 @@ def test_generate_source_and_test_targets() -> None:
                     sources=['**/conftest.py'],
                     overrides={'conftest.py': {'tags': ['overridden']}},
                 )
+
+                pex_binaries_from_entry_points(
+                    name="pexes",
+                    entry_points=[
+                        "f1.py",
+                        "f2:foo",
+                        "subdir.f.py",
+                        "subdir.f:main",
+                    ],
+                    overrides={
+                        'f2:foo': {'tags': ['overridden']},
+                        'subdir.f.py': {'tags': ['overridden']},
+                    }
+                )
                 """
             ),
             "src/py/f1.py": "",
@@ -609,6 +627,7 @@ def test_generate_source_and_test_targets() -> None:
     sources_generator = rule_runner.get_target(Address("src/py", target_name="lib"))
     tests_generator = rule_runner.get_target(Address("src/py", target_name="tests"))
     test_utils_generator = rule_runner.get_target(Address("src/py", target_name="test_utils"))
+    pex_binaries_generator = rule_runner.get_target(Address("src/py", target_name="pexes"))
 
     def gen_source_tgt(
         rel_fp: str, tags: list[str] | None = None, *, tgt_name: str
@@ -626,6 +645,13 @@ def test_generate_source_and_test_targets() -> None:
             residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
         )
 
+    def gen_pex_binary_tgt(entry_point: str, tags: list[str] | None = None) -> PexBinary:
+        return PexBinary(
+            {PexEntryPointField.alias: entry_point, Tags.alias: tags},
+            Address("src/py", target_name="pexes", generated_name=entry_point.replace(":", "-")),
+            residence_dir="src/py",
+        )
+
     sources_generated = rule_runner.request(
         GeneratedTargets, [GenerateTargetsFromPythonSources(sources_generator)]
     )
@@ -634,6 +660,9 @@ def test_generate_source_and_test_targets() -> None:
     )
     test_utils_generated = rule_runner.request(
         GeneratedTargets, [GenerateTargetsFromPythonTestUtils(test_utils_generator)]
+    )
+    pex_binaries_generated = rule_runner.request(
+        GeneratedTargets, [GenerateTargetsFromPexBinariesFromEntryPoints(pex_binaries_generator)]
     )
 
     assert sources_generated == GeneratedTargets(
@@ -658,5 +687,15 @@ def test_generate_source_and_test_targets() -> None:
         {
             gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
             gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
+        },
+    )
+
+    assert pex_binaries_generated == GeneratedTargets(
+        pex_binaries_generator,
+        {
+            gen_pex_binary_tgt("f1.py"),
+            gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
+            gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
+            gen_pex_binary_tgt("subdir.f:main"),
         },
     )

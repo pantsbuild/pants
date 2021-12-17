@@ -195,7 +195,7 @@ async def generate_targets_from_pex_binaries_from_entry_points(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    entry_points_field = request.generator[PexEntryPointsField]
+    entry_points_field = request.generator[PexEntryPointsField].value or []
     overrides = request.generator[OverridesField].flatten()
 
     # @TODO: Check for overlap:
@@ -210,15 +210,14 @@ async def generate_targets_from_pex_binaries_from_entry_points(
             if not isinstance(field, (PexEntryPointsField, OverridesField))
         }
         target_fields.update(overrides.pop(entry_point_spec, {}))
-        address = generator_addr.create_generated(entry_point_spec)
-        try:
-            entry_point = EntryPoint.parse(entry_point_spec, provenance=f"for {address}")
-        except ValueError as e:
-            raise InvalidFieldException(str(e))
 
         return PexBinary(
-            {PexEntryPointField.alias: entry_point, **target_fields},
-            address,
+            {PexEntryPointField.alias: entry_point_spec, **target_fields},
+            # TOREVIEW: We Should discuss the address, because users wil likely want to package or
+            #   run these scripts, so the address they use shouldn't be too weird.
+            # E.g. path/to/scriptdir:generator_name#foo.par:baz is kinda lengthy
+            # ":" is a forbidden character in target names
+            generator_addr.create_generated(entry_point_spec.replace(":", "-")),
             union_membership,
             residence_dir=generator_addr.spec_path,
         )
@@ -544,6 +543,7 @@ def rules():
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinariesFromEntryPoints),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )

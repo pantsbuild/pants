@@ -29,8 +29,4 @@ pex_binaries_from_entry_points(
         "_release_helper.py",
         "reversion.py",
     ],
-    overrides={
-        "_generate_all_lockfiles_helper.py": {"name": "generate_all_lockfiles_helper"},
-        "_release_helper.py": {"name": "release_helper"},
-    },
 )
