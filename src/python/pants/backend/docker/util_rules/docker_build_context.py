@@ -182,7 +182,11 @@ class DockerBuildContext:
             version_context=DockerVersionContext.from_dict(version_context),
             copy_source_vs_context_source=tuple(
                 suggest_renames(
-                    tentative_paths=dockerfile_info.copy_sources,
+                    tentative_paths=(
+                        # We don't want to include the Dockerfile as a suggested rename
+                        dockerfile_info.source,
+                        *dockerfile_info.copy_sources,
+                    ),
                     actual_files=snapshot.files,
                     actual_dirs=snapshot.dirs,
                 )

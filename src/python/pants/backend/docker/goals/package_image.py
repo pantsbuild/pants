@@ -208,7 +208,10 @@ async def build_docker_image(
     result = await Get(FallibleProcessResult, Process, process)
 
     if result.exit_code != 0:
-        docker_build_failed(field_set.address, context, global_options.options.colors)
+        maybe_msg = docker_build_failed(field_set.address, context, global_options.options.colors)
+        if maybe_msg:
+            logger.info(maybe_msg)
+
         raise ProcessExecutionFailure(
             result.exit_code,
             result.stdout,
@@ -236,9 +239,9 @@ async def build_docker_image(
     )
 
 
-def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> None:
+def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:
     if not context.copy_source_vs_context_source:
-        return
+        return None
 
     msg = (
         f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY`"
@@ -273,7 +276,7 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
             f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced)}\n\n"
         )
 
-    logger.info(msg)
+    return msg
 
 
 def rules():

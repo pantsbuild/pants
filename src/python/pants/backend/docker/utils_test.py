@@ -50,7 +50,7 @@ from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
             ("src.proj/bin_a.pex",),
             ("src.proj",),
             [
-                ("src.proj/binb.pex", "src.proj"),
+                ("src.proj/binb.pex", ""),
             ],
             id="Should not suggest renaming to a file we already reference",
         ),
@@ -62,7 +62,7 @@ from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
             ("src.proj/bin_a.pex",),
             ("src.proj",),
             [
-                ("src.proj/binb.pex", "src.proj"),
+                ("src.proj/binb.pex", ""),
             ],
             id="Should not suggest renaming to a file we already reference, order should not matter",
         ),
@@ -88,10 +88,53 @@ from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
             ),
             [
                 ("src.proj/config.ini", "src/proj/config.ini"),
-                ("", "src.proj/other.txt"),
                 ("", "src.proj/nested/file.txt"),
+                ("", "src.proj/other.txt"),
             ],
             id="Glob pattern captures matching files only",
+        ),
+        pytest.param(
+            (
+                "src/project/file",
+                "sources",
+            ),
+            ("src/project/file",),
+            (
+                "src",
+                "src/project",
+            ),
+            [
+                ("sources", ""),
+            ],
+            id="Do not suggest renaming to an 'empty' directory",
+        ),
+        pytest.param(
+            (
+                "testprojects/src/python/docker/Dockerfile.test-example-synth",
+                "testprojects.src.python.hello.main/mains.pez",
+                "blarg",
+                "baz",
+            ),
+            (
+                "testprojects/src/python/docker/Dockerfile.test-example-synth",
+                "testprojects.src.python.hello.main/main.pex",
+            ),
+            (
+                "testprojects",
+                "testprojects/src",
+                "testprojects/src/python",
+                "testprojects/src/python/docker",
+                "testprojects.src.python.hello.main",
+            ),
+            [
+                ("baz", ""),
+                ("blarg", ""),
+                (
+                    "testprojects.src.python.hello.main/mains.pez",
+                    "testprojects.src.python.hello.main/main.pex",
+                ),
+            ],
+            id="Skip Dockerfile",
         ),
     ],
 )
@@ -116,7 +159,7 @@ def test_suggest_renames(
         (
             "srcs/projcet/cmd",
             "src/project/cmd.pex",
-            "src{s => }/proj{ => e}c{e => }t/cmd{ => .pex}",
+            "{srcs/projcet/cmd => src/project/cmd.pex}",
         ),
         (
             "src/bar-foo/file",

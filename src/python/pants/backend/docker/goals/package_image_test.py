@@ -630,7 +630,7 @@ def test_docker_build_fail_logs(
 ) -> None:
     caplog.set_level(logging.INFO)
     rule_runner.write_files({"docker/test/BUILD": "docker_image()"})
-
+    build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
     with pytest.raises(ProcessExecutionFailure):
         assert_build(

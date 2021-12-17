@@ -100,6 +100,16 @@ def suggest_renames(
             return is_referenced(path, parentdir)
         return False
 
+    def get_unreferenced(files: Sequence[str] = (), dirs: Sequence[str] = ()) -> Iterator[str]:
+        unreferenced_files = tuple(path for path in files if not is_referenced(path))
+        yield from unreferenced_files
+        for path in dirs:
+            if not any(filename.startswith(path + "/") for filename in unreferenced_files):
+                # Skip paths where we don't have any unreferenced files any longer.
+                continue
+            if not is_referenced(path, path):
+                yield path
+
     def get_matches(path: str) -> tuple[str, ...]:
         is_pattern = any(all(c in path for c in cs) for cs in ["*", "?", "[]"])
         if not is_pattern:
@@ -115,14 +125,6 @@ def suggest_renames(
         # for a "close enough" approximation to get this moving.
         return tuple(p for p in actual_paths if fnmatch(p, path))
 
-    def get_unreferenced(files: Sequence[str] = (), dirs: Sequence[str] = ()) -> Iterator[str]:
-        for path in files:
-            if not is_referenced(path):
-                yield path
-        for path in dirs:
-            if not is_referenced(path, path):
-                yield path
-
     # Go over exact matches first, so we don't target them as possible matches for renames.
     unmatched_paths = set()
     for path in tentative_paths:
@@ -133,7 +135,7 @@ def suggest_renames(
             unmatched_paths.add(path)
 
     # List unknown files, possibly with a rename suggestion.
-    for path in unmatched_paths:
+    for path in sorted(unmatched_paths):
         for suggestion in difflib.get_close_matches(path, actual_paths, n=1, cutoff=0.1):
             # Suggest rename to match what files there are.
             reference(suggestion)
@@ -144,7 +146,7 @@ def suggest_renames(
             yield path, ""
 
     # List unused files.
-    for path in get_unreferenced(actual_files):
+    for path in sorted(get_unreferenced(actual_files)):
         yield "", path
 
 
@@ -153,7 +155,12 @@ def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> s
     color = MaybeColor(colors)
     matcher = difflib.SequenceMatcher(None, src_path, dst_path)
     parts = []
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+    op_codes = matcher.get_opcodes()
+    if len(op_codes) / (len(src_path) + len(dst_path)) > 0.2:
+        # If there are too many instructions it's just clutter and hard to read, simply drop them
+        # for a single replace all.
+        op_codes = [("replace", 0, len(src_path), 0, len(dst_path))]
+    for tag, i1, i2, j1, j2 in op_codes:
         if tag == "equal":
             parts.append(dst_path[j1:j2])
         elif tag in ["replace", "delete", "insert"]:
