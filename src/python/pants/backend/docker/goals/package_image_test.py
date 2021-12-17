@@ -553,8 +553,9 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="img1",
                   secrets={
-                    "mysecret": "/var/run/secrets/mysecret",
-                    "project-secret": "project/secrets/mysecret",
+                    "system-secret": "/var/run/secrets/mysecret",
+                    "project-secret": "secrets/mysecret",
+                    "target-secret": "./mysecret",
                   }
                 )
                 """
@@ -566,8 +567,9 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--secret=id=mysecret,src=/var/run/secrets/mysecret",
-            f"--secret=id=project-secret,src={rule_runner.build_root}/docker/test/project/secrets/mysecret",
+            "--secret=id=system-secret,src=/var/run/secrets/mysecret",
+            f"--secret=id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
+            f"--secret=id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
             "-t",
             "img1:latest",
             "-f",
