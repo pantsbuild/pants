@@ -1,7 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from itertools import chain
 import logging
+from itertools import chain
+
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -20,6 +21,7 @@ from pants.jvm.compile import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 class JvmResourcesRequest(ClasspathEntryRequest):
     field_sets = (
