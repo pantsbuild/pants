@@ -9,7 +9,7 @@ from typing import Iterator
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, Targets
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionMembership
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -65,15 +65,18 @@ async def classpath(
     coarsened_targets: CoarsenedTargets,
     union_membership: UnionMembership,
 ) -> Classpath:
-    resolve = await Get(
-        CoursierResolveKey, Targets(t for ct in coarsened_targets.closure() for t in ct.members)
-    )
+    # Compute a single shared resolve for all of the roots, which will validate that they
+    # are compatible with one another.
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
 
+    # Then request classpath entries for each root.
     classpath_entries = await MultiGet(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(union_membership, component=t, resolve=resolve),
+            ClasspathEntryRequest.for_targets(
+                union_membership, component=t, resolve=resolve, root=True
+            ),
         )
         for t in coarsened_targets
     )

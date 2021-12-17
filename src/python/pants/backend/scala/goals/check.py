@@ -9,7 +9,7 @@ from pants.backend.scala.target_types import ScalaFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, Targets
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -31,8 +31,10 @@ async def scalac_check(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )
 
+    # NB: Each root can have an independent resolve, because there is no inherent relation
+    # between them other than that they were on the commandline together.
     resolves = await MultiGet(
-        Get(CoursierResolveKey, Targets(t.members)) for t in coarsened_targets
+        Get(CoursierResolveKey, CoarsenedTargets([t])) for t in coarsened_targets
     )
 
     results = await MultiGet(

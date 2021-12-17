@@ -9,7 +9,6 @@ import pytest
 
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
@@ -24,7 +23,6 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
@@ -44,8 +42,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
             QueryRule(Targets, [AddressSpecs]),
