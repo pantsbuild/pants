@@ -244,7 +244,7 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
         return None
 
     msg = (
-        f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY`"
+        f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY` "
         "instructions where the source files may not have been found in the Docker build context."
         "\n\n"
     )
@@ -263,7 +263,7 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
     unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]
     if unknown:
         msg += (
-            f"The following files where not found in the Docker build context:\n\n"
+            f"The following files were not found in the Docker build context:\n\n"
             f"{bullet_list(unknown)}\n\n"
         )
 

@@ -116,7 +116,7 @@ def suggest_renames(
             return (path,) if path in actual_paths else ()
         #
         # NOTICE: There is a slight difference in the pattern syntax used for the Dockerfile `COPY`
-        # instruction, than what is implmented by the `fnmatch` function in Python.
+        # instruction, than what is implemented by the `fnmatch` function in Python.
         # https://docs.docker.com/engine/reference/builder/#copy which is implemented using
         # https://golang.org/pkg/path/filepath#Match compared to
         # https://docs.python.org/3/library/fnmatch.html#fnmatch.fnmatch
