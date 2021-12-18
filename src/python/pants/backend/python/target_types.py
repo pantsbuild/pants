@@ -578,14 +578,14 @@ class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
 class PexBinariesFromEntryPointsOverrideField(OverridesField):
     help = (
         f"Override the field values for generated `{PexBinary.alias}` targets.\n\n"
-        "Expects a dictionary of entry_points to a dictionary for the overrides. You may either "
-        "use a string for a entry_point, or a string tuple for multiple paths / globs. Each "
-        "override is a dictionary of field names to the overridden value.\n\n"
+        "Expects a dictionary mapping values from the `entry_points` field to a dictionary for "
+        "their overrides. You may either use a single string or a tuple of strings to override "
+        "multiple targets.\n\n"
         "For example:\n\n```\n"
         "overrides={\n"
         '  "foo.py": {"execution_mode": "venv"]},\n'
         '  "bar:main": {"restartable": True]},\n'
-        '  ("foo.py", "bar"): {"tags": ["legacy"]},\n'
+        '  ("foo.py", "bar:main"): {"tags": ["legacy"]},\n'
         "}"
         "\n```\n\n"
         "Every key is validated to belong to this target's `entry_points` field.\n\n"
