@@ -1463,6 +1463,10 @@ def test_overrides_field_normalization() -> None:
         "dir/bar1.ext": tgt2_override,
         "dir/bar2.ext": tgt2_override,
     }
+    assert path_field.flatten() == {
+        "foo.ext": {**tgt1_override, **tgt2_override},
+        "bar*.ext": tgt2_override,
+    }
     with pytest.raises(InvalidFieldException):
         # Same field is overridden for the same file multiple times, which is an error.
         path_field.flatten_paths(
