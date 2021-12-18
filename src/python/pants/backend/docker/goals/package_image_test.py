@@ -237,7 +237,7 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: directory, name, parent_directory\."
+        r"Try with one of: build_args, directory, name, parent_directory\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
@@ -573,8 +573,9 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="img1",
                   secrets={
-                    "mysecret": "/var/run/secrets/mysecret",
-                    "project-secret": "project/secrets/mysecret",
+                    "system-secret": "/var/run/secrets/mysecret",
+                    "project-secret": "secrets/mysecret",
+                    "target-secret": "./mysecret",
                   }
                 )
                 """
@@ -586,8 +587,9 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--secret=id=mysecret,src=/var/run/secrets/mysecret",
-            f"--secret=id=project-secret,src={rule_runner.build_root}/docker/test/project/secrets/mysecret",
+            "--secret=id=system-secret,src=/var/run/secrets/mysecret",
+            f"--secret=id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
+            f"--secret=id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
             "-t",
             "img1:latest",
             "-f",

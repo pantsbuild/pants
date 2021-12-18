@@ -36,8 +36,7 @@ from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+def create_rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *context_rules(),
@@ -64,6 +63,11 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return create_rule_runner()
+
+
 def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
@@ -72,7 +76,7 @@ def assert_build_context(
     expected_version_context: dict[str, dict[str, str]] | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
-) -> None:
+) -> DockerBuildContext:
     if runner_options is None:
         runner_options = {}
     runner_options.setdefault("env_inherit", set()).update({"PATH", "PYENV_ROOT", "HOME"})
@@ -91,6 +95,7 @@ def assert_build_context(
     assert sorted(expected_files) == sorted(snapshot.files)
     if expected_version_context is not None:
         assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
+    return context
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
@@ -232,6 +237,7 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
             "interim": {"tag": "latest"},
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
+            "build_args": {},
         },
     )
 
@@ -264,6 +270,7 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "interim": {"tag": "latest"},
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
+            "build_args": {},
         },
     )
 
@@ -420,3 +427,60 @@ def test_undefined_env_var_behavior(
             Address("src/docker"),
             expected_files=["src/docker/Dockerfile"],
         )
+
+
+@pytest.fixture(scope="session")
+def build_context() -> DockerBuildContext:
+    rule_runner = create_rule_runner()
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  extra_build_args=["DEF_ARG"],
+                  instructions=[
+                    "FROM python:3.8",
+                    "ARG MY_ARG",
+                    "ARG DEF_ARG=some-value",
+                  ],
+                )
+                """
+            ),
+        }
+    )
+
+    return assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile.docker"],
+    )
+
+
+@pytest.mark.parametrize(
+    "fmt_string, result, expectation",
+    [
+        pytest.param(
+            "{build_args.MY_ARG}",
+            None,
+            pytest.raises(
+                ValueError,
+                match=(r"The build arg 'MY_ARG' is undefined\. Defined build args are: DEF_ARG\."),
+            ),
+            id="ARG_NAME",
+        ),
+        pytest.param(
+            "{build_args.DEF_ARG}",
+            "some-value",
+            no_exception(),
+            id="DEF_ARG",
+        ),
+    ],
+)
+def test_build_arg_behavior(
+    build_context: DockerBuildContext,
+    fmt_string: str,
+    result: str | None,
+    expectation: ContextManager,
+) -> None:
+    with expectation:
+        assert fmt_string.format(**build_context.version_context) == result
