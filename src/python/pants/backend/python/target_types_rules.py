@@ -198,10 +198,8 @@ async def generate_targets_from_pex_binaries_from_entry_points(
     entry_points_field = request.generator[PexEntryPointsField].value or []
     overrides = request.generator[OverridesField].flatten()
 
-    # @TODO: Check for overlap:
-    #   E.g. `path.to.app` specd as well as `app`, that should error
-    #   do this by resolving entry points before creating binaries so all are of the form
-    #   `path.to.app`. (But note that the override field might have `app`)
+    # Note that we don't check for overlap because it seems unlikely to be a problem.
+    # If it does, we should add this check. (E.g. `path.to.app` and `path/to/app.py`)
 
     def create_pex_binary(entry_point_spec: str) -> PexBinary:
         target_fields = {
@@ -213,9 +211,6 @@ async def generate_targets_from_pex_binaries_from_entry_points(
 
         return PexBinary(
             {PexEntryPointField.alias: entry_point_spec, **target_fields},
-            # TOREVIEW: We Should discuss the address, because users wil likely want to package or
-            #   run these scripts, so the address they use shouldn't be too weird.
-            # E.g. path/to/scriptdir:generator_name#foo.par:baz is kinda lengthy
             # ":" is a forbidden character in target names
             generator_addr.create_generated(entry_point_spec.replace(":", "-")),
             union_membership,
