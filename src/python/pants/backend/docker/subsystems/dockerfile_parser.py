@@ -6,7 +6,7 @@ from __future__ import annotations
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Generator
+from typing import Iterator
 
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
@@ -126,6 +126,7 @@ class DockerfileInfo:
     putative_target_addresses: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
     build_args: DockerBuildArgs = DockerBuildArgs()
+    from_image_build_args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -133,9 +134,7 @@ class DockerfileInfoRequest:
     address: Address
 
 
-def split_iterable(
-    sep: str, obj: list[str] | tuple[str, ...]
-) -> Generator[tuple[str, ...], None, None]:
+def split_iterable(sep: str, obj: list[str] | tuple[str, ...]) -> Iterator[tuple[str, ...]]:
     while sep in obj:
         idx = obj.index(sep)
         yield tuple(obj[:idx])
@@ -162,12 +161,14 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
         ProcessResult,
         DockerfileParseRequest(
             sources.snapshot.digest,
-            ("version-tags,putative-targets,build-args", dockerfile),
+            ("version-tags,putative-targets,build-args,from-image-build-args", dockerfile),
         ),
     )
 
     output = result.stdout.decode("utf-8").strip().split("\n")
-    version_tags, putative_targets, build_args = split_iterable("---", output)
+    version_tags, putative_targets, build_args, from_image_build_args = split_iterable(
+        "---", output
+    )
 
     try:
         return DockerfileInfo(
@@ -177,6 +178,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
             putative_target_addresses=putative_targets,
             version_tags=version_tags,
             build_args=DockerBuildArgs.from_strings(*build_args, duplicates_must_match=True),
+            from_image_build_args=from_image_build_args,
         )
     except ValueError as e:
         raise DockerfileInfoError(

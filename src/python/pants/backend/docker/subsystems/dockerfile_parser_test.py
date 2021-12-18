@@ -107,6 +107,25 @@ def test_build_args(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_args(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/a/BUILD": """docker_image(name="image")""",
+            "test/a/Dockerfile": "FROM upstream",
+            "test/b/BUILD": """docker_image(name="image")""",
+            "test/b/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=test/a:image
+                FROM ${BASE_IMAGE} AS base
+                """
+            ),
+        }
+    )
+    addr = Address("test/b", target_name="image")
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+    assert info.from_image_build_args == ("BASE_IMAGE",)
+
+
 def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
