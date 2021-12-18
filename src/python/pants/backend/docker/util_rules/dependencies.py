@@ -30,7 +30,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
         Targets,
         UnparsedAddressInputs(
             dockerfile_info.putative_target_addresses,
-            owning_address=None,
+            owning_address=dockerfile_info.address,
         ),
     )
     package = await Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets))

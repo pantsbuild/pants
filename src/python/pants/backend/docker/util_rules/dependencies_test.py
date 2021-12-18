@@ -5,13 +5,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
+from pants.backend.docker.goals import package_image
+from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.target_types import DockerDependenciesField, DockerImageTarget
+from pants.backend.docker.util_rules import dockerfile
 from pants.backend.docker.util_rules.dependencies import (
     InjectDockerDependencies,
     inject_docker_dependencies,
 )
-from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex
@@ -24,9 +25,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *dockerfile_rules(),
+            *dockerfile.rules(),
+            *dockerfile_parser.rules(),
+            *package_image.rules(),
             *package_pex_binary.rules(),
-            *parser_rules(),
             *pex.rules(),
             inject_docker_dependencies,
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
@@ -45,12 +47,14 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
         {
             "project/image/test/BUILD": dedent(
                 """\
+                docker_image(name="base")
                 docker_image(name="image")
                 """
             ),
             "project/image/test/Dockerfile": dedent(
                 """\
-                FROM baseimage
+                ARG BASE_IMAGE=:base
+                FROM $BASE_IMAGE
                 ENTRYPOINT ["./entrypoint"]
                 COPY project.hello.main/main_binary.pex /entrypoint
                 """
@@ -68,5 +72,8 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
         [InjectDockerDependencies(tgt[DockerDependenciesField])],
     )
     assert injected == InjectedDependencies(
-        [Address("project/hello/main", target_name="main_binary")]
+        [
+            Address("project/hello/main", target_name="main_binary"),
+            Address("project/image/test", target_name="base"),
+        ]
     )

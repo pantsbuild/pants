@@ -37,6 +37,19 @@ def translate_to_address(value: str) -> str | None:
     return None
 
 
+_address_regexp = re.compile(
+    r"""
+    (?://)?[^:# ]*:[^:#!@?/\= ]+(?:\#[^:#!@?= ]+)?$
+    """,
+    re.VERBOSE,
+)
+
+
+def valid_address(value: str) -> bool:
+    """Checks if `value` may pass as an address."""
+    return bool(re.match(_address_regexp, value))
+
+
 def main(cmd: str, args: list[str]) -> None:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string
@@ -69,9 +82,23 @@ def main(cmd: str, args: list[str]) -> None:
                     if address:
                         yield address
 
+        def from_image_addresses(self) -> Iterator[str]:
+            build_args = {
+                key: value
+                for key, has_value, value in [
+                    build_arg.partition("=") for build_arg in self.build_args()
+                ]
+                if has_value and valid_address(value)
+            }
+
+            for image_build_arg in self.from_image_build_args():
+                if image_build_arg in build_args:
+                    yield build_args[image_build_arg]
+
         def putative_target_addresses(self) -> tuple[str, ...]:
             addresses: list[str] = []
             addresses.extend(self.copy_source_addresses())
+            addresses.extend(self.from_image_addresses())
             return tuple(addresses)
 
         def from_baseimages(self) -> Iterator[tuple[str, tuple[str, ...]]]:
