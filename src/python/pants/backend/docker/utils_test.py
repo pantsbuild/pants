@@ -169,5 +169,8 @@ def test_suggest_renames(
     ],
 )
 def test_format_rename_suggestion(src: str, dst: str, expected: str) -> None:
-    actual = format_rename_suggestion(src, dst, colors=False)
+    actual = format_rename_suggestion(src, dst, colors=False, atomic=False)
     assert actual == expected
+
+    actual = format_rename_suggestion(src, dst, colors=False, atomic=True)
+    assert actual == f"{src} => {dst}"

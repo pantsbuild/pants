@@ -150,9 +150,16 @@ def suggest_renames(
         yield "", path
 
 
-def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> str:
+def format_rename_suggestion(
+    src_path: str, dst_path: str, *, colors: bool, atomic: bool = True
+) -> str:
     """Given two paths, formats a line showing what to change in `src_path` to get to `dst_path`."""
     color = MaybeColor(colors)
+    if atomic:
+        rem = color.maybe_red(src_path)
+        add = color.maybe_green(dst_path)
+        return f"{rem} => {add}"
+
     matcher = difflib.SequenceMatcher(None, src_path, dst_path)
     parts = []
     op_codes = matcher.get_opcodes()

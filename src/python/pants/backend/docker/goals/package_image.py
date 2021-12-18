@@ -208,7 +208,12 @@ async def build_docker_image(
     result = await Get(FallibleProcessResult, Process, process)
 
     if result.exit_code != 0:
-        maybe_msg = docker_build_failed(field_set.address, context, global_options.options.colors)
+        maybe_msg = docker_build_failed(
+            field_set.address,
+            context,
+            global_options.options.colors,
+            options.suggest_renames_atomic,
+        )
         if maybe_msg:
             logger.info(maybe_msg)
 
@@ -239,7 +244,9 @@ async def build_docker_image(
     )
 
 
-def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:
+def docker_build_failed(
+    address: Address, context: DockerBuildContext, colors: bool, suggest_renames_atomic: bool
+) -> str | None:
     if not context.copy_source_vs_context_source:
         return None
 
@@ -250,7 +257,7 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
     )
 
     renames = [
-        format_rename_suggestion(src, dst, colors=colors)
+        format_rename_suggestion(src, dst, colors=colors, atomic=suggest_renames_atomic)
         for src, dst in context.copy_source_vs_context_source
         if src and dst
     ]
