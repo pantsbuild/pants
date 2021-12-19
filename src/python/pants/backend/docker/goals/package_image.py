@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from os import path
 from typing import Any, Iterator, Mapping
 
+# Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
+# a dependency cycle from docker_build_context.
+from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
@@ -22,14 +25,13 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
     DockerVersionContext,
 )
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -43,32 +45,17 @@ class DockerRepositoryNameError(ValueError):
 
 
 @dataclass(frozen=True)
-class BuiltDockerImage(BuiltPackageArtifact):
-    tags: tuple[str, ...] = ()
-
-    @classmethod
-    def create(cls, tags: tuple[str, ...]) -> BuiltDockerImage:
-        tags_string = tags[0] if len(tags) == 1 else (f"\n{bullet_list(tags)}")
-        return cls(
-            tags=tags,
-            relpath=None,
-            extra_log_lines=(
-                f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-            ),
-        )
-
-
-@dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
     registries: DockerRegistriesField
     repository: DockerRepositoryField
+    source: DockerImageSourceField
     tags: DockerImageTagsField
 
     def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
         try:
-            return tag.format(**version_context)
+            return tag.format(**version_context).lower()
         except (KeyError, ValueError) as e:
             msg = (
                 "Invalid tag value for the `image_tags` field of the `docker_image` target at "
@@ -100,7 +87,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         repository_fmt = self.repository.value or default_repository
 
         try:
-            return repository_fmt.format(**fmt_context)
+            return repository_fmt.format(**fmt_context).lower()
         except (KeyError, ValueError) as e:
             if self.repository.value:
                 source = f"`repository` field of the `docker_image` target at {self.address}"

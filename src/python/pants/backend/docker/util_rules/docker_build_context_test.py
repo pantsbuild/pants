@@ -8,17 +8,24 @@ from typing import Any, ContextManager
 
 import pytest
 
-from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
+from pants.backend.docker.goals import package_image
+from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules.docker_build_args import docker_build_args
+from pants.backend.docker.util_rules import (
+    dependencies,
+    docker_binary,
+    docker_build_args,
+    docker_build_context,
+    docker_build_env,
+    dockerfile,
+)
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerVersionContext,
+    DockerVersionContextBuildArgsValue,
+    DockerVersionContextValue,
 )
-from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
-from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
-from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -39,16 +46,19 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def create_rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *context_rules(),
             *core_target_types_rules(),
-            *dockerfile_rules(),
+            *dependencies.rules(),
+            *docker_binary.rules(),
+            *docker_build_args.rules(),
+            *docker_build_context.rules(),
+            *docker_build_env.rules(),
+            *dockerfile.rules(),
+            *dockerfile_parser.rules(),
+            *package_image.rules(),
             *package_pex_binary.rules(),
-            *parser_rules(),
             *pex_from_targets.rules(),
             *shell_target_types_rules(),
             *target_types_rules.rules(),
-            docker_build_args,
-            docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
@@ -72,8 +82,9 @@ def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
     *,
+    build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_version_context: dict[str, dict[str, str]] | None = None,
+    expected_version_context: dict[str, dict[str, str] | DockerVersionContextValue] | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
 ) -> DockerBuildContext:
@@ -86,7 +97,7 @@ def assert_build_context(
         [
             DockerBuildContextRequest(
                 address=address,
-                build_upstream_images=False,
+                build_upstream_images=build_upstream_images,
             )
         ],
     )
@@ -94,6 +105,10 @@ def assert_build_context(
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
     if expected_version_context is not None:
+        if "build_args" in expected_version_context:
+            expected_version_context["build_args"] = DockerVersionContextBuildArgsValue(
+                expected_version_context["build_args"]
+            )
         assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
     return context
 
@@ -157,6 +172,43 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
             "src/b/files/b01",
             "src/b/files/b02",
         ],
+    )
+
+
+def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image_a",
+                  repository="test/{name}",
+                  instructions=["FROM scratch"],
+                )
+                """
+            ),
+            "src/b/BUILD": "docker_image(name='image_b')",
+            "src/b/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/a:image_a
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/b", target_name="image_b"),
+        expected_files=["src/b/Dockerfile"],
+        build_upstream_images=True,
+        expected_version_context={
+            "baseimage": {"tag": "latest"},
+            "stage0": {"tag": "latest"},
+            "build_args": {
+                "BASE_IMAGE": "test/image_a:latest",
+            },
+        },
     )
 
 

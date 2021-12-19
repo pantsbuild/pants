@@ -26,6 +26,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     dockerfile_info = await Get(
         DockerfileInfo, DockerfileInfoRequest(request.dependencies_field.address)
     )
+
     targets = await Get(
         Targets,
         UnparsedAddressInputs(

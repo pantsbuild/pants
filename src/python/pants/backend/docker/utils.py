@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Callable, TypeVar
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -47,3 +47,11 @@ class KeyValueSequenceUtil(FrozenOrderedSet[str]):
             entry_and_value[0] for entry_and_value in key_to_entry_and_value.values()
         )
         return cls(FrozenOrderedSet(deduped_entries))
+
+    def to_dict(
+        self, default: Callable[[str], str | None] = lambda x: None
+    ) -> dict[str, str | None]:
+        return {
+            key: value if has_value else default(key)
+            for key, has_value, value in [pair.partition("=") for pair in self]
+        }
