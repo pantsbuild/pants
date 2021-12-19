@@ -138,6 +138,7 @@ async def pants_setup_kwargs(
             "Twitter": "https://twitter.com/pantsbuild",
             "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
             "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
+            "Mailing lists": "https://groups.google.com/g/pants-devel",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,
