@@ -39,7 +39,7 @@ class GoogleJavaFormatRequest(JavaFmtRequest, LintRequest):
 
 
 class GoogleJavaFormatToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = GoogleJavaFormatSubsystem.options_scope
+    resolve_name = GoogleJavaFormatSubsystem.options_scope
 
 
 @dataclass(frozen=True)

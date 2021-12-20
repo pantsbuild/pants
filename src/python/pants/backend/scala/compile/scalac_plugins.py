@@ -64,7 +64,7 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
 
 
 class GlobalScalacPluginsToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = Scalac.options_scope
+    resolve_name = "scalac-plugins"
 
 
 @rule
