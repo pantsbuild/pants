@@ -63,7 +63,7 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
     assert putative_targets == PutativeTargets(
         [
             PutativeTarget.for_target_type(
-                GoModTarget, path="unowned", name="unowned", triggering_sources=["go.mod"]
+                GoModTarget, path="unowned", name=None, triggering_sources=["go.mod"]
             )
         ]
     )
@@ -93,7 +93,7 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
             PutativeTarget.for_target_type(
                 GoPackageTarget,
                 path="unowned",
-                name="unowned",
+                name=None,
                 triggering_sources=["f.go", "f1.go"],
             )
         ]
@@ -133,7 +133,6 @@ def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
                 path="missing_binary_tgt",
                 name="bin",
                 triggering_sources=[],
-                kwargs={"name": "bin"},
             ),
             PutativeTarget.for_target_type(
                 GoPackageTarget,
@@ -147,7 +146,6 @@ def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
                 path="missing_pkg_and_binary_tgt",
                 name="bin",
                 triggering_sources=[],
-                kwargs={"name": "bin"},
             ),
         ]
     )
