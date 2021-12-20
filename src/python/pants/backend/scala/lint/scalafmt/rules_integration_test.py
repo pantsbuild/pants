@@ -35,9 +35,6 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -64,13 +61,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[ScalaSourceTarget, ScalaSourcesGeneratorTarget],
     )
-    rule_runner.set_options(
-        [
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 

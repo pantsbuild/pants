@@ -43,9 +43,6 @@ from pants.jvm.testutil import (
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -73,14 +70,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
         target_types=[JavaSourcesGeneratorTarget, JvmArtifactTarget],
-        bootstrap_args=[
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
     )
-    rule_runner.set_options(
-        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -115,17 +106,8 @@ JAVA_LIB_MAIN_SOURCE = dedent(
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'lib',
-
-                )
-                """
-            ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "BUILD": "java_sources(name='lib')",
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -165,9 +147,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -178,19 +158,13 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    rule_runner.set_options(
-        ["--javac-jdk=zulu:8.0.312", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(["--javac-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
-    rule_runner.set_options(
-        ["--javac-jdk=bogusjdk:999", NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(["--javac-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(ClasspathEntry, [request])
@@ -208,9 +182,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
             "OtherLib.java": dedent(
                 """\
@@ -288,9 +260,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -376,9 +346,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 public class Main implements A {}
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -462,9 +430,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 class Other implements B {}
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "lib/BUILD": dedent(
                 """\
                 java_sources(
@@ -523,9 +489,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -566,9 +530,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "package-info.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -607,9 +569,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
         }
     )
     request = CompileJavaSourceRequest(
@@ -659,7 +619,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": resolved_joda_lockfile.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_json().decode(),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -700,9 +660,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;

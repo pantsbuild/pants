@@ -41,8 +41,8 @@ def expect_single_expanded_coarsened_target(
 
 def make_resolve(
     rule_runner: RuleRunner,
-    resolve_name: str = "test",
-    resolve_path: str = "coursier_resolve.lockfile",
+    resolve_name: str = "jvm-default",
+    resolve_path: str = "3rdparty/jvm/default.lock",
 ) -> CoursierResolveKey:
     digest = rule_runner.request(Digest, [PathGlobs([resolve_path])])
     return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
