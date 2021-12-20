@@ -24,7 +24,10 @@ class JavacSubsystem(Subsystem):
             type=list,
             member_type=shell_str,
             default=[],
-            help=("Global `javac` compiler flags."),
+            help=(
+                "Global `javac` compiler flags, e.g. "
+                f"`--{cls.options_scope}-args='-g -deprecation'`."
+            ),
         )
         register(
             "--jdk",

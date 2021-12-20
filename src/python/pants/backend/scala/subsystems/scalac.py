@@ -22,7 +22,10 @@ class Scalac(Subsystem):
             type=list,
             member_type=shell_str,
             default=[],
-            help=("Global `scalac` compiler flags."),
+            help=(
+                "Global `scalac` compiler flags, e.g. "
+                f"`--{cls.options_scope}-args='-encoding UTF-8'`."
+            ),
         )
         register(
             "--global",
