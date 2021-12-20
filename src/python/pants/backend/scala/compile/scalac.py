@@ -7,9 +7,9 @@ import logging
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests

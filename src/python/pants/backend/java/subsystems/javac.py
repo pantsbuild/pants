@@ -21,6 +21,8 @@ class JavacSubsystem(Subsystem):
             "--jdk",
             default="adopt:1.11",
             advanced=True,
+            removal_version="2.10.0.dev0",
+            removal_hint="Use `--jvm-jdk`, which behaves the same.",
             help=(
                 "The JDK to use for invoking javac.\n\n"
                 " This string will be passed directly to Coursier's `--jvm` parameter."

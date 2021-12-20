@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests

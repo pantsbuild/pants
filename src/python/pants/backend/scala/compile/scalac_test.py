@@ -437,7 +437,7 @@ def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         args=[
             "--scalac-plugins-global=lib:acyclic",
-            "--scalac-plugins-lockfile=3rdparty/jvm/default.lock",
+            "--scalac-plugins-global-lockfile=3rdparty/jvm/default.lock",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
