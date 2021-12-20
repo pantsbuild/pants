@@ -86,7 +86,6 @@ def test_find_putative_go_targets(rule_runner: RuleRunner) -> None:
                 path="src/go/owned/pkg1",
                 name="bin",
                 triggering_sources=[],
-                kwargs={"name": "bin"},
             ),
         ]
     )

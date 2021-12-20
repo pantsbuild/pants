@@ -110,12 +110,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo", "foo", ["__init__.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo", None, ["__init__.py"]
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget,
                     "src/python/foo/bar",
-                    "bar",
+                    None,
                     ["baz2.py", "baz3.py"],
                 ),
                 PutativeTarget.for_target_type(
@@ -123,14 +123,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "src/python/foo/bar",
                     "tests",
                     ["baz1_test.py", "baz2_test.py"],
-                    kwargs={"name": "tests"},
                 ),
                 PutativeTarget.for_target_type(
                     PythonTestUtilsGeneratorTarget,
                     "src/python/foo/bar",
                     "test_utils",
                     ["conftest.py"],
-                    kwargs={"name": "test_utils"},
                 ),
             ]
         )
@@ -170,10 +168,9 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                     "src/python/foo/bar",
                     "tests",
                     ["bar_test.py"],
-                    kwargs={"name": "tests"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", None, ["qux.py"]
                 ),
             ]
         )
@@ -214,7 +211,7 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "src/python/foo",
                     "main3",
                     [],
-                    kwargs={"name": "main3", "entry_point": "main3.py"},
+                    kwargs={"entry_point": "main3.py"},
                 ),
             ]
         )
