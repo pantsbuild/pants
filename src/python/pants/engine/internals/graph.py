@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Sequence, cast
+from typing import Iterable, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -361,29 +361,25 @@ class _DependencyMapping:
     roots_as_targets: Collection[Target]
 
 
-def _apply_metadata_filter(
-    metadata: DependencyEdgeMetadata, label_filter: Mapping[str, str]
-) -> bool:
-    for filter_key, filter_value in label_filter:
-        if filter_key not in metadata.labels:
-            return False
-        if metadata.labels[filter_value] != filter_value:
-            return False
-    return True
-
-
 def _filter_dependencies_result(
-    dep_result: DependenciesResult, filter_spec: DependencyFilterSpec
+    dep_result: DependenciesResult,
+    filter_spec: DependencyFilterSpec,
 ) -> Addresses:
+    def _apply_filter(address: Address) -> bool:
+        for filter_key, filter_values in filter_spec.label_filters.items():
+            actual_value: str | None = None
+            if address in dep_result.metadata:
+                actual_value = dep_result.metadata[address].labels.get(filter_key)
+            if actual_value is None:
+                actual_value = filter_spec.missing_values.get(filter_key)
+            if actual_value not in filter_values:
+                return False
+        return True
+
     addresses: list[Address] = []
     for address in dep_result.addresses:
-        for filter_key, filter_values in filter_spec.label_filters:
-            actual_value = dep_result.metadata.get(filter_key)
-            if not actual_value:
-                actual_value = filter_spec.missing_values.get(filter_key, "")
-            if actual_value not in filter_values:
-                continue
-        addresses.append(address)
+        if _apply_filter(address):
+            addresses.append(address)
 
     return Addresses(addresses)
 
@@ -976,13 +972,13 @@ def parse_address_with_labels(
     spec_and_label: str,
     relative_to: str | None = None,
     subproject_roots: Sequence[str] | None = None,
-) -> tuple[AddressInput, DependencyEdgeMetadata]:
+) -> AddressInputWithMetadata:
     parts = spec_and_label.rsplit("!", 2)
     address_input = AddressInput.parse(parts[0], relative_to, subproject_roots)
     labels: FrozenDict[str, str] | None = None
     if len(parts) > 1:
         labels = parse_labels(parts[1])
-    return address_input, DependencyEdgeMetadata(labels or FrozenDict())
+    return AddressInputWithMetadata(address_input, DependencyEdgeMetadata(labels or FrozenDict()))
 
 
 @rule
@@ -1015,11 +1011,11 @@ async def determine_explicitly_provided_dependencies(
                 v = v[2:]
             else:
                 v = v[1:]
-        address_input, metadata = parse(v)
+        address_input_with_metadata = parse(v)
         if is_ignore:
-            ignored_addresses.append(AddressInputWithMetadata(address_input, metadata))
+            ignored_addresses.append(address_input_with_metadata)
         else:
-            addresses.append(AddressInputWithMetadata(address_input, metadata))
+            addresses.append(address_input_with_metadata)
 
     parsed_includes = await MultiGet(
         Get(AddressWithMetadata, AddressInputWithMetadata, ai) for ai in addresses

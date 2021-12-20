@@ -50,6 +50,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     DependencyEdgeMetadata,
+    DependencyFilterSpec,
     ExplicitlyProvidedDependencies,
     FieldSet,
     GeneratedSources,
@@ -624,6 +625,71 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
         AllUnexpandedTargets, [AllTargetsRequest()]
     )
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
+
+
+def test_label_filters(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', dependencies=[':t1'])
+                target(name='d1', dependencies=[':t1'])
+                target(name='d2', dependencies=[':t2!foo=bar'])
+                target(name='d3')
+                target(name='root', dependencies=[':d1!foo=bar', ':d2', ':d3!foo=xyzzy'])
+                """
+            ),
+        }
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
+
+    t1 = get_target("t1")
+    t2 = get_target("t2")
+    d1 = get_target("d1")
+    d2 = get_target("d2")
+    d3 = get_target("d3")
+    root = get_target("root")
+
+    tt_1 = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [root.address],
+                filter_spec=DependencyFilterSpec({"foo": ["bar"]}, missing_values={"foo": "bar"}),
+            )
+        ],
+    )
+    assert tt_1.dependencies == FrozenOrderedSet([d1, d2, t1, t2])
+    assert tt_1.closure == FrozenOrderedSet([root, d1, d2, t1, t2])
+
+    tt_2 = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [root.address],
+                filter_spec=DependencyFilterSpec({"foo": ["xyzzy"]}, missing_values={"foo": "bar"}),
+            )
+        ],
+    )
+    assert tt_2.dependencies == FrozenOrderedSet([d3])
+    assert tt_2.closure == FrozenOrderedSet([root, d3])
+
+    tt_3 = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [root.address],
+                filter_spec=DependencyFilterSpec(
+                    {"foo": ["xyzzy"]}, missing_values={"foo": "xyzzy"}
+                ),
+            )
+        ],
+    )
+    assert tt_3.dependencies == FrozenOrderedSet([d2, d3])
+    assert tt_3.closure == FrozenOrderedSet([root, d2, d3])
 
 
 def test_resolve_specs_snapshot() -> None:

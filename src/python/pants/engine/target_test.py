@@ -1195,6 +1195,7 @@ def test_explicitly_provided_dependencies_any_are_covered_by_includes() -> None:
         Address("", target_name="input_tgt"),
         includes=FrozenOrderedSet([addr, generated_addr]),
         ignores=FrozenOrderedSet(),
+        metadata=FrozenDict(),
     )
 
     assert epd.any_are_covered_by_includes(()) is False
@@ -1223,6 +1224,7 @@ def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> No
         Address("", target_name="input_tgt"),
         includes=FrozenOrderedSet(),
         ignores=FrozenOrderedSet([addr, generated_addr]),
+        metadata=FrozenDict(),
     )
 
     def assert_disambiguated_via_ignores(ambiguous: List[Address], expected: Set[Address]) -> None:
@@ -1246,7 +1248,10 @@ def test_explicitly_provided_dependencies_remaining_after_disambiguation() -> No
 
     # Check disambiguation via `owners_must_be_ancestors`.
     epd = ExplicitlyProvidedDependencies(
-        Address("src/lang/project"), FrozenOrderedSet(), FrozenOrderedSet()
+        Address("src/lang/project"),
+        FrozenOrderedSet(),
+        FrozenOrderedSet(),
+        FrozenDict(),
     )
     valid_candidates = {
         Address("src/lang/project", target_name="another_tgt"),
@@ -1280,6 +1285,7 @@ def test_explicitly_provided_dependencies_disambiguated() -> None:
             address=Address("dir", target_name="input_tgt"),
             includes=FrozenOrderedSet(includes or []),
             ignores=FrozenOrderedSet(ignores or []),
+            metadata=FrozenDict(),
         )
         return epd.disambiguated(
             tuple(ambiguous), owners_must_be_ancestors=owners_must_be_ancestors
@@ -1341,6 +1347,7 @@ def test_explicitly_provided_dependencies_maybe_warn_of_ambiguous_dependency_inf
             Address("dir", target_name="input_tgt"),
             includes=FrozenOrderedSet(includes or []),
             ignores=FrozenOrderedSet(ignores or []),
+            metadata=FrozenDict(),
         )
         epd.maybe_warn_of_ambiguous_dependency_inference(
             tuple(ambiguous),

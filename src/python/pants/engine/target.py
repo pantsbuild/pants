@@ -764,11 +764,14 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     include_special_cased_deps: bool
-    filter_spec: DependencyFilterSpec
+    filter_spec: DependencyFilterSpec | None
 
     def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False,
-        filter_spec: DependencyFilterSpec | None = None
+        self,
+        roots: Iterable[Address],
+        *,
+        include_special_cased_deps: bool = False,
+        filter_spec: DependencyFilterSpec | None = None,
     ) -> None:
         self.roots = tuple(roots)
         self.include_special_cased_deps = include_special_cased_deps
