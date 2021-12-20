@@ -10,8 +10,8 @@ to run via `./pants run`.
 
 We want to allow direct invocation of scripts for these reasons:
 1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
-2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_travis_yaml.py [args]`,
-   rather than `./pants run build-support/bin:generate_travis_yaml -- [args]`.
+2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_github_workflows.py [args]`,
+   rather than `./pants run build-support/bin:generate_github_workflows -- [args]`.
 3) Avoid undesired dependencies on Pants for certain scripts.
 
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
@@ -25,7 +25,6 @@ from typing import NoReturn
 
 _SCRIPT_START_TIME = time.time()
 
-_CLEAR_LINE = "\x1b[K"
 _COLOR_BLUE = "\x1b[34m"
 _COLOR_RED = "\x1b[31m"
 _COLOR_GREEN = "\x1b[32m"
