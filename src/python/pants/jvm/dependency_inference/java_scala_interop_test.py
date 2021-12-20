@@ -25,9 +25,6 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -57,9 +54,7 @@ def rule_runner() -> RuleRunner:
             ScalaSourceTarget,
         ],
     )
-    rule_runner.set_options(
-        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -69,28 +64,28 @@ def test_java_infers_scala_dependency(rule_runner: RuleRunner) -> None:
             "org/pantsbuild/lib/BUILD": "scala_sources()\n",
             "org/pantsbuild/lib/Foo.scala": textwrap.dedent(
                 """
-            package org.pantsbuild.lib
+                package org.pantsbuild.lib
 
-            object Foo {
-              def grok(): Unit = {
-                println("Hello world!")
-              }
-            }
-            """
+                object Foo {
+                  def grok(): Unit = {
+                    println("Hello world!")
+                  }
+                }
+                """
             ),
             "org/pantsbuild/example/BUILD": "java_sources()\n",
             "org/pantsbuild/example/Bar.java": textwrap.dedent(
                 """
-            package org.pantsbuild.example;
+                package org.pantsbuild.example;
 
-            import org.pantsbuild.lib.Foo$;
+                import org.pantsbuild.lib.Foo$;
 
-            public class Bar {
-              public static void main(String[] args) {
-                Foo$.MODULE$.grok();
-              }
-            }
-            """
+                public class Bar {
+                  public static void main(String[] args) {
+                    Foo$.MODULE$.grok();
+                  }
+                }
+                """
             ),
         }
     )
