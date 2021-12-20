@@ -130,7 +130,7 @@ class JvmToolBase(Subsystem):
 
 @union
 class JvmToolLockfileSentinel:
-    options_scope: ClassVar[str]
+    resolve_name: ClassVar[str]
 
 
 @dataclass(frozen=True)
@@ -336,7 +336,7 @@ def determine_resolves_to_generate(
     Return the tool_lockfile_sentinels to operate on.
     """
     resolve_names_to_sentinels = {
-        sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
+        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
     }
 
     if not requested_resolve_names:

@@ -10,7 +10,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable
 
-from pants.backend.java.compile.javac_subsystem import JavacSubsystem
+from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
@@ -18,6 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.coursier_fetch import Coordinate, Coordinates, CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 
@@ -67,7 +68,9 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 
 @rule
-async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary) -> JdkSetup:
+async def setup_jdk(
+    coursier: Coursier, jvm: JvmSubsystem, javac: JavacSubsystem, bash: BashBinary
+) -> JdkSetup:
     nailgun = await Get(
         ClasspathEntry,
         CoursierLockfileEntry(
@@ -82,10 +85,11 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
         ),
     )
 
-    if javac.options.jdk == "system":
+    jdk = jvm.jdk(javac)
+    if jdk == "system":
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={javac.options.jdk}")
+        coursier_jdk_option = shlex.quote(f"--jvm={jdk}")
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *coursier.args(["java-home", coursier_jdk_option])))
@@ -109,7 +113,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{javac.options.jdk}`:\n"
+            f"Failed to locate Java for JDK `{jdk}`:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
@@ -117,7 +121,7 @@ async def setup_jdk(coursier: Coursier, javac: JavacSubsystem, bash: BashBinary)
     jre_major_version = parse_jre_major_version(java_version)
     if not jre_major_version:
         raise ValueError(
-            f"Pants was unable to parse the output of `java -version` for JDK `{javac.options.jdk}`. "
+            f"Pants was unable to parse the output of `java -version` for JDK `{jdk}`. "
             "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
             f"with the following output:\n\n{java_version}"
         )

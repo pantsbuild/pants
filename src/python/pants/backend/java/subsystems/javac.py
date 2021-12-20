@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
+from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
@@ -18,9 +20,21 @@ class JavacSubsystem(Subsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
+            "--args",
+            type=list,
+            member_type=shell_str,
+            default=[],
+            help=(
+                "Global `javac` compiler flags, e.g. "
+                f"`--{cls.options_scope}-args='-g -deprecation'`."
+            ),
+        )
+        register(
             "--jdk",
             default="adopt:1.11",
             advanced=True,
+            removal_version="2.10.0.dev0",
+            removal_hint="Use `--jvm-jdk`, which behaves the same.",
             help=(
                 "The JDK to use for invoking javac.\n\n"
                 " This string will be passed directly to Coursier's `--jvm` parameter."
@@ -30,3 +44,7 @@ class JavacSubsystem(Subsystem):
                 " will be whatever happens to be found first on the system's PATH."
             ),
         )
+
+    @property
+    def args(self) -> list[str]:
+        return cast("list[str]", self.options.args)
