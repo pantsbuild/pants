@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -49,6 +49,8 @@ from pants.engine.target import (
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DependenciesResult,
+    DependencyEdgeMetadata,
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
@@ -868,9 +870,24 @@ def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
     return SubprojectRoots(global_options.options.subproject_roots)
 
 
-class ParsedDependencies(NamedTuple):
-    addresses: list[AddressInput]
-    ignored_addresses: list[AddressInput]
+@dataclass(frozen=True)
+class AddressInputWithMetadata:
+    address_input: AddressInput
+    metadata: DependencyEdgeMetadata
+
+
+@dataclass(frozen=True)
+class AddressWithMetadata:
+    address: Address
+    metadata: DependencyEdgeMetadata
+
+
+@rule
+async def resolve_address_input_with_metadata(
+    request: AddressInputWithMetadata,
+) -> AddressWithMetadata:
+    address = await Get(Address, AddressInput, request.address_input)
+    return AddressWithMetadata(address, request.metadata)
 
 
 class TransitiveExcludesNotSupportedError(ValueError):
@@ -900,6 +917,27 @@ class TransitiveExcludesNotSupportedError(ValueError):
         )
 
 
+def parse_labels(labels_str: str) -> FrozenDict[str, str]:
+    result = {}
+    for key_value in labels_str.split(","):
+        key, _, value = key_value.partition("=")
+        result[key] = value
+    return FrozenDict(result)
+
+
+def parse_address_with_labels(
+    spec_and_label: str,
+    relative_to: str | None = None,
+    subproject_roots: Sequence[str] | None = None,
+) -> tuple[AddressInput, DependencyEdgeMetadata]:
+    parts = spec_and_label.rsplit("!", 2)
+    address_input = AddressInput.parse(parts[0], relative_to, subproject_roots)
+    labels: FrozenDict[str, str] | None = None
+    if len(parts) > 1:
+        labels = parse_labels(parts[1])
+    return address_input, DependencyEdgeMetadata(labels or FrozenDict())
+
+
 @rule
 async def determine_explicitly_provided_dependencies(
     request: DependenciesRequest,
@@ -908,13 +946,13 @@ async def determine_explicitly_provided_dependencies(
     subproject_roots: SubprojectRoots,
 ) -> ExplicitlyProvidedDependencies:
     parse = functools.partial(
-        AddressInput.parse,
+        parse_address_with_labels,
         relative_to=request.field.address.spec_path,
         subproject_roots=subproject_roots,
     )
 
-    addresses: list[AddressInput] = []
-    ignored_addresses: list[AddressInput] = []
+    addresses: list[AddressInputWithMetadata] = []
+    ignored_addresses: list[AddressInputWithMetadata] = []
     for v in request.field.value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
@@ -930,18 +968,28 @@ async def determine_explicitly_provided_dependencies(
                 v = v[2:]
             else:
                 v = v[1:]
-        result = parse(v)
+        address_input, metadata = parse(v)
         if is_ignore:
-            ignored_addresses.append(result)
+            ignored_addresses.append(AddressInputWithMetadata(address_input, metadata))
         else:
-            addresses.append(result)
+            addresses.append(AddressInputWithMetadata(address_input, metadata))
 
-    parsed_includes = await MultiGet(Get(Address, AddressInput, ai) for ai in addresses)
-    parsed_ignores = await MultiGet(Get(Address, AddressInput, ai) for ai in ignored_addresses)
+    parsed_includes = await MultiGet(
+        Get(AddressWithMetadata, AddressInputWithMetadata, ai) for ai in addresses
+    )
+    parsed_ignores = await MultiGet(
+        Get(AddressWithMetadata, AddressInputWithMetadata, ai) for ai in ignored_addresses
+    )
+
+    metadata = FrozenDict({pi.address: pi.metadata for pi in parsed_includes if pi.metadata})
+    parsed_includes_set = FrozenOrderedSet(sorted(pi.address for pi in parsed_includes))
+    parsed_ignores_set = FrozenOrderedSet(sorted(pi.address for pi in parsed_ignores))
+
     return ExplicitlyProvidedDependencies(
         request.field.address,
-        FrozenOrderedSet(sorted(parsed_includes)),
-        FrozenOrderedSet(sorted(parsed_ignores)),
+        parsed_includes_set,
+        parsed_ignores_set,
+        metadata,
     )
 
 
@@ -951,7 +999,7 @@ async def resolve_dependencies(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
-) -> Addresses:
+) -> DependenciesResult:
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(WrappedTarget, Address, request.field.address),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
@@ -1034,7 +1082,14 @@ async def resolve_dependencies(
         )
         if addr not in explicitly_provided.ignores
     }
-    return Addresses(sorted(result))
+    return DependenciesResult(
+        addresses=Addresses(sorted(result)), metadata=explicitly_provided.metadata
+    )
+
+
+@rule(level=LogLevel.DEBUG)
+async def narrow_dependencies_result_to_addresses(result: DependenciesResult) -> Addresses:
+    return result.addresses
 
 
 @rule(desc="Resolve addresses")

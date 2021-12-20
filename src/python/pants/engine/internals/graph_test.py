@@ -49,6 +49,7 @@ from pants.engine.target import (
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DependencyEdgeMetadata,
     ExplicitlyProvidedDependencies,
     FieldSet,
     GeneratedSources,
@@ -81,6 +82,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -1903,4 +1905,49 @@ def test_resolve_unparsed_address_inputs() -> None:
     assert set(addresses) == {
         Address("project", target_name="t1"),
         Address("project", target_name="t2"),
+    }
+
+
+def test_labelled_dependency_edges(dependencies_rule_runner: RuleRunner) -> None:
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/f1.st": "",
+            "src/smalltalk/BUILD": dedent(
+                """\
+                smalltalk(
+                  sources=['*.st'],
+                  dependencies=[
+                    "//src/smalltalk/util!scope=main,foo=bar",
+                    "//src/smalltalk/runtime!hello=world,scope=runtime",
+                  ],
+                )
+                """
+            ),
+            "src/smalltalk/util/BUILD": "smalltalk(sources=['*.st'])",
+            "src/smalltalk/util/util.st": "",
+            "src/smalltalk/runtime/BUILD": "smalltalk(sources=['*.st'])",
+            "src/smalltalk/runtime/log.st": "",
+        }
+    )
+    target = dependencies_rule_runner.get_target(Address("src/smalltalk"))
+    result = dependencies_rule_runner.request(
+        ExplicitlyProvidedDependencies, [DependenciesRequest(target[Dependencies])]
+    )
+    assert dict(result.metadata) == {
+        Address("src/smalltalk/util"): DependencyEdgeMetadata(
+            FrozenDict(
+                {
+                    "scope": "main",
+                    "foo": "bar",
+                }
+            )
+        ),
+        Address("src/smalltalk/runtime"): DependencyEdgeMetadata(
+            FrozenDict(
+                {
+                    "hello": "world",
+                    "scope": "runtime",
+                }
+            )
+        ),
     }

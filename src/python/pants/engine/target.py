@@ -34,7 +34,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
-from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -2028,6 +2028,22 @@ class DependenciesRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class DependenciesResult:
+    addresses: Addresses
+    metadata: FrozenDict[Address, DependencyEdgeMetadata]
+
+
+@dataclass(frozen=True)
+class DependencyEdgeMetadata:
+    """Metadata for a dependency edge from a target to another target."""
+
+    labels: FrozenDict[str, str]
+
+    def __bool__(self) -> bool:
+        return bool(self.labels)
+
+
+@dataclass(frozen=True)
 class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
@@ -2045,6 +2061,7 @@ class ExplicitlyProvidedDependencies:
     address: Address
     includes: FrozenOrderedSet[Address]
     ignores: FrozenOrderedSet[Address]
+    metadata: FrozenDict[Address, DependencyEdgeMetadata]
 
     @memoized_method
     def any_are_covered_by_includes(self, addresses: Iterable[Address]) -> bool:
