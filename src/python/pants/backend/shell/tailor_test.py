@@ -64,17 +64,22 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    ShellSourcesGeneratorTarget, "src/sh/foo", "foo", ["f.sh"]
+                    ShellSourcesGeneratorTarget,
+                    path="src/sh/foo",
+                    name=None,
+                    triggering_sources=["f.sh"],
                 ),
                 PutativeTarget.for_target_type(
-                    ShellSourcesGeneratorTarget, "src/sh/foo/bar", "bar", ["baz2.sh", "baz3.sh"]
+                    ShellSourcesGeneratorTarget,
+                    path="src/sh/foo/bar",
+                    name=None,
+                    triggering_sources=["baz2.sh", "baz3.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     Shunit2TestsGeneratorTarget,
-                    "src/sh/foo/bar",
-                    "tests",
-                    ["baz2_test.sh"],
-                    kwargs={"name": "tests"},
+                    path="src/sh/foo/bar",
+                    name="tests",
+                    triggering_sources=["baz2_test.sh"],
                 ),
             ]
         )
@@ -109,13 +114,15 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
             [
                 PutativeTarget.for_target_type(
                     Shunit2TestsGeneratorTarget,
-                    "src/sh/foo/bar",
-                    "tests",
-                    ["bar_test.sh"],
-                    kwargs={"name": "tests"},
+                    path="src/sh/foo/bar",
+                    name="tests",
+                    triggering_sources=["bar_test.sh"],
                 ),
                 PutativeTarget.for_target_type(
-                    ShellSourcesGeneratorTarget, "src/sh/foo/qux", "qux", ["qux.sh"]
+                    ShellSourcesGeneratorTarget,
+                    path="src/sh/foo/qux",
+                    name=None,
+                    triggering_sources=["qux.sh"],
                 ),
             ]
         )

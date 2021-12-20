@@ -74,10 +74,9 @@ async def find_putative_targets(
     putative_targets = []
     for tgt_type, paths in classified_unowned_scala_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = os.path.basename(dirname)
             putative_targets.append(
                 PutativeTarget.for_target_type(
-                    tgt_type, dirname, name, sorted(filenames), kwargs={}
+                    tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
                 )
             )
 

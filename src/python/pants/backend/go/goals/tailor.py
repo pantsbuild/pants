@@ -62,7 +62,7 @@ async def find_putative_go_targets(
             PutativeTarget.for_target_type(
                 GoModTarget,
                 path=dirname,
-                name=os.path.basename(dirname),
+                name=None,
                 triggering_sources=sorted(filenames),
             )
         )
@@ -70,14 +70,13 @@ async def find_putative_go_targets(
     # Add `go_package` targets.
     unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
     for dirname, filenames in group_by_dir(unowned_go_files).items():
-        dir_path = PurePath(dirname)
-        if "testdata" in dir_path.parts:
+        if "testdata" in PurePath(dirname).parts:
             continue
         putative_targets.append(
             PutativeTarget.for_target_type(
                 GoPackageTarget,
                 path=dirname,
-                name=dir_path.name,
+                name=None,
                 triggering_sources=sorted(filenames),
             )
         )
@@ -104,11 +103,10 @@ async def find_putative_go_targets(
     }
     putative_targets.extend(
         PutativeTarget.for_target_type(
-            target_type=GoBinaryTarget,
+            GoBinaryTarget,
             path=main_pkg_dir,
             name="bin",
             triggering_sources=tuple(),
-            kwargs={"name": "bin"},
         )
         for main_pkg_dir in unowned_main_package_dirs
     )
