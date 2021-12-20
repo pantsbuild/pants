@@ -56,13 +56,6 @@ HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
 )
 
 
-ARGS = [
-    "--jvm-resolves={'test': 'coursier_resolve.lockfile'}",
-    "--jvm-default-resolve=test",
-    "--coursier-resolve-names=test",
-]
-
-
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
@@ -76,18 +69,18 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmArtifactTarget],
     )
-    rule_runner.set_options(args=ARGS, env_inherit={"PATH"})
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
 @maybe_skip_jdk_test
 def test_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": HAMCREST_BUILD_FILE})
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
+    result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
-    assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
+    assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
     assert (
-        Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
         == HAMCREST_EXPECTED_LOCKFILE.to_json()
     )
 
@@ -97,26 +90,26 @@ def test_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": HAMCREST_BUILD_FILE,
-            "coursier_resolve.lockfile": HAMCREST_EXPECTED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": HAMCREST_EXPECTED_LOCKFILE.to_json().decode("utf-8"),
         }
     )
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
+    result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == ""
     assert (
-        Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
         == HAMCREST_EXPECTED_LOCKFILE.to_json()
     )
 
 
 @maybe_skip_jdk_test
 def test_updates_lockfile(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": HAMCREST_BUILD_FILE, "coursier_resolve.lockfile": "[]"})
-    result = rule_runner.run_goal_rule(CoursierResolve, args=ARGS, env_inherit={"PATH"})
+    rule_runner.write_files({"BUILD": HAMCREST_BUILD_FILE, "3rdparty/jvm/default.lock": "[]"})
+    result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
-    assert result.stderr == "Updated lockfile at: coursier_resolve.lockfile\n"
+    assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
     assert (
-        Path(rule_runner.build_root, "coursier_resolve.lockfile").read_bytes()
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
         == HAMCREST_EXPECTED_LOCKFILE.to_json()
     )
 

@@ -20,15 +20,14 @@ class JvmSubsystem(Subsystem):
         register(
             "--resolves",
             type=dict,
-            # TODO: Default this to something like {'jvm-default': '3rdparty/jvm/default.lockfile'}.
+            default={"jvm-default": "3rdparty/jvm/default.lock"},
             # TODO: expand help message
             help="A dictionary mapping resolve names to the path of their lockfile.",
         )
         register(
             "--default-resolve",
             type=str,
-            # TODO: Default this to something like `jvm-default`.
-            default=None,
+            default="jvm-default",
             help=(
                 "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
                 "The name must be defined as a resolve in `[jvm].resolves`.",
@@ -40,15 +39,12 @@ class JvmSubsystem(Subsystem):
         return cast("dict[str, str]", self.options.resolves)
 
     @property
-    def default_resolve(self) -> str | None:
+    def default_resolve(self) -> str:
         return cast(str, self.options.default_resolve)
 
     def resolves_for_target(self, target: Target) -> tuple[str, ...]:
         if target.has_field(JvmResolveField):
             val = target[JvmResolveField].value or self.default_resolve
-            # TODO: remove once we always have a default resolve.
-            if val is None:
-                return ()
             if val not in self.resolves:
                 raise InvalidFieldException(
                     f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
@@ -58,9 +54,7 @@ class JvmSubsystem(Subsystem):
                 )
             return (val,)
         if target.has_field(JvmCompatibleResolvesField):
-            vals = target[JvmCompatibleResolvesField].value or (
-                (self.default_resolve,) if self.default_resolve is not None else ()
-            )
+            vals = target[JvmCompatibleResolvesField].value or (self.default_resolve,)
             invalid_resolves = set(vals) - set(self.resolves.keys())
             if invalid_resolves:
                 raise InvalidFieldException(
