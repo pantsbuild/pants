@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
@@ -57,15 +56,7 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
 
 @rule
 def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessCleanupOption:
-    cleanup = resolve_conflicting_options(
-        old_option="process_execution_local_cleanup",
-        new_option="process_cleanup",
-        old_scope="",
-        new_scope="",
-        old_container=global_options.options,
-        new_container=global_options.options,
-    )
-    return ProcessCleanupOption(cleanup)
+    return ProcessCleanupOption(global_options.options.process_cleanup)
 
 
 def rules():

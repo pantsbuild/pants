@@ -355,22 +355,8 @@ class ExecutionOptions:
             remote_instance_name=dynamic_remote_options.instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
-            process_cleanup=resolve_conflicting_options(
-                old_option="process_execution_local_cleanup",
-                new_option="process_cleanup",
-                old_scope="",
-                new_scope="",
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
-            local_cache=resolve_conflicting_options(
-                old_option="process_execution_local_cache",
-                new_option="local_cache",
-                old_scope="",
-                new_scope="",
-                old_container=bootstrap_options,
-                new_container=bootstrap_options,
-            ),
+            process_cleanup=bootstrap_options.process_cleanup,
+            local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
@@ -989,18 +975,6 @@ class GlobalOptions(Subsystem):
             ),
         )
         register(
-            "--process-execution-local-cache",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.local_cache,
-            advanced=True,
-            help=(
-                "Whether to cache process executions in a local cache persisted to disk at "
-                "`--local-store-dir`."
-            ),
-            removal_version="2.10.0.dev0",
-            removal_hint="Use `--local-cache`, which behaves the same.",
-        )
-        register(
             "--process-cleanup",
             type=bool,
             default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
@@ -1010,20 +984,6 @@ class GlobalOptions(Subsystem):
                 "run the `__run.sh` script to recreate the process using the same argv and "
                 "environment variables used by Pants. This option is useful for debugging."
             ),
-        )
-        register(
-            "--process-execution-local-cleanup",
-            type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
-            advanced=True,
-            help=(
-                "If false, Pants will not clean up local directories used as chroots for running "
-                "processes. Pants will log their location so that you can inspect the chroot, and "
-                "run the `__run.sh` script to recreate the process using the same argv and "
-                "environment variables used by Pants. This option is useful for debugging."
-            ),
-            removal_version="2.10.0.dev0",
-            removal_hint="Use `--process-cleanup`, which behaves the same.",
         )
 
         register(
