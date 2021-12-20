@@ -107,10 +107,8 @@ class PutativeTarget:
     # Whether the pututative target has an address (or, e.g., is a macro with no address).
     addressable: bool
 
-    # Note that we generate the BUILD file target entry exclusively from these kwargs (plus the
-    # type_alias), not from the fields above, which are broken out for other uses.
-    # This allows the creator of instances of this class to control whether the generated
-    # target should assume default kwarg values or provide them explicitly.
+    # Note that we generate the BUILD file target entry from these kwargs, the
+    # `name`, and `type_alias`.
     kwargs: FrozenDict[str, str | int | bool | tuple[str, ...]]
 
     # Any comment lines to add above the BUILD file stanza we generate for this putative target.
@@ -122,11 +120,14 @@ class PutativeTarget:
         cls,
         target_type: type[Target],
         path: str,
-        name: str,
+        name: str | None,
         triggering_sources: Iterable[str],
         kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-    ):
+    ) -> PutativeTarget:
+        if name is None:
+            name = os.path.basename(path)
+
         explicit_sources = (kwargs or {}).get("sources")
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
@@ -135,7 +136,7 @@ class PutativeTarget:
 
         default_sources = default_sources_for_target_type(target_type)
         if (explicit_sources or triggering_sources) and not default_sources:
-            raise ValueError(
+            raise AssertionError(
                 f"A target of type {target_type.__name__} was proposed at "
                 f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
                 "but this target type does not have a `sources` field."
@@ -195,9 +196,7 @@ class PutativeTarget:
 
     def rename(self, new_name: str) -> PutativeTarget:
         """A copy of this object with the name replaced to the given name."""
-        # We assume that a rename imposes an explicit "name=" kwarg, overriding any previous
-        # explicit "name=" kwarg, even if the rename happens to be to the default name.
-        return dataclasses.replace(self, name=new_name, kwargs={**self.kwargs, "name": new_name})
+        return dataclasses.replace(self, name=new_name)
 
     def restrict_sources(self) -> PutativeTarget:
         """A copy of this object with the sources explicitly set to just the triggering sources."""
@@ -221,9 +220,14 @@ class PutativeTarget:
                 return f"[{val_str}\n{indent}]"
             return repr(v)
 
-        if self.kwargs:
-            kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in self.kwargs.items()]
-            kwargs_str = ",".join(kwargs_str_parts) + ",\n"
+        is_default_name = self.name == os.path.basename(self.path)
+        if self.kwargs or not is_default_name:
+            _kwargs = {
+                **({} if is_default_name else {"name": self.name}),
+                **self.kwargs,  # type: ignore[arg-type]
+            }
+            _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
+            kwargs_str = ",".join(_kwargs_str_parts) + ",\n"
         else:
             kwargs_str = ""
 

@@ -55,7 +55,7 @@ async def find_putative_go_targets(
             PutativeTarget.for_target_type(
                 GoModTarget,
                 path=dirname,
-                name=os.path.basename(dirname),
+                name=None,
                 triggering_sources=sorted(filenames),
             )
         )
@@ -84,11 +84,10 @@ async def find_putative_go_targets(
     }
     putative_targets.extend(
         PutativeTarget.for_target_type(
-            target_type=GoBinaryTarget,
+            GoBinaryTarget,
             path=main_pkg_dir,
             name="bin",
             triggering_sources=tuple(),
-            kwargs={"name": "bin"},
         )
         for main_pkg_dir in unowned_main_package_dirs
     )

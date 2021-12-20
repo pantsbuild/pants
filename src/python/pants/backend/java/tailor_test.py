@@ -30,15 +30,13 @@ def test_classify_source_files() -> None:
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+    return RuleRunner(
         rules=[
             *tailor.rules(),
             QueryRule(PutativeTargets, (PutativeJavaTargetsRequest, AllOwnedSources)),
         ],
         target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget],
     )
-    rule_runner.set_options(["--backend-packages=pants.backend.experimental.java"])
-    return rule_runner
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
@@ -68,7 +66,6 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "src/java/unowned",
                     "tests",
                     ["UnownedFileTest.java"],
-                    kwargs={"name": "tests"},
                 ),
             ]
         )
