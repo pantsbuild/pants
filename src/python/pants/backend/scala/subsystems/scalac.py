@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import cast
 
 from pants.base.deprecated import resolve_conflicting_options
+from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 
 
@@ -16,6 +17,13 @@ class Scalac(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        register(
+            "--args",
+            type=list,
+            member_type=shell_str,
+            default=[],
+            help=("Global `scalac` compiler flags."),
+        )
         register(
             "--global",
             type=list,
@@ -58,6 +66,10 @@ class Scalac(Subsystem):
             advanced=True,
             help=("The filename of a lockfile for global plugins."),
         )
+
+    @property
+    def args(self) -> list[str]:
+        return cast("list[str]", self.options.args)
 
     @property
     def plugins_global(self) -> list[str]:
