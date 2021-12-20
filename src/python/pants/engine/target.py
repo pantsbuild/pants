@@ -739,6 +739,22 @@ class TransitiveTargets:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class DependencyFilterSpec:
+    label_filters: FrozenDict[str, FrozenOrderedSet[str]]
+    missing_values: FrozenDict[str, str]
+
+    def __init__(
+        self,
+        label_filters: Mapping[str, Iterable[str]],
+        *,
+        missing_values: Mapping[str, str] | None = None,
+    ) -> None:
+        self.label_filters = FrozenDict({k: FrozenOrderedSet(v) for k, v in label_filters.items()})
+        self.missing_values = FrozenDict(missing_values or {})
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
@@ -748,12 +764,15 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     include_special_cased_deps: bool
+    filter_spec: DependencyFilterSpec
 
     def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False,
+        filter_spec: DependencyFilterSpec | None = None
     ) -> None:
         self.roots = tuple(roots)
         self.include_special_cased_deps = include_special_cased_deps
+        self.filter_spec = filter_spec
 
 
 @frozen_after_init

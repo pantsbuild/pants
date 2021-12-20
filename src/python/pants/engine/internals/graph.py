@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Sequence, cast
+from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -51,6 +51,7 @@ from pants.engine.target import (
     DependenciesRequest,
     DependenciesResult,
     DependencyEdgeMetadata,
+    DependencyFilterSpec,
     ExplicitlyProvidedDependencies,
     Field,
     FieldSet,
@@ -360,6 +361,33 @@ class _DependencyMapping:
     roots_as_targets: Collection[Target]
 
 
+def _apply_metadata_filter(
+    metadata: DependencyEdgeMetadata, label_filter: Mapping[str, str]
+) -> bool:
+    for filter_key, filter_value in label_filter:
+        if filter_key not in metadata.labels:
+            return False
+        if metadata.labels[filter_value] != filter_value:
+            return False
+    return True
+
+
+def _filter_dependencies_result(
+    dep_result: DependenciesResult, filter_spec: DependencyFilterSpec
+) -> Addresses:
+    addresses: list[Address] = []
+    for address in dep_result.addresses:
+        for filter_key, filter_values in filter_spec.label_filters:
+            actual_value = dep_result.metadata.get(filter_key)
+            if not actual_value:
+                actual_value = filter_spec.missing_values.get(filter_key, "")
+            if actual_value not in filter_values:
+                continue
+        addresses.append(address)
+
+    return Addresses(addresses)
+
+
 @rule
 async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _DependencyMapping:
     """This uses iteration, rather than recursion, so that we can tolerate dependency cycles.
@@ -372,28 +400,47 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
+        dependencies_results = await MultiGet(
+            Get(
+                DependenciesResult,
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                ),
+            )
+            for tgt in queued
+        )
+
+        # Apply any filters from the ultimate requestor.
+        all_addresses: tuple[Addresses, ...]
+        if request.tt_request.filter_spec:
+            addresses_list = []
+            for dep_result in dependencies_results:
+                addresses_list.append(
+                    _filter_dependencies_result(dep_result, request.tt_request.filter_spec)
+                )
+            all_addresses = tuple(addresses_list)
+        else:
+            all_addresses = tuple(r.addresses for r in dependencies_results)
+
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(
                 Get(
                     Targets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
-                    ),
+                    Addresses,
+                    addresses,
                 )
-                for tgt in queued
+                for addresses in all_addresses
             )
         else:
             direct_dependencies = await MultiGet(
                 Get(
                     UnexpandedTargets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
-                    ),
+                    Addresses,
+                    addresses,
                 )
-                for tgt in queued
+                for addresses in all_addresses
             )
 
         dependency_mapping.update(
