@@ -128,7 +128,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     # TODO(#12314): Figure out how to model the default and disabling lockfile, e.g. if we
     #  hardcode to `default` or let the user set it.
     help = (
-        "The resolve from `[python].experimental_resolves_to_lockfiles` to use, if any.\n\n"
+        "The resolve from `[python].experimental_resolves` to use, if any.\n\n"
         "This field is highly experimental and may change without the normal deprecation policy."
     )
 
@@ -136,10 +136,10 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         """Check that the resolve name is recognized."""
         if not self.value:
             return None
-        if self.value not in python_setup.resolves_to_lockfiles:
+        if self.value not in python_setup.resolves:
             raise UnrecognizedResolveNamesError(
                 [self.value],
-                python_setup.resolves_to_lockfiles.keys(),
+                python_setup.resolves.keys(),
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
 
@@ -149,11 +149,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         Error if the resolve name is invalid.
         """
         self.validate(python_setup)
-        return (
-            (self.value, python_setup.resolves_to_lockfiles[self.value])
-            if self.value is not None
-            else None
-        )
+        return (self.value, python_setup.resolves[self.value]) if self.value is not None else None
 
 
 # -----------------------------------------------------------------------------------------------

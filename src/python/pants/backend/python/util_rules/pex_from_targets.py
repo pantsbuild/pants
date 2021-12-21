@@ -430,8 +430,7 @@ async def get_repository_pex(
             requirements=Lockfile(
                 file_path=lockfile,
                 file_path_description_of_origin=(
-                    f"the resolve `{resolve}` (from "
-                    "`[python].experimental_resolves_to_lockfiles`)"
+                    f"the resolve `{resolve}` (from `[python].experimental_resolves`)"
                 ),
                 # TODO(#12314): Hook up lockfile staleness check.
                 lockfile_hex_digest=None,

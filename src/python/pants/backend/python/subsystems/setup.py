@@ -126,7 +126,7 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--experimental-resolves-to-lockfiles",
+            "--experimental-resolves",
             advanced=True,
             type=dict,
             help=(
@@ -272,8 +272,8 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.experimental_lockfile)
 
     @property
-    def resolves_to_lockfiles(self) -> dict[str, str]:
-        return cast("dict[str, str]", self.options.experimental_resolves_to_lockfiles)
+    def resolves(self) -> dict[str, str]:
+        return cast("dict[str, str]", self.options.experimental_resolves)
 
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
