@@ -214,7 +214,7 @@ async def build_docker_image(
             global_options.options.colors,
         )
         if maybe_msg:
-            logger.info(maybe_msg)
+            logger.warning(maybe_msg)
 
         raise ProcessExecutionFailure(
             result.exit_code,

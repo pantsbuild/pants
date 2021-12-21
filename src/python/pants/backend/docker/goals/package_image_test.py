@@ -613,7 +613,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
                 "src.project/binary.pex",
                 "src/project/app.py",
             ),
-            [(logging.INFO, "Docker build failed for `docker_image` docker/test:test.")],
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
             [
                 "suggested renames:\n\n  * src/project/bin.pex => src.project/binary.pex\n\n",
                 "There are additional files",
