@@ -25,6 +25,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
+from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.coursier_fetch import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -385,4 +386,7 @@ def filter_tool_lockfile_requests(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *coursier_fetch.rules(),
+    ]
