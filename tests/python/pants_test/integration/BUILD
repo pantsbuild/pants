@@ -33,8 +33,6 @@ python_tests(
 
 python_tests(name="prelude_integration", sources=["prelude_integration_test.py"], timeout=180)
 
-python_tests(name="log_output_integration", sources=["log_output_integration_test.py"], timeout=180)
-
 python_tests(
     name="remote_cache_integration",
     sources=["remote_cache_integration_test.py"],

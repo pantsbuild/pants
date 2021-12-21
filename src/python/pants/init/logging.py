@@ -99,7 +99,9 @@ def stdio_destination_use_color(use_color: bool) -> None:
 
 
 @contextmanager
-def _python_logging_setup(level: LogLevel, *, print_stacktrace: bool) -> Iterator[None]:
+def _python_logging_setup(
+    level: LogLevel, log_levels_by_target: dict[str, LogLevel], *, print_stacktrace: bool
+) -> Iterator[None]:
     """Installs a root Python logger that routes all logging through a Rust logger."""
 
     def trace_fn(self, message, *args, **kwargs):
@@ -129,6 +131,9 @@ def _python_logging_setup(level: LogLevel, *, print_stacktrace: bool) -> Iterato
         handler.setFormatter(exc_formatter)
         logger.addHandler(handler)
         level.set_level_for(logger)
+
+        for key, level in log_levels_by_target.items():
+            level.set_level_for(logging.getLogger(key))
 
         if logger.isEnabledFor(LogLevel.TRACE.level):
             http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
@@ -213,7 +218,9 @@ def initialize_stdio_raw(
 
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
         # Install a Python logger that will route through the Rust logger.
-        with _python_logging_setup(global_level, print_stacktrace=print_stacktrace):
+        with _python_logging_setup(
+            global_level, log_levels_by_target, print_stacktrace=print_stacktrace
+        ):
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
