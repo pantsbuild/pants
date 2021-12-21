@@ -178,19 +178,19 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
 def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/a/BUILD": dedent(
+            "src/upstream/BUILD": dedent(
                 """\
                 docker_image(
-                  name="image_a",
-                  repository="test/{name}",
-                  instructions=["FROM scratch"],
+                  name="image",
+                  repository="upstream/{name}",
+                  instructions=["FROM alpine"],
                 )
                 """
             ),
-            "src/b/BUILD": "docker_image(name='image_b')",
-            "src/b/Dockerfile": dedent(
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
                 """\
-                ARG BASE_IMAGE=src/a:image_a
+                ARG BASE_IMAGE=src/upstream:image
                 FROM $BASE_IMAGE
                 """
             ),
@@ -199,14 +199,14 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
 
     assert_build_context(
         rule_runner,
-        Address("src/b", target_name="image_b"),
-        expected_files=["src/b/Dockerfile"],
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile"],
         build_upstream_images=True,
         expected_version_context={
             "baseimage": {"tag": "latest"},
             "stage0": {"tag": "latest"},
             "build_args": {
-                "BASE_IMAGE": "test/image_a:latest",
+                "BASE_IMAGE": "upstream/image:latest",
             },
         },
     )
