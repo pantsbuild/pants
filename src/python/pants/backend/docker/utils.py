@@ -150,28 +150,9 @@ def suggest_renames(
         yield "", path
 
 
-def format_rename_suggestion(
-    src_path: str, dst_path: str, *, colors: bool, atomic: bool = True
-) -> str:
+def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> str:
     """Given two paths, formats a line showing what to change in `src_path` to get to `dst_path`."""
     color = MaybeColor(colors)
-    if atomic:
-        rem = color.maybe_red(src_path)
-        add = color.maybe_green(dst_path)
-        return f"{rem} => {add}"
-
-    matcher = difflib.SequenceMatcher(None, src_path, dst_path)
-    parts = []
-    op_codes = matcher.get_opcodes()
-    if len(op_codes) / (len(src_path) + len(dst_path)) > 0.2:
-        # If there are too many instructions it's just clutter and hard to read, simply drop them
-        # for a single replace all.
-        op_codes = [("replace", 0, len(src_path), 0, len(dst_path))]
-    for tag, i1, i2, j1, j2 in op_codes:
-        if tag == "equal":
-            parts.append(dst_path[j1:j2])
-        elif tag in ["replace", "delete", "insert"]:
-            rem = color.maybe_red(src_path[i1:i2])
-            add = color.maybe_green(dst_path[j1:j2])
-            parts.append(f"{{{rem} => {add}}}")
-    return "".join(parts)
+    rem = color.maybe_red(src_path)
+    add = color.maybe_green(dst_path)
+    return f"{rem} => {add}"

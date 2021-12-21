@@ -149,28 +149,22 @@ def test_suggest_renames(
 
 
 @pytest.mark.parametrize(
-    "src, dst, expected",
+    "src, dst",
     [
         (
             "src/project/cmd.pex",
             "src.project/cmd.pex",
-            "src{/ => .}project/cmd.pex",
         ),
         (
             "srcs/projcet/cmd",
             "src/project/cmd.pex",
-            "{srcs/projcet/cmd => src/project/cmd.pex}",
         ),
         (
             "src/bar-foo/file",
             "src/foo-bar/file",
-            "src/{ => foo-}bar{-foo => }/file",
         ),
     ],
 )
-def test_format_rename_suggestion(src: str, dst: str, expected: str) -> None:
-    actual = format_rename_suggestion(src, dst, colors=False, atomic=False)
-    assert actual == expected
-
-    actual = format_rename_suggestion(src, dst, colors=False, atomic=True)
+def test_format_rename_suggestion(src: str, dst: str) -> None:
+    actual = format_rename_suggestion(src, dst, colors=False)
     assert actual == f"{src} => {dst}"

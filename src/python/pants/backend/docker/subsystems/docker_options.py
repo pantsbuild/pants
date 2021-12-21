@@ -128,20 +128,6 @@ class DockerOptions(Subsystem):
             ),
         )
 
-        register(
-            "--build-context-suggest-renames-atomic",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "How to present suggested renames for files in the Docker build context, in case "
-                "of build failure.\n\nBy default, in 'atomic' mode, it shows the full before and "
-                "after file names:\n\n    file/name/in/source => file/name/in/context\n\nOtherwise "
-                "it shows each file with embedded replacements:\n\n    file/name/in/{source => "
-                "context}\n\n"
-            ),
-        )
-
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
@@ -157,10 +143,6 @@ class DockerOptions(Subsystem):
     @property
     def default_repository(self) -> str:
         return cast(str, self.options.default_repository)
-
-    @property
-    def suggest_renames_atomic(self) -> bool:
-        return cast(bool, self.options.build_context_suggest_renames_atomic)
 
     @memoized_method
     def registries(self) -> DockerRegistries:
