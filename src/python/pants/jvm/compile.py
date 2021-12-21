@@ -273,6 +273,7 @@ class FallibleClasspathEntry(EngineAwareReturnType):
 
         exit_code = process_result.exit_code
         # TODO: Coursier renders this line on macOS.
+        #   see https://github.com/pantsbuild/pants/issues/13942.
         stderr = "\n".join(
             line
             for line in prep_output(process_result.stderr).splitlines()
