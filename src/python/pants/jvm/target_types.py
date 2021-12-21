@@ -102,6 +102,7 @@ class JvmArtifactUrlField(StringField):
 class JvmArtifactJarSourceField(SingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
+    expected_num_files = range(0, 2)
     required = False
     help = (
         "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
