@@ -38,9 +38,6 @@ from pants.testutil.rule_runner import (
     logging,
 )
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -66,9 +63,7 @@ def rule_runner() -> RuleRunner:
             JvmArtifactTarget,
         ],
     )
-    rule_runner.set_options(
-        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -77,9 +72,7 @@ def rule_runner() -> RuleRunner:
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
+            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}"
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -121,7 +114,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     )
 
     mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
-    root_node = mapping.mapping_roots["test"]
+    root_node = mapping.mapping_roots["jvm-default"]
 
     # Handy trie traversal function to placate mypy
     def traverse(*children) -> FrozenTrieNode:
@@ -206,11 +199,7 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        [
-            "--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
+        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
@@ -255,8 +244,6 @@ def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None
     rule_runner.set_options(
         [
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -336,8 +323,6 @@ def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> Non
     rule_runner.set_options(
         [
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -405,8 +390,6 @@ def test_third_party_dep_inference_with_incorrect_provides(rule_runner: RuleRunn
     rule_runner.set_options(
         [
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

@@ -29,7 +29,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
 
 class ScalatestToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = Scalatest.options_scope
+    resolve_name = Scalatest.options_scope
 
 
 @rule(desc="Run Scalatest", level=LogLevel.DEBUG)

@@ -39,9 +39,6 @@ from pants.jvm.testutil import (
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -63,13 +60,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
     )
-    rule_runner.set_options(
-        args=[
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -111,9 +102,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
@@ -163,9 +152,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -210,9 +197,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
         }
     )
     request = CompileScalaSourceRequest(
@@ -261,7 +246,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": resolved_joda_lockfile.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_json().decode(),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -309,9 +294,7 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode("utf-8"),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -358,9 +341,7 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -414,7 +395,7 @@ def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(
                 entries=(
                     CoursierLockfileEntry(
                         coord=Coordinate(
@@ -455,10 +436,8 @@ def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         args=[
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
             "--scalac-plugins-global=lib:acyclic",
-            "--scalac-plugins-lockfile=coursier_resolve.lockfile",
+            "--scalac-plugins-global-lockfile=3rdparty/jvm/default.lock",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

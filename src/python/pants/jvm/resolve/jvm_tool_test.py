@@ -41,7 +41,7 @@ class MockJvmTool(JvmToolBase):
 
 
 class MockJvmToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = MockJvmTool.options_scope
+    resolve_name = MockJvmTool.options_scope
 
 
 @rule
@@ -109,13 +109,13 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
 
 def test_determine_tool_sentinels_to_generate() -> None:
     class Tool1(JvmToolLockfileSentinel):
-        options_scope = "tool1"
+        resolve_name = "tool1"
 
     class Tool2(JvmToolLockfileSentinel):
-        options_scope = "tool2"
+        resolve_name = "tool2"
 
     class Tool3(JvmToolLockfileSentinel):
-        options_scope = "tool3"
+        resolve_name = "tool3"
 
     def assert_chosen(
         requested: list[str],
@@ -124,9 +124,9 @@ def test_determine_tool_sentinels_to_generate() -> None:
         tools = determine_resolves_to_generate([Tool1, Tool2, Tool3], requested)
         assert tools == expected_tools
 
-    assert_chosen([Tool2.options_scope], expected_tools=[Tool2])
+    assert_chosen([Tool2.resolve_name], expected_tools=[Tool2])
     assert_chosen(
-        [Tool1.options_scope, Tool3.options_scope],
+        [Tool1.resolve_name, Tool3.resolve_name],
         expected_tools=[Tool1, Tool3],
     )
 

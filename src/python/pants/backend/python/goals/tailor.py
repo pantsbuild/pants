@@ -99,15 +99,13 @@ async def find_putative_targets(
     pts = []
     for tgt_type, paths in classified_unowned_py_files.items():
         for dirname, filenames in group_by_dir(paths).items():
+            name: str | None
             if issubclass(tgt_type, PythonTestsGeneratorTarget):
                 name = "tests"
-                kwargs = {"name": name}
             elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
                 name = "test_utils"
-                kwargs = {"name": name}
             else:
-                name = os.path.basename(dirname)
-                kwargs = {}
+                name = None
             if (
                 python_setup.tailor_ignore_solitary_init_files
                 and tgt_type == PythonSourcesGeneratorTarget
@@ -116,7 +114,7 @@ async def find_putative_targets(
                 continue
             pts.append(
                 PutativeTarget.for_target_type(
-                    tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
+                    tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
                 )
             )
 
@@ -192,7 +190,7 @@ async def find_putative_targets(
                     path=path,
                     name=name,
                     triggering_sources=tuple(),
-                    kwargs={"name": name, "entry_point": fname},
+                    kwargs={"entry_point": fname},
                 )
             )
 

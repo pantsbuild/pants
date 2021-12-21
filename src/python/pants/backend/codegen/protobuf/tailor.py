@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
@@ -36,7 +35,7 @@ async def find_putative_targets(
         PutativeTarget.for_target_type(
             ProtobufSourcesGeneratorTarget,
             path=dirname,
-            name=os.path.basename(dirname),
+            name=None,
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_proto_files).items()
