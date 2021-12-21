@@ -7,9 +7,10 @@ import logging
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
 from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
@@ -49,6 +50,7 @@ async def compile_scala_source(
     coursier: Coursier,
     jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
+    scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
     union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
@@ -167,6 +169,7 @@ async def compile_scala_source(
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
                 *scalac_plugins.args(scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
+                *scalac.args,
                 "-d",
                 output_file,
                 *sorted(

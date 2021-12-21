@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import cast
 
+from pants.backend.java.subsystems.javac import JavacSubsystem
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.target import InvalidFieldException, Target
 from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
 from pants.option.subsystem import Subsystem
@@ -17,6 +19,19 @@ class JvmSubsystem(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        register(
+            "--jdk",
+            default="adopt:1.11",
+            advanced=True,
+            help=(
+                "The JDK to use.\n\n"
+                " This string will be passed directly to Coursier's `--jvm` parameter."
+                " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
+                " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
+                " instead, but note that this can lead to inconsistent behavior since the JVM version"
+                " will be whatever happens to be found first on the system's PATH."
+            ),
+        )
         register(
             "--resolves",
             type=dict,
@@ -33,6 +48,17 @@ class JvmSubsystem(Subsystem):
                 "The name must be defined as a resolve in `[jvm].resolves`.",
             ),
         )
+
+    def jdk(self, javac_subsystem: JavacSubsystem) -> str:
+        jdk = resolve_conflicting_options(
+            old_option="jdk",
+            new_option="jdk",
+            old_scope=javac_subsystem.options_scope,
+            new_scope=self.options_scope,
+            old_container=javac_subsystem.options,
+            new_container=self.options,
+        )
+        return cast(str, jdk)
 
     @property
     def resolves(self) -> dict[str, str]:
