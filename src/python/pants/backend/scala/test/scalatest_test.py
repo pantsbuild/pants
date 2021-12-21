@@ -34,9 +34,6 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 
 # TODO(12812): Switch tests to using parsed scalatest.xml results instead of scanning stdout strings.
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -66,13 +63,7 @@ def rule_runner() -> RuleRunner:
             ScalatestTestsGeneratorTarget,
         ],
     )
-    rule_runner.set_options(
-        args=[
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -81,7 +72,7 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest = rule_runner.request(Scalatest, [])
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": scalatest.resolved_lockfile().to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": scalatest.resolved_lockfile().to_json().decode("utf-8"),
             "BUILD": dedent(
                 """\
                 jvm_artifact(

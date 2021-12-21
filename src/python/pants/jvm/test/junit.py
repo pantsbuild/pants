@@ -29,7 +29,7 @@ class JunitTestFieldSet(TestFieldSet):
 
 
 class JunitToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = JUnit.options_scope
+    resolve_name = JUnit.options_scope
 
 
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)

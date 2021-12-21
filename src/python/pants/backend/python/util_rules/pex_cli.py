@@ -37,9 +37,9 @@ class PexBinary(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.56"
+    default_version = "v2.1.59"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.51,<3.0"
+    version_constraints = ">=2.1.59,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -48,8 +48,8 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "aff02e2ef0212db4531354e9b7b0d5f61745b3eb49665bc11142f0b603a27db9",
-                    "3688610",
+                    "1770d818cecffff7b9f69858c09b2b11819596f537de35b4d329726aad7e8359",
+                    "3693940",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]

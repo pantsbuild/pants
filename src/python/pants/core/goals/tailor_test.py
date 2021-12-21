@@ -102,11 +102,10 @@ async def find_fortran_targets(
     pts = []
     for tgt_type, paths in classified_unowned_shell_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == FortranTestsTarget else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == FortranTestsTarget else {}
+            name = "tests" if tgt_type == FortranTestsTarget else None
             pts.append(
                 PutativeTarget.for_target_type(
-                    tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
+                    tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
                 )
             )
     return PutativeTargets(pts)
@@ -126,7 +125,13 @@ class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
 
 @rule
 def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) -> PutativeTargets:
-    return PutativeTargets([PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])])
+    return PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                FortranModule, path="dir", name=None, triggering_sources=[]
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -163,10 +168,10 @@ def test_make_content_str() -> None:
         [
             PutativeTarget.for_target_type(
                 FortranTestsTarget,
-                "path/to",
-                "tests",
-                ["test1.f90", "test2.f90"],
-                kwargs={"name": "tests", "sources": ("test1.f90", "test2.f90")},
+                path="path/to",
+                name="tests",
+                triggering_sources=["test1.f90", "test2.f90"],
+                kwargs={"sources": ("test1.f90", "test2.f90")},
             )
         ],
     )
@@ -212,7 +217,6 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
                     "fortran_library",
                     ["bar3.f90"],
                     FortranLibrarySources.default,
-                    kwargs={"name": "foo1"},
                 )
             ]
         )
@@ -234,7 +238,6 @@ def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
                     "fortran_library",
                     ["foo.f90"],
                     FortranLibrarySources.default,
-                    kwargs={"name": "root"},
                 )
             ]
         )
@@ -257,7 +260,6 @@ def test_root_macros_dont_get_named(rule_runner: RuleRunner) -> None:
                     [],
                     [],
                     addressable=False,
-                    kwargs={},
                 )
             ]
         )
@@ -305,14 +307,14 @@ def test_edit_build_files(rule_runner: RuleRunner, name: str) -> None:
                     "src/fortran/foo",
                     "tests",
                     ["bar1_test.f90"],
-                    kwargs={"name": "tests", "life_the_universe_and_everything": 42},
+                    kwargs={"life_the_universe_and_everything": 42},
                 ),
                 PutativeTarget.for_target_type(
                     FortranLibraryTarget,
                     "src/fortran/foo",
                     "foo0",
                     ["bar2.f90", "bar3.f90"],
-                    kwargs={"name": "foo0", "sources": ("bar2.f90", "bar3.f90")},
+                    kwargs={"sources": ("bar2.f90", "bar3.f90")},
                     comments=["# A comment spread", "# over multiple lines."],
                 ),
                 PutativeTarget.for_target_type(
@@ -605,7 +607,7 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]
     )
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(AssertionError) as excinfo:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
     expected_msg = (
         "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
