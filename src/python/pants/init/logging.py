@@ -240,11 +240,11 @@ def _get_log_levels_by_target(
     for key, value in raw_levels.items():
         if not isinstance(key, str):
             raise ValueError(
-                f"Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
+                "Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
             )
         if not isinstance(value, str):
             raise ValueError(
-                f"Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
+                "Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
             )
         log_level = LogLevel[value.upper()]
         levels[key] = log_level
