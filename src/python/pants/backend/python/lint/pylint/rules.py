@@ -14,7 +14,13 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    VenvPexRequest,
+)
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -131,12 +137,18 @@ async def pylint_lint_partition(
     pylint_runner_pex, config_files = await MultiGet(
         Get(
             VenvPex,
-            PexRequest(
-                output_filename="pylint_runner.pex",
-                interpreter_constraints=partition.interpreter_constraints,
-                main=pylint.main,
-                internal_only=True,
-                pex_path=[pylint_pex, requirements_pex],
+            VenvPexRequest(
+                PexRequest(
+                    output_filename="pylint_runner.pex",
+                    interpreter_constraints=partition.interpreter_constraints,
+                    main=pylint.main,
+                    internal_only=True,
+                    pex_path=[pylint_pex, requirements_pex],
+                ),
+                # TODO(John Sirois): Remove this (change to the default of symlinks) when we can
+                #  upgrade to a version of Pylint with https://github.com/PyCQA/pylint/issues/1470
+                #  resolved.
+                site_packages_copies=True,
             ),
         ),
         Get(
