@@ -151,9 +151,9 @@ pytest-metadata==1.11.0; python_version >= "3.6" and python_full_version < "3.0.
 pytest==6.2.5; python_version >= "3.6" \
     --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134 \
     --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89
-setuptools==60.0.2; python_version >= "3.7" \
-    --hash=sha256:451fc25d0d428b69d28e7e519228eafc4e9bd827c2836f961747fe8ad97936f7 \
-    --hash=sha256:e2b6b147ffc384f3722b567f678379c70b96ac4f195f30490035115b5fe63e2f
+setuptools==60.0.3; python_version >= "3.7" \
+    --hash=sha256:032e5949c02878c405552fb800743aad96940097460bc6f115340402852dcdde \
+    --hash=sha256:989ab2d3e632ba23358b8d43950bd46babde5bbb1516760dc5f5ccfe7accdd45
 toml==0.10.2; python_version > "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version > "3.6" \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
