@@ -228,8 +228,8 @@ class DockerImageTarget(Target):
         "By default, will use a Dockerfile from the same directory as the BUILD file this target "
         "is defined in. Point at another file with the `source` field, or use the `instructions` "
         "field to have the Dockerfile contents verbatim directly in the BUILD file.\n\n"
-        "Dependencies on upstream (or base) images defined by another `docker_image` are infered "
-        "if referenced by a build argument with a default value of the target address.\n\n"
+        "Dependencies on upstream/base images defined by another `docker_image` are infered if "
+        "referenced by a build argument with a default value of the target address.\n\n"
         + dedent(
             """\
             Example:
