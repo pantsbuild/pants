@@ -275,18 +275,20 @@ async def create_docker_build_context(
         or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
     )
 
-    images_str = (
-        ", ".join(
+    if request.build_upstream_images:
+        images_str = ", ".join(
             a.tags[0] for p in embedded_pkgs for a in p.artifacts if isinstance(a, BuiltDockerImage)
         )
-        or "<None>"
-    )
-    logger.debug(f"Built upstream Docker images: {images_str}")
+        if images_str:
+            logger.debug(f"Built upstream Docker images: {images_str}")
+        else:
+            logger.debug("Did not build any upstream Docker images")
 
-    packages_str = (
-        ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath) or "<None>"
-    )
-    logger.debug(f"Packages for Docker image: {packages_str}")
+    packages_str = ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath)
+    if packages_str:
+        logger.debug(f"Built packages for Docker image: {packages_str}")
+    else:
+        logger.debug("Did not build any packages for Docker image")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)

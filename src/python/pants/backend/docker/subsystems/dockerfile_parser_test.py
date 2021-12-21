@@ -110,18 +110,18 @@ def test_build_args(rule_runner: RuleRunner) -> None:
 def test_from_image_build_arg_names(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "test/a/BUILD": """docker_image(name="image")""",
-            "test/a/Dockerfile": "FROM upstream",
-            "test/b/BUILD": """docker_image(name="image")""",
-            "test/b/Dockerfile": dedent(
+            "test/upstream/BUILD": "docker_image(name='image')",
+            "test/upstream/Dockerfile": "FROM upstream",
+            "test/downstream/BUILD": "docker_image(name='image')",
+            "test/downstream/Dockerfile": dedent(
                 """\
-                ARG BASE_IMAGE=test/a:image
+                ARG BASE_IMAGE=test/upstream:image
                 FROM ${BASE_IMAGE} AS base
                 """
             ),
         }
     )
-    addr = Address("test/b", target_name="image")
+    addr = Address("test/downstream", target_name="image")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
     assert info.from_image_build_arg_names == ("BASE_IMAGE",)
 
