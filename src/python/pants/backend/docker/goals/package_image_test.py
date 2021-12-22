@@ -11,6 +11,7 @@ from typing import Callable
 import pytest
 
 from pants.backend.docker.goals.package_image import (
+    DockerBuildTargetStageError,
     DockerFieldSet,
     DockerImageTagValueError,
     DockerRepositoryNameError,
@@ -79,6 +80,7 @@ def assert_build(
     exit_code: int = 0,
     copy_sources: tuple[str, ...] = (),
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
+    version_tags: tuple[str, ...] = (),
 ) -> None:
     tgt = rule_runner.get_target(address)
 
@@ -90,6 +92,7 @@ def assert_build(
                 digest=EMPTY_DIGEST,
                 source=os.path.join(address.spec_path, "Dockerfile"),
                 copy_sources=copy_sources,
+                version_tags=version_tags,
             ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
             build_env=rule_runner.request(
@@ -117,6 +120,7 @@ def assert_build(
         opts.setdefault("registries", {})
         opts.setdefault("default_repository", "{directory}/{name}")
         opts.setdefault("build_args", [])
+        opts.setdefault("build_target_stage", None)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -680,4 +684,70 @@ def test_build_target_stage(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("", target_name="image"),
         process_assertions=check_docker_proc,
+        version_tags=("build latest", "dev latest", "prod latest"),
     )
+
+
+def test_docker_build_target_stage(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "docker_image(name='image', target_stage='dev')",
+            "Dockerfile": dedent(
+                """\
+                FROM base as build
+                FROM build as dev
+                FROM build as prod
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--target",
+            "prod",
+            "--tag",
+            "image:latest",
+            "--file",
+            "Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("", target_name="image"),
+        options={
+            "build_target_stage": "prod",
+            "default_repository": "{name}",
+        },
+        process_assertions=check_docker_proc,
+        version_tags=("build latest", "dev latest", "prod latest"),
+    )
+
+
+def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "docker_image(name='image', target_stage='bad')",
+            "Dockerfile": dedent(
+                """\
+                FROM base as build
+                FROM build as dev
+                FROM build as prod
+                """
+            ),
+        }
+    )
+
+    err = (
+        r"Attempt to build stage 'bad' for `docker_image` //:image, but there is no such stage in "
+        r"`Dockerfile`\. Available stages: build, dev, prod\."
+    )
+    with pytest.raises(DockerBuildTargetStageError, match=err):
+        assert_build(
+            rule_runner,
+            Address("", target_name="image"),
+            version_tags=("build latest", "dev latest", "prod latest"),
+        )

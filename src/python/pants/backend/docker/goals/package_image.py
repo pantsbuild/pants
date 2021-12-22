@@ -49,6 +49,10 @@ class DockerRepositoryNameError(ValueError):
     pass
 
 
+class DockerBuildTargetStageError(ValueError):
+    pass
+
+
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
@@ -57,6 +61,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     repository: DockerRepositoryField
     source: DockerImageSourceField
     tags: DockerImageTagsField
+    target_stage: DockerImageTargetStageField
 
     def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
         try:
@@ -155,13 +160,35 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
 
-def get_build_options(target: Target) -> Iterator[str]:
+def get_build_options(
+    build_target_stage: str | None,
+    context: DockerBuildContext,
+    field_set: DockerFieldSet,
+    target: Target,
+) -> Iterator[str]:
+    # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
             yield from target[field_type].options()
 
-    target_stage = target.get(DockerImageTargetStageField).value
+    # Target stage
+    target_stage = None
+    if build_target_stage in context.stages:
+        target_stage = build_target_stage
+    elif field_set.target_stage.value:
+        target_stage = field_set.target_stage.value
+
     if target_stage:
+        if target_stage not in context.stages:
+            raise DockerBuildTargetStageError(
+                f"Attempt to build stage {target_stage!r} for `{target.alias}` {field_set.address}"
+                + (
+                    f", but there is no such stage in `{context.dockerfile}`. "
+                    f"Available stages: {', '.join(context.stages)}."
+                    if context.stages
+                    else f", but there are no named stages in `{context.dockerfile}`."
+                )
+            )
         yield from ("--target", target_stage)
 
 
@@ -196,7 +223,14 @@ async def build_docker_image(
         dockerfile=context.dockerfile,
         env=context.build_env.environment,
         tags=tags,
-        extra_args=tuple(get_build_options(wrapped_target.target)),
+        extra_args=tuple(
+            get_build_options(
+                build_target_stage=options.build_target_stage,
+                context=context,
+                field_set=field_set,
+                target=wrapped_target.target,
+            )
+        ),
     )
     result = await Get(FallibleProcessResult, Process, process)
 

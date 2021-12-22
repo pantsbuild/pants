@@ -168,6 +168,7 @@ class DockerBuildContext:
     dockerfile: str
     version_context: DockerVersionContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
+    stages: tuple[str, ...]
 
     @classmethod
     def create(
@@ -179,8 +180,12 @@ class DockerBuildContext:
     ) -> DockerBuildContext:
         version_context: dict[str, dict[str, str] | DockerVersionContextValue] = {}
 
-        # FROM tags for all stages.
-        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
+        # Go over all FROM tags and names for all stages.
+        stage_names: set[str] = set()
+        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        for idx, (stage, tag) in enumerate(stage_tags):
+            if stage != f"stage{idx}":
+                stage_names.add(stage)
             value = {"tag": tag}
             if not version_context:
                 # Expose the first (stage0) FROM directive as the "baseimage".
@@ -243,6 +248,7 @@ class DockerBuildContext:
                     actual_dirs=snapshot.dirs,
                 )
             ),
+            stages=tuple(sorted(stage_names)),
         )
 
 
