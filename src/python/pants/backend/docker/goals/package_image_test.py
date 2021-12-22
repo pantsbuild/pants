@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os.path
 from textwrap import dedent
 from typing import Callable
 
@@ -87,7 +88,7 @@ def assert_build(
             dockerfile_info=DockerfileInfo(
                 request.address,
                 digest=EMPTY_DIGEST,
-                source="docker/test/Dockerfile",
+                source=os.path.join(address.spec_path, "Dockerfile"),
                 copy_sources=copy_sources,
             ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
@@ -646,3 +647,37 @@ def test_docker_build_fail_logs(
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
         assert msg in caplog.records[0].message
+
+
+def test_build_target_stage(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "docker_image(name='image', target_stage='dev')",
+            "Dockerfile": dedent(
+                """\
+                FROM base as build
+                FROM build as dev
+                FROM build as prod
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--target",
+            "dev",
+            "--tag",
+            "image:latest",
+            "--file",
+            "Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("", target_name="image"),
+        process_assertions=check_docker_proc,
+    )

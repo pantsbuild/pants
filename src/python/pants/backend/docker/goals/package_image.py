@@ -17,6 +17,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
     DockerImageSourceField,
     DockerImageTagsField,
+    DockerImageTargetStageField,
     DockerRegistriesField,
     DockerRepositoryField,
 )
@@ -158,6 +159,10 @@ def get_build_options(target: Target) -> Iterator[str]:
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
             yield from target[field_type].options()
+
+    target_stage = target.get(DockerImageTargetStageField).value
+    if target_stage:
+        yield from ("--target", target_stage)
 
 
 @rule
