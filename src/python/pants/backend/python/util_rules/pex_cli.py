@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import os
 from dataclasses import dataclass
@@ -59,12 +61,14 @@ class PexBinary(TemplatedExternalTool):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexCliProcess:
-    argv: Tuple[str, ...]
+    subcommand: tuple[str, ...]
+    extra_args: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
     additional_input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
+    set_resolve_args: bool
     python: Optional[PythonExecutable]
     level: LogLevel
     cache_scope: ProcessCacheScope
@@ -72,29 +76,33 @@ class PexCliProcess:
     def __init__(
         self,
         *,
-        argv: Iterable[str],
+        subcommand: Iterable[str],
+        extra_args: Iterable[str],
         description: str,
         additional_input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
+        set_resolve_args: bool = True,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
-        self.argv = tuple(argv)
+        self.subcommand = tuple(subcommand)
+        self.extra_args = tuple(extra_args)
         self.description = description
         self.additional_input_digest = additional_input_digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
+        self.set_resolve_args = set_resolve_args
         self.python = python
         self.level = level
         self.cache_scope = cache_scope
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if "--pex-root-path" in self.argv:
+        if "--pex-root-path" in self.extra_args:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
 
 
@@ -121,10 +129,10 @@ async def setup_pex_cli_process(
 ) -> Process:
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
-    cert_args = []
 
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
     # Instead we manually create a FileContent for it.
+    cert_args = []
     if global_options.options.ca_certs_path:
         ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
         chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
@@ -143,11 +151,7 @@ async def setup_pex_cli_process(
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
-    argv = [
-        pex_binary.exe,
-        *cert_args,
-        "--python-path",
-        create_path_env_var(pex_env.interpreter_search_paths),
+    global_args = [
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
@@ -161,17 +165,32 @@ async def setup_pex_cli_process(
         tmpdir,
     ]
     if pex_runtime_env.verbosity > 0:
-        argv.append(f"-{'v' * pex_runtime_env.verbosity}")
+        global_args.append(f"-{'v' * pex_runtime_env.verbosity}")
 
+    resolve_args = (
+        [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
+        if request.set_resolve_args
+        else []
+    )
     # NB: This comes at the end of the argv because the request may use `--` passthrough args,
     # which must come at the end.
+    args = [
+        *global_args,
+        *request.subcommand,
+        *resolve_args,
+        # NB: This comes at the end because it may use `--` passthrough args, # which must come at
+        # the end.
+        *request.extra_args,
+    ]
+
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    argv.extend(request.argv)
-    normalized_argv = complete_pex_env.create_argv(*argv, python=request.python)
+    normalized_argv = complete_pex_env.create_argv(pex_binary.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
+        # If a subcommand is used, we need to use the `pex3` console script.
+        **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
 
     return Process(
