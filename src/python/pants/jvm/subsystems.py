@@ -48,6 +48,13 @@ class JvmSubsystem(Subsystem):
                 "The name must be defined as a resolve in `[jvm].resolves`.",
             ),
         )
+        register(
+            "--debug-args",
+            type=list,
+            member_type=str,
+            default=["-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"],
+            help="The JVM arguments to use when running tests in debug mode.",
+        )
 
     def jdk(self, javac_subsystem: JavacSubsystem) -> str:
         jdk = resolve_conflicting_options(
@@ -62,11 +69,15 @@ class JvmSubsystem(Subsystem):
 
     @property
     def resolves(self) -> dict[str, str]:
-        return cast("dict[str, str]", self.options.resolves)
+        return cast("dict[str, str]", dict(self.options.resolves))
 
     @property
     def default_resolve(self) -> str:
         return cast(str, self.options.default_resolve)
+
+    @property
+    def debug_args(self) -> tuple[str, ...]:
+        return cast("tuple[str, ...]", tuple(self.options.debug_args))
 
     def resolves_for_target(self, target: Target) -> tuple[str, ...]:
         if target.has_field(JvmResolveField):

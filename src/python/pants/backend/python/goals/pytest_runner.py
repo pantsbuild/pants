@@ -323,7 +323,8 @@ async def setup_pytest_for_target(
 
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
-    field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
+    field_set: PythonTestFieldSet,
+    test_subsystem: TestSubsystem,
 ) -> TestResult:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
