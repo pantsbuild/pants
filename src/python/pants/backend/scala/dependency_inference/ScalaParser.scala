@@ -1,9 +1,7 @@
-/**
- * TODO: The dependencies of this class are defined in two places:
- *   1. `3rdparty/jvm` via import inference.
- *   2. `SCALA_PARSER_ARTIFACT_REQUIREMENTS`.
- * See https://github.com/pantsbuild/pants/issues/13754.
- */
+/** TODO: The dependencies of this class are defined in two places:
+  *   1. `3rdparty/jvm` via import inference. 2. `SCALA_PARSER_ARTIFACT_REQUIREMENTS`. See
+  *      https://github.com/pantsbuild/pants/issues/13754.
+  */
 package org.pantsbuild.backend.scala.dependency_inference
 
 import io.circe._
@@ -17,21 +15,21 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
 case class AnImport(
-   // The partially qualified input name for the import, which must be in scope at
-   // the import site.
-   name: String,
-   // An optional single token alias for the import in this scope.
-   alias: Option[String],
-   // True if the import imports all symbols contained within the name.
-   isWildcard: Boolean,
+    // The partially qualified input name for the import, which must be in scope at
+    // the import site.
+    name: String,
+    // An optional single token alias for the import in this scope.
+    alias: Option[String],
+    // True if the import imports all symbols contained within the name.
+    isWildcard: Boolean
 )
 
 case class Analysis(
-   providedSymbols: Vector[String],
-   providedSymbolsEncoded: Vector[String],
-   importsByScope: HashMap[String, ArrayBuffer[AnImport]],
-   consumedSymbolsByScope: HashMap[String, HashSet[String]],
-   scopes: Vector[String],
+    providedSymbols: Vector[String],
+    providedSymbolsEncoded: Vector[String],
+    importsByScope: HashMap[String, ArrayBuffer[AnImport]],
+    consumedSymbolsByScope: HashMap[String, HashSet[String]],
+    scopes: Vector[String]
 )
 
 case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
@@ -48,13 +46,13 @@ class SourceAnalysisTraverser extends Traverser {
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
     tree match {
-      case Term.Select(qual, name) => s"${extractName(qual)}.${extractName(name)}"
-      case Type.Select(qual, name) => s"${extractName(qual)}.${extractName(name)}"
-      case Term.Name(name) => name
-      case Type.Name(name) => name
-      case Pat.Var(node) => extractName(node)
+      case Term.Select(qual, name)  => s"${extractName(qual)}.${extractName(name)}"
+      case Type.Select(qual, name)  => s"${extractName(qual)}.${extractName(name)}"
+      case Term.Name(name)          => name
+      case Type.Name(name)          => name
+      case Pat.Var(node)            => extractName(node)
       case Name.Indeterminate(name) => name
-      case _ => ""
+      case _                        => ""
     }
   }
 
@@ -65,36 +63,45 @@ class SourceAnalysisTraverser extends Traverser {
         val qualName = extractName(qual)
         Vector(s"${qualName}.${name}")
       }
-      case Type.Apply(tpe, args) => extractNamesFromTypeTree(tpe) ++ args.toVector.flatMap(extractNamesFromTypeTree(_))
-      case Type.ApplyInfix(lhs, _op, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.Apply(tpe, args) =>
+        extractNamesFromTypeTree(tpe) ++ args.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.ApplyInfix(lhs, _op, rhs) =>
+        extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       case Type.Function(params, res) =>
         params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
       case Type.PolyFunction(_tparams, tpe) => extractNamesFromTypeTree(tpe)
       case Type.ContextFunction(params, res) =>
         params.toVector.flatMap(extractNamesFromTypeTree(_)) ++ extractNamesFromTypeTree(res)
-      case Type.Tuple(args) => args.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.Tuple(args)    => args.toVector.flatMap(extractNamesFromTypeTree(_))
       case Type.With(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
-      case Type.And(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
-      case Type.Or(lhs, rhs) => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.And(lhs, rhs)  => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
+      case Type.Or(lhs, rhs)   => extractNamesFromTypeTree(lhs) ++ extractNamesFromTypeTree(rhs)
       // TODO: Recurse into `_stats` to find additional types.
       // A `Type.Refine` represents syntax: A { def f: Int }
-      case Type.Refine(typeOpt, _stats) => typeOpt.toVector.flatMap(extractNamesFromTypeTree(_))
+      case Type.Refine(typeOpt, _stats)  => typeOpt.toVector.flatMap(extractNamesFromTypeTree(_))
       case Type.Existential(tpe, _stats) => extractNamesFromTypeTree(tpe)
-      case Type.Annotate(tpe, _annots) => extractNamesFromTypeTree(tpe)
-      case Type.Lambda(_tparams, tpe) => extractNamesFromTypeTree(tpe)
+      case Type.Annotate(tpe, _annots)   => extractNamesFromTypeTree(tpe)
+      case Type.Lambda(_tparams, tpe)    => extractNamesFromTypeTree(tpe)
       case Type.Bounds(loOpt, hiOpt) =>
-        loOpt.toVector.flatMap(extractNamesFromTypeTree(_)) ++ hiOpt.toVector.flatMap(extractNamesFromTypeTree(_))
-      case Type.ByName(tpe) => extractNamesFromTypeTree(tpe)
+        loOpt.toVector.flatMap(extractNamesFromTypeTree(_)) ++ hiOpt.toVector.flatMap(
+          extractNamesFromTypeTree(_)
+        )
+      case Type.ByName(tpe)   => extractNamesFromTypeTree(tpe)
       case Type.Repeated(tpe) => extractNamesFromTypeTree(tpe)
       // TODO: Should we extract a type from _tpe?
       // `Type.Match` represents this Scala 3 syntax: type T = match { case A => B }
       case Type.Match(_tpe, cases) => cases.toVector.flatMap(extractNamesFromTypeTree(_))
       case TypeCase(pat, body) => extractNamesFromTypeTree(pat) ++ extractNamesFromTypeTree(body)
-      case _ => Vector()
+      case _                   => Vector()
     }
   }
 
-  def recordProvidedName(symbolName: String, sawClass: Boolean = false, sawTrait: Boolean = false, sawObject: Boolean = false): Unit = {
+  def recordProvidedName(
+      symbolName: String,
+      sawClass: Boolean = false,
+      sawTrait: Boolean = false,
+      sawObject: Boolean = false
+  ): Unit = {
     if (!skipProvidedNames) {
       val fullPackageName = nameParts.mkString(".")
       if (!providedSymbolsByScope.contains(fullPackageName)) {
@@ -107,7 +114,7 @@ class SourceAnalysisTraverser extends Traverser {
         val newSymbol = ProvidedSymbol(
           sawClass = existingSymbol.sawClass || sawClass,
           sawTrait = existingSymbol.sawTrait || sawTrait,
-          sawObject = existingSymbol.sawObject || sawObject,
+          sawObject = existingSymbol.sawObject || sawObject
         )
         providedSymbols(symbolName) = newSymbol
       } else {
@@ -157,16 +164,19 @@ class SourceAnalysisTraverser extends Traverser {
 
   def visitTemplate(templ: Template, name: String): Unit = {
     templ.inits.foreach(init => apply(init))
-    withNamePart(name, () => {
-      apply(templ.early)
-      apply(templ.stats)
-    })
+    withNamePart(
+      name,
+      () => {
+        apply(templ.early)
+        apply(templ.stats)
+      }
+    )
   }
 
   def visitMods(mods: List[Mod]): Unit = {
     mods.foreach({
-      case Mod.Annot(init) => apply(init)  // rely on `Init` extraction in main parsing match code
-      case _ => ()
+      case Mod.Annot(init) => apply(init) // rely on `Init` extraction in main parsing match code
+      case _               => ()
     })
   }
 
@@ -265,7 +275,7 @@ class SourceAnalysisTraverser extends Traverser {
               recordImport(
                 s"${baseName}.${extractName(nameNode)}",
                 if (alias == "_") None else Some(alias),
-                false,
+                false
               )
             }
             case _ =>
@@ -314,25 +324,31 @@ class SourceAnalysisTraverser extends Traverser {
   }
 
   def gatherProvidedSymbols(): Vector[String] = {
-    providedSymbolsByScope.flatMap({ case (scopeName, symbolsForScope) =>
-      symbolsForScope.keys.map(symbolName => s"${scopeName}.${symbolName}").toVector
-    }).toVector
+    providedSymbolsByScope
+      .flatMap({ case (scopeName, symbolsForScope) =>
+        symbolsForScope.keys.map(symbolName => s"${scopeName}.${symbolName}").toVector
+      })
+      .toVector
   }
 
   def gatherEncodedProvidedSymbols(): Vector[String] = {
-    providedSymbolsByScope.flatMap({ case (scopeName, symbolsForScope) =>
-      val encodedSymbolsForScope = symbolsForScope.flatMap({ case (symbolName, symbol) => {
-        val encodedSymbolName = NameTransformer.encode(symbolName)
-        val result = ArrayBuffer[String](encodedSymbolName)
-        if (symbol.sawObject) {
-          result.append(encodedSymbolName + "$")
-          result.append(encodedSymbolName + "$.MODULE$")
-        }
-        result.toVector
-      }})
+    providedSymbolsByScope
+      .flatMap({ case (scopeName, symbolsForScope) =>
+        val encodedSymbolsForScope = symbolsForScope.flatMap({
+          case (symbolName, symbol) => {
+            val encodedSymbolName = NameTransformer.encode(symbolName)
+            val result = ArrayBuffer[String](encodedSymbolName)
+            if (symbol.sawObject) {
+              result.append(encodedSymbolName + "$")
+              result.append(encodedSymbolName + "$.MODULE$")
+            }
+            result.toVector
+          }
+        })
 
-      encodedSymbolsForScope.map(symbolName => s"${scopeName}.${symbolName}")
-    }).toVector
+        encodedSymbolsForScope.map(symbolName => s"${scopeName}.${symbolName}")
+      })
+      .toVector
   }
 
   def toAnalysis: Analysis = {
@@ -341,7 +357,7 @@ class SourceAnalysisTraverser extends Traverser {
       providedSymbolsEncoded = gatherEncodedProvidedSymbols(),
       importsByScope = importsByScope,
       consumedSymbolsByScope = consumedSymbolsByScope,
-      scopes = scopes.toVector,
+      scopes = scopes.toVector
     )
   }
 }
@@ -365,7 +381,11 @@ object ScalaParser {
     val analysis = analyze(args(1))
 
     val json = analysis.asJson.noSpaces
-    java.nio.file.Files.write(outputPath, json.getBytes(),
-      java.nio.file.StandardOpenOption.CREATE_NEW, java.nio.file.StandardOpenOption.WRITE)
+    java.nio.file.Files.write(
+      outputPath,
+      json.getBytes(),
+      java.nio.file.StandardOpenOption.CREATE_NEW,
+      java.nio.file.StandardOpenOption.WRITE
+    )
   }
 }
