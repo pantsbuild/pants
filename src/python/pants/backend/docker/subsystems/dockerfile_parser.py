@@ -127,6 +127,7 @@ class DockerfileInfo:
     version_tags: tuple[str, ...] = ()
     build_args: DockerBuildArgs = DockerBuildArgs()
     from_image_build_arg_names: tuple[str, ...] = ()
+    copy_sources: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -161,14 +162,21 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
         ProcessResult,
         DockerfileParseRequest(
             sources.snapshot.digest,
-            ("version-tags,putative-targets,build-args,from-image-build-args", dockerfile),
+            (
+                "version-tags,putative-targets,build-args,from-image-build-args,copy-sources",
+                dockerfile,
+            ),
         ),
     )
 
     output = result.stdout.decode("utf-8").strip().split("\n")
-    version_tags, putative_targets, build_args, from_image_build_arg_names = split_iterable(
-        "---", output
-    )
+    (
+        version_tags,
+        putative_targets,
+        build_args,
+        from_image_build_arg_names,
+        copy_sources,
+    ) = split_iterable("---", output)
 
     try:
         return DockerfileInfo(
@@ -179,6 +187,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
             version_tags=version_tags,
             build_args=DockerBuildArgs.from_strings(*build_args, duplicates_must_match=True),
             from_image_build_arg_names=from_image_build_arg_names,
+            copy_sources=copy_sources,
         )
     except ValueError as e:
         raise DockerfileInfoError(

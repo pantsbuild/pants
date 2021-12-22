@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from textwrap import dedent
 from typing import Callable
 
@@ -36,11 +37,18 @@ from pants.backend.docker.util_rules.docker_build_env import (
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult, ProcessResultMetadata
+from pants.engine.process import (
+    FallibleProcessResult,
+    Process,
+    ProcessExecutionFailure,
+    ProcessResultMetadata,
+)
 from pants.engine.target import WrappedTarget
+from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -52,6 +60,7 @@ def rule_runner() -> RuleRunner:
             *rules(),
             *build_args_rules(),
             *build_env_rules(),
+            QueryRule(GlobalOptions, []),
             QueryRule(DockerOptions, []),
             QueryRule(DockerBuildArgs, [DockerBuildArgsRequest]),
             QueryRule(DockerBuildEnvironment, [DockerBuildEnvironmentRequest]),
@@ -66,14 +75,20 @@ def assert_build(
     *extra_log_lines: str,
     options: dict | None = None,
     process_assertions: Callable[[Process], None] | None = None,
+    exit_code: int = 0,
+    copy_sources: tuple[str, ...] = (),
+    build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
 ) -> None:
     tgt = rule_runner.get_target(address)
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
-            digest=EMPTY_DIGEST,
+            snapshot=build_context_snapshot,
             dockerfile_info=DockerfileInfo(
-                request.address, digest=EMPTY_DIGEST, source="docker/test/Dockerfile"
+                request.address,
+                digest=EMPTY_DIGEST,
+                source="docker/test/Dockerfile",
+                copy_sources=copy_sources,
             ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
             build_env=rule_runner.request(
@@ -81,11 +96,12 @@ def assert_build(
             ),
         )
 
-    def run_process_mock(process: Process) -> ProcessResult:
+    def run_process_mock(process: Process) -> FallibleProcessResult:
         if process_assertions:
             process_assertions(process)
 
-        return ProcessResult(
+        return FallibleProcessResult(
+            exit_code=exit_code,
             stdout=b"stdout",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr=b"stderr",
@@ -109,12 +125,16 @@ def assert_build(
     else:
         docker_options = rule_runner.request(DockerOptions, [])
 
+    global_options = rule_runner.request(GlobalOptions, [])
+
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
             DockerFieldSet.create(tgt),
             docker_options,
+            global_options,
             DockerBinary("/dummy/docker"),
+            ProcessCleanupOption(True),
         ],
         mock_gets=[
             MockGet(
@@ -128,7 +148,7 @@ def assert_build(
                 mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
-                output_type=ProcessResult,
+                output_type=FallibleProcessResult,
                 input_type=Process,
                 mock=run_process_mock,
             ),
@@ -582,3 +602,47 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="img1"),
         process_assertions=check_docker_proc,
     )
+
+
+@pytest.mark.parametrize(
+    "copy_sources, build_context_files, expect_logged, fail_log_contains",
+    [
+        (
+            ("src/project/bin.pex",),
+            (
+                "src.project/binary.pex",
+                "src/project/app.py",
+            ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
+            [
+                "suggested renames:\n\n  * src/project/bin.pex => src.project/binary.pex\n\n",
+                "There are additional files",
+                "  * src/project/app.py\n\n",
+            ],
+        ),
+    ],
+)
+def test_docker_build_fail_logs(
+    rule_runner: RuleRunner,
+    caplog,
+    copy_sources: tuple[str, ...],
+    build_context_files: tuple[str, ...],
+    expect_logged: list[tuple[int, str]] | None,
+    fail_log_contains: list[str],
+) -> None:
+    caplog.set_level(logging.INFO)
+    rule_runner.write_files({"docker/test/BUILD": "docker_image()"})
+    build_context_files = ("docker/test/Dockerfile", *build_context_files)
+    build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
+    with pytest.raises(ProcessExecutionFailure):
+        assert_build(
+            rule_runner,
+            Address("docker/test"),
+            exit_code=1,
+            copy_sources=copy_sources,
+            build_context_snapshot=build_context_snapshot,
+        )
+
+    assert_logged(caplog, expect_logged)
+    for msg in fail_log_contains:
+        assert msg in caplog.records[0].message

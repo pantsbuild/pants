@@ -6,6 +6,7 @@ from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, repl, tailor
 from pants.backend.scala.target_types import (
+    ScalacPluginTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
     ScalaSourcesGeneratorTarget,
@@ -31,6 +32,7 @@ def target_types():
         ScalaJunitTestsGeneratorTarget,
         ScalaSourceTarget,
         ScalaSourcesGeneratorTarget,
+        ScalacPluginTarget,
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
     ]

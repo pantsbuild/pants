@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 import sys
 from dataclasses import dataclass
+from itertools import chain
 from typing import Iterator
 
 #
@@ -157,6 +158,10 @@ def main(cmd: str, args: list[str]) -> None:
                 if build_arg:
                     yield build_arg.group(1)
 
+        def copy_source_references(self) -> tuple[str, ...]:
+            """Return all files referenced from the build context using COPY instruction."""
+            return tuple(chain(*(cmd.value[:-1] for cmd in self.get_all("COPY"))))
+
     for parsed in map(ParsedDockerfile.from_file, args):
         if cmd == "putative-targets":
             for addr in parsed.putative_target_addresses():
@@ -170,6 +175,9 @@ def main(cmd: str, args: list[str]) -> None:
         elif cmd == "from-image-build-args":
             for build_arg in parsed.from_image_build_args():
                 print(build_arg)
+        elif cmd == "copy-sources":
+            for src in parsed.copy_source_references():
+                print(src)
 
 
 if __name__ == "__main__":

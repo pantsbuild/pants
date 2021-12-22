@@ -148,3 +148,24 @@ def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
     )
     with pytest.raises(ExecutionError, match=err_msg):
         rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+
+
+def test_copy_source_references(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": dedent(
+                """\
+                FROM base
+                COPY a b /
+                COPY --option c/d e/f/g /h
+                ADD ignored
+                COPY j k /
+                COPY
+                """
+            ),
+        }
+    )
+
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
+    assert info.copy_sources == ("a", "b", "c/d", "e/f/g", "j", "k")
