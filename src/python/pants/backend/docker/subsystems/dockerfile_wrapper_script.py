@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 import sys
 from dataclasses import dataclass
+from itertools import chain
 from typing import Generator
 
 #
@@ -116,6 +117,10 @@ def main(cmd: str, args: list[str]) -> None:
             """Return all defined build args, including any default values."""
             return tuple(cmd.original[4:].strip() for cmd in self.get_all("ARG"))
 
+        def copy_source_references(self) -> tuple[str, ...]:
+            """Return all files referenced from the build context using COPY instruction."""
+            return tuple(chain(*(cmd.value[:-1] for cmd in self.get_all("COPY"))))
+
     for parsed in map(ParsedDockerfile.from_file, args):
         if cmd == "putative-targets":
             for addr in parsed.putative_target_addresses():
@@ -126,6 +131,9 @@ def main(cmd: str, args: list[str]) -> None:
         elif cmd == "build-args":
             for arg in parsed.build_args():
                 print(arg)
+        elif cmd == "copy-sources":
+            for src in parsed.copy_source_references():
+                print(src)
 
 
 if __name__ == "__main__":
