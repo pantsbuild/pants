@@ -17,7 +17,6 @@ from types import CoroutineType, GeneratorType
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import deprecated
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -399,24 +398,6 @@ class RuleRunner:
         self._invalidate_for(relpath)
         return path
 
-    @deprecated(
-        "2.10.0.dev0",
-        (
-            "Use `RuleRunner.write_files({<relpath>: <contents>}) instead of "
-            "`RuleRunner.create_file(<relpath>, <contents>)`"
-        ),
-    )
-    def create_file(
-        self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
-    ) -> str:
-        """Writes to a file under the buildroot.
-
-        relpath: The relative path to the file from the build root.
-        contents: A string containing the contents of the file - '' by default..
-        mode: The mode to write to the file in - over-write by default.
-        """
-        return self._create_file(relpath, contents, mode)
-
     def _create_file(
         self, relpath: str | PurePath, contents: bytes | str = "", mode: str = "w"
     ) -> str:
@@ -431,45 +412,6 @@ class RuleRunner:
             fp.write(contents)
         self._invalidate_for(str(relpath))
         return path
-
-    @deprecated(
-        "2.10.0.dev0",
-        (
-            'Use `RuleRunner.write_files({"path/to/file": "file contents"})` instead of '
-            '`RuleRunner.create_files("path/to", ["file"])`.\n'
-            "This allows creating all files with specific content in one call."
-        ),
-    )
-    def create_files(self, path: str | PurePath, files: Iterable[str]) -> None:
-        """Writes to a file under the buildroot with contents same as file name.
-
-        path: The relative path to the file from the build root.
-        files: List of file names.
-        """
-        for f in files:
-            self._create_file(os.path.join(path, f), contents=f)
-
-    @deprecated(
-        "2.10.0.dev0",
-        (
-            'Use `RuleRunner.write_files({"<relpath>/BUILD": <contents>})` instead of '
-            "`RuleRunner.add_to_build_file(<relpath>, <contents>)`."
-        ),
-    )
-    def add_to_build_file(
-        self, relpath: str | PurePath, target: str, *, overwrite: bool = False
-    ) -> str:
-        """Adds the given target specification to the BUILD file at relpath.
-
-        relpath: The relative path to the BUILD file from the build root.
-        target:  A string containing the target definition as it would appear in a BUILD file.
-        overwrite:  Whether to overwrite vs. append to the BUILD file.
-        """
-        build_path = (
-            relpath if PurePath(relpath).name.startswith("BUILD") else PurePath(relpath, "BUILD")
-        )
-        mode = "w" if overwrite else "a"
-        return self._create_file(str(build_path), target, mode=mode)
 
     def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
         """Write the files to the build root.
