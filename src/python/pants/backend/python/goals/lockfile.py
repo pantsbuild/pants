@@ -269,6 +269,9 @@ class _UserLockfileRequests(Collection[PythonLockfileRequest]):
 async def setup_user_lockfile_requests(
     requested: _SpecifiedUserResolves, all_targets: AllTargets, python_setup: PythonSetup
 ) -> _UserLockfileRequests:
+    if not python_setup.enable_resolves:
+        return _UserLockfileRequests()
+
     # First, associate all resolves with their consumers.
     resolves_to_roots = defaultdict(list)
     for tgt in all_targets:
