@@ -63,12 +63,12 @@ class PexBinary(TemplatedExternalTool):
 class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
+    set_resolve_args: bool
     description: str = dataclasses.field(compare=False)
     additional_input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
-    set_resolve_args: bool
     python: Optional[PythonExecutable]
     level: LogLevel
     cache_scope: ProcessCacheScope
@@ -79,23 +79,23 @@ class PexCliProcess:
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
+        set_resolve_args: bool = True,
         additional_input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
-        set_resolve_args: bool = True,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.subcommand = tuple(subcommand)
         self.extra_args = tuple(extra_args)
+        self.set_resolve_args = set_resolve_args
         self.description = description
         self.additional_input_digest = additional_input_digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
-        self.set_resolve_args = set_resolve_args
         self.python = python
         self.level = level
         self.cache_scope = cache_scope
@@ -172,8 +172,6 @@ async def setup_pex_cli_process(
         if request.set_resolve_args
         else []
     )
-    # NB: This comes at the end of the argv because the request may use `--` passthrough args,
-    # which must come at the end.
     args = [
         *global_args,
         *request.subcommand,
