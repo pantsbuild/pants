@@ -109,8 +109,33 @@ def assert_build_context(
             expected_version_context["build_args"] = DockerVersionContextBuildArgsValue(
                 expected_version_context["build_args"]
             )
+
+        if "PANTS" not in expected_version_context:
+            expected_version_context["PANTS"] = context.version_context["PANTS"]
+
         assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
     return context
+
+
+def test_pants_hash(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": "FROM base",
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("test"),
+        expected_files=["test/Dockerfile"],
+        expected_version_context={
+            "baseimage": {"tag": "latest"},
+            "stage0": {"tag": "latest"},
+            "build_args": {},
+            "PANTS": {"HASH": "5945249394980428683"},
+        },
+    )
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:

@@ -226,6 +226,12 @@ class DockerBuildContext:
             version_context.get("build_args", {})
         )
 
+        # Data from Pants.
+        version_context["PANTS"] = {
+            # Present hash for all inputs that can be used for image tagging.
+            "HASH": str(hash((build_args, build_env, snapshot.digest))).replace("-", "0"),
+        }
+
         return cls(
             build_args=build_args,
             digest=snapshot.digest,
