@@ -14,6 +14,7 @@ from pants.engine.fs import (
     DigestContents,
     Directory,
     FileContent,
+    Snapshot,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
@@ -21,6 +22,7 @@ from pants.engine.process import (
     BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
+    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
     ProcessResult,
@@ -35,6 +37,7 @@ def new_rule_runner() -> RuleRunner:
             QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
+            QueryRule(InteractiveProcess, [InteractiveProcessRequest]),
         ],
     )
 
@@ -266,6 +269,26 @@ def test_interactive_process_cannot_have_append_only_caches_and_workspace() -> N
         InteractiveProcess(
             argv=["/bin/echo"], append_only_caches={"foo": "bar"}, run_in_workspace=True
         )
+
+
+def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) -> None:
+    digest0 = rule_runner.request(Digest, [CreateDigest([FileContent("file0", b"")])])
+    digest1 = rule_runner.request(Digest, [CreateDigest([FileContent("file1", b"")])])
+    digest2 = rule_runner.request(
+        Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
+    )
+    process = Process(
+        argv=["foo", "bar"],
+        description="dummy",
+        env={"BAZ": "QUX"},
+        input_digest=digest0,
+        immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
+    )
+    iproc = rule_runner.request(InteractiveProcess, [InteractiveProcessRequest(process)])
+    assert iproc.argv == process.argv
+    assert iproc.env == process.env
+    snapshot = rule_runner.request(Snapshot, [iproc.input_digest])
+    assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")
 
 
 def test_find_binary_non_existent(rule_runner: RuleRunner, tmp_path: Path) -> None:
