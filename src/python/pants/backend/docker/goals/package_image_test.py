@@ -604,6 +604,39 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  ssh=["default"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--ssh=default",
+            "-t",
+            "img1:latest",
+            "-f",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
 @pytest.mark.parametrize(
     "copy_sources, build_context_files, expect_logged, fail_log_contains",
     [

@@ -8,7 +8,7 @@ import re
 import shlex
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import ClassVar, Iterator
+from typing import ClassVar, Iterator, cast
 
 from typing_extensions import final
 
@@ -206,6 +206,25 @@ class DockerBuildSecretsOptionField(
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
+class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
+    alias = "ssh"
+    default = ()
+    help = (
+        "SSH agent socket or keys to expose to the build (only if BuildKit enabled) "
+        "(format: default|<id>[=<socket>|<key>[,<key>]])\n\n"
+        "The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in "
+        "your `RUN` instructions:\n\n"
+        "    RUN --mount=type=ssh ...\n\n"
+        "See [Docker documentation](https://docs.docker.com/develop/develop-images"
+        "/build_enhancements/#using-ssh-to-access-private-data-in-builds) for more information."
+    )
+
+    docker_build_option = "--ssh"
+
+    def option_values(self) -> Iterator[str]:
+        yield from cast("tuple[str]", self.value)
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -218,6 +237,7 @@ class DockerImageTarget(Target):
         DockerRegistriesField,
         DockerRepositoryField,
         DockerBuildSecretsOptionField,
+        DockerBuildSSHOptionField,
         DockerSkipPushField,
         RestartableField,
     )
