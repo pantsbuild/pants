@@ -215,10 +215,10 @@ class DockerBuildContext:
                 raise DockerBuildContextError(
                     f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
                     "\n\nIf you did not intend to inherit the value for this build arg from the "
-                    "environment, provide a default value where it is defined either in "
-                    "`[docker].build_args` or in the `extra_build_args` field on the target "
-                    "definition. Alternatively, you may also provide a default value on the `ARG` "
-                    "instruction in the `Dockerfile`."
+                    "environment, provide a default value with the option `[docker].build_args` "
+                    "or in the `extra_build_args` field on the target definition. Alternatively, "
+                    "you may also provide a default value on the `ARG` instruction directly in "
+                    "the `Dockerfile`."
                 ) from e
 
         # Override default value type for the `build_args` context to get helpful error messages.

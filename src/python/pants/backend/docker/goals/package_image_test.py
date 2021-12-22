@@ -408,9 +408,9 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "-t",
+            "--tag",
             "env1:1.2.3",
-            "-f",
+            "--file",
             "docker/test/Dockerfile",
             ".",
         )
@@ -444,13 +444,13 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "-t",
+            "--tag",
             "args1:1.2.3",
             "--build-arg",
             "INHERIT",
             "--build-arg",
             "VAR=value",
-            "-f",
+            "--file",
             "docker/test/Dockerfile",
             ".",
         )
@@ -537,7 +537,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "-t",
+            "--tag",
             "img1:latest",
             "--build-arg",
             "DEFAULT1=global1",
@@ -547,7 +547,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
             "FROM_ENV",
             "--build-arg",
             "SET=value",
-            "-f",
+            "--file",
             "docker/test/Dockerfile",
             ".",
         )
@@ -590,9 +590,9 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             "--secret=id=system-secret,src=/var/run/secrets/mysecret",
             f"--secret=id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
             f"--secret=id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
-            "-t",
+            "--tag",
             "img1:latest",
-            "-f",
+            "--file",
             "docker/test/Dockerfile",
             ".",
         )
