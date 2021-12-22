@@ -242,5 +242,5 @@ master = "src/python/pants/notes/master.rst"
 "2.8.x" = "src/python/pants/notes/2.8.x.md"
 "2.9.x" = "src/python/pants/notes/2.9.x.md"
 
-[python-repos]
-indexes.add = ["https://test.pypi.org/simple/"]
+#[python-repos]
+#indexes.add = ["https://test.pypi.org/simple/"]
