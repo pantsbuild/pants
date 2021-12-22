@@ -8,6 +8,7 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import ClassVar, Mapping
 
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
@@ -25,7 +26,7 @@ from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -284,11 +285,23 @@ async def create_docker_build_context(
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if request.build_upstream_images
-        or not isinstance(getattr(field_set, "sources", None), DockerImageSourceField)
+        or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
     )
 
+    if request.build_upstream_images:
+        images_str = ", ".join(
+            a.tags[0] for p in embedded_pkgs for a in p.artifacts if isinstance(a, BuiltDockerImage)
+        )
+        if images_str:
+            logger.debug(f"Built upstream Docker images: {images_str}")
+        else:
+            logger.debug("Did not build any upstream Docker images")
+
     packages_str = ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath)
-    logger.debug(f"Packages for Docker image: {packages_str}")
+    if packages_str:
+        logger.debug(f"Built packages for Docker image: {packages_str}")
+    else:
+        logger.debug("Did not build any packages for Docker image")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
@@ -302,6 +315,38 @@ async def create_docker_build_context(
     context, build_args, build_env = await MultiGet(
         context_request, build_args_request, build_env_request
     )
+
+    if request.build_upstream_images:
+        # Update build arg values for FROM image build args.
+
+        # Get the FROM image build args with defined values in the Dockerfile.
+        dockerfile_build_args = {
+            arg_name: arg_value
+            for arg_name, arg_value in dockerfile_info.build_args.to_dict().items()
+            if arg_value and arg_name in dockerfile_info.from_image_build_arg_names
+        }
+        # Parse the build args values into Address instances.
+        from_image_addresses = await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                dockerfile_build_args.values(),
+                owning_address=dockerfile_info.address,
+            ),
+        )
+        # Map those addresses to the corresponding built image ref (tag).
+        address_to_built_image_tag = {
+            field_set.address: image.tags[0]
+            for field_set, built in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)
+            for image in built.artifacts
+            if isinstance(image, BuiltDockerImage)
+        }
+        # Create the FROM image build args.
+        from_image_build_args = [
+            f"{arg_name}={address_to_built_image_tag[addr]}"
+            for arg_name, addr in zip(dockerfile_build_args.keys(), from_image_addresses)
+        ]
+        # Merge all build args.
+        build_args = DockerBuildArgs.from_strings(*build_args, *from_image_build_args)
 
     return DockerBuildContext.create(
         build_args=build_args,
