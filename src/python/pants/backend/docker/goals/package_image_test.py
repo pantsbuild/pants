@@ -628,9 +628,9 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--ssh=default",
-            "-t",
+            "--tag",
             "img1:latest",
-            "-f",
+            "--file",
             "docker/test/Dockerfile",
             ".",
         )
