@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Mapping
 
 from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -22,6 +21,11 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.value_interpolation import (
+    DockerBuildArgsInterpolationValue,
+    DockerInterpolationContext,
+    DockerInterpolationValue,
+)
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
@@ -42,81 +46,12 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
 
 class DockerBuildContextError(Exception):
     pass
-
-
-class DockerVersionContextError(ValueError):
-    @classmethod
-    def attribute_error(
-        cls, context: DockerVersionContextValue, attribute: str
-    ) -> DockerVersionContextError:
-        msg = f"The placeholder {attribute!r} is unknown."
-        if context:
-            msg += f' Try with one of: {", ".join(context.keys())}.'
-        return cls(msg)
-
-
-class DockerVersionContextValue(FrozenDict[str, str]):
-    """Dict class suitable for use as a format string context object, as it allows to use attribute
-    access rather than item access."""
-
-    _attribute_error_type: ClassVar[type[DockerVersionContextError]] = DockerVersionContextError
-
-    @classmethod
-    def create(
-        cls, value: Mapping[str, str] | DockerVersionContextValue
-    ) -> DockerVersionContextValue:
-        """Create new instance of `DockerVersionContextValue` unless `value` already is an instance
-        (or subclass) of `DockerVersionContextValue`, in which case `value` is returned as-is."""
-        if isinstance(value, cls):
-            return value
-        return cls(value)
-
-    def __getattr__(self, attribute: str) -> str:
-        if attribute not in self:
-            raise self._attribute_error_type.attribute_error(self, attribute)
-        return self[attribute]
-
-
-class DockerVersionContextBuildArgError(DockerVersionContextError):
-    @classmethod
-    def attribute_error(
-        cls, context: DockerVersionContextValue, attribute: str
-    ) -> DockerVersionContextError:
-        msg = f"The build arg {attribute!r} is undefined."
-        if context:
-            msg += f' Defined build args are: {", ".join(context.keys())}.'
-        msg += (
-            "\n\nThis build arg may be defined in `pants.toml` under `[docker].build_args`, on the "
-            "command line with `--docker-build-args` or directly on the `docker_image` target "
-            "using the `extra_build_args` field."
-        )
-        return cls(msg)
-
-
-class DockerVersionContextBuildArgsValue(DockerVersionContextValue):
-    """Version context value with specific error handling for build args."""
-
-    _attribute_error_type = DockerVersionContextBuildArgError
-
-
-class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
-    @classmethod
-    def from_dict(
-        cls, data: Mapping[str, Mapping[str, str] | DockerVersionContextValue]
-    ) -> DockerVersionContext:
-        return DockerVersionContext(
-            {key: DockerVersionContextValue.create(value) for key, value in data.items()}
-        )
-
-    def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
-        return DockerVersionContext.from_dict({**self, **other})
 
 
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
@@ -166,7 +101,7 @@ class DockerBuildContext:
     digest: Digest
     build_env: DockerBuildEnvironment
     dockerfile: str
-    version_context: DockerVersionContext
+    interpolation_context: DockerInterpolationContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
 
     @classmethod
@@ -177,15 +112,15 @@ class DockerBuildContext:
         build_env: DockerBuildEnvironment,
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
-        version_context: dict[str, dict[str, str] | DockerVersionContextValue] = {}
+        interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
 
         # FROM tags for all stages.
         for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
             value = {"tag": tag}
-            if not version_context:
+            if not interpolation_context:
                 # Expose the first (stage0) FROM directive as the "baseimage".
-                version_context["baseimage"] = value
-            version_context[stage] = value
+                interpolation_context["baseimage"] = value
+            interpolation_context[stage] = value
 
         if build_args:
             # Extract default arg values from the parsed Dockerfile.
@@ -203,7 +138,7 @@ class DockerBuildContext:
                 # which args are actually being used by Pants. We do pick up any defined default ARG
                 # values from the Dockerfile however, in order to not having to duplicate them in
                 # the BUILD files.
-                version_context["build_args"] = {
+                interpolation_context["build_args"] = {
                     arg_name: arg_value
                     if has_value
                     else build_env.get(arg_name, build_arg_defaults.get(arg_name))
@@ -222,8 +157,8 @@ class DockerBuildContext:
                 ) from e
 
         # Override default value type for the `build_args` context to get helpful error messages.
-        version_context["build_args"] = DockerVersionContextBuildArgsValue(
-            version_context.get("build_args", {})
+        interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
+            interpolation_context.get("build_args", {})
         )
 
         return cls(
@@ -231,7 +166,7 @@ class DockerBuildContext:
             digest=snapshot.digest,
             dockerfile=dockerfile_info.source,
             build_env=build_env,
-            version_context=DockerVersionContext.from_dict(version_context),
+            interpolation_context=DockerInterpolationContext.from_dict(interpolation_context),
             copy_source_vs_context_source=tuple(
                 suggest_renames(
                     tentative_paths=(
