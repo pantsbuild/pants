@@ -157,7 +157,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 
 
 # -----------------------------------------------------------------------------------------------
-# `pex_binary` and `pex_binaries_from_entry_points` target
+# `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -573,7 +573,7 @@ class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
         "The entry points for each binary, i.e. what gets run when when executing `./my_app.pex.`"
         "\n\n"
         "Use a file name, relative to the BUILD file, like `app.py`. You can also set the "
-        "function to run, like `app.py:func`.\n"
+        "function to run, like `app.py:func`.\n\n"
         "Pants will convert these file names into well-formed entry points, like `app.py:func` "
         "into `path.to.app:func.`"
         "\n\n"
@@ -582,7 +582,7 @@ class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
     )
 
 
-class PexBinariesFromEntryPointsOverrideField(OverridesField):
+class PexBinariesOverrideField(OverridesField):
     help = (
         f"Override the field values for generated `{PexBinary.alias}` targets.\n\n"
         "Expects a dictionary mapping values from the `entry_points` field to a dictionary for "
@@ -604,12 +604,12 @@ class PexBinariesFromEntryPointsOverrideField(OverridesField):
     )
 
 
-class PexBinariesFromEntryPointsGeneratorTarget(Target):
-    alias = "pex_binaries_from_entry_points"
+class PexBinariesGeneratorTarget(Target):
+    alias = "pex_binaries"
     core_fields = (
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointsField,
-        PexBinariesFromEntryPointsOverrideField,
+        PexBinariesOverrideField,
     )
     help = (
         "Generate a `pex_binary` target for each entry_point in the `entry_points` field."

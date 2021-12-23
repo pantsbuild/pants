@@ -19,7 +19,7 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
-    PexBinariesFromEntryPointsGeneratorTarget,
+    PexBinariesGeneratorTarget,
     PexBinary,
     PexBinaryDependenciesField,
     PexEntryPointField,
@@ -42,7 +42,7 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
-    GenerateTargetsFromPexBinariesFromEntryPoints,
+    GenerateTargetsFromPexBinaries,
     GenerateTargetsFromPythonSources,
     GenerateTargetsFromPythonTests,
     GenerateTargetsFromPythonTestUtils,
@@ -567,13 +567,13 @@ def test_generate_source_and_test_targets() -> None:
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTests]),
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonSources]),
             QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTestUtils]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromPexBinariesFromEntryPoints]),
+            QueryRule(GeneratedTargets, [GenerateTargetsFromPexBinaries]),
         ],
         target_types=[
             PythonTestsGeneratorTarget,
             PythonSourcesGeneratorTarget,
             PythonTestUtilsGeneratorTarget,
-            PexBinariesFromEntryPointsGeneratorTarget,
+            PexBinariesGeneratorTarget,
         ],
     )
     rule_runner.write_files(
@@ -598,7 +598,7 @@ def test_generate_source_and_test_targets() -> None:
                     overrides={'conftest.py': {'tags': ['overridden']}},
                 )
 
-                pex_binaries_from_entry_points(
+                pex_binaries(
                     name="pexes",
                     entry_points=[
                         "f1.py",
@@ -662,7 +662,7 @@ def test_generate_source_and_test_targets() -> None:
         GeneratedTargets, [GenerateTargetsFromPythonTestUtils(test_utils_generator)]
     )
     pex_binaries_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromPexBinariesFromEntryPoints(pex_binaries_generator)]
+        GeneratedTargets, [GenerateTargetsFromPexBinaries(pex_binaries_generator)]
     )
 
     assert sources_generated == GeneratedTargets(

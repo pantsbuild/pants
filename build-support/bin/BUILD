@@ -16,7 +16,7 @@ python_sources(
 
 python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
 
-pex_binaries_from_entry_points(
+pex_binaries(
     entry_points=[
         "changelog.py",
         "check_banned_imports.py",

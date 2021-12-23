@@ -25,7 +25,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
 from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
-    PexBinariesFromEntryPointsGeneratorTarget,
+    PexBinariesGeneratorTarget,
     PexBinary,
     PythonDistribution,
     PythonRequirementsFile,
@@ -89,7 +89,7 @@ def rules():
 def target_types():
     return [
         PexBinary,
-        PexBinariesFromEntryPointsGeneratorTarget,
+        PexBinariesGeneratorTarget,
         PythonDistribution,
         PythonRequirementsFile,
         PythonRequirementTarget,

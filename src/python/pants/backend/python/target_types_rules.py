@@ -20,7 +20,7 @@ from pants.backend.python.dependency_inference.rules import PythonInferSubsystem
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.target_types import (
     EntryPoint,
-    PexBinariesFromEntryPointsGeneratorTarget,
+    PexBinariesGeneratorTarget,
     PexBinary,
     PexBinaryDependenciesField,
     PexEntryPointField,
@@ -185,13 +185,13 @@ async def generate_targets_from_python_test_utils(
     )
 
 
-class GenerateTargetsFromPexBinariesFromEntryPoints(GenerateTargetsRequest):
-    generate_from = PexBinariesFromEntryPointsGeneratorTarget
+class GenerateTargetsFromPexBinaries(GenerateTargetsRequest):
+    generate_from = PexBinariesGeneratorTarget
 
 
 @rule
-async def generate_targets_from_pex_binaries_from_entry_points(
-    request: GenerateTargetsFromPexBinariesFromEntryPoints,
+async def generate_targets_from_pex_binaries(
+    request: GenerateTargetsFromPexBinaries,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
@@ -538,7 +538,7 @@ def rules():
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinariesFromEntryPoints),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
     )
