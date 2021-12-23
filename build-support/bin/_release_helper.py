@@ -276,7 +276,7 @@ def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
     return (*extra_pip_args, "--quiet", "--no-cache-dir")
 
 
-def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
+def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[str]) -> None:
     def run_venv_pants(args: list[str]) -> str:
         # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
         # backend plugins embedded (but it does have all other backends): to load only the internal
@@ -285,7 +285,7 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
         return (
             subprocess.run(
                 [
-                    venv_dir / "bin/pants",
+                    venv_bin_dir / "pants",
                     "--no-remote-cache-read",
                     "--no-remote-cache-write",
                     "--no-pantsd",
@@ -301,7 +301,7 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
 
     subprocess.run(
         [
-            venv_dir / "bin/pip",
+            venv_bin_dir / "pip",
             "install",
             *_pip_args(extra_pip_args),
             f"pantsbuild.pants=={version}",
@@ -317,27 +317,68 @@ def validate_pants_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) 
     run_venv_pants(["list", "src::"])
 
 
-def validate_testutil_pkg(version: str, venv_dir: Path, extra_pip_args: list[str]) -> None:
-    subprocess.run(
-        [
-            venv_dir / "bin/pip",
-            "install",
-            *_pip_args(extra_pip_args),
-            f"pantsbuild.pants.testutil=={version}",
-        ],
-        check=True,
-    )
-    subprocess.run(
-        [
-            venv_dir / "bin/python",
-            "-c",
-            (
-                "import pants.testutil.option_util, pants.testutil.rule_runner, "
-                "pants.testutil.pants_integration_test"
-            ),
-        ],
-        check=True,
-    )
+@contextmanager
+def install_exercising_namespace_packages(
+    venv_bin_dir: Path, *requirements: str, extra_pip_args: list[str]
+) -> Iterator[str]:
+    """Installs requirements in such a way that the viability of any namespace packages is tested.
+
+    :return: The PYTHONPATH that can be used along with venv_bin_dir / "python" to test the
+        installed packages with.
+    """
+    with TemporaryDirectory() as td:
+        tempdir = Path(td)
+        wheel_dir = tempdir / "wheels"
+        pip = venv_bin_dir / "pip"
+        subprocess.run(
+            [
+                pip,
+                "wheel",
+                *_pip_args(extra_pip_args),
+                "--wheel-dir",
+                wheel_dir,
+                *requirements,
+            ],
+            check=True,
+        )
+        sys_path_entries = []
+        for index, wheel in enumerate(wheel_dir.iterdir()):
+            sys_path_entry = tempdir / f"entry_{index}"
+            subprocess.run(
+                [
+                    pip,
+                    "install",
+                    "--quiet",
+                    "--no-deps",
+                    "--no-index",
+                    "--only-binary",
+                    ":all:",
+                    "--target",
+                    sys_path_entry,
+                    wheel,
+                ],
+                check=True,
+            )
+            sys_path_entries.append(sys_path_entry)
+        yield os.pathsep.join(str(entry) for entry in sys_path_entries)
+
+
+def validate_testutil_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[str]) -> None:
+    with install_exercising_namespace_packages(
+        venv_bin_dir, f"pantsbuild.pants.testutil=={version}", extra_pip_args=extra_pip_args
+    ) as pythonpath:
+        subprocess.run(
+            [
+                venv_bin_dir / "python",
+                "-c",
+                (
+                    "import pants.testutil.option_util, pants.testutil.rule_runner, "
+                    "pants.testutil.pants_integration_test"
+                ),
+            ],
+            env={**os.environ, "PYTHONPATH": pythonpath},
+            check=True,
+        )
 
 
 # Artifacts created within this time range will never be considered to be stale.
@@ -473,27 +514,35 @@ def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
     return not all(wheel.name.endswith("-none-any.whl") for wheel in wheel_paths)
 
 
+def create_venv(venv_dir: Path) -> Path:
+    venv.create(venv_dir, with_pip=True, clear=True, symlinks=True)
+    bin_dir = venv_dir / "bin"
+    subprocess.run(
+        [bin_dir / "pip", "install", "--quiet", "--disable-pip-version-check", "--upgrade", "pip"],
+        check=True,
+    )
+    return bin_dir
+
+
 @contextmanager
 def create_tmp_venv() -> Iterator[Path]:
-    """Create a venv and return the path to it.
+    """Create a venv and return its bin path.
 
-    Note that the venv is not sourced. You should run Path(tempdir, "bin/pip") and Path(tempdir,
-    "bin/python") directly.
+    Note that the venv is not sourced. You should run bin_path / "pip" and bin_path / "python"
+    directly.
     """
     with TemporaryDirectory() as tempdir:
-        venv.create(tempdir, with_pip=True, clear=True, symlinks=True)
-        subprocess.run([Path(tempdir, "bin/pip"), "install", "--quiet", "wheel"], check=True)
-        yield Path(tempdir)
+        bin_dir = create_venv(Path(tempdir))
+        subprocess.run([(bin_dir / "pip"), "install", "--quiet", "wheel"], check=True)
+        yield bin_dir
 
 
 def create_twine_venv() -> None:
     """Create a venv at CONSTANTS.twine_venv_dir and install Twine."""
     if CONSTANTS.twine_venv_dir.exists():
         shutil.rmtree(CONSTANTS.twine_venv_dir)
-    venv.create(CONSTANTS.twine_venv_dir, with_pip=True, clear=True, symlinks=True)
-    subprocess.run(
-        [CONSTANTS.twine_venv_dir / "bin/pip", "install", "--quiet", "twine"], check=True
-    )
+    bin_dir = create_venv(CONSTANTS.twine_venv_dir)
+    subprocess.run([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
 
 
 @contextmanager
@@ -600,7 +649,7 @@ def build_3rdparty_wheels() -> None:
     banner(f"Building 3rdparty wheels with Python {CONSTANTS.python_version}")
     dest = CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version
     pkg_tgts = [pkg.target for pkg in PACKAGES]
-    with create_tmp_venv() as venv_tmpdir:
+    with create_tmp_venv() as bin_dir:
         deps = (
             subprocess.run(
                 [
@@ -654,7 +703,7 @@ def build_3rdparty_wheels() -> None:
             )
         )
         subprocess.run(
-            [str(Path(venv_tmpdir, "bin/pip")), "wheel", f"--wheel-dir={dest}", *reqs],
+            [bin_dir / "pip", "wheel", f"--wheel-dir={dest}", *reqs],
             check=True,
         )
         green(f"Wrote 3rdparty wheels to {dest}")
@@ -1012,11 +1061,11 @@ def test_release() -> None:
 
 
 def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
-    with create_tmp_venv() as venv_tmpdir:
+    with create_tmp_venv() as bin_dir:
         for pkg in PACKAGES:
             pip_req = f"{pkg.name}=={version}"
             banner(f"Installing and testing {pip_req}")
-            pkg.validate(version, venv_tmpdir, extra_pip_args or [])
+            pkg.validate(version, bin_dir, extra_pip_args or [])
             green(f"Tests succeeded for {pip_req}")
 
 
