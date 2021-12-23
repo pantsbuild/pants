@@ -570,8 +570,15 @@ class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
     alias = "entry_points"
     default = None
     help = (
-        # @TODO: Update
-        "..."
+        "The entry points for each binary, i.e. what gets run when when executing `./my_app.pex.`"
+        "\n\n"
+        "Use a file name, relative to the BUILD file, like `app.py`. You can also set the "
+        "function to run, like `app.py:func`.\n"
+        "Pants will convert these file names into well-formed entry points, like `app.py:func` "
+        "into `path.to.app:func.`"
+        "\n\n"
+        "If you want the entry point to be for a third-party dependency or to use a console "
+        "script, use the `pex_binary` target directly."
     )
 
 
@@ -604,7 +611,19 @@ class PexBinariesFromEntryPointsGeneratorTarget(Target):
         PexEntryPointsField,
         PexBinariesFromEntryPointsOverrideField,
     )
-    help = "Generate a `pex_binary` target for each entry_point in the `entry_points` field."
+    help = (
+        "Generate a `pex_binary` target for each entry_point in the `entry_points` field."
+        "\n\n"
+        "This is solely meant to reduce duplication when you have multiple scripts in the same "
+        "directory; it's valid to use a distinct `pex_binary` target for each script/binary "
+        "instead."
+        "\n\n"
+        "This target generator does not work well to generate `pex_binary` targets where the entry "
+        "point is for a third-party dependency. Dependency inference will not work for those, so "
+        "you will have to set lots of custom metadata for each binary; prefer an explicit "
+        "`pex_binary` target in that case. This target generator works best when the entry point "
+        "is a first-party file, like `app.py` or `app.py:main`."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
