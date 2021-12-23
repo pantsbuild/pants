@@ -585,7 +585,7 @@ class PexBinariesFromEntryPointsOverrideField(OverridesField):
         "overrides={\n"
         '  "foo.py": {"execution_mode": "venv"]},\n'
         '  "bar.py:main": {"restartable": True]},\n'
-        '  ("foo.py", "bar:main"): {"tags": ["legacy"]},\n'
+        '  ("foo.py", "bar.py:main"): {"tags": ["legacy"]},\n'
         "}"
         "\n```\n\n"
         "Every key is validated to belong to this target's `entry_points` field.\n\n"
