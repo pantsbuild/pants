@@ -88,6 +88,26 @@ class AwaitableConstraints:
         if len(outer_args) == 0:
             raise parse_error("No parameters Get not supported yet.")
         elif len(outer_args) == 1:
+            params_call_node = outer_args[0]
+            if not isinstance(params_call_node, ast.Call):
+                raise parse_error("Expected Params constructor call for `await Get[OutputType](Params(...))` form.")
+            if not isinstance(params_call_node.func, ast.Name):
+                raise parse_error("Expected Params constructor call for `await Get[OutputType](Params(...))` form.")
+            if params_call_node.func.id != "Params":
+                raise parse_error(f"Expected Params constructor call for `await Get[OutputType](Params(...))` form, got {params_call_node.func.id} instead.")
+            input_types = []
+            for input_arg_node in params_call_node.args:
+                if not isinstance(input_arg_node, ast.Tuple):
+                    raise parse_error("Expected Params constructor call for `await Get[OutputType](Params(...))` form. Each argument must be a tuple.")
+                if len(input_arg_node.elts) != 2:
+                    raise parse_error("Invalid Params constructor call for `await Get[OutputType](Params(...))` form. Each argument must be a tuple of (Type, value).")
+                input_arg_type = input_arg_node.elts[0]
+                if not isinstance(input_arg_type, ast.Name):
+                    raise parse_error("Invalid Params constructor call for `await Get[OutputType](Params(...))` form. First type in each tuple must be a type name.")
+                input_types.append(input_arg_type.id)
+            # Support the new syntax with just one specified type.
+            if len(input_types) == 1:
+                return output_type, input_types[0], is_effect
             raise parse_error("Params multi-input Get not supported yet.")
         elif len(outer_args) == 2:
             input_type = outer_args[0]
@@ -178,9 +198,31 @@ class AwaitableConstraints:
         return repr(self)
 
 
+_Awaitable = TypeVar("_Awaitable")
+
+
+class _AwaitableInitTrampoline(Generic[_Awaitable, _Output, _Input]):
+    awaitable_cls: type[_Awaitable[_Output, _Input]]
+    output_type: type[_Output]
+
+    def __init__(self, awaitable_cls: type[_Awaitable[_Output, _Input]], output_type: type[_Output]) -> None:
+        self.awaitable_cls = awaitable_cls
+        self.output_type = output_type
+
+    def __call__(
+        self,
+        input_arg0: type[_Input] | _Input,
+        input_arg1: _Input | None = None,
+    ) -> _Awaitable[_Output, _Input]:
+        return self.awaitable_cls(self.output_type, input_arg0, input_arg1)
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
+    def __class_getitem__(cls, output_type):
+        return _AwaitableInitTrampoline(cls, output_type)
+
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
         ...
