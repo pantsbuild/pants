@@ -592,9 +592,12 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--secret=id=system-secret,src=/var/run/secrets/mysecret",
-            f"--secret=id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
-            f"--secret=id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
+            "--secret",
+            "id=system-secret,src=/var/run/secrets/mysecret",
+            "--secret",
+            f"id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
+            "--secret",
+            f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
             "--tag",
             "img1:latest",
             "--file",
@@ -627,9 +630,57 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--ssh=default",
+            "--ssh",
+            "default",
             "--tag",
             "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_args=[
+                    "BUILD_SLAVE=tbs06",
+                    "BUILD_NUMBER=13934",
+                  ],
+                  image_labels={
+                    "build.host": "{build_args.BUILD_SLAVE}",
+                    "build.job": "{build_args.BUILD_NUMBER}",
+                  }
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--label",
+            "build.host=tbs06",
+            "--label",
+            "build.job=13934",
+            "--tag",
+            "img1:latest",
+            "--build-arg",
+            "BUILD_NUMBER=13934",
+            "--build-arg",
+            "BUILD_SLAVE=tbs06",
             "--file",
             "docker/test/Dockerfile",
             ".",
