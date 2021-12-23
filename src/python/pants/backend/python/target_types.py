@@ -75,7 +75,6 @@ if TYPE_CHECKING:
 class PythonSourceField(SingleSourceField):
     # Note that Python scripts often have no file ending.
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
-    value: str
 
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
