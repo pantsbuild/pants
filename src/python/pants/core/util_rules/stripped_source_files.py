@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesPaths
@@ -87,6 +88,31 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
         )
 
     return StrippedSourceFiles(resulting_snapshot)
+
+
+@dataclass(frozen=True)
+class StrippedFileName:
+    value: str
+
+
+@dataclass(frozen=True)
+class StrippedFileNameRequest(EngineAwareParameter):
+    file_path: str
+
+    def debug_hint(self) -> str:
+        return self.file_path
+
+
+@rule
+async def strip_file_name(request: StrippedFileNameRequest) -> StrippedFileName:
+    source_root = await Get(
+        SourceRoot, SourceRootRequest, SourceRootRequest.for_file(request.file_path)
+    )
+    return StrippedFileName(
+        request.file_path
+        if source_root.path == "."
+        else fast_relpath(request.file_path, source_root.path)
+    )
 
 
 class StrippedSourceFileNames(Collection[str]):

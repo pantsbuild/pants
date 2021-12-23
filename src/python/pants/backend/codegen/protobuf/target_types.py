@@ -55,6 +55,7 @@ def find_all_protobuf_targets(targets: AllTargets) -> AllProtobufTargets:
 
 class ProtobufSourceField(SingleSourceField):
     expected_file_extensions = (".proto",)
+    value: str
 
 
 class ProtobufSourceTarget(Target):
