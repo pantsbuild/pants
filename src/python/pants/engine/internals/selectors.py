@@ -56,12 +56,59 @@ class AwaitableConstraints:
     input_type: type
     is_effect: bool
 
+    # Parse the following Get forms:
+    #  c = await Get[C](B, b) # we can do this now
+    #  e = await Get[E](Params((C, c), (D, d)))
+    #  f = await Get[F](Params(C(...), D(...)))
     @classmethod
-    def signature_from_call_node(
+    def _signature_from_multi_input_typed_params_call_node(
         cls, call_node: ast.Call, *, source_file_name: str
     ) -> tuple[str, str, bool] | None:
-        if not isinstance(call_node.func, ast.Name):
+        subscript_value_node = call_node.func.value
+        if not isinstance(subscript_value_node, ast.Name):
             return None
+        if subscript_value_node.id not in ("Get", "Effect"):
+            return None
+        is_effect = subscript_value_node.id == "Effect"
+
+        parse_error = partial(GetParseError, get_args=(), source_file_name=source_file_name)
+
+        output_expr = call_node.func.slice
+        # ast.Index is deprecated on Python 3.9+ and will eventually be removed. Unwrap to expose the
+        # inner node. On Python 3.9+, this should already be the ast.Name for the output type.
+        if isinstance(output_expr, ast.Index):
+            output_expr = output_expr.value
+        if not isinstance(output_expr, ast.Name):
+            raise parse_error(
+                "The output type in brackets should be the output type, like `Digest` or `ProcessResult`."
+            )
+        output_type = output_expr.id
+
+        outer_args = call_node.args
+        if len(outer_args) == 0:
+            raise parse_error("No parameters Get not supported yet.")
+        elif len(outer_args) == 1:
+            raise parse_error("Params multi-input Get not supported yet.")
+        elif len(outer_args) == 2:
+            input_type = outer_args[0]
+            if not isinstance(input_type, ast.Name):
+                raise parse_error(
+                    f"Because you are using the form [OutputType](InputType, input) ,"
+                    "the first argument should be a type, like `MergeDigests` or `Process`."
+                )
+            return output_type, input_type.id, is_effect
+        else:
+            raise parse_error(
+                "Invalid typed Get. Too many parameters were passed to the typed Get."
+            )
+
+    # Parse the following Get forms:
+    #  c = await Get(B, b) # we can do this now
+    #  e = await Get(B, C, c)
+    @classmethod
+    def _signature_from_old_style_call_node(
+        cls, call_node: ast.Call, *, source_file_name: str
+    ) -> tuple[str, str, bool] | None:
         if call_node.func.id not in ("Get", "Effect"):
             return None
         is_effect = call_node.func.id == "Effect"
@@ -108,6 +155,20 @@ class AwaitableConstraints:
                 "`Process`."
             )
         return output_type, input_type.id, is_effect
+
+    @classmethod
+    def signature_from_call_node(
+        cls, call_node: ast.Call, *, source_file_name: str
+    ) -> tuple[str, str, bool] | None:
+        if isinstance(call_node.func, ast.Subscript):
+            return cls._signature_from_multi_input_typed_params_call_node(
+                call_node, source_file_name=source_file_name
+            )
+        if isinstance(call_node.func, ast.Name):
+            return cls._signature_from_old_style_call_node(
+                call_node, source_file_name=source_file_name
+            )
+        return None
 
     def __repr__(self) -> str:
         name = "Effect" if self.is_effect else "Get"

@@ -23,6 +23,8 @@ def test_parse_get_types_valid() -> None:
     assert parse_get_types("Get(O, I())") == ("O", "I", False)
     assert parse_get_types("Effect(O, I, input)") == ("O", "I", True)
     assert parse_get_types("Effect(O, I())") == ("O", "I", True)
+    assert parse_get_types("Get[O](I, input)") == ("O", "I", False)
+    assert parse_get_types("Effect[O](I, input)") == ("O", "I", True)
 
 
 def assert_parse_get_types_fails(get: str, *, expected_explanation: str) -> None:
