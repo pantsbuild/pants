@@ -161,9 +161,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
 
 def get_build_options(
-    build_target_stage: str | None,
     context: DockerBuildContext,
     field_set: DockerFieldSet,
+    global_target_stage_option: str | None,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
@@ -173,12 +173,10 @@ def get_build_options(
 
     # Target stage
     target_stage = None
-    if build_target_stage in context.stages:
-        target_stage = build_target_stage
+    if global_target_stage_option in context.stages:
+        target_stage = global_target_stage_option
     elif field_set.target_stage.value:
         target_stage = field_set.target_stage.value
-
-    if target_stage:
         if target_stage not in context.stages:
             raise DockerBuildTargetStageError(
                 f"Attempt to build stage {target_stage!r} for `{target.alias}` {field_set.address}"
@@ -189,6 +187,8 @@ def get_build_options(
                     else f", but there are no named stages in `{context.dockerfile}`."
                 )
             )
+
+    if target_stage:
         yield from ("--target", target_stage)
 
 
@@ -225,9 +225,9 @@ async def build_docker_image(
         tags=tags,
         extra_args=tuple(
             get_build_options(
-                build_target_stage=options.build_target_stage,
                 context=context,
                 field_set=field_set,
+                global_target_stage_option=options.build_target_stage,
                 target=wrapped_target.target,
             )
         ),
