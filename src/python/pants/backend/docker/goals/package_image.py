@@ -25,9 +25,9 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContext,
 )
 from pants.backend.docker.utils import format_rename_suggestion
+from pants.backend.docker.value_interpolation import DockerInterpolationContext
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
@@ -63,9 +63,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
 
-    def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
+    def format_tag(self, tag: str, interpolation_context: DockerInterpolationContext) -> str:
         try:
-            return tag.format(**version_context).lower()
+            return tag.format(**interpolation_context).lower()
         except (KeyError, ValueError) as e:
             msg = (
                 "Invalid tag value for the `image_tags` field of the `docker_image` target at "
@@ -73,12 +73,12 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             )
             if isinstance(e, KeyError):
                 msg += f"The placeholder {e} is unknown."
-                if version_context:
-                    msg += f' Try with one of: {", ".join(sorted(version_context.keys()))}.'
+                if interpolation_context:
+                    msg += f' Try with one of: {", ".join(sorted(interpolation_context.keys()))}.'
                 else:
                     msg += (
                         " There are currently no known placeholders to use. These placeholders "
-                        "can come from `[docker].build_args` or parsed FROM instructions of "
+                        "can come from `[docker].build_args` or parsed from instructions of "
                         "your `Dockerfile`."
                     )
             else:
@@ -119,7 +119,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         self,
         default_repository: str,
         registries: DockerRegistries,
-        version_context: DockerVersionContext,
+        interpolation_context: DockerInterpolationContext,
     ) -> tuple[str, ...]:
         """The image refs are the full image name, including any registry and version tag.
 
@@ -139,12 +139,12 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         This method will always return a non-empty tuple.
         """
         repository_context = {}
-        if "build_args" in version_context:
-            repository_context["build_args"] = version_context["build_args"]
+        if "build_args" in interpolation_context:
+            repository_context["build_args"] = interpolation_context["build_args"]
 
         repository = self.format_repository(default_repository, repository_context)
         image_names = tuple(
-            ":".join(s for s in [repository, self.format_tag(tag, version_context)] if s)
+            ":".join(s for s in [repository, self.format_tag(tag, interpolation_context)] if s)
             for tag in self.tags.value or ()
         )
 
@@ -214,7 +214,7 @@ async def build_docker_image(
     tags = field_set.image_refs(
         default_repository=options.default_repository,
         registries=options.registries(),
-        version_context=context.version_context,
+        interpolation_context=context.interpolation_context,
     )
 
     process = docker.build_image(

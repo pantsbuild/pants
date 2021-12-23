@@ -288,12 +288,13 @@ async def find_interpreter(
         ProcessResult,
         PexCliProcess(
             description=f"Find interpreter for constraints: {formatted_constraints}",
+            subcommand=(),
             # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
             # Normally, this would start an isolated repl. By passing `--`, we force the repl to
             # instead act as an interpreter (the selected one) and tell us about itself. The upshot
             # is we run the Pex interpreter selection logic unperturbed but without resolving any
             # distributions.
-            argv=(
+            extra_args=(
                 *interpreter_constraints.generate_pex_arg_list(),
                 "--",
                 "-c",
@@ -530,7 +531,8 @@ async def build_pex(
         Process,
         PexCliProcess(
             python=python,
-            argv=argv,
+            subcommand=(),
+            extra_args=argv,
             additional_input_digest=merged_digest,
             description=_build_pex_description(request),
             output_files=output_files,
@@ -923,9 +925,9 @@ async def create_venv_pex(
             "--venv",
             "--seed",
             "verbose",
-            "--venv-site-packages-copies"
-            if request.site_packages_copies
-            else "--no-venv-site-packages-copies",
+            pex_environment.venv_site_packages_copies_option(
+                use_copies=request.site_packages_copies
+            ),
         ),
     )
     venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)

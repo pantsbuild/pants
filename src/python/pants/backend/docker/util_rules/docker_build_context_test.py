@@ -24,11 +24,13 @@ from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContext,
-    DockerVersionContextBuildArgsValue,
-    DockerVersionContextValue,
 )
 from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
+from pants.backend.docker.value_interpolation import (
+    DockerBuildArgsInterpolationValue,
+    DockerInterpolationContext,
+    DockerInterpolationValue,
+)
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -87,7 +89,8 @@ def assert_build_context(
     *,
     build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_version_context: dict[str, dict[str, str] | DockerVersionContextValue] | None = None,
+    expected_interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue]
+    | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
 ) -> DockerBuildContext:
@@ -107,12 +110,14 @@ def assert_build_context(
 
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
-    if expected_version_context is not None:
-        if "build_args" in expected_version_context:
-            expected_version_context["build_args"] = DockerVersionContextBuildArgsValue(
-                expected_version_context["build_args"]
+    if expected_interpolation_context is not None:
+        if "build_args" in expected_interpolation_context:
+            expected_interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
+                expected_interpolation_context["build_args"]
             )
-        assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
+        assert context.interpolation_context == DockerInterpolationContext.from_dict(
+            expected_interpolation_context
+        )
     return context
 
 
@@ -205,7 +210,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
         Address("src/downstream", target_name="image"),
         expected_files=["src/downstream/Dockerfile"],
         build_upstream_images=True,
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "latest"},
             "stage0": {"tag": "latest"},
             "build_args": {
@@ -267,7 +272,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
+def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/docker/BUILD": "docker_image()",
@@ -286,7 +291,7 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
             "interim": {"tag": "latest"},
@@ -319,7 +324,7 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile.docker"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
             "interim": {"tag": "latest"},
@@ -395,7 +400,7 @@ def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
             },
         },
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "${base_version}"},
             "stage0": {"tag": "${base_version}"},
             "build_args": {
@@ -538,7 +543,7 @@ def test_build_arg_behavior(
     expectation: ContextManager,
 ) -> None:
     with expectation:
-        assert fmt_string.format(**build_context.version_context) == result
+        assert fmt_string.format(**build_context.interpolation_context) == result
 
 
 def test_create_docker_build_context() -> None:

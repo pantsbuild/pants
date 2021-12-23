@@ -31,13 +31,13 @@ from pants.backend.docker.util_rules.docker_build_args import rules as build_arg
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContext,
 )
 from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironment,
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
+from pants.backend.docker.value_interpolation import DockerInterpolationContext
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
@@ -340,7 +340,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    version_context = DockerVersionContext.from_dict(
+    interpolation_context = DockerInterpolationContext.from_dict(
         {
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
@@ -356,7 +356,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
         tags = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
-            version_context,
+            interpolation_context,
         )
         assert expect_tags == tags
 
@@ -598,6 +598,39 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             "--tag",
             "img1:latest",
             "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  ssh=["default"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--ssh=default",
+            "-t",
+            "img1:latest",
+            "-f",
             "docker/test/Dockerfile",
             ".",
         )

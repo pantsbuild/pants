@@ -77,7 +77,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for the different lockfiles used in your project. "
                 "For your own code's dependencies, these come from the option "
-                "`[python].experimental_resolves_to_lockfiles`. For tool lockfiles, resolve "
+                "`[python].experimental_resolves`. For tool lockfiles, resolve "
                 "names are the options scope for that tool such as `black`, `pytest`, and "
                 "`mypy-protobuf`.\n\n"
                 "For example, you can run `./pants generate-lockfiles --resolve=black "
@@ -269,6 +269,9 @@ class _UserLockfileRequests(Collection[PythonLockfileRequest]):
 async def setup_user_lockfile_requests(
     requested: _SpecifiedUserResolves, all_targets: AllTargets, python_setup: PythonSetup
 ) -> _UserLockfileRequests:
+    if not python_setup.enable_resolves:
+        return _UserLockfileRequests()
+
     # First, associate all resolves with their consumers.
     resolves_to_roots = defaultdict(list)
     for tgt in all_targets:
@@ -307,7 +310,7 @@ async def setup_user_lockfile_requests(
             requirements.req_strings,
             interpreter_constraints,
             resolve_name=resolve,
-            lockfile_dest=python_setup.resolves_to_lockfiles[resolve],
+            lockfile_dest=python_setup.resolves[resolve],
         )
         for resolve, requirements, interpreter_constraints in zip(
             requested, pex_requirements_per_resolve, interpreter_constraints_per_resolve
@@ -339,7 +342,7 @@ async def generate_lockfiles_goal(
         warn_python_repos("indexes")
 
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
-        python_setup.resolves_to_lockfiles.keys(),
+        python_setup.resolves.keys(),
         union_membership[PythonToolLockfileSentinel],
         generate_lockfiles_subsystem.resolve_names,
     )
@@ -386,20 +389,17 @@ class AmbiguousResolveNamesError(Exception):
     def __init__(self, ambiguous_names: list[str]) -> None:
         if len(ambiguous_names) == 1:
             first_paragraph = (
-                "A resolve name from the option "
-                "`[python].experimental_resolves_to_lockfiles` collides with the name of a "
-                f"tool resolve: {ambiguous_names[0]}"
+                "A resolve name from the option `[python].experimental_resolves` collides with the "
+                f"name of a tool resolve: {ambiguous_names[0]}"
             )
         else:
             first_paragraph = (
-                "Some resolve names from the option "
-                "`[python].experimental_resolves_to_lockfiles` collide with the names of "
-                f"tool resolves: {sorted(ambiguous_names)}"
+                "Some resolve names from the option `[python].experimental_resolves` collide with "
+                f"the names of tool resolves: {sorted(ambiguous_names)}"
             )
         super().__init__(
             f"{first_paragraph}\n\n"
-            "To fix, please update `[python].experimental_resolves_to_lockfiles` to use "
-            "different resolve names."
+            "To fix, please update `[python].experimental_resolves` to use different resolve names."
         )
 
 
