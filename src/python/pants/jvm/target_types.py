@@ -154,9 +154,8 @@ class JvmProvidesTypesField(StringSequenceField):
 
 class JvmArtifactCompatibleResolvesField(JvmCompatibleResolvesField):
     help = (
-        "The resolves that this artifact should be included in.\n\n"
+        "The resolves from `[jvm].resolves` that this artifact should be included in.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
         "it will include all artifacts that are declared compatible with that resolve. First-party "
         "targets like `java_source` and `scala_source` then declare which resolve(s) they use "
