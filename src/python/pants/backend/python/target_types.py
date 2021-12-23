@@ -584,7 +584,7 @@ class PexBinariesFromEntryPointsOverrideField(OverridesField):
         "For example:\n\n```\n"
         "overrides={\n"
         '  "foo.py": {"execution_mode": "venv"]},\n'
-        '  "bar:main": {"restartable": True]},\n'
+        '  "bar.py:main": {"restartable": True]},\n'
         '  ("foo.py", "bar:main"): {"tags": ["legacy"]},\n'
         "}"
         "\n```\n\n"
