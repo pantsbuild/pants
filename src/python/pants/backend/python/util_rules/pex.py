@@ -923,9 +923,9 @@ async def create_venv_pex(
             "--venv",
             "--seed",
             "verbose",
-            "--venv-site-packages-copies"
-            if request.site_packages_copies
-            else "--no-venv-site-packages-copies",
+            pex_environment.venv_site_packages_copies_option(
+                use_copies=request.site_packages_copies
+            ),
         ),
     )
     venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
