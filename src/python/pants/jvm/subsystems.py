@@ -52,8 +52,12 @@ class JvmSubsystem(Subsystem):
             "--debug-args",
             type=list,
             member_type=str,
-            default=["-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"],
-            help="The JVM arguments to use when running tests in debug mode.",
+            default=[],
+            help=(
+                "Extra JVM arguments to use when running tests in debug mode.\n\n"
+                "For example, if you want to attach a remote debugger, use something like "
+                "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']",
+            ),
         )
 
     def jdk(self, javac_subsystem: JavacSubsystem) -> str:
