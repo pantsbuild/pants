@@ -28,9 +28,8 @@ class JvmCompatibleResolvesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
     help = (
-        "The set of resolve names that this target is compatible with.\n\n"
+        "The set of resolves from `[jvm].resolves` that this target is compatible with.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         # TODO: Document expectations for dependencies once we validate that.
     )
 
@@ -39,9 +38,8 @@ class JvmResolveField(StringField):
     alias = "resolve"
     required = False
     help = (
-        "The name of the resolve to use when building this target.\n\n"
+        "The resolve from `[jvm].resolves` to use when compiling this target.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "The name must be defined as a resolve in `[jvm].resolves`."
         # TODO: Document expectations for dependencies once we validate that.
     )
 
