@@ -159,7 +159,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return (resolve, python_setup.resolves[resolve])
 
 
-class PythonCompatibleResolvesField(StringSequenceField):
+class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
     alias = "experimental_compatible_resolves"
     required = False
     help = (
