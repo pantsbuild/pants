@@ -30,12 +30,7 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
-from pants.engine.process import (
-    FallibleProcessResult,
-    Process,
-    ProcessCacheScope,
-    ProcessResultMetadata,
-)
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
 from pants.engine.unions import UnionRule
@@ -158,8 +153,7 @@ async def run_go_tests(
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
             output_setting=test_subsystem.output,
-            # TODO: What should be here?
-            result_metadata=ProcessResultMetadata(None, "", 0),
+            result_metadata=None,
         )
 
     if maybe_pkg_info.info is None:

@@ -29,11 +29,13 @@ from pants.core.goals.test import (
     TestFieldSet,
     TestResult,
     TestSubsystem,
+    _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
+from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -111,6 +113,18 @@ class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
     def exit_code(address: Address) -> int:
         return 27 if address.target_name == "bad" else 0
+
+
+class MockTestResult:
+    address = "//:dummy_address"
+
+    def __init__(
+        self,
+        exit_code=0,
+        result_metadata=ProcessResultMetadata(50, ProcessResultMetadata.Source.RAN_REMOTELY, 0),
+    ):
+        self.exit_code = exit_code
+        self.result_metadata = result_metadata
 
 
 @pytest.fixture
@@ -252,10 +266,32 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ //:good succeeded in 999 ms (memoized).
-        𐄂 //:bad failed in 999 ms (memoized).
+        ✓ //:good succeeded in 1.00s (memoized).
+        𐄂 //:bad failed in 1.00s (memoized).
         """
     )
+
+
+def test_format_summary_remote() -> None:
+    output = _format_test_summary(MockTestResult(), 0, Console())
+    assert "//:dummy_address succeeded in 0.05s (ran remotely)." in output
+
+
+def test_format_summary_local() -> None:
+    output = _format_test_summary(
+        MockTestResult(
+            result_metadata=ProcessResultMetadata(50, ProcessResultMetadata.Source.RAN_LOCALLY, 0)
+        ),
+        0,
+        Console(),
+    )
+    assert "//:dummy_address succeeded in 0.05s." in output
+
+
+@pytest.mark.skip
+def test_format_summary_memoized() -> None:
+    output = _format_test_summary(MockTestResult(), 1, Console())
+    assert "//:dummy_address succeeded in 0.05s (memoized)." in output
 
 
 def test_debug_target(rule_runner: RuleRunner) -> None:

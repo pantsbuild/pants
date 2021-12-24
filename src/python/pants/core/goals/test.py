@@ -55,7 +55,7 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     address: Address
     output_setting: ShowOutput
-    result_metadata: ProcessResultMetadata
+    result_metadata: ProcessResultMetadata | None
 
     coverage_data: CoverageData | None = None
     xml_results: Snapshot | None = None
@@ -75,8 +75,7 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=EMPTY_FILE_DIGEST,
             address=address,
             output_setting=output_setting,
-            # TODO: what should this be?
-            result_metadata=ProcessResultMetadata(None, "", 0),
+            result_metadata=None,
         )
 
     @classmethod
@@ -439,7 +438,8 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped:
+        if result.skipped or result.result_metadata is None:
+            # TODO: how to replicate skipped / failed to compile tests.
             continue
 
         if result.exit_code != 0:
@@ -512,10 +512,8 @@ async def run_tests(
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-
-    SourceMap = {
+    source_map = {
         ProcessResultMetadata.Source.MEMOIZED: "memoized",
-        ProcessResultMetadata.Source.RAN_LOCALLY: "ran locally",
         ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
         ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
         ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
@@ -531,12 +529,12 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     source = result.result_metadata.source(run_id)
     source_print = ""
 
-    if SourceMap.get(source):
-        source_print = f" ({SourceMap.get(source)})"
+    if source_map.get(source):
+        source_print = f" ({source_map.get(source)})"
 
     elapsed_secs = result.result_metadata.total_elapsed_ms / 1000
 
-    return f"{sigil} {result.address} {status} in {elapsed_secs:.2f}s {source_print}."
+    return f"{sigil} {result.address} {status} in {elapsed_secs:.2f}s{source_print}."
 
 
 @dataclass(frozen=True)
