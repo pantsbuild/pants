@@ -25,8 +25,10 @@ from pants.backend.go.util_rules import (
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
-from pants.core.target_types import ResourceTarget
+from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
+from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -46,9 +48,11 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            *core_target_type_rules(),
+            *archive_rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
+        target_types=[GoModTarget, GoPackageTarget, ResourceTarget, ResourcesGeneratorTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -233,4 +237,66 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+
+
+def test_embed_filesystem(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":resources"])
+                resources(name='resources', sources=['foo/**'])
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+                """
+            ),
+            "foo/hello.txt": "hello",
+            "foo/world.txt": "world",
+            "foo/bar/xyzzy.txt": "xyzzy",
+            "foo.go": dedent(
+                """\
+                package foo
+                """
+            ),
+            "foo_test.go": dedent(
+                """\
+                package foo
+                import (
+                  "embed"
+                  "testing"
+                )
+                //go:embed foo/*.txt foo/bar/*.txt
+                var fs embed.FS
+
+                func cmpFile(t *testing.T, name string, expected string) {
+                  actual, err := fs.ReadFile(name)
+                  if err != nil {
+                    t.Errorf("error while reading %s: %s", name, err)
+                    return
+                  }
+                  if string(actual) != expected {
+                    t.Errorf("mismatch for %s: want=%s; got=%s", name, expected, string(actual))
+                    return
+                  }
+                }
+
+                func TestFoo(t *testing.T) {
+                  cmpFile(t, "foo/hello.txt", "hello")
+                  cmpFile(t, "foo/world.txt", "world")
+                  cmpFile(t, "foo/bar/xyzzy.txt", "xyzzy")
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    print(f"stdout = {result.stdout}")
+    print(f"stderr = {result.stderr}")
     assert result.exit_code == 0
