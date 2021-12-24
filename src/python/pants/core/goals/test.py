@@ -534,9 +534,9 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     if SourceMap.get(source):
         source_print = f" ({SourceMap.get(source)})"
 
-    elapsed_time = result.result_metadata.total_elapsed_ms
+    elapsed_secs = result.result_metadata.total_elapsed_ms / 1000
 
-    return f"{sigil} {result.address} {status} in {elapsed_time} ms{source_print}."
+    return f"{sigil} {result.address} {status} in {elapsed_secs:.2f}s {source_print}."
 
 
 @dataclass(frozen=True)
