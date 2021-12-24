@@ -179,7 +179,8 @@ def get_build_options(
         target_stage = field_set.target_stage.value
         if target_stage not in context.stages:
             raise DockerBuildTargetStageError(
-                f"Attempt to build stage {target_stage!r} for `{target.alias}` {field_set.address}"
+                f"The {field_set.target_stage.alias!r} field in `{target.alias}` "
+                f"{field_set.address} was set to {target_stage!r}"
                 + (
                     f", but there is no such stage in `{context.dockerfile}`. "
                     f"Available stages: {', '.join(context.stages)}."

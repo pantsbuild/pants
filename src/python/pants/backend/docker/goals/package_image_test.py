@@ -686,7 +686,16 @@ def test_docker_build_fail_logs(
         assert msg in caplog.records[0].message
 
 
-def test_build_target_stage(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "expected_target, options",
+    [
+        ("dev", None),
+        ("prod", {"build_target_stage": "prod", "default_repository": "{name}"}),
+    ],
+)
+def test_build_target_stage(
+    rule_runner: RuleRunner, options: dict | None, expected_target: str
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": "docker_image(name='image', target_stage='dev')",
@@ -705,7 +714,7 @@ def test_build_target_stage(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--target",
-            "dev",
+            expected_target,
             "--tag",
             "image:latest",
             "--file",
@@ -716,45 +725,7 @@ def test_build_target_stage(rule_runner: RuleRunner) -> None:
     assert_build(
         rule_runner,
         Address("", target_name="image"),
-        process_assertions=check_docker_proc,
-        version_tags=("build latest", "dev latest", "prod latest"),
-    )
-
-
-def test_docker_build_target_stage(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": "docker_image(name='image', target_stage='dev')",
-            "Dockerfile": dedent(
-                """\
-                FROM base as build
-                FROM build as dev
-                FROM build as prod
-                """
-            ),
-        }
-    )
-
-    def check_docker_proc(process: Process):
-        assert process.argv == (
-            "/dummy/docker",
-            "build",
-            "--target",
-            "prod",
-            "--tag",
-            "image:latest",
-            "--file",
-            "Dockerfile",
-            ".",
-        )
-
-    assert_build(
-        rule_runner,
-        Address("", target_name="image"),
-        options={
-            "build_target_stage": "prod",
-            "default_repository": "{name}",
-        },
+        options=options,
         process_assertions=check_docker_proc,
         version_tags=("build latest", "dev latest", "prod latest"),
     )
@@ -775,8 +746,8 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
     )
 
     err = (
-        r"Attempt to build stage 'bad' for `docker_image` //:image, but there is no such stage in "
-        r"`Dockerfile`\. Available stages: build, dev, prod\."
+        r"The 'target_stage' field in `docker_image` //:image was set to 'bad', but there is no "
+        r"such stage in `Dockerfile`\. Available stages: build, dev, prod\."
     )
     with pytest.raises(DockerBuildTargetStageError, match=err):
         assert_build(
