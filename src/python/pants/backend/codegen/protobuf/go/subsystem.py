@@ -7,6 +7,9 @@ from pants.option.subsystem import Subsystem
 
 class GoProtobufSubsystem(Subsystem):
     options_scope = "go-protobuf"
+    help = (
+        "Go protobuf generator (https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go)."
+    )
 
     @classmethod
     def register_options(cls, register):
@@ -15,13 +18,21 @@ class GoProtobufSubsystem(Subsystem):
             "--version",
             type=str,
             default="v1.27.1",
-            help=("The version of the protobuf Go plugin to use."),
+            help=(
+                "The version of the Go protobuf plugin to use. The value of this option is used as "
+                "the version query passed to `go install` to build the protoc plugin. "
+                "See https://go.dev/ref/mod#version-queries for more information on the format of version queries."
+            ),
         )
         register(
             "--grpc-version",
             type=str,
             default="v1.2.0",
-            help=("The version of the protobuf Go gRPC plugin to use."),
+            help=(
+                "The version of the Go gRPC protobuf plugin to use. The value of this option is used as "
+                "the version query passed to `go install` to build the protoc plugin. "
+                "See https://go.dev/ref/mod#version-queries for more information on the format of version queries."
+            ),
         )
 
     @property
