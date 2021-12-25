@@ -9,6 +9,7 @@ target(
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/experimental/codegen/avro/java",
+        "src/python/pants/backend/experimental/codegen/protobuf/go",
         "src/python/pants/backend/experimental/codegen/protobuf/java",
         "src/python/pants/backend/experimental/codegen/protobuf/scala",
         "src/python/pants/backend/experimental/codegen/thrift/apache/java",
