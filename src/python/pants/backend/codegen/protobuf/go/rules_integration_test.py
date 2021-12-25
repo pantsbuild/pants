@@ -170,7 +170,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
 def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "protos/BUILD": "protobuf_sources(go_grpc=True)",
+            "protos/BUILD": "protobuf_sources(grpc=True)",
             "protos/service.proto": dedent(
                 """\
             syntax = "proto3";

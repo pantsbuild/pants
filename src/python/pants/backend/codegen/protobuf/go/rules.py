@@ -5,11 +5,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.go import additional_fields
-from pants.backend.codegen.protobuf.go.additional_fields import GoGrpcGenField
 from pants.backend.codegen.protobuf.go.subsystem import GoProtobufSubsystem
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -94,7 +92,7 @@ async def generate_go_from_protobuf(
     )
 
     maybe_grpc_plugin_args = []
-    if request.protocol_target.get(GoGrpcGenField).value:
+    if request.protocol_target.get(ProtobufGrpcToggleField).value:
         maybe_grpc_plugin_args = [
             f"--go-grpc_out={output_dir}",
             "--go-grpc_opt=paths=source_relative",
@@ -189,6 +187,5 @@ async def setup_go_protoc_plugin(go_protobuf: GoProtobufSubsystem) -> SetupGoPro
 def rules():
     return (
         *collect_rules(),
-        *additional_fields.rules(),
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
     )
