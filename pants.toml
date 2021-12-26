@@ -25,6 +25,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.codegen.protobuf.scala",
+  "pants.backend.experimental.codegen.thrift.scrooge",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
@@ -192,6 +193,9 @@ lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.loc
 
 [scalatest]
 lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
+
+[scrooge]
+lockfile = "src/python/pants/backend/codegen/thrift/scrooge/scrooge.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"
