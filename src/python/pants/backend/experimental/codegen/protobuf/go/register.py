@@ -7,6 +7,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
 )
+from pants.backend.go.util_rules import sdk
 
 
 def target_types():
@@ -18,4 +19,5 @@ def rules():
         *go_protobuf_rules.rules(),
         *protobuf_target_types.rules(),
         *protobuf_dependency_inference.rules(),
+        *sdk.rules(),
     ]
