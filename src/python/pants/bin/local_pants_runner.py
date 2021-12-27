@@ -123,8 +123,10 @@ class LocalPantsRunner:
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
-            for scope in options.scope_to_flags.keys():
-                options.for_scope(scope)
+            for scope, values in options.scope_to_flags.items():
+                if values:
+                    # Only compute values if there were any command line options presented.
+                    options.for_scope(scope)
 
         # Verify configs.
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
