@@ -175,6 +175,80 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
+    # Tests that an artifact pom which actually reports packaging ends up with proper version and
+    # packaging information.
+    #   see https://github.com/pantsbuild/pants/issues/13986
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements.from_coordinates(
+                [Coordinate(group="org.bouncycastle", artifact="bcutil-jdk15on", version="1.70")]
+            ),
+        ],
+    )
+
+    assert resolved_lockfile == CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.bouncycastle",
+                    artifact="bcprov-jdk15on",
+                    version="1.70",
+                    packaging="jar",
+                    strict=True,
+                ),
+                file_name="org.bouncycastle_bcprov-jdk15on_jar_1.70.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    "8f3c20e3e2d565d26f33e8d4857a37d0d7f8ac39b62a7026496fcab1bdac30d4", 5867298
+                ),
+                remote_url=None,
+                pants_address=None,
+            ),
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.bouncycastle",
+                    artifact="bcutil-jdk15on",
+                    version="1.70",
+                    packaging="jar",
+                    strict=True,
+                ),
+                file_name="org.bouncycastle_bcutil-jdk15on_1.70.jar",
+                direct_dependencies=Coordinates(
+                    [
+                        Coordinate(
+                            group="org.bouncycastle",
+                            artifact="bcprov-jdk15on",
+                            version="1.70",
+                            packaging="jar",
+                            strict=True,
+                        )
+                    ]
+                ),
+                dependencies=Coordinates(
+                    [
+                        Coordinate(
+                            group="org.bouncycastle",
+                            artifact="bcprov-jdk15on",
+                            version="1.70",
+                            packaging="jar",
+                            strict=True,
+                        )
+                    ]
+                ),
+                file_digest=FileDigest(
+                    "52dc5551b0257666526c5095424567fed7dc7b00d2b1ba7bd52298411112b1d0", 482530
+                ),
+                remote_url=None,
+                pants_address=None,
+            ),
+        )
+    )
+
+
+@maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
     coordinate = ArtifactRequirement(
