@@ -39,8 +39,8 @@ def sorted_contributors(range: str) -> list[str]:
 
 def update_contributors_md() -> None:
     Path("CONTRIBUTORS.md").write_text(
-        "Created by running `./pants run build-support/bin/contributors.py`.\n\n* "
-        + "\n* ".join(sorted_contributors(range="HEAD"))
+        "Created by running `./pants run build-support/bin/contributors.py`.\n\n+ "
+        + "\n+ ".join(sorted_contributors(range="HEAD"))
         + "\n"
     )
 
