@@ -29,11 +29,13 @@ from pants.core.goals.test import (
     TestFieldSet,
     TestResult,
     TestSubsystem,
+    _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
+from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -43,7 +45,8 @@ from pants.engine.fs import (
     Snapshot,
     Workspace,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.session import RunId
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
 from pants.engine.target import (
     MultipleSourcesField,
     Target,
@@ -85,6 +88,11 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     def exit_code(_: Address) -> int:
         pass
 
+    @staticmethod
+    @abstractmethod
+    def skipped(_: Address) -> bool:
+        pass
+
     @property
     def test_result(self) -> TestResult:
         return TestResult(
@@ -96,6 +104,9 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             address=self.address,
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
+            result_metadata=None
+            if self.skipped(self.address)
+            else ProcessResultMetadata(999, "ran_locally", 0),
         )
 
 
@@ -104,11 +115,19 @@ class SuccessfulFieldSet(MockTestFieldSet):
     def exit_code(_: Address) -> int:
         return 0
 
+    @staticmethod
+    def skipped(_: Address) -> bool:
+        return False
+
 
 class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
     def exit_code(address: Address) -> int:
         return 27 if address.target_name == "bad" else 0
+
+    @staticmethod
+    def skipped(address: Address) -> bool:
+        return address.target_name == "skipped"
 
 
 @pytest.fixture
@@ -132,6 +151,7 @@ def run_test_rule(
     xml_dir: str | None = None,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
+    run_id: RunId = RunId(999),
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
@@ -179,6 +199,7 @@ def run_test_rule(
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),
+                run_id,
             ],
             mock_gets=[
                 MockGet(
@@ -238,19 +259,77 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
 def test_summary(rule_runner: RuleRunner) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
+    skipped_address = Address("", target_name="skipped")
 
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=ConditionallySucceedsFieldSet,
-        targets=[make_target(good_address), make_target(bad_address)],
+        targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
     )
     assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
     assert stderr == dedent(
         """\
 
-        ✓ //:good succeeded.
-        𐄂 //:bad failed.
+        ✓ //:good succeeded in 1.00s (memoized).
+        - //:skipped skipped.
+        𐄂 //:bad failed in 1.00s (memoized).
         """
+    )
+
+
+def _assert_test_summary(
+    expected: str,
+    *,
+    exit_code: int | None,
+    run_id: int,
+    result_metadata: ProcessResultMetadata | None,
+) -> None:
+    assert expected == _format_test_summary(
+        TestResult(
+            exit_code=exit_code,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=Address(spec_path="", target_name="dummy_address"),
+            output_setting=ShowOutput.FAILED,
+            result_metadata=result_metadata,
+        ),
+        RunId(run_id),
+        Console(use_colors=False),
+    )
+
+
+def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+    )
+
+
+def test_format_summary_local(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s.",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
+def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
+def test_format_summary_skipped(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "- //:dummy_address skipped.", exit_code=None, run_id=0, result_metadata=None
     )
 
 
@@ -324,6 +403,7 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
+    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
@@ -333,6 +413,7 @@ def assert_streaming_output(
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         address=Address("demo_test"),
+        result_metadata=result_metadata,
     )
     assert result.level() == expected_level
     assert result.message() == expected_message
