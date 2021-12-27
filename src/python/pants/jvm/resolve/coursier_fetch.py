@@ -115,13 +115,33 @@ class Coordinate:
         return ret
 
     @classmethod
-    def from_coord_str(cls, s: str) -> Coordinate:
+    def from_coord_str(cls, s: str, *, with_2315_workaround=False) -> Coordinate:
+        """Parses from a coordinate string with an optional `packaging` string.
+
+        ${organisation}:${artifact}:${version}[:${packaging}]
+
+        NB: The `with_2315_workaround` flag is for parsing in locations that are affected by
+          https://github.com/coursier/coursier/issues/2315
+        ... which swaps the `version` and `packaging`.
+        """
         parts = s.split(":")
+
+        if len(parts) == 4:
+            if with_2315_workaround:
+                version = parts[3]
+                packaging = parts[2]
+            else:
+                version = parts[2]
+                packaging = parts[3]
+        else:
+            version = parts[2]
+            packaging = "jar"
+
         return cls(
             group=parts[0],
             artifact=parts[1],
-            version=parts[2],
-            packaging=parts[3] if len(parts) == 4 else "jar",
+            version=version,
+            packaging=packaging,
         )
 
     def as_requirement(self) -> ArtifactRequirement:
@@ -477,14 +497,20 @@ async def coursier_resolve_lockfile(
         )
     )
 
+    # NB: Parsing of the resolve JSON applies the workaround for
+    #   https://github.com/coursier/coursier/issues/2315: see `Coordinate.from_coord_str`.
     first_pass_lockfile = CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
-                coord=Coordinate.from_coord_str(dep["coord"]),
+                coord=Coordinate.from_coord_str(dep["coord"], with_2315_workaround=True),
                 direct_dependencies=Coordinates(
-                    Coordinate.from_coord_str(dd) for dd in dep["directDependencies"]
+                    Coordinate.from_coord_str(dd, with_2315_workaround=True)
+                    for dd in dep["directDependencies"]
                 ),
-                dependencies=Coordinates(Coordinate.from_coord_str(d) for d in dep["dependencies"]),
+                dependencies=Coordinates(
+                    Coordinate.from_coord_str(d, with_2315_workaround=True)
+                    for d in dep["dependencies"]
+                ),
                 file_name=file_name,
                 file_digest=artifact_file_digest,
             )
@@ -611,7 +637,9 @@ async def coursier_fetch_one_coord(
 
     dep = report_deps[0]
 
-    resolved_coord = Coordinate.from_coord_str(dep["coord"])
+    # NB: Parsing of the resolve JSON applies the workaround for
+    #   https://github.com/coursier/coursier/issues/2315: see `Coordinate.from_coord_str`.
+    resolved_coord = Coordinate.from_coord_str(dep["coord"], with_2315_workaround=True)
     if resolved_coord != request.coord:
         raise CoursierError(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
