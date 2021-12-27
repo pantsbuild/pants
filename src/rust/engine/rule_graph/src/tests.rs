@@ -83,7 +83,7 @@ fn ambiguity() {
   assert!(RuleGraph::new(rules, queries)
     .err()
     .unwrap()
-    .contains("Encountered 1 rule graph error:\n  Too many"));
+    .contains("Encountered 1 rule graph error:\n  b+c: Too many"));
 }
 
 #[test]
