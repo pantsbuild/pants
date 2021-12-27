@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 from abc import ABC, abstractmethod
 
 from pants.base.exiter import ExitCode
@@ -24,8 +23,6 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.options import Options
-
-logger = logging.getLogger(__name__)
 
 
 class HelpBuiltinGoalBase(ABC, BuiltinGoal):
@@ -82,7 +79,13 @@ class ThingHelpBuiltinGoal(HelpBuiltinGoalBase):
     )
 
     def create_help_request(self, options: Options) -> HelpRequest:
-        return ThingHelp(advanced=False, things=tuple(options.goals) + tuple(options.unknown_goals))
+        options.builtin_goals.remove("help")
+        return ThingHelp(
+            advanced=False,
+            things=tuple(options.builtin_goals)
+            + tuple(options.goals)
+            + tuple(options.unknown_goals),
+        )
 
 
 class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
@@ -91,7 +94,13 @@ class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
     aliases = ("--help-advanced",)
 
     def create_help_request(self, options: Options) -> HelpRequest:
-        return ThingHelp(advanced=True, things=tuple(options.goals) + tuple(options.unknown_goals))
+        options.builtin_goals.remove("help-advanced")
+        return ThingHelp(
+            advanced=True,
+            things=tuple(options.builtin_goals)
+            + tuple(options.goals)
+            + tuple(options.unknown_goals),
+        )
 
 
 class UnknownGoalHelpBuiltinGoal(HelpBuiltinGoalBase):

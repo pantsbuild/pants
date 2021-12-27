@@ -28,6 +28,7 @@ class BuiltinGoal(GoalSubsystem):
 
     def run(
         self,
+        *,
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
