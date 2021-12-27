@@ -1735,14 +1735,16 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         return self.value or ()
 
 
-class SingleSourceField(SourcesField, StringField):
+class OptionalSingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
     See the docstring for `SourcesField` for some class properties you can set, such as
     `expected_file_extensions`.
 
     When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
-    `tgt.get(SingleSourceField)`.
+    `tgt.get(OptionalSingleSourceField)`.
+
+    Use `SingleSourceField` if the source must exist.
     """
 
     alias = "source"
@@ -1750,8 +1752,9 @@ class SingleSourceField(SourcesField, StringField):
         "A single file that belongs to this target.\n\n"
         "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
     )
-    required = True
-    expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
+    required = False
+    default: ClassVar[str | None] = None
+    expected_num_files: ClassVar[int | range] = range(0, 2)
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
@@ -1779,8 +1782,7 @@ class SingleSourceField(SourcesField, StringField):
         This works without hydration because we validate that `*` globs and `!` ignores are not
         used. However, consider still hydrating so that you verify the source file actually exists.
 
-        The return type is optional because it's possible to have 0-1 files. Most subclasses
-        will have 1 file, though.
+        The return type is optional because it's possible to have 0-1 files.
         """
         if self.value is None:
             return None
@@ -1788,10 +1790,33 @@ class SingleSourceField(SourcesField, StringField):
 
     @property
     def globs(self) -> tuple[str, ...]:
-        # Subclasses might override `required = False`, so `self.value` could be `None`.
         if self.value is None:
             return ()
         return (self.value,)
+
+
+class SingleSourceField(OptionalSingleSourceField):
+    """The `source: str` field.
+
+    Unlike `OptionalSingleSourceField`, the `.value` must be defined, whether by setting the
+    `default` or making the field `required`.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(SingleSourceField)`.
+    """
+
+    required = True
+    expected_num_files = 1
+    value: str
+
+    @property
+    def file_path(self) -> str:
+        result = super().file_path
+        assert result is not None
+        return result
 
 
 @frozen_after_init

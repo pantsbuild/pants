@@ -30,6 +30,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OptionalSingleSourceField,
     OverridesField,
     RequiredFieldMissingException,
     ScalarField,
@@ -1165,9 +1166,8 @@ def test_single_source_path_globs(
 
 
 def test_single_source_file_path() -> None:
-    class TestSingleSourceField(SingleSourceField):
-        required = False
-        expected_num_files = range(0, 2)
+    class TestSingleSourceField(OptionalSingleSourceField):
+        pass
 
     assert TestSingleSourceField(None, Address("project")).file_path is None
     assert TestSingleSourceField("f.ext", Address("project")).file_path == "project/f.ext"

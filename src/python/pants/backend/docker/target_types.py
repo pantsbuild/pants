@@ -8,7 +8,7 @@ import re
 import shlex
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import ClassVar, Iterator
+from typing import ClassVar, Iterator, cast
 
 from typing_extensions import final
 
@@ -22,7 +22,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
-    SingleSourceField,
+    OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -41,7 +41,7 @@ class DockerBuildArgsField(StringSequenceField):
     )
 
 
-class DockerImageSourceField(SingleSourceField):
+class DockerImageSourceField(OptionalSingleSourceField):
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -51,8 +51,6 @@ class DockerImageSourceField(SingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    expected_num_files = range(0, 2)
-    required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
@@ -206,6 +204,25 @@ class DockerBuildSecretsOptionField(
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
+class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
+    alias = "ssh"
+    default = ()
+    help = (
+        "SSH agent socket or keys to expose to the build (only if BuildKit enabled) "
+        "(format: default|<id>[=<socket>|<key>[,<key>]])\n\n"
+        "The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in "
+        "your `RUN` instructions:\n\n"
+        "    RUN --mount=type=ssh ...\n\n"
+        "See [Docker documentation](https://docs.docker.com/develop/develop-images"
+        "/build_enhancements/#using-ssh-to-access-private-data-in-builds) for more information."
+    )
+
+    docker_build_option = "--ssh"
+
+    def option_values(self) -> Iterator[str]:
+        yield from cast("tuple[str]", self.value)
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -218,6 +235,7 @@ class DockerImageTarget(Target):
         DockerRegistriesField,
         DockerRepositoryField,
         DockerBuildSecretsOptionField,
+        DockerBuildSSHOptionField,
         DockerSkipPushField,
         RestartableField,
     )
