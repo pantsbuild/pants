@@ -12,7 +12,7 @@ from pants.backend.java.target_types import DeployJarTarget, JavaSourcesGenerato
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
-from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
+from pants.jvm.resolve.coursier_fetch import Coordinate, NoCompatibleResolve
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactTarget
@@ -111,3 +111,28 @@ def test_no_matching_for_root(rule_runner: RuleRunner) -> None:
 def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
     with engine_error(NoCompatibleResolve):
         assert_resolve("n/a", rule_runner, "one", "one", ["two"])
+
+
+@pytest.mark.parametrize(
+    "coord_str,with_2315_workaround,expected",
+    (
+        *(
+            ("group:artifact:version", b, Coordinate("group", "artifact", "version"))
+            for b in [True, False]
+        ),
+        (
+            "group:artifact:packaging:version",
+            True,
+            Coordinate("group", "artifact", "version", "packaging"),
+        ),
+        (
+            "group:artifact:version:packaging",
+            False,
+            Coordinate("group", "artifact", "version", "packaging"),
+        ),
+    ),
+)
+def test_from_coord_str(coord_str: str, with_2315_workaround: bool, expected: Coordinate) -> None:
+    assert (
+        Coordinate.from_coord_str(coord_str, with_2315_workaround=with_2315_workaround) == expected
+    )
