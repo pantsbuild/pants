@@ -183,24 +183,34 @@ class FallibleProcessResult:
 class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
+    class Source(Enum):
+        RAN_LOCALLY = "ran_locally"
+        RAN_REMOTELY = "ran_remotely"
+        HIT_LOCALLY = "hit_locally"
+        HIT_REMOTELY = "hit_remotely"
+        MEMOIZED = "memoized"
+
     # The execution time of the process, in milliseconds, or None if it could not be captured
     # (since remote execution does not guarantee its availability).
     total_elapsed_ms: int | None
     # Whether the ProcessResult (when it was created in the attached run_id) came from the local
     # or remote cache, or ran locally or remotely. See the `self.source` method.
-    # TODO: Consider extracting an enum.
     _source: str
     # The run_id in which a ProcessResult was created. See the `self.source` method.
     source_run_id: int
 
-    def source(self, current_run_id: RunId) -> str:
+    def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
         If a ProcessResult is consumed in any run_id other than the one it was created in, the its
         source implicitly becomes memoization, since the result was re-used in a new run without
         being recreated.
         """
-        return self._source if self.source_run_id == current_run_id else "memoized"
+        return (
+            self.Source(self._source)
+            if self.source_run_id == current_run_id
+            else self.Source.MEMOIZED
+        )
 
 
 class ProcessExecutionFailure(Exception):
@@ -334,9 +344,9 @@ class InteractiveProcess(SideEffecting):
             )
         if self.append_only_caches and self.run_in_workspace:
             raise ValueError(
-                "InteractiveProcess requested setup of append-only caches and also requested to run in "
-                "the workspace. These options are incompatible since setting up append-only caches would "
-                "modify the workspace."
+                "InteractiveProcess requested setup of append-only caches and also requested to run"
+                " in the workspace. These options are incompatible since setting up append-only"
+                " caches would modify the workspace."
             )
 
     @classmethod
