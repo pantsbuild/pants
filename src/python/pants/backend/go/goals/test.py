@@ -156,6 +156,7 @@ async def run_go_tests(
             stderr_digest=EMPTY_FILE_DIGEST,
             address=field_set.address,
             output_setting=test_subsystem.output,
+            result_metadata=None,
         )
 
     if maybe_pkg_analysis.analysis is None:

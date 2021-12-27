@@ -3,20 +3,25 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Mapping
+from dataclasses import dataclass
+from typing import ClassVar, Mapping, TypeVar, Union
 
+from pants.engine.addresses import Address
 from pants.util.frozendict import FrozenDict
 
 
 class DockerInterpolationError(ValueError):
     @classmethod
     def attribute_error(
-        cls, value: DockerInterpolationValue, attribute: str
+        cls, value: str | DockerInterpolationValue, attribute: str
     ) -> DockerInterpolationError:
         msg = f"The placeholder {attribute!r} is unknown."
-        if value:
+        if value and isinstance(value, DockerInterpolationValue):
             msg += f' Try with one of: {", ".join(value.keys())}.'
         return cls(msg)
+
+
+ErrorT = TypeVar("ErrorT", bound=DockerInterpolationError)
 
 
 class DockerInterpolationValue(FrozenDict[str, str]):
@@ -24,16 +29,6 @@ class DockerInterpolationValue(FrozenDict[str, str]):
     access rather than item access."""
 
     _attribute_error_type: ClassVar[type[DockerInterpolationError]] = DockerInterpolationError
-
-    @classmethod
-    def create(
-        cls, value: Mapping[str, str] | DockerInterpolationValue
-    ) -> DockerInterpolationValue:
-        """Create new instance of `DockerInterpolationValue` unless `value` already is an instance
-        (or subclass) of `DockerInterpolationValue`, in which case `value` is returned as-is."""
-        if isinstance(value, cls):
-            return value
-        return cls(value)
 
     def __getattr__(self, attribute: str) -> str:
         if attribute not in self:
@@ -44,10 +39,10 @@ class DockerInterpolationValue(FrozenDict[str, str]):
 class DockerBuildArgInterpolationError(DockerInterpolationError):
     @classmethod
     def attribute_error(
-        cls, value: DockerInterpolationValue, attribute: str
+        cls, value: str | DockerInterpolationValue, attribute: str
     ) -> DockerInterpolationError:
         msg = f"The build arg {attribute!r} is undefined."
-        if value:
+        if value and isinstance(value, DockerInterpolationValue):
             msg += f' Defined build args are: {", ".join(value.keys())}.'
         msg += (
             "\n\nThis build arg may be defined with the `[docker].build_args` option or directly "
@@ -62,14 +57,68 @@ class DockerBuildArgsInterpolationValue(DockerInterpolationValue):
     _attribute_error_type = DockerBuildArgInterpolationError
 
 
-class DockerInterpolationContext(FrozenDict[str, DockerInterpolationValue]):
+class DockerInterpolationContext(FrozenDict[str, Union[str, DockerInterpolationValue]]):
     @classmethod
-    def from_dict(
-        cls, data: Mapping[str, Mapping[str, str] | DockerInterpolationValue]
-    ) -> DockerInterpolationContext:
+    def from_dict(cls, data: Mapping[str, str | Mapping[str, str]]) -> DockerInterpolationContext:
         return DockerInterpolationContext(
-            {key: DockerInterpolationValue.create(value) for key, value in data.items()}
+            {key: cls.create_value(value) for key, value in data.items()}
         )
 
-    def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerInterpolationContext:
+    @staticmethod
+    def create_value(value: str | Mapping[str, str]) -> str | DockerInterpolationValue:
+        """Ensure that `value` satisfies the type `DockerInterpolationValue`."""
+        if isinstance(value, (str, DockerInterpolationValue)):
+            return value
+        return DockerInterpolationValue(value)
+
+    def merge(self, other: Mapping[str, str | Mapping[str, str]]) -> DockerInterpolationContext:
         return DockerInterpolationContext.from_dict({**self, **other})
+
+    def format(
+        self, text: str, *, source: TextSource, error_cls: type[ErrorT] | None = None
+    ) -> str:
+        try:
+            return text.format(**self)
+        except (KeyError, DockerInterpolationError) as e:
+            default_error_cls = DockerInterpolationError
+            msg = f"Invalid value for the {source}: {text!r}.\n\n"
+            if isinstance(e, DockerInterpolationError):
+                default_error_cls = type(e)
+                msg += str(e)
+            else:
+                # KeyError
+                msg += f"The placeholder {e} is unknown."
+                if self:
+                    msg += f" Try with one of: {', '.join(sorted(self.keys()))}."
+                else:
+                    msg += (
+                        " There are currently no known placeholders to use. These placeholders "
+                        "can come from `[docker].build_args` or parsed from instructions in your "
+                        "`Dockerfile`."
+                    )
+            raise (error_cls or default_error_cls)(msg) from e
+
+    @dataclass(frozen=True)
+    class TextSource:
+        address: Address | None = None
+        target_alias: str | None = None
+        field_alias: str | None = None
+        options_scope: str | None = None
+
+        def __post_init__(self):
+            field_infos_is_none = (
+                x is None for x in [self.address, self.target_alias, self.field_alias]
+            )
+            if self.options_scope is None:
+                assert not any(field_infos_is_none), f"Missing target field details in {self!r}."
+            else:
+                assert all(
+                    field_infos_is_none
+                ), f"Must not refer to both configuration option and target field in {self!r}."
+
+        def __str__(self) -> str:
+            if self.options_scope:
+                return f"`{self.options_scope}` configuration option"
+            return (
+                f"`{self.field_alias}` field of the `{self.target_alias}` target at {self.address}"
+            )

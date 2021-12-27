@@ -380,7 +380,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     assert_tags("ver_2", "image:3.8-latest", "image:beta")
 
     err_1 = (
-        r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
+        r"Invalid value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_1: '{unknown_stage}'\.\n\n"
         r"The placeholder 'unknown_stage' is unknown\. Try with one of: baseimage, interim, "
         r"output, stage0, stage2\."
@@ -389,7 +389,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
         assert_tags("err_1")
 
     err_2 = (
-        r"Invalid tag value for the `image_tags` field of the `docker_image` target at "
+        r"Invalid value for the `image_tags` field of the `docker_image` target at "
         r"docker/test:err_2: '{stage0.unknown_value}'\.\n\n"
         r"The placeholder 'unknown_value' is unknown\. Try with one of: tag\."
     )
