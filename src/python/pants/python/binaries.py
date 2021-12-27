@@ -96,10 +96,10 @@ class PythonBootstrap:
 
     @memoized_method
     def interpreter_search_paths(self):
-        return self.expand_interpreter_search_paths(self.options.search_path, self.environment)
+        return self._expand_interpreter_search_paths(self.options.search_path, self.environment)
 
     @classmethod
-    def expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):
+    def _expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):
         special_strings = {
             "<PEXRC>": cls.get_pex_python_paths,
             "<PATH>": lambda: cls.get_environment_paths(env),
