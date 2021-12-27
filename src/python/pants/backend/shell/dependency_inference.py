@@ -63,7 +63,6 @@ def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
     for tgt in tgts:
         fp = tgt[ShellSourceField].file_path
-        assert fp is not None
         if fp in files_to_addresses:
             files_with_multiple_owners[fp].update({files_to_addresses[fp], tgt.address})
         else:
