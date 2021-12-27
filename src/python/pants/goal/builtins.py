@@ -8,6 +8,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal import help
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.explorer import ExplorerBuiltinGoal
+from pants.goal.list_backends import ListBackendsBuiltinGoal
 
 
 def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> None:
@@ -16,6 +17,7 @@ def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> N
 
 def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
     return (
+        BSPGoal,
         ExplorerBuiltinGoal,
         help.AllHelpBuiltinGoal,
         help.NoGoalHelpBuiltinGoal,
@@ -23,5 +25,5 @@ def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
         help.ThingHelpAdvancedBuiltinGoal,
         help.UnknownGoalHelpBuiltinGoal,
         help.VersionHelpBuiltinGoal,
-        BSPGoal,
+        ListBackendsBuiltinGoal,
     )
