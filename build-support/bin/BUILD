@@ -21,6 +21,7 @@ pex_binaries(
         "changelog.py",
         "check_banned_imports.py",
         "check_inits.py",
+        "contributors.py",
         "deploy_to_s3.py",
         "_generate_all_lockfiles_helper.py",
         "generate_docs.py",
