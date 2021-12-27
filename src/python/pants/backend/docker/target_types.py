@@ -92,6 +92,18 @@ class DockerImageTagsField(StringSequenceField):
     )
 
 
+class DockerImageTargetStageField(StringField):
+    alias = "target_stage"
+    help = (
+        "Specify target build stage, rather than building the entire `Dockerfile`.\n\n"
+        "When using multi-stage build, you may name your stages, and can target them when building "
+        "to only selectively build a certain stage. See also the `--docker-build-target-stage` "
+        "option.\n\n"
+        "Read more about [multi-stage Docker builds]"
+        "(https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)"
+    )
+
+
 class DockerDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
@@ -237,6 +249,7 @@ class DockerImageTarget(Target):
         DockerBuildSecretsOptionField,
         DockerBuildSSHOptionField,
         DockerSkipPushField,
+        DockerImageTargetStageField,
         RestartableField,
     )
     help = (
