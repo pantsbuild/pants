@@ -125,6 +125,7 @@ class UnrecognizedResolveNamesError(Exception):
 
 class PythonResolveField(StringField, AsyncFieldMixin):
     alias = "experimental_resolve"
+    required = False
     help = (
         "The resolve from `[python].experimental_resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
@@ -156,6 +157,32 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         self.validate(python_setup)
         resolve = self.value_or_default(python_setup)
         return (resolve, python_setup.resolves[resolve])
+
+
+class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
+    alias = "experimental_compatible_resolves"
+    required = False
+    help = (
+        "The set of resolves from `[python].experimental_resolves` that this target is "
+        "compatible with.\n\n"
+        "If not defined, will default to `[python].default_resolve`.\n\n"
+        "Only applies if `[python].enable_resolves` is true.\n\n"
+        "This field is experimental and may change without the normal deprecation policy."
+        # TODO: Document expectations for dependencies once we validate that.
+    )
+
+    def value_or_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
+        return self.value or (python_setup.default_resolve,)
+
+    def validate(self, python_setup: PythonSetup) -> None:
+        """Check that the resolve names are recognized."""
+        invalid_resolves = set(self.value_or_default(python_setup)) - set(python_setup.resolves)
+        if invalid_resolves:
+            raise UnrecognizedResolveNamesError(
+                sorted(invalid_resolves),
+                python_setup.resolves.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -972,6 +999,21 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
+class PythonRequirementCompatibleResolvesField(PythonCompatibleResolvesField):
+    help = (
+        "The resolves from `[python].experimental_resolves` that this requirement should be "
+        "included in.\n\n"
+        "If not defined, will default to `[python].default_resolve`.\n\n"
+        "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
+        "it will include all requirements that are declared compatible with that resolve. "
+        "First-party targets like `python_source` and `pex_binary` then declare which resolve(s) "
+        "they use via the `experimental_resolve` and `experimental_compatible_resolves` field; so, "
+        "for your first-party code to use a particular `python_requirement` target, that "
+        "requirement must be included in the resolve(s) "
+        "used by that code."
+    )
+
+
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -980,6 +1022,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
+        PythonCompatibleResolvesField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"

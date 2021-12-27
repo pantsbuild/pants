@@ -24,9 +24,8 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    InterpreterConstraintsField,
+    PythonCompatibleResolvesField,
     PythonRequirementsField,
-    PythonResolveField,
     UnrecognizedResolveNamesError,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -47,7 +46,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -272,51 +271,30 @@ async def setup_user_lockfile_requests(
     if not python_setup.enable_resolves:
         return _UserLockfileRequests()
 
-    # First, associate all resolves with their consumers.
-    resolves_to_roots = defaultdict(list)
+    resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_field(PythonResolveField):
+        if not tgt.has_field(PythonCompatibleResolvesField):
             continue
-        tgt[PythonResolveField].validate(python_setup)
-        resolve = tgt[PythonResolveField].value
-        if resolve is None:
-            continue
-        resolves_to_roots[resolve].append(tgt.address)
+        tgt[PythonCompatibleResolvesField].validate(python_setup)
+        for resolve in tgt[PythonCompatibleResolvesField].value_or_default(python_setup):
+            resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
-    # Expand the resolves for all specified.
-    transitive_targets_per_resolve = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest(resolves_to_roots[resolve]))
-        for resolve in requested
-    )
-    pex_requirements_per_resolve = []
-    interpreter_constraints_per_resolve = []
-    for transitive_targets in transitive_targets_per_resolve:
-        req_fields = []
-        ic_fields = []
-        for tgt in transitive_targets.closure:
-            if tgt.has_field(PythonRequirementsField):
-                req_fields.append(tgt[PythonRequirementsField])
-            if tgt.has_field(InterpreterConstraintsField):
-                ic_fields.append(tgt[InterpreterConstraintsField])
-        pex_requirements_per_resolve.append(
-            PexRequirements.create_from_requirement_fields(req_fields)
-        )
-        interpreter_constraints_per_resolve.append(
-            InterpreterConstraints.create_from_compatibility_fields(ic_fields, python_setup)
-        )
+    # TODO: Figure out how to determine which interpreter constraints to use for each resolve...
+    #  Note that `python_requirement` does not have interpreter constraints, so we either need to
+    #  inspect all consumers of that resolve or start to closely couple the resolve with the
+    #  interpreter constraints (a "context").
 
-    requests = (
+    return _UserLockfileRequests(
         PythonLockfileRequest(
-            requirements.req_strings,
-            interpreter_constraints,
+            PexRequirements.create_from_requirement_fields(
+                resolve_to_requirements_fields[resolve]
+            ).req_strings,
+            InterpreterConstraints(python_setup.interpreter_constraints),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
         )
-        for resolve, requirements, interpreter_constraints in zip(
-            requested, pex_requirements_per_resolve, interpreter_constraints_per_resolve
-        )
+        for resolve in requested
     )
-    return _UserLockfileRequests(requests)
 
 
 # --------------------------------------------------------------------------------------
