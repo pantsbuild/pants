@@ -2387,6 +2387,28 @@ class OverridesField(AsyncFieldMixin, Field):
             for globs in self.value
         )
 
+    def flatten(self) -> dict[str, dict[str, Any]]:
+        """Combine all overrides for every key into a single dictionary."""
+        result: dict[str, dict[str, Any]] = {}
+        for keys, override in (self.value or {}).items():
+            for key in keys:
+                for field, value in override.items():
+                    if key not in result:
+                        result[key] = {field: value}
+                        continue
+                    if field not in result[key]:
+                        result[key][field] = value
+                        continue
+                    raise InvalidFieldException(
+                        f"Conflicting overrides in the `{self.alias}` field of "
+                        f"`{self.address}` for the key `{key}` for "
+                        f"the field `{field}`. You cannot specify the same field name "
+                        "multiple times for the same key.\n\n"
+                        f"(One override sets the field to `{repr(result[key][field])}` "
+                        f"but another sets to `{repr(value)}`.)"
+                    )
+        return result
+
     def flatten_paths(
         self, paths_to_overrides: Mapping[Paths, dict[str, Any]]
     ) -> dict[str, dict[str, Any]]:
