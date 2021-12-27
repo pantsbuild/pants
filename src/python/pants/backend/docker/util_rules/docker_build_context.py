@@ -167,6 +167,7 @@ class DockerBuildContext:
     dockerfile: str
     version_context: DockerVersionContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
+    stages: tuple[str, ...]
 
     @classmethod
     def create(
@@ -178,8 +179,12 @@ class DockerBuildContext:
     ) -> DockerBuildContext:
         version_context: dict[str, dict[str, str] | DockerVersionContextValue] = {}
 
-        # FROM tags for all stages.
-        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
+        # Go over all FROM tags and names for all stages.
+        stage_names: set[str] = set()
+        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        for idx, (stage, tag) in enumerate(stage_tags):
+            if stage != f"stage{idx}":
+                stage_names.add(stage)
             value = {"tag": tag}
             if not version_context:
                 # Expose the first (stage0) FROM directive as the "baseimage".
@@ -214,10 +219,10 @@ class DockerBuildContext:
                 raise DockerBuildContextError(
                     f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
                     "\n\nIf you did not intend to inherit the value for this build arg from the "
-                    "environment, provide a default value where it is defined either in "
-                    "`[docker].build_args` or in the `extra_build_args` field on the target "
-                    "definition. Alternatively, you may also provide a default value on the `ARG` "
-                    "instruction in the `Dockerfile`."
+                    "environment, provide a default value with the option `[docker].build_args` "
+                    "or in the `extra_build_args` field on the target definition. Alternatively, "
+                    "you may also provide a default value on the `ARG` instruction directly in "
+                    "the `Dockerfile`."
                 ) from e
 
         # Override default value type for the `build_args` context to get helpful error messages.
@@ -242,6 +247,7 @@ class DockerBuildContext:
                     actual_dirs=snapshot.dirs,
                 )
             ),
+            stages=tuple(sorted(stage_names)),
         )
 
 
