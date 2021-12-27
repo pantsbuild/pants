@@ -8,16 +8,20 @@ from typing import Any, ContextManager
 
 import pytest
 
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules.docker_build_args import docker_build_args
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs, docker_build_args
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
     DockerVersionContext,
 )
 from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
-from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
+from pants.backend.docker.util_rules.docker_build_env import (
+    DockerBuildEnvironment,
+    docker_build_environment_vars,
+)
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
@@ -30,7 +34,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -484,3 +488,24 @@ def test_build_arg_behavior(
 ) -> None:
     with expectation:
         assert fmt_string.format(**build_context.version_context) == result
+
+
+def test_create_docker_build_context() -> None:
+    context = DockerBuildContext.create(
+        build_args=DockerBuildArgs.from_strings("ARGNAME=value1"),
+        snapshot=EMPTY_SNAPSHOT,
+        build_env=DockerBuildEnvironment.create({"ENVNAME": "value2"}),
+        dockerfile_info=DockerfileInfo(
+            address=Address("test"),
+            digest=EMPTY_DIGEST,
+            source="test/Dockerfile",
+            putative_target_addresses=(),
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
+            build_args=DockerBuildArgs.from_strings(),
+            copy_sources=(),
+        ),
+    )
+    assert list(context.build_args) == ["ARGNAME=value1"]
+    assert dict(context.build_env.environment) == {"ENVNAME": "value2"}
+    assert context.dockerfile == "test/Dockerfile"
+    assert context.stages == ("base", "dev", "prod")
