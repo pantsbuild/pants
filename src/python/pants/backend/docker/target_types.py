@@ -22,7 +22,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
-    SingleSourceField,
+    OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -41,7 +41,7 @@ class DockerBuildArgsField(StringSequenceField):
     )
 
 
-class DockerImageSourceField(SingleSourceField):
+class DockerImageSourceField(OptionalSingleSourceField):
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -51,8 +51,6 @@ class DockerImageSourceField(SingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    expected_num_files = range(0, 2)
-    required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
