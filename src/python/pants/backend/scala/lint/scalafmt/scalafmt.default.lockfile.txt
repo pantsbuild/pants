@@ -86,7 +86,9 @@
         "file_digest": {
             "fingerprint": "c5aad998af8b4ee8c1750e4e2fa214d3a997e8904cf1b5a1235a0a3e374c91e4",
             "serialized_bytes_length": 523681
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -175,7 +177,9 @@
         "file_digest": {
             "fingerprint": "e49ffa30df2f2266a387320366c3022319cacd33d26eca0d26d93acdd536cabc",
             "serialized_bytes_length": 17289
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -204,7 +208,9 @@
         "file_digest": {
             "fingerprint": "d0173938db4e6f1429eb4b93136c5d857c1fa81eaa34b8c59f8b7b99ad0165f5",
             "serialized_bytes_length": 126307
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -219,7 +225,9 @@
         "file_digest": {
             "fingerprint": "61ba4dc49adca95243beaa0569adc2a23aedb5292ae78aa01186fa782ebdc5c2",
             "serialized_bytes_length": 34130
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -248,7 +256,9 @@
         "file_digest": {
             "fingerprint": "250014f81c734b9f5bb8ffc92cfad42c2425ffd8d60fa27e0828adf07483ebfb",
             "serialized_bytes_length": 65403
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -263,7 +273,9 @@
         "file_digest": {
             "fingerprint": "ca3857a3f95266e0d87e1a1f26c8592c53c12ac7203f911759415f6c8a43df7d",
             "serialized_bytes_length": 85365
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -304,7 +316,9 @@
         "file_digest": {
             "fingerprint": "c4f89810da70c3100b52458a85f8d520f54243e05047b98e829e2473f0092283",
             "serialized_bytes_length": 165433
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -319,7 +333,9 @@
         "file_digest": {
             "fingerprint": "a639a90e2d21bbafd8a5e213c65442aad200ee086951605cbda8835bc6ef11d3",
             "serialized_bytes_length": 118671
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -334,7 +350,9 @@
         "file_digest": {
             "fingerprint": "4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25",
             "serialized_bytes_length": 32927
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -349,7 +367,9 @@
         "file_digest": {
             "fingerprint": "4c0aa7e223c75c8840c41fc183d4cd3118140a1ee503e3e08ce66ed2794c948f",
             "serialized_bytes_length": 295197
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -364,7 +384,9 @@
         "file_digest": {
             "fingerprint": "b3987e8c02441e82d88ab8727acd64eabf3a35217ffedba904b125e06a722a77",
             "serialized_bytes_length": 3131490
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -379,7 +401,9 @@
         "file_digest": {
             "fingerprint": "930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac",
             "serialized_bytes_length": 1729586
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -394,7 +418,9 @@
         "file_digest": {
             "fingerprint": "e2ee4b0bd3a2248f9ec6cf33f7d5b97e34ae652aecd3f42e13bded91f0df6bb6",
             "serialized_bytes_length": 992903
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -423,7 +449,9 @@
         "file_digest": {
             "fingerprint": "93f8bf202ac28c4ca13562e31f6881a7770768e12b056b568139f37c025a3841",
             "serialized_bytes_length": 5610
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -452,7 +480,9 @@
         "file_digest": {
             "fingerprint": "68f266c4fa37cb20a76e905ad940e241190ce288b7e4a9877f1dd1261cd1a9a7",
             "serialized_bytes_length": 1127123
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -481,7 +511,9 @@
         "file_digest": {
             "fingerprint": "6d96d45a7fc6fc7ab69bdbac841b48cf67ab109f048c8db375ae4effae524f39",
             "serialized_bytes_length": 571493
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -546,7 +578,9 @@
         "file_digest": {
             "fingerprint": "a450602f03a4686919e60d1aeced549559f1eaffbaf30ffa7987c8d97e3e79a9",
             "serialized_bytes_length": 12092802
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -561,7 +595,9 @@
         "file_digest": {
             "fingerprint": "a8bc08f3b9ff93d0496032bf2677163071b8d212992f41dbf04212e07d91616b",
             "serialized_bytes_length": 6004712
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -590,7 +626,9 @@
         "file_digest": {
             "fingerprint": "a7bc4eca6970083d426a8d081aec313c7b7207d5f83b6724995e34078edc5cbb",
             "serialized_bytes_length": 3771937
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -643,7 +681,9 @@
         "file_digest": {
             "fingerprint": "f6fb1c7f4ff257edb900d66e02d6ee1c8b5b4d7f7084b2d1710120cd36c524cc",
             "serialized_bytes_length": 530688
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -684,7 +724,9 @@
         "file_digest": {
             "fingerprint": "faec8003d08e27971b292062f79e16a4a428491f50736d140b8a1de38cd5c6b1",
             "serialized_bytes_length": 2344659
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -725,7 +767,9 @@
         "file_digest": {
             "fingerprint": "8fca8597ad6d7c13c48009ee13bbe80c176b08ab12e68af54a50f7f69d8447c5",
             "serialized_bytes_length": 320855
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -790,7 +834,9 @@
         "file_digest": {
             "fingerprint": "66c78cdb5ed6c6345089603eee8e1b41392245252019d1268bd87fd97a7d8bcc",
             "serialized_bytes_length": 1364598
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1047,7 +1093,9 @@
         "file_digest": {
             "fingerprint": "f29db3984599972097fb92d1841ae528dd9989e57cc73daec6e758ee55087ecd",
             "serialized_bytes_length": 164800
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1142,7 +1190,9 @@
         "file_digest": {
             "fingerprint": "be394d7869f91d33995d82dc9b857acb6331103952cb8fea25cf330e7d2b3324",
             "serialized_bytes_length": 9412
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1327,7 +1377,9 @@
         "file_digest": {
             "fingerprint": "aee4a122642450de70661f3777470e26e38f03c3f53f22fdfd62ac8eb45b9d22",
             "serialized_bytes_length": 1964531
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1392,7 +1444,9 @@
         "file_digest": {
             "fingerprint": "983d043a1f3a974844ead98b581cd9399b754c32971f7986efa30c5020d8b805",
             "serialized_bytes_length": 141924
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1407,7 +1461,9 @@
         "file_digest": {
             "fingerprint": "58dba0553bd2fe291b8ae557f2dde8441f556b009d2ec72f94c67d5d1045ab88",
             "serialized_bytes_length": 5371
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1448,7 +1504,9 @@
         "file_digest": {
             "fingerprint": "7d4fc40ce68a9a0d818bbbab84847ac379bbdf3f58bb7b8b816e78203fb07fe1",
             "serialized_bytes_length": 45886
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1555,7 +1613,9 @@
         "file_digest": {
             "fingerprint": "2ee7a9b93baa8ca2213f516ed3ced26990fe34e3df4ddb149ee58aa5d46d6160",
             "serialized_bytes_length": 791746
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1584,7 +1644,9 @@
         "file_digest": {
             "fingerprint": "b31eb8ef90bec4c22a8ec858f5bd007bd46ce80c3dcef9dce238c6f9dd15c1a4",
             "serialized_bytes_length": 3591
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1649,7 +1711,9 @@
         "file_digest": {
             "fingerprint": "79fdf691ff0f75265c99422f31db519ee044e88f52a32bbc39d30c16f6781315",
             "serialized_bytes_length": 4274882
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1678,6 +1742,8 @@
         "file_digest": {
             "fingerprint": "9484ac95856510459d1bd52a77a6b93cdd641560decdf9910395ee4d17e88163",
             "serialized_bytes_length": 121417
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     }
 ]
