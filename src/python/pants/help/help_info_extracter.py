@@ -14,7 +14,7 @@ from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
@@ -152,13 +152,14 @@ class TargetFieldHelpInfo:
     """A container for help information for a field in a target type."""
 
     alias: str
+    provider: str
     description: str
     type_hint: str
     required: bool
     default: str | None
 
     @classmethod
-    def create(cls, field: type[Field]) -> TargetFieldHelpInfo:
+    def create(cls, field: type[Field], *, provider: str) -> TargetFieldHelpInfo:
         raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
@@ -180,6 +181,7 @@ class TargetFieldHelpInfo:
 
         return cls(
             alias=field.alias,
+            provider=provider,
             description=field.help,
             type_hint=type_hint,
             required=field.required,
@@ -201,7 +203,12 @@ class TargetTypeHelpInfo:
 
     @classmethod
     def create(
-        cls, target_type: type[Target], *, provider: str, union_membership: UnionMembership
+        cls,
+        target_type: type[Target],
+        *,
+        provider: str,
+        union_membership: UnionMembership,
+        get_field_type_provider: Callable[[type[Field]], str] | None,
     ) -> TargetTypeHelpInfo:
         return cls(
             alias=target_type.alias,
@@ -209,7 +216,12 @@ class TargetTypeHelpInfo:
             summary=first_paragraph(target_type.help),
             description=target_type.help,
             fields=tuple(
-                TargetFieldHelpInfo.create(field)
+                TargetFieldHelpInfo.create(
+                    field,
+                    provider=""
+                    if get_field_type_provider is None
+                    else get_field_type_provider(field),
+                )
                 for field in target_type.class_field_types(union_membership=union_membership)
                 if not field.alias.startswith("_") and field.removal_version is None
             ),
@@ -287,6 +299,13 @@ class HelpInfoExtracter:
                     build_configuration
                     and build_configuration.target_type_to_providers.get(target_type)
                     or None
+                ),
+                get_field_type_provider=lambda field_type: cls.get_first_provider(
+                    build_configuration.union_rule_to_providers.get(
+                        UnionRule(target_type._plugin_field_cls, field_type)
+                    )
+                    if build_configuration is not None
+                    else None
                 ),
             )
             for alias, target_type in registered_target_types.aliases_to_types.items()
@@ -373,7 +392,7 @@ class HelpInfoExtracter:
     def get_first_provider(providers: tuple[str, ...] | None) -> str:
         if not providers:
             return ""
-        return providers[0]
+        return ", ".join(providers)
 
     def __init__(self, scope: str):
         self._scope = scope

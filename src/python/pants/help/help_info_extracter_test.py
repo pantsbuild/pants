@@ -404,6 +404,7 @@ def test_get_all_help_info():
                 "fields": (
                     {
                         "alias": "qux",
+                        "provider": "",
                         "default": "'blahblah'",
                         "description": "A qux string.",
                         "required": False,
@@ -411,6 +412,7 @@ def test_get_all_help_info():
                     },
                     {
                         "alias": "quux",
+                        "provider": "",
                         "default": None,
                         "description": "A quux int.\n\nMust be non-zero. Or zero. "
                         "Whatever you like really.",

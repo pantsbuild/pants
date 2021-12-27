@@ -283,6 +283,8 @@ class HelpPrinter(MaybeColor):
             required_or_default = "required" if field.required else f"default: {field.default}"
             print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
+            if field.provider not in ["", tinfo.provider]:
+                print(self.maybe_cyan(f"{indent}plugin: {field.provider}"))
             if field.description:
                 formatted_desc = "\n".join(
                     hard_wrap(field.description, indent=len(indent), width=self._width)
