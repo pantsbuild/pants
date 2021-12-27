@@ -29,8 +29,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    SourcesPaths,
-    SourcesPathsRequest,
     Targets,
     WrappedTarget,
 )
@@ -60,16 +58,11 @@ class ShellMapping:
 
 
 @rule(desc="Creating map of Shell file names to Shell targets", level=LogLevel.DEBUG)
-async def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
-    sources_per_target = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt[ShellSourceField])) for tgt in tgts
-    )
-
+def map_shell_files(tgts: AllShellTargets) -> ShellMapping:
     files_to_addresses: dict[str, Address] = {}
     files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
-    for tgt, sources in zip(tgts, sources_per_target):
-        assert len(sources.files) == 1
-        fp = sources.files[0]
+    for tgt in tgts:
+        fp = tgt[ShellSourceField].file_path
         if fp in files_to_addresses:
             files_with_multiple_owners[fp].update({files_to_addresses[fp], tgt.address})
         else:

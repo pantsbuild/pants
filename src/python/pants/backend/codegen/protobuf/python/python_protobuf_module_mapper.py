@@ -13,10 +13,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
 )
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesPathsRequest, Target
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -36,8 +36,8 @@ async def map_protobuf_to_python_modules(
     protobuf_targets: AllProtobufTargets,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
+    stripped_file_per_target = await MultiGet(
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 
@@ -53,14 +53,13 @@ async def map_protobuf_to_python_modules(
         else:
             modules_to_addresses[module] = (tgt.address,)
 
-    for tgt, stripped_sources in zip(protobuf_targets, stripped_sources_per_target):
-        for stripped_f in stripped_sources:
-            # NB: We don't consider the MyPy plugin, which generates `_pb2.pyi`. The stubs end up
-            # sharing the same module as the implementation `_pb2.py`. Because both generated files
-            # come from the same original Protobuf target, we're covered.
-            add_module(proto_path_to_py_module(stripped_f, suffix="_pb2"), tgt)
-            if tgt.get(ProtobufGrpcToggleField).value:
-                add_module(proto_path_to_py_module(stripped_f, suffix="_pb2_grpc"), tgt)
+    for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target):
+        # NB: We don't consider the MyPy plugin, which generates `_pb2.pyi`. The stubs end up
+        # sharing the same module as the implementation `_pb2.py`. Because both generated files
+        # come from the same original Protobuf target, we're covered.
+        add_module(proto_path_to_py_module(stripped_file.value, suffix="_pb2"), tgt)
+        if tgt.get(ProtobufGrpcToggleField).value:
+            add_module(proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc"), tgt)
 
     # Remove modules with ambiguous owners.
     for ambiguous_module in modules_with_multiple_owners:
