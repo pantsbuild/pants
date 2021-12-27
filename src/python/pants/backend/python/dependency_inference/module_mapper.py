@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, cast
+from typing import DefaultDict
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -206,7 +206,7 @@ async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker, all_python_targets: AllPythonTargets
 ) -> FirstPartyPythonMappingImpl:
     stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(cast(str, tgt[PythonSourceField].file_path)))
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 

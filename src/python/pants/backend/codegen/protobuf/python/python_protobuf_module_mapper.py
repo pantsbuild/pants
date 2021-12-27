@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import defaultdict
-from typing import DefaultDict, cast
+from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
@@ -37,9 +37,7 @@ async def map_protobuf_to_python_modules(
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
     stripped_file_per_target = await MultiGet(
-        Get(
-            StrippedFileName, StrippedFileNameRequest(cast(str, tgt[ProtobufSourceField].file_path))
-        )
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 

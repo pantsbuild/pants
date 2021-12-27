@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, cast
+from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
@@ -41,9 +41,7 @@ class ProtobufMapping:
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
 async def map_protobuf_files(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
     stripped_file_per_target = await MultiGet(
-        Get(
-            StrippedFileName, StrippedFileNameRequest(cast(str, tgt[ProtobufSourceField].file_path))
-        )
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 
