@@ -1117,10 +1117,16 @@ impl<R: Rule> Builder<R> {
           .neighbors_directed(node_id, Direction::Outgoing)
           .any(|dependency_id| errored.contains_key(&dependency_id) && node_id != dependency_id)
       })
-      .flat_map(|(_, errors)| {
+      .flat_map(|(&node_id, errors)| {
         let mut errors = errors.clone();
         errors.sort();
-        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+        errors.into_iter().map(move |e| {
+          format!(
+            "{}: {}",
+            params_str(&graph[node_id].0.out_set),
+            e.trim().replace("\n", "\n    ")
+          )
+        })
       })
       .collect::<Vec<_>>();
 
