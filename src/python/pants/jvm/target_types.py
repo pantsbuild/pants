@@ -12,6 +12,7 @@ from pants.engine.target import (
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
+    OptionalSingleSourceField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -97,11 +98,9 @@ class JvmArtifactUrlField(StringField):
     )
 
 
-class JvmArtifactJarSourceField(SingleSourceField):
+class JvmArtifactJarSourceField(OptionalSingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
-    expected_num_files = range(0, 2)
-    required = False
     help = (
         "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
         "Maven repository.\n\n"

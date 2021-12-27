@@ -17,6 +17,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
     DockerImageSourceField,
     DockerImageTagsField,
+    DockerImageTargetStageField,
     DockerRegistriesField,
     DockerRepositoryField,
 )
@@ -48,6 +49,10 @@ class DockerRepositoryNameError(ValueError):
     pass
 
 
+class DockerBuildTargetStageError(ValueError):
+    pass
+
+
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
@@ -56,6 +61,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     repository: DockerRepositoryField
     source: DockerImageSourceField
     tags: DockerImageTagsField
+    target_stage: DockerImageTargetStageField
 
     def format_tag(self, tag: str, interpolation_context: DockerInterpolationContext) -> str:
         try:
@@ -154,10 +160,37 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
 
-def get_build_options(target: Target) -> Iterator[str]:
+def get_build_options(
+    context: DockerBuildContext,
+    field_set: DockerFieldSet,
+    global_target_stage_option: str | None,
+    target: Target,
+) -> Iterator[str]:
+    # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
             yield from target[field_type].options()
+
+    # Target stage
+    target_stage = None
+    if global_target_stage_option in context.stages:
+        target_stage = global_target_stage_option
+    elif field_set.target_stage.value:
+        target_stage = field_set.target_stage.value
+        if target_stage not in context.stages:
+            raise DockerBuildTargetStageError(
+                f"The {field_set.target_stage.alias!r} field in `{target.alias}` "
+                f"{field_set.address} was set to {target_stage!r}"
+                + (
+                    f", but there is no such stage in `{context.dockerfile}`. "
+                    f"Available stages: {', '.join(context.stages)}."
+                    if context.stages
+                    else f", but there are no named stages in `{context.dockerfile}`."
+                )
+            )
+
+    if target_stage:
+        yield from ("--target", target_stage)
 
 
 @rule
@@ -191,7 +224,14 @@ async def build_docker_image(
         dockerfile=context.dockerfile,
         env=context.build_env.environment,
         tags=tags,
-        extra_args=tuple(get_build_options(wrapped_target.target)),
+        extra_args=tuple(
+            get_build_options(
+                context=context,
+                field_set=field_set,
+                global_target_stage_option=options.build_target_stage,
+                target=wrapped_target.target,
+            )
+        ),
     )
     result = await Get(FallibleProcessResult, Process, process)
 

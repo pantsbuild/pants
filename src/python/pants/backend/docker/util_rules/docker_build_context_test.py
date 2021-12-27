@@ -10,6 +10,7 @@ import pytest
 
 from pants.backend.docker.goals import package_image
 from pants.backend.docker.subsystems import dockerfile_parser
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import (
     dependencies,
@@ -19,10 +20,12 @@ from pants.backend.docker.util_rules import (
     docker_build_env,
     dockerfile,
 )
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
 )
+from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
 from pants.backend.docker.value_interpolation import (
     DockerBuildArgsInterpolationValue,
     DockerInterpolationContext,
@@ -39,7 +42,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -541,3 +544,25 @@ def test_build_arg_behavior(
 ) -> None:
     with expectation:
         assert fmt_string.format(**build_context.interpolation_context) == result
+
+
+def test_create_docker_build_context() -> None:
+    context = DockerBuildContext.create(
+        build_args=DockerBuildArgs.from_strings("ARGNAME=value1"),
+        snapshot=EMPTY_SNAPSHOT,
+        build_env=DockerBuildEnvironment.create({"ENVNAME": "value2"}),
+        dockerfile_info=DockerfileInfo(
+            address=Address("test"),
+            digest=EMPTY_DIGEST,
+            source="test/Dockerfile",
+            putative_target_addresses=(),
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
+            build_args=DockerBuildArgs.from_strings(),
+            from_image_build_arg_names=(),
+            copy_sources=(),
+        ),
+    )
+    assert list(context.build_args) == ["ARGNAME=value1"]
+    assert dict(context.build_env.environment) == {"ENVNAME": "value2"}
+    assert context.dockerfile == "test/Dockerfile"
+    assert context.stages == ("base", "dev", "prod")

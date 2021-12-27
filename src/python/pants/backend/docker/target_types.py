@@ -22,7 +22,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
-    SingleSourceField,
+    OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -41,7 +41,7 @@ class DockerBuildArgsField(StringSequenceField):
     )
 
 
-class DockerImageSourceField(SingleSourceField):
+class DockerImageSourceField(OptionalSingleSourceField):
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -51,8 +51,6 @@ class DockerImageSourceField(SingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    expected_num_files = range(0, 2)
-    required = False
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
@@ -91,6 +89,18 @@ class DockerImageTagsField(StringSequenceField):
         "Each tag may use placeholders in curly braces to be interpolated. The placeholders are "
         "derived from various sources, such as the Dockerfile FROM instructions tags and build "
         f"args.\n\nSee {doc_url('tagging-docker-images')}."
+    )
+
+
+class DockerImageTargetStageField(StringField):
+    alias = "target_stage"
+    help = (
+        "Specify target build stage, rather than building the entire `Dockerfile`.\n\n"
+        "When using multi-stage build, you may name your stages, and can target them when building "
+        "to only selectively build a certain stage. See also the `--docker-build-target-stage` "
+        "option.\n\n"
+        "Read more about [multi-stage Docker builds]"
+        "(https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)"
     )
 
 
@@ -239,6 +249,7 @@ class DockerImageTarget(Target):
         DockerBuildSecretsOptionField,
         DockerBuildSSHOptionField,
         DockerSkipPushField,
+        DockerImageTargetStageField,
         RestartableField,
     )
     help = (

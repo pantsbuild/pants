@@ -21,10 +21,10 @@ from pants.backend.python.target_types import (
     PythonRequirementTypeStubModulesField,
     PythonSourceField,
 )
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, SourcesPathsRequest, Target
+from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -205,18 +205,16 @@ class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
 async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker, all_python_targets: AllPythonTargets
 ) -> FirstPartyPythonMappingImpl:
-    stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSourceField]))
+    stripped_file_per_target = await MultiGet(
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 
     modules_to_addresses: DefaultDict[str, list[Address]] = defaultdict(list)
     modules_with_type_stub: set[str] = set()
     modules_with_multiple_implementations: DefaultDict[str, set[Address]] = defaultdict(set)
-    for tgt, stripped_sources in zip(all_python_targets.first_party, stripped_sources_per_target):
-        # `PythonSourceFile` validates that each target has exactly one file.
-        assert len(stripped_sources) == 1
-        stripped_f = PurePath(stripped_sources[0])
+    for tgt, stripped_file in zip(all_python_targets.first_party, stripped_file_per_target):
+        stripped_f = PurePath(stripped_file.value)
         is_type_stub = stripped_f.suffix == ".pyi"
 
         module = PythonModule.create_from_stripped_path(stripped_f).module
