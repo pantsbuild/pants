@@ -274,7 +274,8 @@ class HelpPrinter(MaybeColor):
         if tinfo.description:
             formatted_desc = "\n".join(hard_wrap(tinfo.description, width=self._width))
             print(formatted_desc)
-        print("\n\nValid fields:")
+        print(f"\n\nProvider: {self.maybe_magenta(tinfo.provider)}")
+        print("Valid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
             print()
             print(self.maybe_magenta(field.alias))

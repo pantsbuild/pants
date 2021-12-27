@@ -5,6 +5,7 @@ import dataclasses
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
@@ -112,9 +113,10 @@ def test_default() -> None:
         )
         parser.register(*args, **kwargs)
         oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser, False
+            "description", parser, False, "provider"
         )
         assert oshi.description == "description"
+        assert oshi.provider == "provider"
         assert len(oshi.basic) == 1
         ohi = oshi.basic[0]
         assert to_help_str(ohi.default) == expected_default_str
@@ -212,7 +214,7 @@ def test_grouping():
             scope_info=GlobalOptions.get_scope_info(),
         )
         parser.register("--foo", **kwargs)
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "")
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -273,11 +275,16 @@ def test_get_all_help_info():
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
+    bc_builder = BuildConfiguration.Builder()
+    bc_builder.register_subsystems("help_info_extracter_test", (Foo, Bar))
+    bc_builder.register_target_types("help_info_extracter_test", (BazLibrary,))
+
     all_help_info = HelpInfoExtracter.get_all_help_info(
         options,
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
+        bc_builder.create(),
     )
     all_help_info_dict = dataclasses.asdict(all_help_info)
     expected_all_help_info_dict = {
@@ -285,6 +292,7 @@ def test_get_all_help_info():
             GLOBAL_SCOPE: {
                 "scope": GLOBAL_SCOPE,
                 "description": "Global options.",
+                "provider": "",
                 "is_goal": False,
                 "basic": (
                     {
@@ -316,6 +324,7 @@ def test_get_all_help_info():
             },
             "foo": {
                 "scope": "foo",
+                "provider": "help_info_extracter_test",
                 "description": "A foo.",
                 "is_goal": False,
                 "basic": (
@@ -369,6 +378,7 @@ def test_get_all_help_info():
             },
             "bar": {
                 "scope": "bar",
+                "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "is_goal": True,
                 "basic": tuple(),
@@ -379,6 +389,7 @@ def test_get_all_help_info():
         "name_to_goal_info": {
             "bar": {
                 "name": "bar",
+                "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "consumed_scopes": ("somescope", "used_by_bar"),
                 "is_implemented": True,
@@ -387,6 +398,7 @@ def test_get_all_help_info():
         "name_to_target_type_info": {
             "baz_library": {
                 "alias": "baz_library",
+                "provider": "help_info_extracter_test",
                 "summary": "A library of baz-es.",
                 "description": "A library of baz-es.\n\nUse it however you like.",
                 "fields": (

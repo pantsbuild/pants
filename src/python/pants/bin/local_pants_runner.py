@@ -206,6 +206,7 @@ class LocalPantsRunner:
             self.union_membership,
             self.graph_session.goal_consumed_subsystem_scopes,
             RegisteredTargetTypes.create(self.build_config.target_types),
+            self.build_config,
         )
         help_printer = HelpPrinter(
             bin_name=global_options.pants_bin_name,
