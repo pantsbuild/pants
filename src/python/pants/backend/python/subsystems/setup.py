@@ -30,9 +30,6 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    deprecated_options_scope = "python-setup"
-    deprecated_options_scope_removal_version = "2.10.0.dev0"
-
     default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
