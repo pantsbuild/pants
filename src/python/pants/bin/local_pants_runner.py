@@ -14,6 +14,7 @@ from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine
+from pants.engine.internals.builtin_goal import BuiltinGoal
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
@@ -22,16 +23,12 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallback,
     WorkunitsCallbackFactories,
 )
-from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
-from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.arg_splitter import HelpRequest
 from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -198,23 +195,6 @@ class LocalPantsRunner:
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
-    def _print_help(self, request: HelpRequest) -> ExitCode:
-        global_options = self.options.for_global_scope()
-
-        all_help_info = HelpInfoExtracter.get_all_help_info(
-            self.options,
-            self.union_membership,
-            self.graph_session.goal_consumed_subsystem_scopes,
-            RegisteredTargetTypes.create(self.build_config.target_types),
-        )
-        help_printer = HelpPrinter(
-            bin_name=global_options.pants_bin_name,
-            help_request=request,
-            all_help_info=all_help_info,
-            color=global_options.colors,
-        )
-        return help_printer.print_help()
-
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
@@ -223,10 +203,32 @@ class LocalPantsRunner:
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 
+    def _run_builtin_goals(self, builtin_goals: tuple[str, ...]) -> ExitCode | None:
+        for goal in builtin_goals:
+            scope_info = self.options.known_scope_to_info[goal]
+            if not scope_info.subsystem_cls:
+                continue
+            scoped_options = self.options.for_scope(goal)
+            goal = scope_info.subsystem_cls(scoped_options)
+            assert isinstance(goal, BuiltinGoal)
+            result = goal.run(
+                build_config=self.build_config,
+                graph_session=self.graph_session,
+                options=self.options,
+                specs=self.specs,
+                union_membership=self.union_membership,
+            )
+            if result is not None:
+                return result
+        return None
+
     def _run_inner(self) -> ExitCode:
+        if self.options.builtin_goals:
+            result = self._run_builtin_goals(tuple(self.options.builtin_goals))
+            if result is not None:
+                return result
+
         goals = tuple(self.options.goals)
-        if self.options.help_request:
-            return self._print_help(self.options.help_request)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 

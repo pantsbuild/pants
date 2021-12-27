@@ -149,3 +149,6 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     rules = invoke_entrypoint("rules")
     if rules:
         build_configuration.register_rules(backend_package, rules)
+    builtin_goals = invoke_entrypoint("builtin_goals")
+    if builtin_goals:
+        build_configuration.register_subsystems(backend_package, builtin_goals)

@@ -39,7 +39,7 @@ from pants.core.util_rules import (
     stripped_source_files,
     subprocess_environment,
 )
-from pants.goal import anonymous_telemetry, stats_aggregator
+from pants.goal import anonymous_telemetry, help, stats_aggregator
 from pants.python import binaries as python_binaries
 from pants.source import source_root
 
@@ -84,4 +84,15 @@ def target_types():
         ResourceTarget,
         ResourcesGeneratorTarget,
         RelocatedFiles,
+    ]
+
+
+def builtin_goals():
+    return [
+        help.AllHelpBuiltinGoal,
+        help.NoGoalHelpBuiltinGoal,
+        help.ThingHelpBuiltinGoal,
+        help.ThingHelpAdvancedBuiltinGoal,
+        help.UnknownGoalHelpBuiltinGoal,
+        help.VersionHelpBuiltinGoal,
     ]

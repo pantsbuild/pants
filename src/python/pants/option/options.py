@@ -9,7 +9,7 @@ from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
-from pants.option.arg_splitter import ArgSplitter, HelpRequest
+from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -136,16 +136,15 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        help_request = splitter.help_request
-
         parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
+            builtin_goals=split_args.builtin_goals,
             goals=split_args.goals,
+            unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
-            help_request=help_request,
             parser_by_scope=parser_by_scope,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
@@ -154,11 +153,12 @@ class Options:
 
     def __init__(
         self,
+        builtin_goals: list[str],
         goals: list[str],
+        unknown_goals: list[str],
         scope_to_flags: dict[str, list[str]],
         specs: list[str],
         passthru: list[str],
-        help_request: HelpRequest | None,
         parser_by_scope: dict[str, Parser],
         bootstrap_option_values: OptionValueContainer | None,
         known_scope_to_info: dict[str, ScopeInfo],
@@ -168,22 +168,16 @@ class Options:
 
         Dependees should use `Options.create` instead.
         """
+        self._builtin_goals = builtin_goals
         self._goals = goals
+        self._unknown_goals = unknown_goals
         self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
-        self._help_request = help_request
         self._parser_by_scope = parser_by_scope
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
         self._allow_unknown_options = allow_unknown_options
-
-    @property
-    def help_request(self) -> HelpRequest | None:
-        """
-        :API: public
-        """
-        return self._help_request
 
     @property
     def specs(self) -> list[str]:
@@ -194,12 +188,28 @@ class Options:
         return self._specs
 
     @property
+    def builtin_goals(self) -> list[str]:
+        """The requested builtin goals, in the order specified on the cmd line.
+
+        :API: public
+        """
+        return self._builtin_goals
+
+    @property
     def goals(self) -> list[str]:
         """The requested goals, in the order specified on the cmd line.
 
         :API: public
         """
         return self._goals
+
+    @property
+    def unknown_goals(self) -> list[str]:
+        """The requested goals without implementation, in the order specified on the cmd line.
+
+        :API: public
+        """
+        return self._unknown_goals
 
     @property
     def known_scope_to_info(self) -> dict[str, ScopeInfo]:
