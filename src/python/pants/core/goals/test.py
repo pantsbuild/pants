@@ -105,7 +105,7 @@ class TestResult(EngineAwareReturnType):
 
     @property
     def skipped(self) -> bool:
-        return self.exit_code is None and not self.stdout and not self.stderr
+        return self.exit_code is None or self.result_metadata is None
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
@@ -114,9 +114,9 @@ class TestResult(EngineAwareReturnType):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.address.spec < other.address.spec
-        if self.exit_code is None:
+        if self.skipped or self.exit_code is None:
             return True
-        if other.exit_code is None:
+        if other.skipped or other.exit_code is None:
             return False
         return abs(self.exit_code) < abs(other.exit_code)
 
@@ -438,15 +438,10 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped or result.result_metadata is None:
-            # TODO: how to replicate skipped / failed to compile tests.
-            continue
-
         if result.exit_code != 0:
             exit_code = cast(int, result.exit_code)
 
-        test_summary = _format_test_summary(result, run_id, console)
-        console.print_stderr(test_summary)
+        console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
@@ -519,22 +514,30 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
     }
 
-    if result.exit_code == 0:
-        sigil = console.sigil_succeeded()
-        status = "succeeded"
+    if result.result_metadata:
+        if result.exit_code == 0:
+            sigil = console.sigil_succeeded()
+            status = "succeeded"
+        else:
+            sigil = console.sigil_failed()
+            status = "failed"
+
+        source = source_map.get(result.result_metadata.source(run_id))
+        source_print = f" ({source})" if source else ""
+
+        elapsed_print = ""
+        total_elapsed_ms = result.result_metadata.total_elapsed_ms
+        if total_elapsed_ms is not None:
+            elapsed_secs = total_elapsed_ms / 1000
+            elapsed_print = f"in {elapsed_secs:.2f}s"
+
+        suffix = f" {elapsed_print}{source_print}"
     else:
-        sigil = console.sigil_failed()
-        status = "failed"
+        sigil = console.sigil_skipped()
+        status = "skipped"
+        suffix = ""
 
-    source = result.result_metadata.source(run_id)
-    source_print = ""
-
-    if source_map.get(source):
-        source_print = f" ({source_map.get(source)})"
-
-    elapsed_secs = result.result_metadata.total_elapsed_ms / 1000
-
-    return f"{sigil} {result.address} {status} in {elapsed_secs:.2f}s{source_print}."
+    return f"{sigil} {result.address} {status}{suffix}."
 
 
 @dataclass(frozen=True)

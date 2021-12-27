@@ -88,6 +88,11 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     def exit_code(_: Address) -> int:
         pass
 
+    @staticmethod
+    @abstractmethod
+    def skipped(_: Address) -> bool:
+        pass
+
     @property
     def test_result(self) -> TestResult:
         return TestResult(
@@ -99,7 +104,9 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             address=self.address,
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
-            result_metadata=ProcessResultMetadata(999, "ran_locally", 0),
+            result_metadata=None
+            if self.skipped(self.address)
+            else ProcessResultMetadata(999, "ran_locally", 0),
         )
 
 
@@ -108,23 +115,19 @@ class SuccessfulFieldSet(MockTestFieldSet):
     def exit_code(_: Address) -> int:
         return 0
 
+    @staticmethod
+    def skipped(_: Address) -> bool:
+        return False
+
 
 class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
     def exit_code(address: Address) -> int:
         return 27 if address.target_name == "bad" else 0
 
-
-class MockTestResult:
-    address = "//:dummy_address"
-
-    def __init__(
-        self,
-        exit_code=0,
-        result_metadata=ProcessResultMetadata(50, ProcessResultMetadata.Source.RAN_REMOTELY, 0),
-    ):
-        self.exit_code = exit_code
-        self.result_metadata = result_metadata
+    @staticmethod
+    def skipped(address: Address) -> bool:
+        return address.target_name == "skipped"
 
 
 @pytest.fixture
@@ -256,42 +259,78 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
 def test_summary(rule_runner: RuleRunner) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
+    skipped_address = Address("", target_name="skipped")
 
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=ConditionallySucceedsFieldSet,
-        targets=[make_target(good_address), make_target(bad_address)],
+        targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
     )
     assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
     assert stderr == dedent(
         """\
 
         ✓ //:good succeeded in 1.00s (memoized).
+        - //:skipped skipped.
         𐄂 //:bad failed in 1.00s (memoized).
         """
     )
 
 
-def test_format_summary_remote() -> None:
-    output = _format_test_summary(MockTestResult(), 0, Console())
-    assert "//:dummy_address succeeded in 0.05s (ran remotely)." in output
-
-
-def test_format_summary_local() -> None:
-    output = _format_test_summary(
-        MockTestResult(
-            result_metadata=ProcessResultMetadata(50, ProcessResultMetadata.Source.RAN_LOCALLY, 0)
+def _assert_test_summary(
+    expected: str,
+    *,
+    exit_code: int | None,
+    run_id: int,
+    result_metadata: ProcessResultMetadata | None,
+) -> None:
+    assert expected == _format_test_summary(
+        TestResult(
+            exit_code=exit_code,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=Address(spec_path="", target_name="dummy_address"),
+            output_setting=ShowOutput.FAILED,
+            result_metadata=result_metadata,
         ),
-        0,
-        Console(),
+        RunId(run_id),
+        Console(use_colors=False),
     )
-    assert "//:dummy_address succeeded in 0.05s." in output
 
 
-@pytest.mark.skip
-def test_format_summary_memoized() -> None:
-    output = _format_test_summary(MockTestResult(), 1, Console())
-    assert "//:dummy_address succeeded in 0.05s (memoized)." in output
+def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+    )
+
+
+def test_format_summary_local(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s.",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
+def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
+def test_format_summary_skipped(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "- //:dummy_address skipped.", exit_code=None, run_id=0, result_metadata=None
+    )
 
 
 def test_debug_target(rule_runner: RuleRunner) -> None:
