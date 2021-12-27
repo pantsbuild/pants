@@ -9,7 +9,12 @@ import pytest
 
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames, StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import (
+    StrippedFileName,
+    StrippedFileNameRequest,
+    StrippedSourceFileNames,
+    StrippedSourceFiles,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
@@ -30,6 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(StrippedSourceFiles, [SourceFiles]),
             QueryRule(StrippedSourceFileNames, [SourcesPathsRequest]),
+            QueryRule(StrippedFileName, [StrippedFileNameRequest]),
         ],
         target_types=[TargetWithSources],
     )
@@ -142,3 +148,10 @@ def test_strip_source_file_names(rule_runner: RuleRunner) -> None:
     assert_stripped_source_file_names(
         Address("", target_name="empty"), source_root="/", expected=[]
     )
+
+
+@pytest.mark.parametrize("source_root,expected", [("root", "f.txt"), ("/", "root/f.txt")])
+def test_strip_file_name(rule_runner: RuleRunner, source_root: str, expected: str) -> None:
+    rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
+    result = rule_runner.request(StrippedFileName, [StrippedFileNameRequest("root/f.txt")])
+    assert result.value == expected
