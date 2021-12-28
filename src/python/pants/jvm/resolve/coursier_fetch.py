@@ -7,6 +7,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from itertools import chain
 from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
@@ -91,6 +92,7 @@ class Coordinate:
     artifact: str
     version: str
     packaging: str = "jar"
+    classifier: str | None = None
 
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
@@ -103,6 +105,7 @@ class Coordinate:
             artifact=data["artifact"],
             version=data["version"],
             packaging=data.get("packaging", "jar"),
+            classifier=data.get("classifier", None),
         )
 
     def to_json_dict(self) -> dict:
@@ -111,37 +114,26 @@ class Coordinate:
             "artifact": self.artifact,
             "version": self.version,
             "packaging": self.packaging,
+            "classifier": self.classifier,
         }
         return ret
 
     @classmethod
-    def from_coord_str(cls, s: str, *, with_2315_workaround=False) -> Coordinate:
-        """Parses from a coordinate string with an optional `packaging` string.
+    def from_coord_str(cls, s: str) -> Coordinate:
+        """Parses from a coordinate string with optional `packaging` and `classifier` coordinates.
 
-        ${organisation}:${artifact}:${version}[:${packaging}]
-
-        NB: The `with_2315_workaround` flag is for parsing in locations that are affected by
-          https://github.com/coursier/coursier/issues/2315
-        ... which swaps the `version` and `packaging`.
+        ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
         """
-        parts = s.split(":")
-
-        if len(parts) == 4:
-            if with_2315_workaround:
-                version = parts[3]
-                packaging = parts[2]
-            else:
-                version = parts[2]
-                packaging = parts[3]
-        else:
-            version = parts[2]
-            packaging = "jar"
-
+        regex = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
+        parts = regex.match(s)
+        packagingPart = parts.group(4)
+        classifierPart = parts.group(6)
         return cls(
-            group=parts[0],
-            artifact=parts[1],
-            version=version,
-            packaging=packaging,
+            group=parts.group(1),
+            artifact=parts.group(2),
+            packaging=packagingPart if packagingPart is not None else "jar",
+            classifier=classifierPart,
+            version=parts.group(7)
         )
 
     def as_requirement(self) -> ArtifactRequirement:
@@ -150,6 +142,11 @@ class Coordinate:
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
+        if self.classifier is not None:
+            unversioned += f":{self.packaging}:{self.classifier}"
+        elif self.packaging != "jar":
+            unversioned += f":{self.packaging}"
+
         version_suffix = ""
         if versioned:
             version_suffix = f":{self.version}"
