@@ -137,7 +137,8 @@ class Coordinate:
         ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
         """
 
-        if parts := Coordinate.REGEX.match(s):
+        parts = Coordinate.REGEX.match(s)
+        if parts is not None:
             packaging_part = parts.group(4)
             return cls(
                 group=parts.group(1),
