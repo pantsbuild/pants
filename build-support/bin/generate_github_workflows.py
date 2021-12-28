@@ -275,33 +275,19 @@ def upload_log_artifacts(name: str) -> Step:
     }
 
 
-def download_apache_thrift() -> Sequence[Step]:
-    return [
-        {
-            "name": "Download Apache `thrift` binary (Linux)",
-            "if": "runner.os == 'Linux'",
-            "run": dedent(
-                """\
-                mkdir -p "$HOME/bin"
-                curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift \
-                  -o "$HOME/bin/thrift"
-                echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=['${HOME}/bin']" >> $GITHUB_ENV
-                """
-            )
-        },
-        {
-            "name": "Download Apache `thrift` binary (macOS)",
-            "if": "runner.os == 'macOS'",
-            "run": dedent(
-                """\
-                mkdir -p "$HOME/bin"
-                curl --fail -L https://binaries.pantsbuild.org/bin/thrift/mac/10.12/0.15.0/thrift \
-                  -o "$HOME/bin/thrift"
-                echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=['${HOME}/bin']" >> $GITHUB_ENV
-                """
-            )
-        },
-    ]
+def download_apache_thrift() -> Step:
+    return {
+        "name": "Download Apache `thrift` binary (Linux)",
+        "if": "runner.os == 'Linux'",
+        "run": dedent(
+            """\
+            mkdir -p "$HOME/.thrift"
+            curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "$HOME/.thrift/thrift"
+            chmod +x "$HOME/.thrift/thrift"
+            echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+            """
+        ),
+    }
 
 
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
@@ -368,7 +354,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 *checkout(),
                 install_jdk(),
                 install_go(),
-                *download_apache_thrift(),
+                download_apache_thrift(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),
@@ -438,7 +424,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 install_jdk(),
-                *download_apache_thrift(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 pants_virtualenv_cache(),

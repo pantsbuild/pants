@@ -398,22 +398,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/bin"
+      run: 'mkdir -p "$HOME/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift                   -o
-        "$HOME/bin/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
+        -o "$HOME/.thrift/thrift"
 
-        echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=[''${HOME}/bin'']" >> $GITHUB_ENV
+        chmod +x "$HOME/.thrift/thrift"
 
-        '
-    - if: runner.os == 'macOS'
-      name: Download Apache `thrift` binary (macOS)
-      run: 'mkdir -p "$HOME/bin"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/mac/10.12/0.15.0/thrift                   -o
-        "$HOME/bin/thrift"
-
-        echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=[''${HOME}/bin'']" >> $GITHUB_ENV
+        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -499,26 +491,6 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - if: runner.os == 'Linux'
-      name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/bin"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift                   -o
-        "$HOME/bin/thrift"
-
-        echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=[''${HOME}/bin'']" >> $GITHUB_ENV
-
-        '
-    - if: runner.os == 'macOS'
-      name: Download Apache `thrift` binary (macOS)
-      run: 'mkdir -p "$HOME/bin"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/mac/10.12/0.15.0/thrift                   -o
-        "$HOME/bin/thrift"
-
-        echo "PANTS_APACHE_THRIFT_THRIFT_SEARCH_PATHS=[''${HOME}/bin'']" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
