@@ -60,6 +60,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-oncecell"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e81301a5b23aaf8a2b002c722af894aca1d423ac1b0e17f553e8a2964e441a3"
+dependencies = [
+ "futures",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -572,17 +581,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
-name = "double-checked-cell-async"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f22db4315075554331c4976a70d10d2d07192d1df01e9e68553bb632c3fa157"
-dependencies = [
- "futures-util",
- "unreachable",
- "void",
-]
-
-[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -607,6 +605,7 @@ dependencies = [
 name = "engine"
 version = "0.0.1"
 dependencies = [
+ "async-oncecell",
  "async-trait",
  "async_latch",
  "async_semaphore",
@@ -615,7 +614,6 @@ dependencies = [
  "concrete_time",
  "crossbeam-channel 0.4.4",
  "derivative",
- "double-checked-cell-async",
  "either",
  "env_logger",
  "fnv",
@@ -2173,6 +2171,7 @@ name = "process_execution"
 version = "0.0.1"
 dependencies = [
  "async-lock",
+ "async-oncecell",
  "async-trait",
  "async_semaphore",
  "bincode",
@@ -2180,7 +2179,6 @@ dependencies = [
  "cache",
  "concrete_time",
  "derivative",
- "double-checked-cell-async",
  "fs",
  "futures",
  "grpc_util",
@@ -2944,12 +2942,12 @@ dependencies = [
 name = "store"
 version = "0.1.0"
 dependencies = [
+ "async-oncecell",
  "async-stream",
  "async-trait",
  "bytes",
  "concrete_time",
  "criterion",
- "double-checked-cell-async",
  "fs",
  "futures",
  "glob",
@@ -3551,15 +3549,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f14ee04d9415b52b3aeab06258a3f07093182b88ba0f9b8d203f211a7a7d41c7"
 
 [[package]]
-name = "unreachable"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"
-dependencies = [
- "void",
-]
-
-[[package]]
 name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3607,12 +3596,6 @@ name = "version_check"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
-
-[[package]]
-name = "void"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "walkdir"

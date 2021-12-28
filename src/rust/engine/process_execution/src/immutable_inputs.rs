@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use double_checked_cell_async::DoubleCheckedCell;
+use async_oncecell::OnceCell;
 use fs::{Permissions, RelativePath};
+use futures::TryFutureExt;
 use hashing::Digest;
 use parking_lot::Mutex;
 use store::Store;
@@ -18,17 +19,20 @@ pub struct ImmutableInputs {
   workdir: TempDir,
   // A map from Digest to the location it has been materialized at. The DoubleCheckedCell allows
   // for cooperation between threads attempting to create Digests.
-  contents: Mutex<HashMap<Digest, Arc<DoubleCheckedCell<PathBuf>>>>,
+  contents: Mutex<HashMap<Digest, Arc<OnceCell<PathBuf>>>>,
 }
 
 impl ImmutableInputs {
   pub fn new(store: Store, base: &Path) -> Result<Self, String> {
-    let workdir = TempDir::new_in(base).map_err(|e| {
-      format!(
-        "Failed to create temporary directory for immutable inputs: {}",
-        e
-      )
-    })?;
+    let workdir = tempfile::Builder::new()
+      .prefix("immutable_inputs")
+      .tempdir_in(base)
+      .map_err(|e| {
+        format!(
+          "Failed to create temporary directory for immutable inputs: {}",
+          e
+        )
+      })?;
     Ok(Self {
       store,
       workdir,
@@ -42,20 +46,41 @@ impl ImmutableInputs {
     let value: Result<_, String> = cell
       .get_or_try_init(async {
         let digest_str = digest.hash.to_hex();
-
         let path = self.workdir.path().join(digest_str);
         if let Ok(meta) = tokio::fs::metadata(&path).await {
-          // TODO: If this error triggers, it indicates that we have previously checked out this
-          // directory, either due to a race condition, or due to a previous failure to
-          // materialize. See https://github.com/pantsbuild/pants/issues/13899
+          // If this error triggers, it indicates that we have previously checked out this
+          // directory, and OnceCell double checked locking is broken.
+          // We can remove this sanity-check if we gain confidence that OnceCell does its job.
+          // See: https://github.com/pantsbuild/pants/issues/13899
           return Err(format!(
             "Destination for immutable digest already exists: {:?}",
             meta
           ));
         }
+
+        let chroot = TempDir::new_in(self.workdir.path()).map_err(|e| {
+          format!(
+            "Failed to created a temporary directory for materialization of immutable input \
+                digest {:?}: {}",
+            digest, e
+          )
+        })?;
         self
           .store
-          .materialize_directory(path.clone(), digest, Permissions::ReadOnly)
+          .materialize_directory(chroot.path().to_path_buf(), digest, Permissions::ReadOnly)
+          .await?;
+        let materialized_chroot = chroot.into_path();
+        tokio::fs::rename(&materialized_chroot, &path)
+          .map_err(|e| {
+            format!(
+              "Failed to move materialized chroot for {digest:?} from {chroot:?} to {dest:?}: \
+              {err}",
+              digest = digest,
+              chroot = materialized_chroot,
+              dest = &path,
+              err = e
+            )
+          })
           .await?;
         Ok(path)
       })

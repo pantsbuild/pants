@@ -114,7 +114,7 @@ cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.4"
 derivative = "2.2"
-double-checked-cell-async = "2.0"
+async-oncecell = "0.2"
 either = "1.6"
 fnv = "1.0.5"
 fs = { path = "fs" }
