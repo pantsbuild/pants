@@ -203,6 +203,9 @@ class ArtifactRequirement:
         )
 
     def to_coord_str(self, versioned: bool = True) -> str:
+        # NB: Coursier does not support the entire coordinate syntax as an input (and will report a
+        # "Malformed dependency" if either the classifier or packaging are specified). We don't strip
+        # those here, since the error from Coursier is helpful enough.
         without_url = self.coordinate.to_coord_str(versioned)
         url_suffix = ""
         if self.url:

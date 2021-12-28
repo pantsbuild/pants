@@ -116,7 +116,7 @@ def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize(
     "coord_str,expected",
     (
-        *(("group:artifact:version", Coordinate("group", "artifact", "version"))),
+        ("group:artifact:version", Coordinate("group", "artifact", "version")),
         (
             "group:artifact:packaging:version",
             Coordinate("group", "artifact", "version", "packaging"),

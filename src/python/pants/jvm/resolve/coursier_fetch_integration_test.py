@@ -250,25 +250,23 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_resolve_with_classifier(rule_runner: RuleRunner) -> None:
-    coordinate = Coordinate(
-        group="org.apache.kafka", artifact="kafka-clients", version="2.8.1", classifier="test"
-    )
+    # Has as a transitive dependency an artifact with both a `classifier` and `packaging`.
+    coordinate = Coordinate(group="org.apache.avro", artifact="avro-tools", version="1.11.0")
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        ArtifactRequirements.from_coordinates([coordinate]),
+        [ArtifactRequirements.from_coordinates([coordinate])],
     )
 
-    (head_entry,) = resolved_lockfile.entries
-    assert head_entry.coord == Coordinate(
-        group="org.apache.kafka",
-        artifact="kafka-clients",
-        version="2.8.1",
-        packaging="jar",
-        classifier="test",
-        strict=True,
-    )
-    assert head_entry.file_digest == FileDigest(
-        "b774d65ba44f3866261b3f4f217e19261451838067166cfb949a4122f5b01a90", 3684301
+    assert (
+        Coordinate(
+            group="org.apache.avro",
+            artifact="trevni-avro",
+            version="1.11.0",
+            packaging="jar",
+            classifier="tests",
+            strict=True,
+        )
+        in [e.coord for e in resolved_lockfile.entries]
     )
 
 
