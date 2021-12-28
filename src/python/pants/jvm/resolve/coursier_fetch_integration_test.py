@@ -251,16 +251,13 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_classifier(rule_runner: RuleRunner) -> None:
     coordinate = Coordinate(
-        group="org.apache.kafka",
-        artifact="kafka-clients",
-        version="2.8.1",
-        classifier="test"
+        group="org.apache.kafka", artifact="kafka-clients", version="2.8.1", classifier="test"
     )
     resolved_lockfile = rule_runner.request(
         CoursierResolvedLockfile,
-        ArtifactRequirements.from_coordinates[coordinate],
+        ArtifactRequirements.from_coordinates([coordinate]),
     )
-    
+
     (head_entry,) = resolved_lockfile.entries
     assert head_entry.coord == Coordinate(
         group="org.apache.kafka",
@@ -268,11 +265,12 @@ def test_resolve_with_classifier(rule_runner: RuleRunner) -> None:
         version="2.8.1",
         packaging="jar",
         classifier="test",
-        strict=True
+        strict=True,
     )
     assert head_entry.file_digest == FileDigest(
         "b774d65ba44f3866261b3f4f217e19261451838067166cfb949a4122f5b01a90", 3684301
     )
+
 
 @maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:

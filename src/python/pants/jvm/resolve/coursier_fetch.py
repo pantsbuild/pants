@@ -84,9 +84,18 @@ class NoCompatibleResolve(Exception):
         )
 
 
+class InvalidCoordinateString(Exception):
+    """The coordinate string being passed is invalid or malformed."""
+
+    def __init__(self, coords: str) -> None:
+        super().__init__(f"Received invalid artifact coordinates: {coords}")
+
+
 @dataclass(frozen=True)
 class Coordinate:
     """A single Maven-style coordinate for a JVM dependency."""
+
+    REGEX = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
 
     group: str
     artifact: str
@@ -122,19 +131,23 @@ class Coordinate:
     def from_coord_str(cls, s: str) -> Coordinate:
         """Parses from a coordinate string with optional `packaging` and `classifier` coordinates.
 
+        Using Aether's implementation as reference
+        http://www.javased.com/index.php?source_dir=aether-core/aether-api/src/main/java/org/eclipse/aether/artifact/DefaultArtifact.java
+
         ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
         """
-        regex = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
-        parts = regex.match(s)
-        packagingPart = parts.group(4)
-        classifierPart = parts.group(6)
-        return cls(
-            group=parts.group(1),
-            artifact=parts.group(2),
-            packaging=packagingPart if packagingPart is not None else "jar",
-            classifier=classifierPart,
-            version=parts.group(7)
-        )
+
+        if parts := Coordinate.REGEX.match(s):
+            packaging_part = parts.group(4)
+            return cls(
+                group=parts.group(1),
+                artifact=parts.group(2),
+                packaging=packaging_part if packaging_part is not None else "jar",
+                classifier=parts.group(6),
+                version=parts.group(7),
+            )
+        else:
+            raise InvalidCoordinateString(s)
 
     def as_requirement(self) -> ArtifactRequirement:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
@@ -499,13 +512,9 @@ async def coursier_resolve_lockfile(
             CoursierLockfileEntry(
                 coord=Coordinate.from_coord_str(dep["coord"]),
                 direct_dependencies=Coordinates(
-                    Coordinate.from_coord_str(dd)
-                    for dd in dep["directDependencies"]
+                    Coordinate.from_coord_str(dd) for dd in dep["directDependencies"]
                 ),
-                dependencies=Coordinates(
-                    Coordinate.from_coord_str(d)
-                    for d in dep["dependencies"]
-                ),
+                dependencies=Coordinates(Coordinate.from_coord_str(d) for d in dep["dependencies"]),
                 file_name=file_name,
                 file_digest=artifact_file_digest,
             )
