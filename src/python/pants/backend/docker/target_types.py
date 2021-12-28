@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import os
 import re
-import shlex
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import ClassVar, Iterator, cast
+from typing import Callable, ClassVar, Iterator, cast
 
 from typing_extensions import final
 
@@ -28,6 +27,12 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import doc_url
+
+# Common help text to be applied to each field that supports value interpolation.
+_interpolation_help = (
+    "{kind} may use placeholders in curly braces to be interpolated. The placeholders are derived "
+    "from various sources, such as the Dockerfile instructions and build args.\n\n"
+)
 
 
 class DockerBuildArgsField(StringSequenceField):
@@ -86,9 +91,8 @@ class DockerImageTagsField(StringSequenceField):
     default = ("latest",)
     help = (
         "Any tags to apply to the Docker image name (the version is usually applied as a tag).\n\n"
-        "Each tag may use placeholders in curly braces to be interpolated. The placeholders are "
-        "derived from various sources, such as the Dockerfile FROM instructions tags and build "
-        f"args.\n\nSee {doc_url('tagging-docker-images')}."
+        + _interpolation_help.format(kind="tag")
+        + f"See {doc_url('tagging-docker-images')}."
     )
 
 
@@ -148,9 +152,11 @@ class DockerRepositoryField(StringField):
     alias = "repository"
     help = (
         'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
-        "It uses the `[docker].default_repository` by default."
-        "This field value may contain format strings that will be interpolated at runtime. "
-        "See the documentation for `[docker].default_repository` for details."
+        "It uses the `[docker].default_repository` by default.\n\n"
+        + _interpolation_help.format(kind="repository")
+        + "Additional placeholders for the repository field are: `name`, `directory` and "
+        "`parent_directory`.\n\nSee the documentation for `[docker].default_repository` for more "
+        "information."
     )
 
 
@@ -160,20 +166,38 @@ class DockerSkipPushField(BoolField):
     help = "If set to true, do not push this image to registries when running `./pants publish`."
 
 
+OptionValueFormatter = Callable[[str], str]
+
+
 class DockerBuildOptionFieldMixin(ABC):
     """Inherit this mixin class to provide options to `docker build`."""
 
     docker_build_option: ClassVar[str]
 
     @abstractmethod
-    def option_values(self) -> Iterator[str]:
+    def option_values(self, *, value_formatter: OptionValueFormatter) -> Iterator[str]:
         """Subclasses must implement this, to turn their `self.value` into none, one or more option
         values."""
 
     @final
-    def options(self) -> Iterator[str]:
-        for value in self.option_values():
-            yield f"{self.docker_build_option}={shlex.quote(value)}"
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        for value in self.option_values(value_formatter=value_formatter):
+            yield from (self.docker_build_option, value)
+
+
+class DockerBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "image_labels"
+    help = (
+        "Provide image metadata.\n\n"
+        + _interpolation_help.format(kind="label value")
+        + "See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/"
+        "#manage-labels-on-objects) for more information."
+    )
+    docker_build_option = "--label"
+
+    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        for label, value in (self.value or {}).items():
+            yield f"{label}={value_formatter(value)}"
 
 
 class DockerBuildSecretsOptionField(
@@ -203,7 +227,7 @@ class DockerBuildSecretsOptionField(
 
     docker_build_option = "--secret"
 
-    def option_values(self) -> Iterator[str]:
+    def option_values(self, **kwargs) -> Iterator[str]:
         # os.path.join() discards preceeding parts if encountering an abs path, e.g. if the secret
         # `path` is an absolute path, the `buildroot` and `spec_path` will not be considered.  Also,
         # an empty path part is ignored.
@@ -231,7 +255,7 @@ class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField
 
     docker_build_option = "--ssh"
 
-    def option_values(self) -> Iterator[str]:
+    def option_values(self, **kwargs) -> Iterator[str]:
         yield from cast("tuple[str]", self.value)
 
 
@@ -246,6 +270,7 @@ class DockerImageTarget(Target):
         DockerImageTagsField,
         DockerRegistriesField,
         DockerRepositoryField,
+        DockerBuildImageLabelsOptionField,
         DockerBuildSecretsOptionField,
         DockerBuildSSHOptionField,
         DockerSkipPushField,
