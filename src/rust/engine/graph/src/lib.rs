@@ -638,7 +638,7 @@ impl<N: Node> Graph<N> {
     // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
     let mut edge_ids = inner
       .pg
-      .edges_directed(entry_id, Direction::Incoming)
+      .edges_directed(entry_id, Direction::Outgoing)
       .map(|e| e.id())
       .collect::<Vec<_>>();
     edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
