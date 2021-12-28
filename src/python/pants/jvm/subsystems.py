@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from typing import cast
 
-from pants.backend.java.subsystems.javac import JavacSubsystem
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.target import InvalidFieldException, Target
 from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
 from pants.option.subsystem import Subsystem
@@ -60,16 +58,9 @@ class JvmSubsystem(Subsystem):
             ),
         )
 
-    def jdk(self, javac_subsystem: JavacSubsystem) -> str:
-        jdk = resolve_conflicting_options(
-            old_option="jdk",
-            new_option="jdk",
-            old_scope=javac_subsystem.options_scope,
-            new_scope=self.options_scope,
-            old_container=javac_subsystem.options,
-            new_container=self.options,
-        )
-        return cast(str, jdk)
+    @property
+    def jdk(self) -> str:
+        return cast(str, self.options.jdk)
 
     @property
     def resolves(self) -> dict[str, str]:
