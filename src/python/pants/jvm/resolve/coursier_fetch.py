@@ -494,18 +494,16 @@ async def coursier_resolve_lockfile(
         )
     )
 
-    # NB: Parsing of the resolve JSON applies the workaround for
-    #   https://github.com/coursier/coursier/issues/2315: see `Coordinate.from_coord_str`.
     first_pass_lockfile = CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
-                coord=Coordinate.from_coord_str(dep["coord"], with_2315_workaround=True),
+                coord=Coordinate.from_coord_str(dep["coord"]),
                 direct_dependencies=Coordinates(
-                    Coordinate.from_coord_str(dd, with_2315_workaround=True)
+                    Coordinate.from_coord_str(dd)
                     for dd in dep["directDependencies"]
                 ),
                 dependencies=Coordinates(
-                    Coordinate.from_coord_str(d, with_2315_workaround=True)
+                    Coordinate.from_coord_str(d)
                     for d in dep["dependencies"]
                 ),
                 file_name=file_name,
@@ -633,10 +631,7 @@ async def coursier_fetch_one_coord(
         )
 
     dep = report_deps[0]
-
-    # NB: Parsing of the resolve JSON applies the workaround for
-    #   https://github.com/coursier/coursier/issues/2315: see `Coordinate.from_coord_str`.
-    resolved_coord = Coordinate.from_coord_str(dep["coord"], with_2315_workaround=True)
+    resolved_coord = Coordinate.from_coord_str(dep["coord"])
     if resolved_coord != request.coord:
         raise CoursierError(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
