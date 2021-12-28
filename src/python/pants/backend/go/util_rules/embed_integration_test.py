@@ -297,6 +297,4 @@ def test_embed_filesystem(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    print(f"stdout = {result.stdout}")
-    print(f"stderr = {result.stderr}")
     assert result.exit_code == 0
