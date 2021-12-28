@@ -114,25 +114,22 @@ def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "coord_str,with_2315_workaround,expected",
+    "coord_str,expected",
     (
         *(
-            ("group:artifact:version", b, Coordinate("group", "artifact", "version"))
-            for b in [True, False]
+            ("group:artifact:version", Coordinate("group", "artifact", "version"))
         ),
         (
             "group:artifact:packaging:version",
-            True,
             Coordinate("group", "artifact", "version", "packaging"),
         ),
         (
-            "group:artifact:version:packaging",
-            False,
-            Coordinate("group", "artifact", "version", "packaging"),
+            "group:artifact:packaging:classifier:version",
+            Coordinate("group", "artifact", "version", "packaging", "classifier"),
         ),
     ),
 )
-def test_from_coord_str(coord_str: str, with_2315_workaround: bool, expected: Coordinate) -> None:
+def test_from_coord_str(coord_str: str, expected: Coordinate) -> None:
     assert (
-        Coordinate.from_coord_str(coord_str, with_2315_workaround=with_2315_workaround) == expected
+        Coordinate.from_coord_str(coord_str) == expected
     )
