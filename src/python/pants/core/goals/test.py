@@ -505,15 +505,16 @@ async def run_tests(
     return Test(exit_code)
 
 
+_SOURCE_MAP = {
+    ProcessResultMetadata.Source.MEMOIZED: "memoized",
+    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
+    ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
+}
+
+
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    source_map = {
-        ProcessResultMetadata.Source.MEMOIZED: "memoized",
-        ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
-        ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
-        ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
-    }
-
     if result.result_metadata:
         if result.exit_code == 0:
             sigil = console.sigil_succeeded()
@@ -522,7 +523,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
             sigil = console.sigil_failed()
             status = "failed"
 
-        source = source_map.get(result.result_metadata.source(run_id))
+        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
         source_print = f" ({source})" if source else ""
 
         elapsed_print = ""
