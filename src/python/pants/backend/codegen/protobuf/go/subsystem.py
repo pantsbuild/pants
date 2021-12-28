@@ -19,8 +19,9 @@ class GoProtobufSubsystem(Subsystem):
             type=str,
             default="v1.27.1",
             help=(
-                "The version of the Go protobuf plugin to use. The value of this option is used as "
-                "the version query passed to `go install` to build the protoc plugin. "
+                "The version of the Go protobuf plugin to use.\n\n"
+                "The value of this option is used as  the version query passed to `go install` "
+                "to build the protoc plugin. "
                 "See https://go.dev/ref/mod#version-queries for more information on the format of version queries."
             ),
         )
@@ -29,8 +30,9 @@ class GoProtobufSubsystem(Subsystem):
             type=str,
             default="v1.2.0",
             help=(
-                "The version of the Go gRPC protobuf plugin to use. The value of this option is used as "
-                "the version query passed to `go install` to build the protoc plugin. "
+                "The version of the Go gRPC protobuf plugin to use.\n\n"
+                "The value of this option is used as the version query passed to `go install` "
+                "to build the protoc plugin. "
                 "See https://go.dev/ref/mod#version-queries for more information on the format of version queries."
             ),
         )

@@ -72,9 +72,6 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateGoFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
-    sources_contents = rule_runner.request(DigestContents, [generated_sources.snapshot.digest])
-    for sc in sources_contents:
-        print(f"{sc.path}:\n{sc.content.decode()}")
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
