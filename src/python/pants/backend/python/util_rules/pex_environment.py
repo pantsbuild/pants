@@ -100,10 +100,6 @@ class PexRuntimeEnvironment(Subsystem):
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
-    def bootstrap_interpreter_names(self) -> tuple[str, ...]:
-        return tuple(self.options.bootstrap_interpreter_names)
-
-    @property
     def verbosity(self) -> int:
         level = cast(int, self.options.verbosity)
         if level < 0 or level > 9:
@@ -195,9 +191,7 @@ async def find_pex_python(
 ) -> PexEnvironment:
     return PexEnvironment(
         path=pex_runtime_env.path(python_bootstrap.environment),
-        interpreter_search_paths=tuple(
-            python_setup.interpreter_search_paths(python_bootstrap.environment)
-        ),
+        interpreter_search_paths=python_bootstrap.interpreter_search_paths(python_setup),
         subprocess_environment_dict=subprocess_env_vars.vars,
         # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
         #  the normalization only once, via the options system?

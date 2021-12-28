@@ -8,12 +8,9 @@ import logging
 import os
 from typing import Iterable, Optional, cast
 
-from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.python.binaries import PythonBootstrap
 from pants.util.docutil import doc_url
-from pants.util.memo import memoized_method
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
@@ -289,14 +286,6 @@ class PythonSetup(Subsystem):
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
-
-    @memoized_method
-    def interpreter_search_paths(self, env: Environment):
-        # TODO: When the `interpreter_search_paths` option is removed, callers who need the
-        # interpreter search path should directly use `PythonBootstrap.interpreter_search_path`.
-        return PythonBootstrap.expand_interpreter_search_paths(
-            self.options.interpreter_search_paths, env
-        )
 
     @property
     def manylinux(self) -> str | None:
