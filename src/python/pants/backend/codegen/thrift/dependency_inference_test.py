@@ -27,42 +27,37 @@ from pants.util.frozendict import FrozenDict
 @pytest.mark.parametrize(
     "file_content,expected",
     [
-        ("include 'foo.thrift';", {"foo.thrift"}),
-        ("include'foo.thrift';", {"foo.thrift"}),
-        ("include\t   'foo.thrift'   \t;", {"foo.thrift"}),
-        ('include "foo.thrift";', {"foo.thrift"}),
+        ("include 'foo.thrift'", {"foo.thrift"}),
+        ("include'foo.thrift'", {"foo.thrift"}),
+        ("include\t   'foo.thrift'   \t", {"foo.thrift"}),
+        ('include "foo.thrift"', {"foo.thrift"}),
         # We don't worry about matching opening and closing ' vs. " quotes; Thrift will error if
         # invalid.
-        ("include 'foo.thrift\";", {"foo.thrift"}),
-        ("include \"foo.thrift';", {"foo.thrift"}),
+        ("include 'foo.thrift\"", {"foo.thrift"}),
+        ("include \"foo.thrift'", {"foo.thrift"}),
         # More complex file names.
-        ("include 'path/to_dir/f.thrift';", {"path/to_dir/f.thrift"}),
-        ("include 'path/to dir/f.thrift';", {"path/to dir/f.thrift"}),
-        ("include 'path\\to-dir\\f.thrift';", {"path\\to-dir\\f.thrift"}),
-        ("include 'âčĘï.thrift';", {"âčĘï.thrift"}),
-        ("include '123.thrift';", {"123.thrift"}),
+        ("include 'path/to_dir/f.thrift'", {"path/to_dir/f.thrift"}),
+        ("include 'path\\to-dir\\f.thrift'", {"path\\to-dir\\f.thrift"}),
+        ("include 'âčĘï.thrift'", {"âčĘï.thrift"}),
+        ("include '123.thrift'", {"123.thrift"}),
         # Invalid includes.
-        ("include foo.thrift;", set()),
-        ("include 'foo.thrift'", set()),
-        ("include 'foo.thrift';", set()),
-        ("inlude 'foo.thrift';", set()),
+        ("include foo.thrift", set()),
+        ("inlude 'foo.thrift'", set()),
         # Multiple includes in a file.
         ("include 'foo.thrift'; include \"bar.thrift\";", {"foo.thrift", "bar.thrift"}),
         (
             dedent(
                 """\
-                syntax = "proto3";
-
-                include 'dir/foo.thrift';
-                some random proto code;
-                include public 'ábč.thrift';
+                include 'dir/foo.thrift'
+                some random thrift code;
+                include 'ábč.thrift';
                 """
             ),
             {"dir/foo.thrift", "ábč.thrift"},
         ),
     ],
 )
-def test_parse_proto_imports(file_content: str, expected: Set[str]) -> None:
+def test_parse_thrift_imports(file_content: str, expected: Set[str]) -> None:
     assert set(parse_thrift_imports(file_content)) == expected
 
 
@@ -80,7 +75,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_protobuf_mapping(rule_runner: RuleRunner) -> None:
+def test_thrift_mapping(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--source-root-patterns=['root1', 'root2', 'root3']"])
     rule_runner.write_files(
         {
