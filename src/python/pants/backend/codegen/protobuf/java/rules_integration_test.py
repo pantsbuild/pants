@@ -66,12 +66,9 @@ def assert_files_generated(
     *,
     expected_files: list[str],
     source_roots: list[str],
-    mypy: bool = False,
     extra_args: list[str] | None = None,
 ) -> None:
     args = [f"--source-root-patterns={repr(source_roots)}", *(extra_args or ())]
-    if mypy:
-        args.append("--python-protobuf-mypy-plugin")
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
     protocol_sources = rule_runner.request(

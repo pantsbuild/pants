@@ -49,7 +49,7 @@ async def generate_java_from_protobuf(
     output_dir = "_generated_files"
     create_output_dir_request = Get(Digest, CreateDigest([Directory(output_dir)]))
 
-    # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
+    # Protoc needs all transitive dependencies on `protobuf_source` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
     transitive_targets = await Get(
