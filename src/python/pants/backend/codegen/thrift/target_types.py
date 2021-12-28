@@ -77,8 +77,8 @@ class ThriftSourcesOverridesField(OverridesField):
         ThriftSourceTarget.alias,
         (
             "overrides={\n"
-            '  "bar.proto": {"description": "our user model"]},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
+            '  "bar.thrift": {"description": "our user model"]},\n'
+            '  ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},\n'
             "}"
         ),
     )
