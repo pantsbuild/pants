@@ -59,6 +59,7 @@ def test_help_specific_target() -> None:
             A ZIP or TAR file containing loose files and code packages.
 
 
+            Activated by pants.core
             Valid fields:
             """
         )
@@ -71,6 +72,7 @@ def test_help_specific_target() -> None:
             format
                 type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
                 required
+
                 The type of archive file to be generated.
             """
         )

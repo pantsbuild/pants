@@ -274,22 +274,22 @@ class HelpPrinter(MaybeColor):
         if tinfo.description:
             formatted_desc = "\n".join(hard_wrap(tinfo.description, width=self._width))
             print(formatted_desc)
-        print(f"\n\nProvider: {self.maybe_magenta(tinfo.provider)}")
+        print(f"\n\nActivated by {self.maybe_magenta(tinfo.provider)}")
         print("Valid fields:")
         for field in sorted(tinfo.fields, key=lambda x: x.alias):
             print()
             print(self.maybe_magenta(field.alias))
             indent = "    "
             required_or_default = "required" if field.required else f"default: {field.default}"
+            if field.provider not in ["", tinfo.provider]:
+                print(self.maybe_cyan(f"{indent}from: {field.provider}"))
             print(self.maybe_cyan(f"{indent}type: {field.type_hint}"))
             print(self.maybe_cyan(f"{indent}{required_or_default}"))
-            if field.provider not in ["", tinfo.provider]:
-                print(self.maybe_cyan(f"{indent}plugin: {field.provider}"))
             if field.description:
                 formatted_desc = "\n".join(
                     hard_wrap(field.description, indent=len(indent), width=self._width)
                 )
-                print(formatted_desc)
+                print("\n" + formatted_desc)
         print()
 
     def _get_help_json(self) -> str:

@@ -392,7 +392,7 @@ class HelpInfoExtracter:
     def get_first_provider(providers: tuple[str, ...] | None) -> str:
         if not providers:
             return ""
-        return ", ".join(providers)
+        return providers[0]
 
     def __init__(self, scope: str):
         self._scope = scope
