@@ -249,6 +249,28 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_resolve_with_classifier(rule_runner: RuleRunner) -> None:
+    # Has as a transitive dependency an artifact with both a `classifier` and `packaging`.
+    coordinate = Coordinate(group="org.apache.avro", artifact="avro-tools", version="1.11.0")
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements.from_coordinates([coordinate])],
+    )
+
+    assert (
+        Coordinate(
+            group="org.apache.avro",
+            artifact="trevni-avro",
+            version="1.11.0",
+            packaging="jar",
+            classifier="tests",
+            strict=True,
+        )
+        in [e.coord for e in resolved_lockfile.entries]
+    )
+
+
+@maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
     coordinate = ArtifactRequirement(
