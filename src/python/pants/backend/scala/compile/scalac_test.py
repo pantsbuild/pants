@@ -370,9 +370,8 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
     assert "error: object joda is not a member of package org" in fallible_result.stderr
 
 
-@logging
 @maybe_skip_jdk_test
-def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
+def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
@@ -451,3 +450,392 @@ def test_compile_with_scalac_plugins(rule_runner: RuleRunner) -> None:
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "error: Unwanted cyclic dependency" in fallible_result.stderr
+
+
+@maybe_skip_jdk_test
+def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+                scala_sources()
+
+                jvm_artifact(
+                    name="kind-projector-lib",
+                    group="org.typelevel",
+                    artifact="kind-projector_2.13.6",
+                    version="0.13+",
+                )
+
+                scalac_plugin(
+                    name="kind-projector",
+                    plugin_name="kind-projector",
+                    artifact=":kind-projector-lib",
+                )
+
+                jvm_artifact(
+                    name="better-monadic-for-lib",
+                    group="com.olegpy",
+                    artifact="better-monadic-for_2.13",
+                    version="0.3+",
+                )
+
+                scalac_plugin(
+                    name="better-monadic-for",
+                    plugin_name="bm4",
+                    artifact=":better-monadic-for-lib",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(
+                entries=(
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="com.olegpy",
+                            artifact="better-monadic-for_2.13",
+                            version="0.3.1",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="com.olegpy_better-monadic-for_2.13_0.3.1.jar",
+                        direct_dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-compiler",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-compiler",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        file_digest=FileDigest(
+                            "fac649fa7de697d1f98d3f814c4b70f5372c547fa41778383e22cee6c16084f5",
+                            130370,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="net.java.dev.jna",
+                            artifact="jna",
+                            version="5.3.1",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="net.java.dev.jna_jna_5.3.1.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "01cb505c0698d0f7acf3524c7e73acb7dc424a5bae5e9c86ce44075ab32bc4ee",
+                            1505196,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jline",
+                            artifact="jline",
+                            version="3.19.0",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="org.jline_jline_3.19.0.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "c99ddcfa5431cab88d1cd40fd63bec6ab5a3fe2e83877051198539af66592a46",
+                            987021,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version="2.13.6",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="org.scala-lang_scala-compiler_2.13.6.jar",
+                        direct_dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="net.java.dev.jna",
+                                    artifact="jna",
+                                    version="5.3.1",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.jline",
+                                    artifact="jline",
+                                    version="3.19.0",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-reflect",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="net.java.dev.jna",
+                                    artifact="jna",
+                                    version="5.3.1",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.jline",
+                                    artifact="jline",
+                                    version="3.19.0",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-reflect",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        file_digest=FileDigest(
+                            "310d263d622a3d016913e94ee00b119d270573a5ceaa6b21312d69637fd9eec1",
+                            12010571,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version="2.13.6",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="org.scala-lang_scala-library_2.13.6.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
+                            5955737,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version="2.13.6",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="org.scala-lang_scala-reflect_2.13.6.jar",
+                        direct_dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                )
+                            ]
+                        ),
+                        dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                )
+                            ]
+                        ),
+                        file_digest=FileDigest(
+                            "f713593809b387c60935bb9a940dfcea53bd0dbf8fdc8d10739a2896f8ac56fa",
+                            3769997,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.typelevel",
+                            artifact="kind-projector_2.13.6",
+                            version="0.13.2",
+                            packaging="jar",
+                            strict=True,
+                        ),
+                        file_name="org.typelevel_kind-projector_2.13.6_0.13.2.jar",
+                        direct_dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-compiler",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-compiler",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-reflect",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.scala-lang",
+                                    artifact="scala-library",
+                                    version="2.13.6",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="net.java.dev.jna",
+                                    artifact="jna",
+                                    version="5.3.1",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                                Coordinate(
+                                    group="org.jline",
+                                    artifact="jline",
+                                    version="3.19.0",
+                                    packaging="jar",
+                                    strict=True,
+                                ),
+                            ]
+                        ),
+                        file_digest=FileDigest(
+                            "3d713d02bbe0d52b01c22ac11a50970460114f32b339f3ea429d52461d6c39ff",
+                            44257,
+                        ),
+                        remote_url=None,
+                        pants_address=None,
+                    ),
+                )
+            )
+            .to_json()
+            .decode("utf-8"),
+            "lib/A.scala": dedent(
+                """\
+                trait Functor[F[_]] {
+                  def map[A, B](fa: F[A])(f: A => B): F[B]
+                }
+
+                object KindProjectorTest {
+                  implicit def eitherFunctor[E]: Functor[Either[E, *]] = new Functor[Either[E, *]] {
+                    def map[A, B](fa: Either[E, A])(f: A => B): Either[E, B] = {
+                      fa match {
+                        case Left(e) => Left(e)
+                        case Right(a) => Right(f(a))
+                      }
+                    }
+                  }
+                }
+
+                object BetterMonadicForTest {
+                  def example: Option[String] = {
+                    case class ImplicitTest(id: String)
+
+                    for {
+                      x <- Option(42)
+                      implicit0(it: ImplicitTest) <- Option(ImplicitTest("eggs"))
+                      _ <- Option("dummy")
+                      _ = "dummy"
+                      _ = assert(implicitly[ImplicitTest] eq it)
+                    } yield "ok"
+                  }
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            "--scalac-plugins-global=['lib:better-monadic-for', 'lib:kind-projector']",
+            "--scalac-plugins-global-lockfile=3rdparty/jvm/default.lock",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="lib", relative_file_path="A.scala")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    rule_runner.request(RenderedClasspath, [request])
