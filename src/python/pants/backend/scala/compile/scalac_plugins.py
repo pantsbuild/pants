@@ -86,9 +86,8 @@ class GlobalScalacPlugins:
     classpath: MaterializedClasspath
 
     def args(self, prefix: str | None = None) -> Iterator[str]:
-        scalac_plugins_arg = ":".join(self.classpath.classpath_entries(prefix))
-        if scalac_plugins_arg:
-            yield f"-Xplugin:{scalac_plugins_arg}"
+        for scalac_plugin_path in self.classpath.classpath_entries(prefix):
+            yield f"-Xplugin:{scalac_plugin_path}"
         for name in self.names:
             yield f"-Xplugin-require:{name}"
 
