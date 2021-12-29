@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from colors import red
-from setuptools import Extension, setup  # type: ignore[import]
+from setuptools import Extension, setup
 
 native_impl = Extension("native.impl", sources=["impl.c"])
 
