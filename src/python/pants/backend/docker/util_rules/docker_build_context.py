@@ -120,7 +120,7 @@ class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
 
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """This is a meta field for the context files generator, to tell the codegen machinery what
-    source fields are good to use.
+    source fields are good to use as-is.
 
     Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
     that should be accepted.
@@ -130,7 +130,7 @@ class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """
 
 
-DockerContextFilesAcceptableInputsField.register(FileSourceField)
+# These sources will be used to populate the build context as-is.
 DockerContextFilesAcceptableInputsField.register(ShellSourceField)
 
 
@@ -268,7 +268,10 @@ async def create_docker_build_context(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(DockerContextFilesSourcesField,),
+            for_sources_types=(
+                DockerContextFilesSourcesField,
+                FileSourceField,
+            ),
             enable_codegen=True,
         ),
     )
