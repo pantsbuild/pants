@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Tuple
+from typing import DefaultDict, Iterable, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -195,20 +195,24 @@ async def map_third_party_modules_to_addresses(
     modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
 
     for tgt in all_python_tgts.third_party:
+
+        def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
+            for module in modules:
+                modules_to_providers[module].append(
+                    ModuleProvider(
+                        tgt.address,
+                        ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+                    )
+                )
+
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:
-            for module in explicit_modules:
-                modules_to_providers[module].append(
-                    ModuleProvider(tgt.address, ModuleProviderType.IMPL)
-                )
+            add_modules(explicit_modules)
             continue
 
         explicit_stub_modules = tgt.get(PythonRequirementTypeStubModulesField).value
         if explicit_stub_modules:
-            for module in explicit_stub_modules:
-                modules_to_providers[module].append(
-                    ModuleProvider(tgt.address, ModuleProviderType.TYPE_STUB)
-                )
+            add_modules(explicit_stub_modules, type_stub=True)
             continue
 
         # Else, fall back to defaults.
@@ -231,15 +235,9 @@ async def map_third_party_modules_to_addresses(
                     stub_modules = (
                         fallback_value[6:] if starts_with_prefix else fallback_value[:-6],
                     )
-                for module in stub_modules:
-                    modules_to_providers[module].append(
-                        ModuleProvider(tgt.address, ModuleProviderType.TYPE_STUB)
-                    )
+                add_modules(stub_modules, type_stub=True)
             else:
-                for module in DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)):
-                    modules_to_providers[module].append(
-                        ModuleProvider(tgt.address, ModuleProviderType.IMPL)
-                    )
+                add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)))
 
     return ThirdPartyPythonModuleMapping(
         (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
