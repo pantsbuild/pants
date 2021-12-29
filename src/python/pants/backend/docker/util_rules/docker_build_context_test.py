@@ -117,8 +117,8 @@ def assert_build_context(
                 build_args
             )
 
-        if "PANTS" not in expected_interpolation_context:
-            expected_interpolation_context["PANTS"] = context.interpolation_context["PANTS"]
+        if "pants" not in expected_interpolation_context:
+            expected_interpolation_context["pants"] = context.interpolation_context["pants"]
 
         assert context.interpolation_context == DockerInterpolationContext.from_dict(
             expected_interpolation_context
@@ -143,7 +143,7 @@ def test_pants_hash(rule_runner: RuleRunner) -> None:
             "baseimage": {"tag": "latest"},
             "stage0": {"tag": "latest"},
             "build_args": {},
-            "PANTS": {"HASH": "5945249394980428683"},
+            "pants": {"hash": "5945249394980428683"},
         },
     )
 
