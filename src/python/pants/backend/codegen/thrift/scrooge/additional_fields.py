@@ -10,7 +10,7 @@ from pants.engine.target import BoolField
 class ScroogeFinagleBoolField(BoolField):
     alias = "finagle"
     default = False
-    help = "If True, then generate Finagle classes when using Scrooge as the Thrift generator."
+    help = "If True, then also generate Finagle classes for services when using Scrooge as the Thrift generator."
 
 
 def rules():

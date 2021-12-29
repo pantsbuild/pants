@@ -35,7 +35,7 @@ class ApacheThriftJavaSubsystem(Subsystem):
                 "A list of addresses to `jvm_artifact` targets for the runtime "
                 "dependencies needed for generated Java code to work. For example, "
                 "`['3rdparty/jvm:libthrift']`. These dependencies will "
-                "be automatically added to every `thrift_sources` target. At the very least, "
+                "be automatically added to every `thrift_source` target. At the very least, "
                 "this option must be set to a `jvm_artifact` for the "
                 "`org.apache.thrift:libthrift` runtime library."
             ),

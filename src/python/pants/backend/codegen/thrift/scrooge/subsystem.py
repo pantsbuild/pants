@@ -33,7 +33,7 @@ class ScroogeSubsystem(JvmToolBase):
                 "A list of addresses to `jvm_artifact` targets for the runtime "
                 "dependencies needed for generated Scala code to work. For example, "
                 "`['3rdparty/jvm:scrooge-runtime']`. These dependencies will "
-                "be automatically added to every `protobuf_sources` target. At the very least, "
+                "be automatically added to every `thrift_source` target. At the very least, "
                 "this option must be set to a `jvm_artifact` for the "
                 f"`com.twitter:scrooge-runtime_SCALAVER:{cls.default_version}` runtime library."
             ),
