@@ -8,12 +8,9 @@ import logging
 import os
 from typing import Iterable, Optional, cast
 
-from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.python.binaries import PythonBootstrap
 from pants.util.docutil import doc_url
-from pants.util.memo import memoized_method
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
@@ -29,9 +26,6 @@ class InvalidLockfileBehavior(enum.Enum):
 class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
-
-    deprecated_options_scope = "python-setup"
-    deprecated_options_scope_removal_version = "2.10.0.dev0"
 
     default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
@@ -87,7 +81,8 @@ class PythonSetup(Subsystem):
                 "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
                 "information on the format of constraint files and how constraints are applied in "
                 "Pex and pip.\n\n"
-                "Mutually exclusive with `[python].experimental_lockfile`."
+                "Mutually exclusive with `[python].experimental_lockfile` and "
+                "`[python].enable_resolves`."
             ),
         )
         register(
@@ -113,29 +108,56 @@ class PythonSetup(Subsystem):
             # TODO(#11719): Switch this to a file_option once env vars can unset a value.
             type=str,
             metavar="<file>",
-            mutually_exclusive_group="constraints",
+            mutually_exclusive_group="lockfile",
             help=(
                 "The lockfile to use when resolving requirements for your own code (vs. tools you "
                 "run).\n\n"
-                "This is highly experimental and will change, including adding support for "
-                "multiple lockfiles. This option's behavior may change without the normal "
-                "deprecation cycle.\n\n"
+                "This is highly experimental and will be replaced by `[python].enable_resolves`.\n\n"
                 "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
                 "and run `./pants generate-user-lockfile ::`.\n\n"
-                "Mutually exclusive with `[python].requirement_constraints`."
+                "Mutually exclusive with `[python].requirement_constraints` and "
+                "`[python].enable_resolves`."
             ),
         )
         register(
-            "--experimental-resolves-to-lockfiles",
+            "--enable-resolves",
+            advanced=True,
+            type=bool,
+            default=False,
+            mutually_exclusive_group="lockfile",
+            help=(
+                "Set to true to enable the multiple resolves mechanism. See "
+                "`[python].experimental_resolves` for an explanation of this feature.\n\n"
+                "Mutually exclusive with `[python].experimental_lockfile` and "
+                "`[python].requirement_constraints`."
+            ),
+        )
+        register(
+            "--experimental-resolves",
             advanced=True,
             type=dict,
+            default={"python-default": "3rdparty/python/default_lock.txt"},
             help=(
-                "A mapping of logical names to lockfile paths used in your project, e.g. "
-                "`{ default = '3rdparty/default_lockfile.txt', py2 = '3rdparty/py2.txt' }`.\n\n"
+                "A mapping of logical names to lockfile paths used in your project.\n\n"
+                # TODO(#12314): explain how this feature works.
                 "To generate a lockfile, run `./pants generate-lockfiles --resolve=<name>` or "
                 "`./pants generate-lockfiles` to generate for all resolves (including tool "
                 "lockfiles).\n\n"
-                "This is highly experimental and will likely change."
+                "Only applies if `[python].enable_resolves` is true.\n\n"
+                "This option is experimental and may change without the normal deprecation policy."
+            ),
+        )
+        register(
+            "--experimental-default-resolve",
+            advanced=True,
+            type=str,
+            default="python-default",
+            help=(
+                "The default value used for the `experimental_resolve` and "
+                "`experimental_compatible_resolves` fields.\n\n"
+                "Only applies if `[python].enable_resolves` is true.\n\n"
+                "The name must be defined as a resolve in `[python].experimental_resolves`.\n\n"
+                "This option is experimental and may change without the normal deprecation policy."
             ),
         )
         register(
@@ -165,32 +187,6 @@ class PythonSetup(Subsystem):
                 "This option does not affect packaging deployable artifacts, such as "
                 "PEX files, wheels and cloud functions, which will still use just the exact "
                 "subset of requirements needed."
-            ),
-        )
-        register(
-            "--interpreter-search-paths",
-            advanced=True,
-            type=list,
-            default=["<PYENV>", "<PATH>"],
-            metavar="<binary-paths>",
-            removal_version="2.10.0.dev0",
-            removal_hint=("Moved to `[python-bootstrap] search_path`."),
-            help=(
-                "A list of paths to search for Python interpreters that match your project's "
-                "interpreter constraints.\n\n"
-                "You can specify absolute paths to interpreter binaries "
-                "and/or to directories containing interpreter binaries. The order of entries does "
-                "not matter.\n\n"
-                "The following special strings are supported:\n\n"
-                "* `<PATH>`, the contents of the PATH env var\n"
-                "* `<ASDF>`, all Python versions currently configured by ASDF "
-                "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
-                "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
-                "BUILD_ROOT/.tool-versions\n"
-                "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
-                "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
-                "BUILD_ROOT/.python-version\n"
-                "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
             ),
         )
         register(
@@ -272,8 +268,16 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.experimental_lockfile)
 
     @property
-    def resolves_to_lockfiles(self) -> dict[str, str]:
-        return cast("dict[str, str]", self.options.experimental_resolves_to_lockfiles)
+    def enable_resolves(self) -> bool:
+        return cast(bool, self.options.enable_resolves)
+
+    @property
+    def resolves(self) -> dict[str, str]:
+        return cast("dict[str, str]", self.options.experimental_resolves)
+
+    @property
+    def default_resolve(self) -> str:
+        return cast(str, self.options.experimental_default_resolve)
 
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
@@ -289,14 +293,6 @@ class PythonSetup(Subsystem):
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
-
-    @memoized_method
-    def interpreter_search_paths(self, env: Environment):
-        # TODO: When the `interpreter_search_paths` option is removed, callers who need the
-        # interpreter search path should directly use `PythonBootstrap.interpreter_search_path`.
-        return PythonBootstrap.expand_interpreter_search_paths(
-            self.options.interpreter_search_paths, env
-        )
 
     @property
     def manylinux(self) -> str | None:

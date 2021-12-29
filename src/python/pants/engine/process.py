@@ -13,7 +13,15 @@ from typing import Iterable, Mapping
 
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, FileDigest
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    FileContent,
+    FileDigest,
+    MergeDigests,
+)
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
@@ -175,24 +183,34 @@ class FallibleProcessResult:
 class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
+    class Source(Enum):
+        RAN_LOCALLY = "ran_locally"
+        RAN_REMOTELY = "ran_remotely"
+        HIT_LOCALLY = "hit_locally"
+        HIT_REMOTELY = "hit_remotely"
+        MEMOIZED = "memoized"
+
     # The execution time of the process, in milliseconds, or None if it could not be captured
     # (since remote execution does not guarantee its availability).
     total_elapsed_ms: int | None
     # Whether the ProcessResult (when it was created in the attached run_id) came from the local
     # or remote cache, or ran locally or remotely. See the `self.source` method.
-    # TODO: Consider extracting an enum.
     _source: str
     # The run_id in which a ProcessResult was created. See the `self.source` method.
     source_run_id: int
 
-    def source(self, current_run_id: RunId) -> str:
+    def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
         If a ProcessResult is consumed in any run_id other than the one it was created in, the its
         source implicitly becomes memoization, since the result was re-used in a new run without
         being recreated.
         """
-        return self._source if self.source_run_id == current_run_id else "memoized"
+        return (
+            self.Source(self._source)
+            if self.source_run_id == current_run_id
+            else self.Source.MEMOIZED
+        )
 
 
 class ProcessExecutionFailure(Exception):
@@ -326,9 +344,9 @@ class InteractiveProcess(SideEffecting):
             )
         if self.append_only_caches and self.run_in_workspace:
             raise ValueError(
-                "InteractiveProcess requested setup of append-only caches and also requested to run in "
-                "the workspace. These options are incompatible since setting up append-only caches would "
-                "modify the workspace."
+                "InteractiveProcess requested setup of append-only caches and also requested to run"
+                " in the workspace. These options are incompatible since setting up append-only"
+                " caches would modify the workspace."
             )
 
     @classmethod
@@ -339,6 +357,14 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
     ) -> InteractiveProcess:
+        # TODO: Remove this check once https://github.com/pantsbuild/pants/issues/13852 is
+        #  implemented and the immutable_input_digests are propagated into the InteractiveProcess.
+        if process.immutable_input_digests:
+            raise ValueError(
+                "Process has immutable_input_digests, so it cannot be converted to an "
+                "InteractiveProcess by calling from_process().  Use an async "
+                "InteractiveProcessRequest instead."
+            )
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -347,6 +373,39 @@ class InteractiveProcess(SideEffecting):
             restartable=restartable,
             append_only_caches=process.append_only_caches,
         )
+
+
+@dataclass(frozen=True)
+class InteractiveProcessRequest:
+    process: Process
+    forward_signals_to_process: bool = True
+    restartable: bool = False
+
+
+@rule
+async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
+    # TODO: Temporary workaround until https://github.com/pantsbuild/pants/issues/13852
+    #  is implemented. Once that is implemented we can get rid of this rule, and the
+    #  InteractiveProcessRequest type, and use InteractiveProcess.from_process directly.
+
+    if req.process.immutable_input_digests:
+        prefixed_immutable_input_digests = await MultiGet(
+            Get(Digest, AddPrefix(digest, prefix))
+            for prefix, digest in req.process.immutable_input_digests.items()
+        )
+        full_input_digest = await Get(
+            Digest, MergeDigests([req.process.input_digest, *prefixed_immutable_input_digests])
+        )
+    else:
+        full_input_digest = req.process.input_digest
+    return InteractiveProcess(
+        argv=req.process.argv,
+        env=req.process.env,
+        input_digest=full_input_digest,
+        forward_signals_to_process=req.forward_signals_to_process,
+        restartable=req.restartable,
+        append_only_caches=req.process.append_only_caches,
+    )
 
 
 @frozen_after_init

@@ -7,6 +7,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from itertools import chain
 from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
@@ -83,14 +84,24 @@ class NoCompatibleResolve(Exception):
         )
 
 
+class InvalidCoordinateString(Exception):
+    """The coordinate string being passed is invalid or malformed."""
+
+    def __init__(self, coords: str) -> None:
+        super().__init__(f"Received invalid artifact coordinates: {coords}")
+
+
 @dataclass(frozen=True)
 class Coordinate:
     """A single Maven-style coordinate for a JVM dependency."""
+
+    REGEX = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
 
     group: str
     artifact: str
     version: str
     packaging: str = "jar"
+    classifier: str | None = None
 
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
@@ -103,6 +114,7 @@ class Coordinate:
             artifact=data["artifact"],
             version=data["version"],
             packaging=data.get("packaging", "jar"),
+            classifier=data.get("classifier", None),
         )
 
     def to_json_dict(self) -> dict:
@@ -111,18 +123,32 @@ class Coordinate:
             "artifact": self.artifact,
             "version": self.version,
             "packaging": self.packaging,
+            "classifier": self.classifier,
         }
         return ret
 
     @classmethod
     def from_coord_str(cls, s: str) -> Coordinate:
-        parts = s.split(":")
-        return cls(
-            group=parts[0],
-            artifact=parts[1],
-            version=parts[2],
-            packaging=parts[3] if len(parts) == 4 else "jar",
-        )
+        """Parses from a coordinate string with optional `packaging` and `classifier` coordinates.
+
+        Using Aether's implementation as reference
+        http://www.javased.com/index.php?source_dir=aether-core/aether-api/src/main/java/org/eclipse/aether/artifact/DefaultArtifact.java
+
+        ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
+        """
+
+        parts = Coordinate.REGEX.match(s)
+        if parts is not None:
+            packaging_part = parts.group(4)
+            return cls(
+                group=parts.group(1),
+                artifact=parts.group(2),
+                packaging=packaging_part if packaging_part is not None else "jar",
+                classifier=parts.group(6),
+                version=parts.group(7),
+            )
+        else:
+            raise InvalidCoordinateString(s)
 
     def as_requirement(self) -> ArtifactRequirement:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
@@ -130,6 +156,11 @@ class Coordinate:
 
     def to_coord_str(self, versioned: bool = True) -> str:
         unversioned = f"{self.group}:{self.artifact}"
+        if self.classifier is not None:
+            unversioned += f":{self.packaging}:{self.classifier}"
+        elif self.packaging != "jar":
+            unversioned += f":{self.packaging}"
+
         version_suffix = ""
         if versioned:
             version_suffix = f":{self.version}"
@@ -172,6 +203,9 @@ class ArtifactRequirement:
         )
 
     def to_coord_str(self, versioned: bool = True) -> str:
+        # NB: Coursier does not support the entire coordinate syntax as an input (and will report a
+        # "Malformed dependency" if either the classifier or packaging are specified). We don't strip
+        # those here, since the error from Coursier is helpful enough.
         without_url = self.coordinate.to_coord_str(versioned)
         url_suffix = ""
         if self.url:
@@ -610,7 +644,6 @@ async def coursier_fetch_one_coord(
         )
 
     dep = report_deps[0]
-
     resolved_coord = Coordinate.from_coord_str(dep["coord"])
     if resolved_coord != request.coord:
         raise CoursierError(

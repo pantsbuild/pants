@@ -26,7 +26,9 @@
         "file_digest": {
             "fingerprint": "1569de6437d71e878807302f8e1b06a06b62d217cd4a30e8019c9543d6683dff",
             "serialized_bytes_length": 3285506
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -85,7 +87,9 @@
         "file_digest": {
             "fingerprint": "0d75e8d13af1c78c55def7645dfc001edf91e45c987bfd420de0f0cda2044200",
             "serialized_bytes_length": 91593
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -100,7 +104,9 @@
         "file_digest": {
             "fingerprint": "8d0e2f9834f4fc1a083a65239adc507ca83682c754a27f4c80e4f21990eff686",
             "serialized_bytes_length": 1674945
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -177,7 +183,9 @@
         "file_digest": {
             "fingerprint": "25aed9ea609c6009c74b58f7759e4461299f7a7f4c814523e4d64fdd8f89c600",
             "serialized_bytes_length": 585060
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -218,7 +226,9 @@
         "file_digest": {
             "fingerprint": "3b595b94c21d899b94b84190f87905b5586e0b813f056a85892ec726dec4d581",
             "serialized_bytes_length": 128899
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -337,7 +347,9 @@
         "file_digest": {
             "fingerprint": "fc1856b638b0434d8d7db7442e283bca311a78a8337f37f22142d1e1e1394d79",
             "serialized_bytes_length": 6187
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -384,7 +396,9 @@
         "file_digest": {
             "fingerprint": "00257d1ccfb9890bb12382df13175822a24992162d12950dc710db27bf5c9f24",
             "serialized_bytes_length": 22110
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -551,7 +565,9 @@
         "file_digest": {
             "fingerprint": "314e88805de922f0a7cab9f3920ae99553c5586a18a22e83619a545fcf97f5b9",
             "serialized_bytes_length": 25381
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -566,7 +582,9 @@
         "file_digest": {
             "fingerprint": "6d18fe25aa30b7e08b908cd21151d8f96e22965c640acd7751add9bbfe6137d4",
             "serialized_bytes_length": 14239
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -601,7 +619,9 @@
         "file_digest": {
             "fingerprint": "e88e55332fba0826bef2d80d2a471dcf808e67f978f9537cb95cbf13168f50d5",
             "serialized_bytes_length": 802637
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -666,7 +686,9 @@
         "file_digest": {
             "fingerprint": "88c1812998b902ee6d61cfb48a262bef29dcc9e32fd4f392e08fec3f16335b86",
             "serialized_bytes_length": 387140
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -737,7 +759,9 @@
         "file_digest": {
             "fingerprint": "57df50ddd6d32bf91292b4f22e7ee99f6409e727a8b7477fd1b2afca1cce2dee",
             "serialized_bytes_length": 1295823
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -778,7 +802,9 @@
         "file_digest": {
             "fingerprint": "101b561504f58af88c53b4e0e556bea16789c14350dbca80e5b2b621f8e7363c",
             "serialized_bytes_length": 488342
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -897,7 +923,9 @@
         "file_digest": {
             "fingerprint": "b0a18751171ef36720e61ffcbf9f1dfdcf781d15d6f00df492f59a20af8a987b",
             "serialized_bytes_length": 496062
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -926,7 +954,9 @@
         "file_digest": {
             "fingerprint": "ad622c46395c28246f6ac3e1f4970b370e3ff19daa41af94ecfb61697cec4e92",
             "serialized_bytes_length": 6360
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -941,7 +971,9 @@
         "file_digest": {
             "fingerprint": "6f23a489c24743f1109125554e0d1c6420ab784f36acedd80a0704c8873b9642",
             "serialized_bytes_length": 23575
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -956,7 +988,9 @@
         "file_digest": {
             "fingerprint": "109e64fc65767c7a1a3bd654709d76f107b0a3b39db32cbf11139e13a6f5229b",
             "serialized_bytes_length": 287352
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -985,7 +1019,9 @@
         "file_digest": {
             "fingerprint": "93f8bf202ac28c4ca13562e31f6881a7770768e12b056b568139f37c025a3841",
             "serialized_bytes_length": 5610
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1014,7 +1050,9 @@
         "file_digest": {
             "fingerprint": "6d96d45a7fc6fc7ab69bdbac841b48cf67ab109f048c8db375ae4effae524f39",
             "serialized_bytes_length": 571493
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1029,7 +1067,9 @@
         "file_digest": {
             "fingerprint": "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
             "serialized_bytes_length": 5955737
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -1058,6 +1098,8 @@
         "file_digest": {
             "fingerprint": "c8acaef84ae06ad83416a7e121ba8cb3da83c8581106be0695b8066c5d7c38ae",
             "serialized_bytes_length": 3607717
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     }
 ]

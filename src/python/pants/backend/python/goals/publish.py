@@ -41,9 +41,6 @@ class PythonRepositoriesField(StringSequenceField):
     # Twine uploads to 'pypi' by default, but we don't set default to ["@pypi"] here to make it
     # explicit in the BUILD file when a package is meant for public distribution.
 
-    deprecated_alias = "pypi_repositories"
-    deprecated_alias_removal_version = "2.10.0.dev0"
-
 
 class SkipTwineUploadField(BoolField):
     alias = "skip_twine"

@@ -12,6 +12,7 @@ from pants.engine.target import (
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
+    OptionalSingleSourceField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -28,9 +29,8 @@ class JvmCompatibleResolvesField(StringSequenceField):
     alias = "compatible_resolves"
     required = False
     help = (
-        "The set of resolve names that this target is compatible with.\n\n"
+        "The set of resolves from `[jvm].resolves` that this target is compatible with.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         # TODO: Document expectations for dependencies once we validate that.
     )
 
@@ -39,9 +39,8 @@ class JvmResolveField(StringField):
     alias = "resolve"
     required = False
     help = (
-        "The name of the resolve to use when building this target.\n\n"
+        "The resolve from `[jvm].resolves` to use when compiling this target.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "The name must be defined as a resolve in `[jvm].resolves`."
         # TODO: Document expectations for dependencies once we validate that.
     )
 
@@ -99,11 +98,9 @@ class JvmArtifactUrlField(StringField):
     )
 
 
-class JvmArtifactJarSourceField(SingleSourceField):
+class JvmArtifactJarSourceField(OptionalSingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
-    expected_num_files = range(0, 2)
-    required = False
     help = (
         "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
         "Maven repository.\n\n"
@@ -156,9 +153,8 @@ class JvmProvidesTypesField(StringSequenceField):
 
 class JvmArtifactCompatibleResolvesField(JvmCompatibleResolvesField):
     help = (
-        "The resolves that this artifact should be included in.\n\n"
+        "The resolves from `[jvm].resolves` that this artifact should be included in.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "Each name must be defined as a resolve in `[jvm].resolves`.\n\n"
         "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
         "it will include all artifacts that are declared compatible with that resolve. First-party "
         "targets like `java_source` and `scala_source` then declare which resolve(s) they use "
