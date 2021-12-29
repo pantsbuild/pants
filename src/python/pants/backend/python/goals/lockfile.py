@@ -24,7 +24,7 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    PythonCompatibleResolvesField,
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementsField,
     UnrecognizedResolveNamesError,
 )
@@ -273,10 +273,10 @@ async def setup_user_lockfile_requests(
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_field(PythonCompatibleResolvesField):
+        if not tgt.has_field(PythonRequirementCompatibleResolvesField):
             continue
-        tgt[PythonCompatibleResolvesField].validate(python_setup)
-        for resolve in tgt[PythonCompatibleResolvesField].value_or_default(python_setup):
+        tgt[PythonRequirementCompatibleResolvesField].validate(python_setup)
+        for resolve in tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup):
             resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
     # TODO: Figure out how to determine which interpreter constraints to use for each resolve...
