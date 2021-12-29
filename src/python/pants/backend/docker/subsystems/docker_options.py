@@ -141,6 +141,28 @@ class DockerOptions(Subsystem):
             ),
         )
 
+        register(
+            "--build-cache-images",
+            type=bool,
+            default=False,
+            help=(
+                "Build new cache images for `docker_image` targets with `cache=True` or "
+                '`cache="<tag>"`.\n\n'
+                "See the documentation for the `cache` field of the `docker_image` target for "
+                "more information."
+            ),
+        )
+
+        register(
+            "--push-cache-images",
+            type=bool,
+            default=False,
+            help=(
+                "Automatically push cache images after building them.\n\n"
+                "This uses `docker buildx build` which requires that BuildKit is enabled."
+            ),
+        )
+
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
@@ -164,3 +186,11 @@ class DockerOptions(Subsystem):
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self.options.registries)
+
+    @property
+    def build_cache_images(self) -> bool:
+        return cast(bool, self.options.build_cache_images)
+
+    @property
+    def push_cache_images(self) -> bool:
+        return cast(bool, self.options.push_cache_images)

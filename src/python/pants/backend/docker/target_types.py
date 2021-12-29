@@ -7,13 +7,14 @@ import os
 import re
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import Callable, ClassVar, Iterator, cast
+from typing import Callable, ClassVar, Iterator, Union, cast
 
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
+from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -21,6 +22,8 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    Field,
+    InvalidFieldTypeException,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
@@ -259,6 +262,34 @@ class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField
         yield from cast("tuple[str]", self.value)
 
 
+class DockerImageCacheField(Field):
+    alias = "cache"
+    default = False
+    value: Union[bool, str]
+    help = (
+        "Use `--cache-from` with a pre-built version of the image with caching enabled.\n\n"
+        "The cache image is tagged with the value of this field, or `cache` if set to `True`.\n\n"
+        "Set `--docker-build-cache-images` to build the cache image. With BuildKit enabled set "
+        "`--docker-push-cache-images` to push the cache image to a registry (this will switch to "
+        "use `docker buildx build` when building the cache image).\n\n"
+        "This is useful when there are time expensive layers in the image, before layers that "
+        "change more frequently. I.e. by placing RUN instructions installing external dependencies "
+        "before COPY and RUN instructions for your project files enables caching for the "
+        "installation of those external dependencies between builds.\n\n"
+        "Notice: when enabled, Docker will always attempt to pull the cache image unless already "
+        "present as a local image."
+    )
+
+    @classmethod
+    def compute_value(cls, raw_value: Union[bool, str, None], address: Address) -> Union[bool, str]:
+        value_or_default = super().compute_value(raw_value, address)
+        if not isinstance(value_or_default, (bool, str)):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type="a boolean or string"
+            )
+        return value_or_default
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -275,6 +306,7 @@ class DockerImageTarget(Target):
         DockerBuildSSHOptionField,
         DockerSkipPushField,
         DockerImageTargetStageField,
+        DockerImageCacheField,
         RestartableField,
     )
     help = (

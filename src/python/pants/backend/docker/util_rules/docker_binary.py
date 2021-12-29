@@ -37,7 +37,9 @@ class DockerBinary(BinaryPath):
         env: Mapping[str, str] | None = None,
         extra_args: tuple[str, ...] = (),
     ) -> Process:
-        args = [self.path, "build", *extra_args]
+        # If the first extra arg is "build", we use `docker buildx build ...`
+        subcommand = "buildx" if "build" in extra_args[:1] else "build"
+        args = [self.path, subcommand, *extra_args]
 
         for tag in tags:
             args.extend(["--tag", tag])

@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from hashlib import sha256
 
 import pytest
@@ -20,21 +22,32 @@ def docker(docker_path: str) -> DockerBinary:
     return DockerBinary(docker_path)
 
 
-def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> None:
+@pytest.mark.parametrize(
+    "extra_args, expected_args",
+    [
+        (("--pull", "--squash"), ("build", "--pull", "--squash")),
+        (("--tag", "build"), ("build", "--tag", "build")),
+        (("build", "--push"), ("buildx", "build", "--push")),
+    ],
+)
+def test_docker_binary_build_image(
+    docker_path: str,
+    docker: DockerBinary,
+    extra_args: tuple[str, ...],
+    expected_args: tuple[str, ...],
+) -> None:
     dockerfile = "src/test/repo/Dockerfile"
     digest = Digest(sha256().hexdigest(), 123)
     tags = (
         "test:0.1.0",
         "test:latest",
     )
-    build_request = docker.build_image(tags, digest, dockerfile, extra_args=("--pull", "--squash"))
+    build_request = docker.build_image(tags, digest, dockerfile, extra_args=extra_args)
 
     assert build_request == Process(
         argv=(
             docker_path,
-            "build",
-            "--pull",
-            "--squash",
+            *expected_args,
             "--tag",
             tags[0],
             "--tag",

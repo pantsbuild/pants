@@ -16,6 +16,7 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerImageCacheField,
     DockerImageSourceField,
     DockerImageTagsField,
     DockerImageTargetStageField,
@@ -35,6 +36,7 @@ from pants.backend.docker.value_interpolation import (
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget
@@ -65,6 +67,7 @@ class DockerImageOptionValueError(ValueError):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
+    cache: DockerImageCacheField
     registries: DockerRegistriesField
     repository: DockerRepositoryField
     source: DockerImageSourceField
@@ -109,6 +112,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         default_repository: str,
         registries: DockerRegistries,
         interpolation_context: DockerInterpolationContext,
+        override_tags: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         """The image refs are the full image name, including any registry and version tag.
 
@@ -130,7 +134,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         repository = self.format_repository(default_repository, interpolation_context)
         image_names = tuple(
             ":".join(s for s in [repository, self.format_tag(tag, interpolation_context)] if s)
-            for tag in self.tags.value or ()
+            for tag in override_tags or self.tags.value or ()
         )
 
         registries_options = tuple(registries.get(*(self.registries.value or [])))
@@ -143,6 +147,100 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             for image_name in image_names
             for registry in registries_options
         )
+
+
+@dataclass(frozen=True)
+class BuildDockerImageRequest:
+    context: DockerBuildContext
+    field_set: DockerFieldSet
+    target: Target
+    extra_args: tuple[str, ...] = ()
+    override_tags: tuple[str, ...] = ()
+
+    @classmethod
+    def build_cache(cls, cache_tag: str | bool, push: bool, **kwargs) -> BuildDockerImageRequest:
+        extra_args = []
+        if push:
+            # The leading "build" here triggers the use of `docker buildx extra_args...`
+            extra_args.extend(["build", "--push"])
+        extra_args.extend(
+            [
+                "--build-arg",
+                "BUILDKIT_INLINE_CACHE=1",
+            ]
+        )
+        tags = (cache_tag,) if isinstance(cache_tag, str) else ("cache",)
+        return cls(
+            extra_args=tuple(extra_args),
+            override_tags=tags,
+            **kwargs,
+        )
+
+    @classmethod
+    def use_cache(cls, image_cache: str, **kwargs) -> BuildDockerImageRequest:
+        return cls(extra_args=("--cache-from", image_cache), **kwargs)
+
+
+@dataclass(frozen=True)
+class BuildDockerImageResult:
+    digest: Digest
+    tags: tuple[str, ...]
+
+
+@rule
+async def package_image(
+    field_set: DockerFieldSet,
+    options: DockerOptions,
+) -> BuiltPackage:
+    context, wrapped_target = await MultiGet(
+        Get(
+            DockerBuildContext,
+            DockerBuildContextRequest(
+                address=field_set.address,
+                build_upstream_images=True,
+            ),
+        ),
+        Get(WrappedTarget, Address, field_set.address),
+    )
+
+    if not field_set.cache.value:
+        build_request = BuildDockerImageRequest(
+            context=context,
+            field_set=field_set,
+            target=wrapped_target.target,
+        )
+    else:
+        cache_request = BuildDockerImageRequest.build_cache(
+            cache_tag=field_set.cache.value,
+            context=context,
+            field_set=field_set,
+            push=options.push_cache_images,
+            target=wrapped_target.target,
+        )
+        if options.build_cache_images:
+            cache = await Get(BuildDockerImageResult, BuildDockerImageRequest, cache_request)
+            image_cache = cache.tags[0]
+        else:
+            image_cache = field_set.image_refs(
+                default_repository=options.default_repository,
+                registries=options.registries(),
+                interpolation_context=context.interpolation_context,
+                override_tags=cache_request.override_tags,
+            )[0]
+
+        build_request = BuildDockerImageRequest.use_cache(
+            context=context,
+            field_set=field_set,
+            image_cache=image_cache,
+            target=wrapped_target.target,
+        )
+
+    result = await Get(BuildDockerImageResult, BuildDockerImageRequest, build_request)
+
+    return BuiltPackage(
+        result.digest,
+        (BuiltDockerImage.create(result.tags),),
+    )
 
 
 def get_build_options(
@@ -188,27 +286,20 @@ def get_build_options(
 
 @rule
 async def build_docker_image(
-    field_set: DockerFieldSet,
+    request: BuildDockerImageRequest,
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
     process_cleanup: ProcessCleanupOption,
-) -> BuiltPackage:
-    context, wrapped_target = await MultiGet(
-        Get(
-            DockerBuildContext,
-            DockerBuildContextRequest(
-                address=field_set.address,
-                build_upstream_images=True,
-            ),
-        ),
-        Get(WrappedTarget, Address, field_set.address),
-    )
+) -> BuildDockerImageResult:
+    context = request.context
+    field_set = request.field_set
 
-    tags = field_set.image_refs(
+    image_refs = field_set.image_refs(
         default_repository=options.default_repository,
         registries=options.registries(),
         interpolation_context=context.interpolation_context,
+        override_tags=request.override_tags,
     )
 
     process = docker.build_image(
@@ -216,13 +307,14 @@ async def build_docker_image(
         digest=context.digest,
         dockerfile=context.dockerfile,
         env=context.build_env.environment,
-        tags=tags,
-        extra_args=tuple(
+        tags=image_refs,
+        extra_args=request.extra_args
+        + tuple(
             get_build_options(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
-                target=wrapped_target.target,
+                target=request.target,
             )
         ),
     )
@@ -248,7 +340,7 @@ async def build_docker_image(
     logger.debug(
         dedent(
             f"""\
-            Docker build output for {tags[0]}:
+            Docker build output for {image_refs[0]}:
             stdout:
             {result.stdout.decode()}
 
@@ -258,10 +350,7 @@ async def build_docker_image(
         )
     )
 
-    return BuiltPackage(
-        result.output_digest,
-        (BuiltDockerImage.create(tags),),
-    )
+    return BuildDockerImageResult(result.output_digest, image_refs)
 
 
 def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:

@@ -11,11 +11,15 @@ from typing import Callable
 import pytest
 
 from pants.backend.docker.goals.package_image import (
+    BuildDockerImageRequest,
+    BuildDockerImageResult,
+    BuiltDockerImage,
     DockerBuildTargetStageError,
     DockerFieldSet,
     DockerImageTagValueError,
     DockerRepositoryNameError,
     build_docker_image,
+    package_image,
     rules,
 )
 from pants.backend.docker.registries import DockerRegistries
@@ -38,6 +42,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.backend.docker.value_interpolation import DockerInterpolationContext
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
@@ -84,11 +89,11 @@ def assert_build(
 ) -> None:
     tgt = rule_runner.get_target(address)
 
-    def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
+    def build_context_mock() -> DockerBuildContext:
         return DockerBuildContext.create(
             snapshot=build_context_snapshot,
             dockerfile_info=DockerfileInfo(
-                request.address,
+                address,
                 digest=EMPTY_DIGEST,
                 source=os.path.join(address.spec_path, "Dockerfile"),
                 copy_sources=copy_sources,
@@ -131,15 +136,107 @@ def assert_build(
         docker_options = rule_runner.request(DockerOptions, [])
 
     global_options = rule_runner.request(GlobalOptions, [])
-
+    build_request = BuildDockerImageRequest(
+        context=build_context_mock(),
+        field_set=DockerFieldSet.create(tgt),
+        target=tgt,
+    )
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
-            DockerFieldSet.create(tgt),
+            build_request,
             docker_options,
             global_options,
             DockerBinary("/dummy/docker"),
             ProcessCleanupOption(True),
+        ],
+        mock_gets=[
+            MockGet(
+                output_type=FallibleProcessResult,
+                input_type=Process,
+                mock=run_process_mock,
+            ),
+        ],
+    )
+
+    # Package up result as done in the `@rule package_image()` now..
+    built = BuiltPackage(
+        result.digest,
+        (BuiltDockerImage.create(result.tags),),
+    )
+
+    assert built.digest == EMPTY_DIGEST
+    assert len(built.artifacts) == 1
+    assert built.artifacts[0].relpath is None
+
+    for log_line in extra_log_lines:
+        assert log_line in built.artifacts[0].extra_log_lines
+
+
+def assert_package(
+    rule_runner: RuleRunner,
+    address: Address,
+    *build_request_assertions: Callable[[BuildDockerImageRequest], None] | None,
+    options: dict | None = None,
+    copy_sources: tuple[str, ...] = (),
+    build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
+    version_tags: tuple[str, ...] = (),
+) -> None:
+    tgt = rule_runner.get_target(address)
+    assert_builds = iter(build_request_assertions)
+
+    def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
+        return DockerBuildContext.create(
+            snapshot=build_context_snapshot,
+            dockerfile_info=DockerfileInfo(
+                request.address,
+                digest=EMPTY_DIGEST,
+                source=os.path.join(request.address.spec_path, "Dockerfile"),
+                copy_sources=copy_sources,
+                version_tags=version_tags,
+            ),
+            build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
+            build_env=rule_runner.request(
+                DockerBuildEnvironment, [DockerBuildEnvironmentRequest(tgt)]
+            ),
+        )
+
+    def run_build_mock(request: BuildDockerImageRequest) -> BuildDockerImageResult:
+        for assert_build in assert_builds:
+            if assert_build:
+                break
+        else:
+            assert False, f"Too few `build_request_assertions`, got unexpected: {request}"
+        assert_build(request)
+        return BuildDockerImageResult(
+            EMPTY_DIGEST,
+            tuple(
+                f"test/{address.target_name}:{tag}" for tag in request.override_tags or ("latest",)
+            ),
+        )
+
+    if options:
+        opts = options or {}
+        opts.setdefault("registries", {})
+        opts.setdefault("default_repository", "{directory}/{name}")
+        opts.setdefault("build_args", [])
+        opts.setdefault("build_target_stage", None)
+        opts.setdefault("env_vars", [])
+        opts.setdefault("build_cache_images", False)
+        opts.setdefault("push_cache_images", True)
+
+        docker_options = create_subsystem(
+            DockerOptions,
+            **opts,
+        )
+    else:
+        docker_options = rule_runner.request(DockerOptions, [])
+
+    result = run_rule_with_mocks(
+        package_image,
+        rule_args=[
+            DockerFieldSet.create(tgt),
+            docker_options,
         ],
         mock_gets=[
             MockGet(
@@ -153,19 +250,19 @@ def assert_build(
                 mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
-                output_type=FallibleProcessResult,
-                input_type=Process,
-                mock=run_process_mock,
+                output_type=BuildDockerImageResult,
+                input_type=BuildDockerImageRequest,
+                mock=run_build_mock,
             ),
         ],
     )
 
     assert result.digest == EMPTY_DIGEST
-    assert len(result.artifacts) == 1
-    assert result.artifacts[0].relpath is None
+    for artifact in result.artifacts:
+        assert artifact.relpath is None
 
-    for log_line in extra_log_lines:
-        assert log_line in result.artifacts[0].extra_log_lines
+    assert_build = next(assert_builds, None)
+    assert assert_build is None, f"Unmatched `build_request_assertions`: {assert_build}"
 
 
 def test_build_docker_image(rule_runner: RuleRunner) -> None:
@@ -806,3 +903,91 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
             Address("", target_name="image"),
             version_tags=("build latest", "dev latest", "prod latest"),
         )
+
+
+@pytest.mark.parametrize(
+    "cache_field, build, push, cache_request, build_request",
+    [
+        pytest.param(None, False, False, None, {}, id="none"),
+        pytest.param(None, True, False, None, {}, id="unused"),
+        pytest.param(
+            True, False, False, None, {"args": ("--cache-from", "test/test:cache")}, id="only build"
+        ),
+        pytest.param(
+            "my-cache",
+            False,
+            False,
+            None,
+            {"args": ("--cache-from", "test/test:my-cache")},
+            id="custom cache tag",
+        ),
+        pytest.param(
+            True,
+            True,
+            False,
+            {
+                "args": (
+                    "--build-arg",
+                    "BUILDKIT_INLINE_CACHE=1",
+                ),
+                "tags": ("cache",),
+            },
+            {"args": ("--cache-from", "test/test:cache")},
+            id="build cache image",
+        ),
+        pytest.param(
+            True,
+            True,
+            True,
+            {
+                "args": ("build", "--push", "--build-arg", "BUILDKIT_INLINE_CACHE=1"),
+                "tags": ("cache",),
+            },
+            {"args": ("--cache-from", "test/test:cache")},
+            id="build and push cache image",
+        ),
+        pytest.param(
+            "my-cache",
+            True,
+            False,
+            {"args": ("--build-arg", "BUILDKIT_INLINE_CACHE=1"), "tags": ("my-cache",)},
+            {"args": ("--cache-from", "test/test:my-cache")},
+            id="build custom cache tag",
+        ),
+    ],
+)
+def test_package_caching(
+    rule_runner: RuleRunner,
+    cache_field: bool | str | None,
+    build: bool,
+    push: bool,
+    cache_request: dict | None,
+    build_request: dict,
+) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": f"docker_image(cache={cache_field!r})",
+            "test/Dockerfile": "FROM python:3.8",
+        }
+    )
+
+    def get_build_request_assertions(
+        name: str, args: tuple[str, ...] = (), tags: tuple[str, ...] = ()
+    ):
+        def check_build_request(request: BuildDockerImageRequest) -> None:
+            assert request.field_set.address == request.target.address
+            assert request.extra_args == args
+            assert request.override_tags == tags
+
+        check_build_request.__name__ = name
+        return check_build_request
+
+    assert_package(
+        rule_runner,
+        Address("test"),
+        get_build_request_assertions("cache", **cache_request)
+        if isinstance(cache_request, dict)
+        else None,
+        get_build_request_assertions("build", **build_request),
+        options={"build_cache_images": build, "push_cache_images": push},
+    )
