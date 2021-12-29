@@ -4,7 +4,8 @@
             "group": "com.fasterxml.jackson.core",
             "artifact": "jackson-annotations",
             "version": "2.12.5",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -21,7 +22,8 @@
             "group": "com.fasterxml.jackson.core",
             "artifact": "jackson-core",
             "version": "2.12.5",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -38,20 +40,23 @@
             "group": "com.fasterxml.jackson.core",
             "artifact": "jackson-databind",
             "version": "2.12.5",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -59,13 +64,15 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.fasterxml.jackson.core_jackson-databind_2.12.5.jar",
@@ -81,7 +88,8 @@
             "group": "com.github.luben",
             "artifact": "zstd-jni",
             "version": "1.5.0-4",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -98,7 +106,8 @@
             "group": "commons-cli",
             "artifact": "commons-cli",
             "version": "1.4",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -115,7 +124,8 @@
             "group": "javax.annotation",
             "artifact": "javax.annotation-api",
             "version": "1.3.2",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -132,7 +142,8 @@
             "group": "javax.servlet",
             "artifact": "javax.servlet-api",
             "version": "3.1.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -149,7 +160,8 @@
             "group": "log4j",
             "artifact": "log4j",
             "version": "1.2.17",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -166,7 +178,8 @@
             "group": "net.sf.jopt-simple",
             "artifact": "jopt-simple",
             "version": "5.0.4",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -183,38 +196,44 @@
             "group": "org.apache.avro",
             "artifact": "avro-compiler",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -222,49 +241,57 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro-compiler_1.11.0.jar",
@@ -280,44 +307,51 @@
             "group": "org.apache.avro",
             "artifact": "avro-ipc-jetty",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -325,127 +359,148 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro-ipc-jetty_1.11.0.jar",
@@ -461,62 +516,72 @@
             "group": "org.apache.avro",
             "artifact": "avro-ipc",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -524,73 +589,85 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro-ipc_1.11.0.jar",
@@ -606,32 +683,37 @@
             "group": "org.apache.avro",
             "artifact": "avro-mapred",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc-jetty",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -639,133 +721,155 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc-jetty",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro-mapred_1.11.0.jar",
@@ -781,104 +885,121 @@
             "group": "org.apache.avro",
             "artifact": "avro-tools",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
-                "version": "jar",
-                "packaging": "jar"
+                "version": "1.11.0",
+                "packaging": "jar",
+                "classifier": "tests"
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-avro",
-                "version": "jar",
-                "packaging": "jar"
+                "version": "1.11.0",
+                "packaging": "jar",
+                "classifier": "tests"
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "commons-cli",
                 "artifact": "commons-cli",
                 "version": "1.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-compiler",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-log4j12",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.sf.jopt-simple",
                 "artifact": "jopt-simple",
                 "version": "5.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -886,193 +1007,225 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
-                "version": "jar",
-                "packaging": "jar"
+                "version": "1.11.0",
+                "packaging": "jar",
+                "classifier": "tests"
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "log4j",
                 "artifact": "log4j",
                 "version": "1.2.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc-jetty",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-avro",
-                "version": "jar",
-                "packaging": "jar"
+                "version": "1.11.0",
+                "packaging": "jar",
+                "classifier": "tests"
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "commons-cli",
                 "artifact": "commons-cli",
                 "version": "1.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-compiler",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-log4j12",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.sf.jopt-simple",
                 "artifact": "jopt-simple",
                 "version": "5.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro-tools_1.11.0.jar",
@@ -1088,32 +1241,37 @@
             "group": "org.apache.avro",
             "artifact": "avro",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1121,31 +1279,36 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_avro_1.11.0.jar",
@@ -1161,32 +1324,37 @@
             "group": "org.apache.avro",
             "artifact": "trevni-avro",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1194,145 +1362,169 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc-jetty",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_trevni-avro_1.11.0.jar",
@@ -1347,33 +1539,38 @@
         "coord": {
             "group": "org.apache.avro",
             "artifact": "trevni-avro",
-            "version": "jar",
-            "packaging": "jar"
+            "version": "1.11.0",
+            "packaging": "jar",
+            "classifier": "tests"
         },
         "directDependencies": [
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1381,145 +1578,169 @@
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-annotations",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-servlet",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-ipc-jetty",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.velocity",
                 "artifact": "velocity-engine-core",
                 "version": "2.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-databind",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.luben",
                 "artifact": "zstd-jni",
                 "version": "1.5.0-4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "avro-mapred",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.annotation",
                 "artifact": "javax.annotation-api",
                 "version": "1.3.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.tukaani",
                 "artifact": "xz",
                 "version": "1.9",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.apache.avro",
                 "artifact": "trevni-core",
                 "version": "1.11.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.fasterxml.jackson.core",
                 "artifact": "jackson-core",
                 "version": "2.12.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_trevni-avro_jar_tests_1.11.0.jar",
@@ -1535,26 +1756,30 @@
             "group": "org.apache.avro",
             "artifact": "trevni-core",
             "version": "1.11.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1562,19 +1787,22 @@
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_trevni-core_1.11.0.jar",
@@ -1589,27 +1817,31 @@
         "coord": {
             "group": "org.apache.avro",
             "artifact": "trevni-core",
-            "version": "jar",
-            "packaging": "jar"
+            "version": "1.11.0",
+            "packaging": "jar",
+            "classifier": "tests"
         },
         "directDependencies": [
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1617,19 +1849,22 @@
                 "group": "org.apache.commons",
                 "artifact": "commons-compress",
                 "version": "1.21",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.xerial.snappy",
                 "artifact": "snappy-java",
                 "version": "1.1.8.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.avro_trevni-core_jar_tests_1.11.0.jar",
@@ -1645,7 +1880,8 @@
             "group": "org.apache.commons",
             "artifact": "commons-compress",
             "version": "1.21",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -1662,7 +1898,8 @@
             "group": "org.apache.commons",
             "artifact": "commons-lang3",
             "version": "3.12.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -1679,20 +1916,23 @@
             "group": "org.apache.velocity",
             "artifact": "velocity-engine-core",
             "version": "2.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1700,13 +1940,15 @@
                 "group": "org.apache.commons",
                 "artifact": "commons-lang3",
                 "version": "3.12.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.apache.velocity_velocity-engine-core_2.3.jar",
@@ -1722,20 +1964,23 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-http",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1743,13 +1988,15 @@
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-http_9.4.43.v20210629.jar",
@@ -1765,14 +2012,16 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-io",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1780,7 +2029,8 @@
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-io_9.4.43.v20210629.jar",
@@ -1796,14 +2046,16 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-security",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1811,31 +2063,36 @@
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-security_9.4.43.v20210629.jar",
@@ -1851,26 +2108,30 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-server",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1878,25 +2139,29 @@
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-server_9.4.43.v20210629.jar",
@@ -1912,20 +2177,23 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-servlet",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1933,43 +2201,50 @@
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-security",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-server",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-http",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-io",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "javax.servlet",
                 "artifact": "javax.servlet-api",
                 "version": "3.1.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util-ajax",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-servlet_9.4.43.v20210629.jar",
@@ -1985,14 +2260,16 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-util-ajax",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -2000,7 +2277,8 @@
                 "group": "org.eclipse.jetty",
                 "artifact": "jetty-util",
                 "version": "9.4.43.v20210629",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.eclipse.jetty_jetty-util-ajax_9.4.43.v20210629.jar",
@@ -2016,7 +2294,8 @@
             "group": "org.eclipse.jetty",
             "artifact": "jetty-util",
             "version": "9.4.43.v20210629",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -2033,7 +2312,8 @@
             "group": "org.slf4j",
             "artifact": "slf4j-api",
             "version": "1.7.32",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -2050,20 +2330,23 @@
             "group": "org.slf4j",
             "artifact": "slf4j-log4j12",
             "version": "1.7.32",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "log4j",
                 "artifact": "log4j",
                 "version": "1.2.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -2071,13 +2354,15 @@
                 "group": "log4j",
                 "artifact": "log4j",
                 "version": "1.2.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.slf4j",
                 "artifact": "slf4j-api",
                 "version": "1.7.32",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.slf4j_slf4j-log4j12_1.7.32.jar",
@@ -2093,7 +2378,8 @@
             "group": "org.tukaani",
             "artifact": "xz",
             "version": "1.9",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -2110,7 +2396,8 @@
             "group": "org.xerial.snappy",
             "artifact": "snappy-java",
             "version": "1.1.8.4",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
