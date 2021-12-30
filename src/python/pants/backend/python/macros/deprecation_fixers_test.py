@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_determine_macro_changes(rule_runner: RuleRunner) -> None:
+def test_determine_macro_changes(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "requirements.txt": "req",
@@ -63,10 +63,10 @@ def test_determine_macro_changes(rule_runner: RuleRunner) -> None:
     )
     renames = rule_runner.request(MacroRenames, [])
     assert renames.generators == (
-        GeneratorRename("", "python_requirements", "reqs"),
-        GeneratorRename("pipenv", "pipenv_requirements", None),
-        GeneratorRename("poetry", "poetry_requirements", None),
-        GeneratorRename("reqs", "python_requirements", "reqs"),
+        GeneratorRename("BUILD", "python_requirements", "reqs"),
+        GeneratorRename("pipenv/BUILD", "pipenv_requirements", None),
+        GeneratorRename("poetry/BUILD", "poetry_requirements", None),
+        GeneratorRename("reqs/BUILD", "python_requirements", "reqs"),
     )
     assert renames.generated == FrozenDict(
         {
@@ -91,3 +91,7 @@ def test_determine_macro_changes(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    assert '* `python_requirements` in BUILD: add `name="reqs"' in caplog.text
+    assert '* `python_requirements` in reqs/BUILD: add `name="reqs"' in caplog.text
+    assert "* `poetry_requirements`" not in caplog.text
+    assert "* `pipenv_requirements`" not in caplog.text

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
@@ -11,7 +12,7 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
 )
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, BuildFileAddress
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -24,6 +25,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import bullet_list
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, order=True)
@@ -57,6 +61,10 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
         if isinstance(tgt, PythonRequirementTarget) and tgt[Dependencies].value is not None:
             python_requirement_dependencies_fields.add(tgt[Dependencies])
 
+    build_file_addresses_per_tgt = await MultiGet(
+        Get(BuildFileAddress, Address, deps_field.address)
+        for deps_field in python_requirement_dependencies_fields
+    )
     explicit_deps_per_tgt = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(deps_field))
         for deps_field in python_requirement_dependencies_fields
@@ -68,7 +76,9 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
 
     generators = set()
     generated = {}
-    for python_req_deps_field, deps in zip(python_requirement_dependencies_fields, deps_per_tgt):
+    for python_req_deps_field, build_file_addr, deps in zip(
+        python_requirement_dependencies_fields, build_file_addresses_per_tgt, deps_per_tgt
+    ):
         generator_tgt = next((tgt for tgt in deps if isinstance(tgt, PythonRequirementsFile)), None)
         if generator_tgt is None:
             continue
@@ -83,6 +93,8 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
         else:
             generator_alias = "python_requirements"
 
+        # TODO: Robustly handle if the `name` is already claimed? This can happen, for example,
+        #  if you have two `python_requirements` in the same BUILD file.
         generator_name: str | None
         if (
             generator_tgt.address.spec_path
@@ -96,14 +108,25 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
         else:
             generator_name = "reqs"
 
-        generators.add(
-            GeneratorRename(generator_tgt.address.spec_path, generator_alias, generator_name)
-        )
+        generators.add(GeneratorRename(build_file_addr.rel_path, generator_alias, generator_name))
 
         generated[python_req_deps_field.address] = Address(
             generator_tgt.address.spec_path,
             target_name=generator_name,
             generated_name=python_req_deps_field.address.target_name,
+        )
+
+    generators_that_need_renames = sorted(
+        generator for generator in generators if generator.new_name is not None
+    )
+    if generators_that_need_renames:
+        changes = bullet_list(
+            f'`{generator.alias}` in {generator.build_path}: add `name="{generator.new_name}"'
+            for generator in generators_that_need_renames
+        )
+        logger.error(
+            "You must manually add the `name=` field to the following targets. This is not done "
+            f"automatically by the `update-build-files` goal.\n\n{changes}"
         )
 
     return MacroRenames(tuple(sorted(generators)), FrozenDict(sorted(generated.items())))
