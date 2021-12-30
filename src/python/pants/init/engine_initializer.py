@@ -37,8 +37,8 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.python import binaries as python_binaries
 from pants.python import _binaries_rules as python_binaries2
+from pants.python import binaries as python_binaries
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 
