@@ -7,8 +7,9 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.codegen.thrift.rules import rules as thrift_rules
-from pants.backend.codegen.thrift.scrooge.rules import GenerateScalaFromThriftRequest
 from pants.backend.codegen.thrift.scrooge.rules import rules as scrooge_rules
+from pants.backend.codegen.thrift.scrooge.scala.rules import GenerateScalaFromThriftRequest
+from pants.backend.codegen.thrift.scrooge.scala.rules import rules as scrooge_scala_rules
 from pants.backend.codegen.thrift.target_types import (
     ThriftSourceField,
     ThriftSourcesGeneratorTarget,
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *thrift_rules(),
             *scrooge_rules(),
+            *scrooge_scala_rules(),
             *config_files.rules(),
             *classpath.rules(),
             *coursier_fetch_rules(),
