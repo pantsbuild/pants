@@ -12,13 +12,12 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImpl,
     FirstPartyPythonMappingImplMarker,
+    ModuleProvider,
+    ModuleProviderType,
 )
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -41,35 +40,21 @@ async def map_protobuf_to_python_modules(
         for tgt in protobuf_targets
     )
 
-    # NB: There should be only one address per module, else it's ambiguous.
-    modules_to_addresses: dict[str, tuple[Address]] = {}
-    modules_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
-
-    def add_module(module: str, tgt: Target) -> None:
-        if module in modules_to_addresses:
-            modules_with_multiple_owners[module].update(
-                {*modules_to_addresses[module], tgt.address}
-            )
-        else:
-            modules_to_addresses[module] = (tgt.address,)
-
+    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
     for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target):
         # NB: We don't consider the MyPy plugin, which generates `_pb2.pyi`. The stubs end up
         # sharing the same module as the implementation `_pb2.py`. Because both generated files
         # come from the same original Protobuf target, we're covered.
-        add_module(proto_path_to_py_module(stripped_file.value, suffix="_pb2"), tgt)
+        modules_to_providers[proto_path_to_py_module(stripped_file.value, suffix="_pb2")].append(
+            ModuleProvider(tgt.address, ModuleProviderType.IMPL)
+        )
         if tgt.get(ProtobufGrpcToggleField).value:
-            add_module(proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc"), tgt)
-
-    # Remove modules with ambiguous owners.
-    for ambiguous_module in modules_with_multiple_owners:
-        modules_to_addresses.pop(ambiguous_module)
+            modules_to_providers[
+                proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc")
+            ].append(ModuleProvider(tgt.address, ModuleProviderType.IMPL))
 
     return FirstPartyPythonMappingImpl(
-        mapping=FrozenDict(sorted(modules_to_addresses.items())),
-        ambiguous_modules=FrozenDict(
-            (k, tuple(sorted(v))) for k, v in sorted(modules_with_multiple_owners.items())
-        ),
+        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
     )
 
 
