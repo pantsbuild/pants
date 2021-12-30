@@ -14,6 +14,7 @@ from pants.base.build_environment import get_pants_cachedir
 from pants.engine.environment import Environment
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, rule
+from pants.python import _binaries_rules as python_binaries2
 from pants.python import binaries as python_binaries
 from pants.python.binaries import PythonBinary, PythonBootstrap, get_asdf_data_dir, get_pyenv_root
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -134,7 +135,12 @@ async def python_binary_version(python_binary: PythonBinary) -> PythonBinaryVers
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*python_binaries.rules(), python_binary_version, QueryRule(PythonBinaryVersion, [])]
+        rules=[
+            *python_binaries.rules(),
+            *python_binaries2.rules(),
+            python_binary_version,
+            QueryRule(PythonBinaryVersion, []),
+        ]
     )
 
 
@@ -300,7 +306,11 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
 
 def test_interpreter_search_path_file_entries() -> None:
     rule_runner = RuleRunner(
-        rules=[*python_binaries.rules(), QueryRule(PythonBinary, input_types=())]
+        rules=[
+            *python_binaries.rules(),
+            *python_binaries2.rules(),
+            QueryRule(PythonBinary, input_types=()),
+        ]
     )
     current_python = os.path.realpath(sys.executable)
     rule_runner.set_options(
