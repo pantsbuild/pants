@@ -4,15 +4,18 @@
 from __future__ import annotations
 
 import logging
+import os.path
+import tokenize
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
+from pants.build_graph.address import InvalidAddress
 from pants.core.goals.update_build_files import (
     DeprecationFixerRequest,
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
 )
-from pants.engine.addresses import Address, Addresses, BuildFileAddress
+from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -40,7 +43,8 @@ class GeneratorRename:
 @dataclass(frozen=True)
 class MacroRenames:
     generators: tuple[GeneratorRename, ...]
-    generated: FrozenDict[Address, Address]
+    # Includes the alias for the macro.
+    generated: FrozenDict[Address, tuple[Address, str]]
 
 
 @rule(desc="Determine how to rename Python macros to target generators", level=LogLevel.DEBUG)
@@ -94,7 +98,7 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
             generator_alias = "python_requirements"
 
         # TODO: Robustly handle if the `name` is already claimed? This can happen, for example,
-        #  if you have two `python_requirements` in the same BUILD file.
+        #  if you have two `python_requirements` in the same BUILD file. Perhaps error?
         generator_name: str | None
         if (
             generator_tgt.address.spec_path
@@ -110,11 +114,12 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
 
         generators.add(GeneratorRename(build_file_addr.rel_path, generator_alias, generator_name))
 
-        generated[python_req_deps_field.address] = Address(
+        new_addr = Address(
             generator_tgt.address.spec_path,
             target_name=generator_name,
             generated_name=python_req_deps_field.address.target_name,
         )
+        generated[python_req_deps_field.address] = (new_addr, generator_alias)
 
     generators_that_need_renames = sorted(
         generator for generator in generators if generator.new_name is not None
@@ -132,20 +137,76 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
     return MacroRenames(tuple(sorted(generators)), FrozenDict(sorted(generated.items())))
 
 
-class UpdatePythonRequirementsRequest(DeprecationFixerRequest):
+class UpdatePythonMacrosRequest(DeprecationFixerRequest):
     pass
 
 
 @rule(desc="Change Python macros to target generators", level=LogLevel.DEBUG)
-def maybe_replace_macros(
-    request: UpdatePythonRequirementsRequest,
+def maybe_update_macros_references(
+    request: UpdatePythonMacrosRequest,
     renames: MacroRenames,
 ) -> RewrittenBuildFile:
-    return RewrittenBuildFile(request.path, request.lines, change_descriptions=())
+    tokens = request.tokenize()
+
+    changed_generators = set()
+    updated_text_lines = list(request.lines)
+    for token in tokens:
+        if token.type is not tokenize.STRING:
+            continue
+        line_index = token.start[0] - 1
+        line = request.lines[line_index]
+
+        # The `prefix` and `suffix` include the quotes for the string.
+        prefix = line[: token.start[1] + 1]
+        val = line[token.start[1] + 1 : token.end[1] - 1]
+        suffix = line[token.end[1] - 1 :]
+
+        # TODO: handle if multiple updates happen on the same line.
+
+        # All macros generate targets with a `name`, so we know they must have `:`. We know they
+        # also can't have `#` because they're not generated targets syntax.
+        if ":" not in val or "#" in val:
+            continue
+
+        try:
+            # We assume that all addresses are normal addresses, rather than file addresses, as we
+            # know that none of the generated targets will be file addresses. That is, we can
+            # ignore file addresses.
+            addr = AddressInput.parse(
+                val, relative_to=os.path.dirname(request.path)
+            ).dir_to_address()
+        except InvalidAddress:
+            continue
+
+        if addr not in renames.generated:
+            continue
+
+        new_addr, generator_alias = renames.generated[addr]
+
+        # Preserve relative addresses (`:tgt`), else use the normalized spec.
+        if val.startswith(":"):
+            new_val = (
+                f"#{new_addr.generated_name}"
+                if new_addr.is_default_target
+                else f":{new_addr.target_name}#{new_addr.generated_name}"
+            )
+        else:
+            new_val = new_addr.spec
+
+        updated_text_lines[line_index] = f"{prefix}{new_val}{suffix}"
+        changed_generators.add(generator_alias)
+
+    return RewrittenBuildFile(
+        request.path,
+        tuple(updated_text_lines),
+        change_descriptions=tuple(
+            f"Update references to targets generated by `{alias}`" for alias in changed_generators
+        ),
+    )
 
 
 def rules():
     return (
         *collect_rules(),
-        UnionRule(RewrittenBuildFileRequest, UpdatePythonRequirementsRequest),
+        UnionRule(RewrittenBuildFileRequest, UpdatePythonMacrosRequest),
     )
