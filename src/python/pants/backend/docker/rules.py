@@ -9,6 +9,7 @@ from pants.backend.docker.util_rules import (
     docker_build_args,
     docker_build_context,
     docker_build_env,
+    docker_buildx,
     dockerfile,
 )
 
@@ -20,6 +21,7 @@ def rules():
         *docker_build_args.rules(),
         *docker_build_context.rules(),
         *docker_build_env.rules(),
+        *docker_buildx.rules(),
         *dockerfile.rules(),
         *dockerfile_parser.rules(),
         *package_image.rules(),
