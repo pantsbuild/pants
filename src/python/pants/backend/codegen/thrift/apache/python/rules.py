@@ -47,7 +47,7 @@ async def generate_python_from_thrift(
         # Verify that the python source root specified by the target is in fact a source root.
         source_root_request = SourceRootRequest(PurePath(py_source_root))
     else:
-        # The target didn't specify a python source root, so use the protobuf_source's source root.
+        # The target didn't specify a python source root, so use the thrift_source's source root.
         source_root_request = SourceRootRequest.for_target(request.protocol_target)
 
     source_root = await Get(SourceRoot, SourceRootRequest, source_root_request)
