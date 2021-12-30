@@ -18,6 +18,7 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.python import _binaries_rules as python_binaries2
 from pants.python import binaries as python_binaries
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
@@ -290,4 +291,5 @@ def rules():
     return [
         *collect_rules(),
         *python_binaries.rules(),
+        *python_binaries2.rules(),
     ]

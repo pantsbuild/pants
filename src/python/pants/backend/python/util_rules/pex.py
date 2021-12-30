@@ -53,6 +53,7 @@ from pants.engine.fs import (
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.python import _binaries_rules
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -1193,4 +1194,4 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
 
 
 def rules():
-    return [*collect_rules(), *pex_cli.rules()]
+    return [*collect_rules(), *pex_cli.rules(), *_binaries_rules.rules()]
