@@ -123,7 +123,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             new_node = node.find_child(child)
             if not new_node:
                 coord = ".".join(children)
-                raise Exception(f"Could not find the package specifed by {coord}.")
+                raise Exception(f"Could not find the package specified by {coord}.")
             node = new_node
         return node
 

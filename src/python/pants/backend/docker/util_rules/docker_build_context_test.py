@@ -365,7 +365,7 @@ def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
-    # Test that only explicitly defined build args in the BUILD file or pants configuraiton use the
+    # Test that only explicitly defined build args in the BUILD file or pants configuration use the
     # environment for its values.
     rule_runner.write_files(
         {
