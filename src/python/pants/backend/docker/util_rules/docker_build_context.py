@@ -46,6 +46,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.hash import get_hash
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +170,7 @@ class DockerBuildContext:
         # Data from Pants.
         interpolation_context["pants"] = {
             # Present hash for all inputs that can be used for image tagging.
-            "hash": str(hash((build_args, build_env, snapshot.digest))).replace("-", "0"),
+            "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
         }
 
         return cls(

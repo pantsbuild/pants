@@ -143,7 +143,7 @@ def test_pants_hash(rule_runner: RuleRunner) -> None:
             "baseimage": {"tag": "latest"},
             "stage0": {"tag": "latest"},
             "build_args": {},
-            "pants": {"hash": "5945249394980428683"},
+            "pants": {"hash": "fd19488a9b08a0184432762cab85f1370904d09bafd9df1a2f8a94614b2b7eb6"},
         },
     )
 
