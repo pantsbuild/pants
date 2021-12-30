@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.codegen.thrift.apache.subsystem import ApachehriftSubsystem
+from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
@@ -48,7 +48,7 @@ class ApacheThriftSetup:
 
 
 @rule
-async def generate_thrift_sources(
+async def generate_apache_thrift_sources(
     request: GenerateThriftSourcesRequest,
     thrift: ApacheThriftSetup,
 ) -> GeneratedThriftSources:
@@ -123,7 +123,7 @@ async def generate_thrift_sources(
 
 
 @rule
-async def setup_thrift_tool(apache_thrift: ApachehriftSubsystem) -> ApacheThriftSetup:
+async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThriftSetup:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
     search_paths = apache_thrift.thrift_search_paths(env)
     all_thrift_binary_paths = await Get(

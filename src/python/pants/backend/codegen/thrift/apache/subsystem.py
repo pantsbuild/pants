@@ -10,7 +10,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
 
 
-class ApachehriftSubsystem(Subsystem):
+class ApacheThriftSubsystem(Subsystem):
     options_scope = "apache-thrift"
     help = "Apache Thrift IDL compiler (https://thrift.apache.org/)."
 
@@ -34,7 +34,7 @@ class ApachehriftSubsystem(Subsystem):
             type=str,
             default="0.15",
             help=(
-                "The Thrift version you are using, such as `0.15.0`.\n\n"
+                "The major/minor version of Apache Thrift that  you are using, such as `0.15`.\n\n"
                 "Pants will only use Thrift binaries from `--thrift-search-paths` that have the "
                 "expected version, and it will error if none are found.\n\n"
                 "Do not include the patch version."
