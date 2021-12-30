@@ -847,7 +847,6 @@ def find_packages(
     """
     # Find all packages implied by all the sources.
     packages: set[str] = set()
-    package_data: DefaultDict[str, list[str]] = defaultdict(list)
     for file_path in itertools.chain(python_files, resource_files):
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
@@ -855,16 +854,25 @@ def find_packages(
             packages.add(os.path.dirname(file_path).replace(os.path.sep, "."))
 
     # Now find all package_data.
-    for resource_file in resource_files:
-        # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
-        maybe_package: str = os.path.dirname(resource_file).replace(os.path.sep, ".")
+    package_data: DefaultDict[str, list[str]] = defaultdict(list)
+
+    def maybe_add_resource(fp: str) -> None:
+        # Find the closest enclosing package, if any. Resources will be loaded relative to that.
+        maybe_package: str = os.path.dirname(fp).replace(os.path.sep, ".")
         while maybe_package and maybe_package not in packages:
             maybe_package = maybe_package.rpartition(".")[0]
         # If resource is not in a package, ignore it. There's no principled way to load it anyway.
-        if maybe_package:
-            package_data[maybe_package].append(
-                os.path.relpath(resource_file, maybe_package.replace(".", os.path.sep))
-            )
+        if not maybe_package:
+            return
+        package_data[maybe_package].append(
+            os.path.relpath(fp, maybe_package.replace(".", os.path.sep))
+        )
+
+    for resource_file in resource_files:
+        maybe_add_resource(resource_file)
+    for py_file in python_files:
+        if py_file.endswith(".pyi"):
+            maybe_add_resource(py_file)
 
     # See which packages are pkg_resources-style namespace packages.
     # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
