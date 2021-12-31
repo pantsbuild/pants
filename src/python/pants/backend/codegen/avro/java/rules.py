@@ -134,7 +134,10 @@ async def compile_avro_source(
     }
 
     def make_avro_process(
-        args: Iterable[str], overridden_input_digest: Digest | None = None
+        args: Iterable[str],
+        *,
+        overridden_input_digest: Digest | None = None,
+        overridden_output_dir: str | None = None,
     ) -> Process:
         return Process(
             [
@@ -142,12 +145,14 @@ async def compile_avro_source(
                 "org.apache.avro.tool.Main",
                 *args,
             ],
-            input_digest=overridden_input_digest or input_digest,
+            input_digest=overridden_input_digest
+            if overridden_input_digest is not None
+            else input_digest,
             immutable_input_digests=immutable_input_digests,
             use_nailgun=immutable_input_digests,
             description="Generating Java sources from Avro source.",
             level=LogLevel.DEBUG,
-            output_directories=(output_dir,),
+            output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),
             env=jdk_setup.env,
             append_only_caches=jdk_setup.append_only_caches,
         )
@@ -168,18 +173,29 @@ async def compile_avro_source(
     elif path.suffix == ".avdl":
         idl_output_dir = "__idl"
         avpr_path = os.path.join(idl_output_dir, str(path.with_suffix(".avpr")))
-        empty_idl_output_dir = await Get(Digest, CreateDigest([Directory(idl_output_dir)]))
-        idl_input_digest = await Get(Digest, MergeDigests([input_digest, empty_idl_output_dir]))
+        idl_output_dir_digest = await Get(
+            Digest, CreateDigest([Directory(os.path.dirname(avpr_path))])
+        )
+        idl_input_digest = await Get(Digest, MergeDigests([input_digest, idl_output_dir_digest]))
         idl_result = await Get(
             ProcessResult,
             Process,
-            make_avro_process(["idl", request.path, avpr_path], idl_input_digest),
+            make_avro_process(
+                ["idl", request.path, avpr_path],
+                overridden_input_digest=idl_input_digest,
+                overridden_output_dir=idl_output_dir,
+            ),
+        )
+        generated_files_dir = await Get(Digest, CreateDigest([Directory(output_dir)]))
+        protocol_input_digest = await Get(
+            Digest, MergeDigests([idl_result.output_digest, generated_files_dir])
         )
         result = await Get(
             ProcessResult,
             Process,
             make_avro_process(
-                ["compile", "protocol", avpr_path, output_dir], idl_result.output_digest
+                ["compile", "protocol", avpr_path, output_dir],
+                overridden_input_digest=protocol_input_digest,
             ),
         )
     else:

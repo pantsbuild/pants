@@ -16,7 +16,6 @@ from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine import process
-from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -49,7 +48,6 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromAvroRequest]),
-            QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[
             JavaSourceTarget,
@@ -82,9 +80,6 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateJavaFromAvroRequest(protocol_sources.snapshot, tgt)],
     )
-    sources_contents = rule_runner.request(DigestContents, [generated_sources.snapshot.digest])
-    for sc in sources_contents:
-        print(f"{sc.path}:\n{sc.content.decode()}")
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
@@ -167,9 +162,15 @@ def test_generates_java_from_avro(rule_runner: RuleRunner) -> None:
 
     assert_gen(
         Address("src/avro/dir1", relative_file_path="simple.avdl"),
-        ("src/protobuf/dir1/f/FProto.scala", "src/protobuf/dir1/f/Person.scala"),
+        (
+            "src/avro/org/pantsbuild/contrib/avro/Kind.java",
+            "src/avro/org/pantsbuild/contrib/avro/MD5.java",
+            "src/avro/org/pantsbuild/contrib/avro/Simple.java",
+            "src/avro/org/pantsbuild/contrib/avro/TestError.java",
+            "src/avro/org/pantsbuild/contrib/avro/TestRecord.java",
+        ),
     )
     assert_gen(
         Address("src/avro/dir1", relative_file_path="user.avsc"),
-        ["src/protobuf/dir1/f2/F2Proto.scala"],
+        ["src/avro/org/pantsbuild/contrib/avro/User.java"],
     )
