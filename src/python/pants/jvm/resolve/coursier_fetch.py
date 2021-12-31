@@ -93,7 +93,14 @@ class InvalidCoordinateString(Exception):
 
 @dataclass(frozen=True)
 class Coordinate:
-    """A single Maven-style coordinate for a JVM dependency."""
+    """A single Maven-style coordinate for a JVM dependency.
+
+    Coursier uses at least two string serializations of coordinates:
+    1. A format that is accepted by the Coursier CLI which uses trailing attributes to specify
+       optional fields like `packaging`/`type`, `classifier`, `url`, etc. See `to_coord_arg_str`.
+    2. A format in the JSON report, which uses token counts to specify optional fields. We
+       additionally use this format in our own lockfile. See `to_coord_str` and `from_coord_str`.
+    """
 
     REGEX = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
 
@@ -131,10 +138,14 @@ class Coordinate:
     def from_coord_str(cls, s: str) -> Coordinate:
         """Parses from a coordinate string with optional `packaging` and `classifier` coordinates.
 
+        See the classdoc for more information on the format.
+
         Using Aether's implementation as reference
         http://www.javased.com/index.php?source_dir=aether-core/aether-api/src/main/java/org/eclipse/aether/artifact/DefaultArtifact.java
 
         ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
+
+        See also: `to_coord_str`.
         """
 
         parts = Coordinate.REGEX.match(s)
@@ -155,6 +166,10 @@ class Coordinate:
         return ArtifactRequirement(coordinate=self)
 
     def to_coord_str(self, versioned: bool = True) -> str:
+        """Renders the coordinate in Coursier's JSON-report format, which does not use attributes.
+
+        See also: `from_coord_str`.
+        """
         unversioned = f"{self.group}:{self.artifact}"
         if self.classifier is not None:
             unversioned += f":{self.packaging}:{self.classifier}"
@@ -165,6 +180,23 @@ class Coordinate:
         if versioned:
             version_suffix = f":{self.version}"
         return f"{unversioned}{version_suffix}"
+
+    def to_coord_arg_str(self, extra_attrs: dict[str, str] | None = None) -> str:
+        """Renders the coordinate in Coursier's CLI input format.
+
+        The CLI input format uses trailing key-val attributes to specify `packaging`, `url`, etc.
+
+        See https://github.com/coursier/coursier/blob/b5d5429a909426f4465a9599d25c678189a54549/modules/coursier/shared/src/test/scala/coursier/parse/DependencyParserTests.scala#L7
+        """
+        attrs = dict(extra_attrs or {})
+        if self.packaging != "jar":
+            # NB: Coursier refers to `packaging` as `type` internally.
+            attrs["type"] = self.packaging
+        if self.classifier:
+            attrs["classifier"] = self.classifier
+        attrs_sep_str = "," if attrs else ""
+        attrs_str = ",".join((f"{k}={v}" for k, v in attrs.items()))
+        return f"{self.group}:{self.artifact}:{self.version}{attrs_sep_str}{attrs_str}"
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
@@ -202,15 +234,10 @@ class ArtifactRequirement:
             ),
         )
 
-    def to_coord_str(self, versioned: bool = True) -> str:
-        # NB: Coursier does not support the entire coordinate syntax as an input (and will report a
-        # "Malformed dependency" if either the classifier or packaging are specified). We don't strip
-        # those here, since the error from Coursier is helpful enough.
-        without_url = self.coordinate.to_coord_str(versioned)
-        url_suffix = ""
-        if self.url:
-            url_suffix = f",url={url_quote_plus(self.url)}"
-        return f"{without_url}{url_suffix}"
+    def to_coord_arg_str(self) -> str:
+        return self.coordinate.to_coord_arg_str(
+            {"url": url_quote_plus(self.url)} if self.url else {}
+        )
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
@@ -378,7 +405,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 @dataclass(frozen=True)
 class CoursierResolveInfo:
-    coord_strings: FrozenSet[str]
+    coord_arg_strings: FrozenSet[str]
     digest: Digest
 
 
@@ -411,7 +438,7 @@ async def prepare_coursier_resolve_info(
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
     return CoursierResolveInfo(
-        coord_strings=frozenset(req.to_coord_str() for req in to_resolve),
+        coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
         digest=jar_files.snapshot.digest,
     )
 
@@ -460,7 +487,7 @@ async def coursier_resolve_lockfile(
             argv=coursier.args(
                 [
                     coursier_report_file_name,
-                    *coursier_resolve_info.coord_strings,
+                    *coursier_resolve_info.coord_arg_strings,
                     # TODO(#13496): Disable --strict-include to work around Coursier issue
                     # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
                     # artifact rules as malformed.
@@ -481,7 +508,7 @@ async def coursier_resolve_lockfile(
             description=(
                 "Running `coursier fetch` against "
                 f"{pluralize(len(artifact_requirements), 'requirement')}: "
-                f"{', '.join(req.to_coord_str() for req in artifact_requirements)}"
+                f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
             ),
             level=LogLevel.DEBUG,
         ),
@@ -616,7 +643,11 @@ async def coursier_fetch_one_coord(
         ProcessResult,
         Process(
             argv=coursier.args(
-                [coursier_report_file_name, "--intransitive", *coursier_resolve_info.coord_strings],
+                [
+                    coursier_report_file_name,
+                    "--intransitive",
+                    *coursier_resolve_info.coord_arg_strings,
+                ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
             input_digest=coursier_resolve_info.digest,
