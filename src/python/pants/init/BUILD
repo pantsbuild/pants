@@ -12,6 +12,8 @@ target(
         "src/python/pants/backend/experimental/codegen/protobuf/scala",
         "src/python/pants/backend/experimental/codegen/thrift/apache/java",
         "src/python/pants/backend/experimental/codegen/thrift/apache/python",
+        "src/python/pants/backend/experimental/codegen/thrift/scrooge/android",
+        "src/python/pants/backend/experimental/codegen/thrift/scrooge/java",
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
