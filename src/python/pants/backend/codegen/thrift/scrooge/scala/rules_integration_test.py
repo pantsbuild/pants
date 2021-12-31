@@ -96,7 +96,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         {
             "src/thrift/dir1/f.thrift": dedent(
                 """\
-                namespace py dir1
+                #@namespace scala org.pantsbuild.example
                 struct Person {
                   1: string name
                   2: i32 id
@@ -106,7 +106,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             ),
             "src/thrift/dir1/f2.thrift": dedent(
                 """\
-                namespace py dir1
+                #@namespace scala org.pantsbuild.example
                 include "dir1/f.thrift"
                 struct ManagedPerson {
                   1: f.Person employee
@@ -117,6 +117,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/g.thrift": dedent(
                 """\
+                #@namespace scala org.pantsbuild.example
                 include "dir1/f2.thrift"
                 struct ManagedPersonWrapper {
                   1: f2.ManagedPerson managed_person
@@ -127,6 +128,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             # Test another source root.
             "tests/thrift/test_thrifts/f.thrift": dedent(
                 """\
+                #@namespace scala org.pantsbuild.example
                 include "dir2/g.thrift"
                 struct Executive {
                   1: g.ManagedPersonWrapper managed_person_wrapper
@@ -145,30 +147,27 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             expected_files=expected,
         )
 
-    # TODO: Why is generated path `src/thrift/thrift`?
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f.thrift"),
         [
-            "src/thrift/thrift/Person.scala",
+            "src/thrift/org/pantsbuild/example/Person.scala",
         ],
     )
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f2.thrift"),
         [
-            "src/thrift/thrift/ManagedPerson.scala",
+            "src/thrift/org/pantsbuild/example/ManagedPerson.scala",
         ],
     )
-    # TODO: Fix package namespacing?
     assert_gen(
         Address("src/thrift/dir2", relative_file_path="g.thrift"),
         [
-            "src/thrift/thrift/ManagedPersonWrapper.scala",
+            "src/thrift/org/pantsbuild/example/ManagedPersonWrapper.scala",
         ],
     )
-    # TODO: Fix namespacing.
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
-            "tests/thrift/thrift/Executive.scala",
+            "tests/thrift/org/pantsbuild/example/Executive.scala",
         ],
     )

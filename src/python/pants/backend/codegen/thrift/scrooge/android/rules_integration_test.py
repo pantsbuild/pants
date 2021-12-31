@@ -146,7 +146,6 @@ def test_generates_java(rule_runner: RuleRunner) -> None:
             expected_files=expected,
         )
 
-    # TODO: Why is generated path `src/thrift/thrift`?
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f.thrift"),
         [
@@ -159,14 +158,12 @@ def test_generates_java(rule_runner: RuleRunner) -> None:
             "src/thrift/org/pantsbuild/example/ManagedPerson.java",
         ],
     )
-    # TODO: Fix package namespacing?
     assert_gen(
         Address("src/thrift/dir2", relative_file_path="g.thrift"),
         [
             "src/thrift/org/pantsbuild/example/ManagedPersonWrapper.java",
         ],
     )
-    # TODO: Fix namespacing.
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
