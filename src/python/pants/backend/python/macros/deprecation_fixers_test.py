@@ -169,6 +169,9 @@ def test_update_macro_references(rule_runner: RuleRunner) -> None:
                         "f.txt:tgt",
                         # Regression test for a file target breaking pantsbuild/pants.
                         "BUILD_ROOT:tgt",
+                        # Two fixes on the same line.
+                        "default_name:req", "default_name:req",
+                        "name_claimed:req", "name_claimed:req",
                     ],
                 )
                 """
@@ -242,6 +245,9 @@ def test_update_macro_references(rule_runner: RuleRunner) -> None:
                     "f.txt:tgt",
                     # Regression test for a file target breaking pantsbuild/pants.
                     "BUILD_ROOT:tgt",
+                    # Two fixes on the same line.
+                    "default_name#req", "default_name#req",
+                    "name_claimed:reqs#req", "name_claimed:reqs#req",
                 ],
             )
             """
