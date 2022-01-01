@@ -57,7 +57,7 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.field_sets
     )
 
-    owning_go_mod_addresses = set(x.address for x in owning_go_mods)
+    owning_go_mod_addresses = {x.address for x in owning_go_mods}
 
     go_mod_infos = await MultiGet(
         Get(GoModInfo, GoModInfoRequest(address)) for address in owning_go_mod_addresses
@@ -68,7 +68,7 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         MergeDigests([source_files.snapshot.digest, *(info.digest for info in set(go_mod_infos))]),
     )
 
-    package_dirs = sorted(set(os.path.dirname(f) for f in source_files.snapshot.files))
+    package_dirs = sorted({os.path.dirname(f) for f in source_files.snapshot.files})
 
     process_result = await Get(
         FallibleProcessResult,
