@@ -19,6 +19,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex_from_targets import GlobalRequirementConstraints
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -248,7 +249,10 @@ class MyPyFirstPartyPlugins:
 
 
 @rule("Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
-async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
+async def mypy_first_party_plugins(
+    mypy: MyPy,
+    global_requirement_constraints: GlobalRequirementConstraints,
+) -> MyPyFirstPartyPlugins:
     if not mypy.source_plugins:
         return MyPyFirstPartyPlugins(FrozenOrderedSet(), EMPTY_DIGEST, ())
 
@@ -258,9 +262,12 @@ async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
     )
 
     requirements = PexRequirements.create_from_requirement_fields(
-        plugin_tgt[PythonRequirementsField]
-        for plugin_tgt in transitive_targets.closure
-        if plugin_tgt.has_field(PythonRequirementsField)
+        (
+            plugin_tgt[PythonRequirementsField]
+            for plugin_tgt in transitive_targets.closure
+            if plugin_tgt.has_field(PythonRequirementsField)
+        ),
+        constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
     )
 
     sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))

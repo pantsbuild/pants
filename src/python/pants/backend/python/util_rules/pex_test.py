@@ -445,7 +445,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps, apply_constraints=False)
+        rule_runner, requirements=PexRequirements(direct_deps)
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -460,7 +460,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"constraints.txt": "\n".join(constraints)})
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps, apply_constraints=True),
+        requirements=PexRequirements(direct_deps, constraints_strings=constraints),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -563,7 +563,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"], apply_constraints=True),
+        requirements=PexRequirements(["requests==2.23.0"], constraints_strings=constraints),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     ).pex
     dists = rule_runner.request(PexResolveInfo, [pex])

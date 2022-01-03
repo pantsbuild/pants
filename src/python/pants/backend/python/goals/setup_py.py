@@ -707,12 +707,16 @@ async def get_requirements(
     direct_deps_chained = FrozenOrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
-    reqs = PexRequirements.create_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        for tgt in direct_deps_with_excl
-        if tgt.has_field(PythonRequirementsField)
+    req_strs = list(
+        PexRequirements.create_from_requirement_fields(
+            (
+                tgt[PythonRequirementsField]
+                for tgt in direct_deps_with_excl
+                if tgt.has_field(PythonRequirementsField)
+            ),
+            constraints_strings=(),
+        ).req_strings
     )
-    req_strs = list(reqs.req_strings)
 
     # Add the requirements on any exported targets on which we depend.
     kwargs_for_exported_targets_we_depend_on = await MultiGet(

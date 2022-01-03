@@ -46,15 +46,18 @@ async def generate_user_lockfile_goal(
         return GenerateUserLockfileGoal(exit_code=1)
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    reqs = PexRequirements.create_from_requirement_fields(
-        tgt[PythonRequirementsField]
-        # NB: By looking at the dependencies, rather than the closure, we only generate for
-        # requirements that are actually used in the project.
-        for tgt in transitive_targets.dependencies
-        if tgt.has_field(PythonRequirementsField)
-    )
+    req_strings = PexRequirements.create_from_requirement_fields(
+        (
+            tgt[PythonRequirementsField]
+            # NB: By looking at the dependencies, rather than the closure, we only generate for
+            # requirements that are actually used in the project.
+            for tgt in transitive_targets.dependencies
+            if tgt.has_field(PythonRequirementsField)
+        ),
+        constraints_strings=(),
+    ).req_strings
 
-    if not reqs:
+    if not req_strings:
         logger.warning(
             "No third-party requirements found for the transitive closure, so a lockfile will not "
             "be generated."
@@ -64,14 +67,14 @@ async def generate_user_lockfile_goal(
     result = await Get(
         PythonLockfile,
         PythonLockfileRequest(
-            reqs.req_strings,
+            req_strings,
             # TODO(#12314): Use interpreter constraints from the transitive closure.
             InterpreterConstraints(python_setup.interpreter_constraints),
             resolve_name="not yet implemented",
             lockfile_dest=python_setup.lockfile,
             _description=(
-                f"Generate lockfile for {pluralize(len(reqs.req_strings), 'requirement')}: "
-                f"{', '.join(reqs.req_strings)}"
+                f"Generate lockfile for {pluralize(len(req_strings), 'requirement')}: "
+                f"{', '.join(req_strings)}"
             ),
             # TODO(12382): Make this command actually accurate once we figure out the semantics
             #  for user lockfiles. This is currently misleading.
