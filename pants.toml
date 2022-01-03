@@ -25,7 +25,7 @@ backend_packages.add = [
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
   # NOTE: Keep this version in sync with `generate_docs.py`!
-  "toolchain.pants.plugin==0.15.0",
+  "toolchain.pants.plugin==0.17.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -139,6 +139,7 @@ custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [toolchain-setup]
 repo = "pants"
+org = "pantsbuild"
 
 [buildsense]
 enable = false
