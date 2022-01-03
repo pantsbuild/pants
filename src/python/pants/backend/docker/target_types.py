@@ -228,7 +228,7 @@ class DockerBuildSecretsOptionField(
     docker_build_option = "--secret"
 
     def option_values(self, **kwargs) -> Iterator[str]:
-        # os.path.join() discards preceeding parts if encountering an abs path, e.g. if the secret
+        # os.path.join() discards preceding parts if encountering an abs path, e.g. if the secret
         # `path` is an absolute path, the `buildroot` and `spec_path` will not be considered.  Also,
         # an empty path part is ignored.
         for secret, path in (self.value or {}).items():
@@ -284,7 +284,7 @@ class DockerImageTarget(Target):
         "By default, will use a Dockerfile from the same directory as the BUILD file this target "
         "is defined in. Point at another file with the `source` field, or use the `instructions` "
         "field to have the Dockerfile contents verbatim directly in the BUILD file.\n\n"
-        "Dependencies on upstream/base images defined by another `docker_image` are infered if "
+        "Dependencies on upstream/base images defined by another `docker_image` are inferred if "
         "referenced by a build argument with a default value of the target address.\n\n"
         + dedent(
             """\

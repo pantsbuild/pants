@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_module_mapper
@@ -9,11 +11,14 @@ from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import 
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as python_protobuf_target_types_rules
-from pants.backend.python.dependency_inference.module_mapper import FirstPartyPythonMappingImpl
+from pants.backend.python.dependency_inference.module_mapper import (
+    FirstPartyPythonMappingImpl,
+    ModuleProvider,
+    ModuleProviderType,
+)
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -37,7 +42,7 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             "root1/protos/f1.proto": "",
             "root1/protos/f2.proto": "",
             "root1/protos/BUILD": "protobuf_sources()",
-            # These protos would result in the same module name, so neither should be used.
+            # These protos will result in the same module name.
             "root1/two_owners/f.proto": "",
             "root1/two_owners/BUILD": "protobuf_sources()",
             "root2/two_owners/f.proto": "",
@@ -49,21 +54,21 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+
+    def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
+        return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
+
     assert result == FirstPartyPythonMappingImpl(
-        mapping=FrozenDict(
-            {
-                "protos.f1_pb2": (Address("root1/protos", relative_file_path="f1.proto"),),
-                "protos.f2_pb2": (Address("root1/protos", relative_file_path="f2.proto"),),
-                "tests.f_pb2": (Address("root1/tests", relative_file_path="f.proto"),),
-                "tests.f_pb2_grpc": (Address("root1/tests", relative_file_path="f.proto"),),
-            }
-        ),
-        ambiguous_modules=FrozenDict(
-            {
-                "two_owners.f_pb2": (
+        {
+            "protos.f1_pb2": providers([Address("root1/protos", relative_file_path="f1.proto")]),
+            "protos.f2_pb2": providers([Address("root1/protos", relative_file_path="f2.proto")]),
+            "tests.f_pb2": providers([Address("root1/tests", relative_file_path="f.proto")]),
+            "tests.f_pb2_grpc": providers([Address("root1/tests", relative_file_path="f.proto")]),
+            "two_owners.f_pb2": providers(
+                [
                     Address("root1/two_owners", relative_file_path="f.proto"),
                     Address("root2/two_owners", relative_file_path="f.proto"),
-                )
-            }
-        ),
+                ]
+            ),
+        }
     )

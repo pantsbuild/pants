@@ -249,28 +249,6 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_resolve_with_classifier(rule_runner: RuleRunner) -> None:
-    # Has as a transitive dependency an artifact with both a `classifier` and `packaging`.
-    coordinate = Coordinate(group="org.apache.avro", artifact="avro-tools", version="1.11.0")
-    resolved_lockfile = rule_runner.request(
-        CoursierResolvedLockfile,
-        [ArtifactRequirements.from_coordinates([coordinate])],
-    )
-
-    assert (
-        Coordinate(
-            group="org.apache.avro",
-            artifact="trevni-avro",
-            version="1.11.0",
-            packaging="jar",
-            classifier="tests",
-            strict=True,
-        )
-        in [e.coord for e in resolved_lockfile.entries]
-    )
-
-
-@maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
     coordinate = ArtifactRequirement(
@@ -492,6 +470,35 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
         fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
         serialized_bytes_length=384581,
     )
+
+
+@maybe_skip_jdk_test
+def test_fetch_one_coord_with_classifier(rule_runner: RuleRunner) -> None:
+    # Has as a transitive dependency an artifact with both a `classifier` and `packaging`.
+    coordinate = Coordinate(group="org.apache.avro", artifact="avro-tools", version="1.11.0")
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements.from_coordinates([coordinate])],
+    )
+
+    entries = [
+        e
+        for e in resolved_lockfile.entries
+        if e.coord
+        == Coordinate(
+            group="org.apache.avro",
+            artifact="trevni-avro",
+            version="1.11.0",
+            packaging="jar",
+            classifier="tests",
+            strict=True,
+        )
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+
+    classpath_entry = rule_runner.request(ClasspathEntry, [entry])
+    assert classpath_entry.filenames == ("org.apache.avro_trevni-avro_jar_tests_1.11.0.jar",)
 
 
 @maybe_skip_jdk_test

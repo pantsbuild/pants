@@ -7,7 +7,7 @@ updates:
     schedule:
       interval: "weekly" 
       day: "tuesday"
-      time: "9:00"
+      time: "09:00"
       timezone: "US/Pacific"
     reviewers:
       - Eric-Arellano
