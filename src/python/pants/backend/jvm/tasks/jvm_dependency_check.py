@@ -192,8 +192,7 @@ class JvmDependencyCheck(Task):
         explicit direct deps where relevant, so we optionally warn about indirect deps, to make them
         easy to find and reason about.
 
-        - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
-          compiler.
+        - actual_deps: a list of actual deps (source, class or jar file) as noted by the compiler.
 
         Returns a tuple (missing_file_deps, missing_direct_tgt_deps) where:
 
@@ -284,9 +283,7 @@ class JvmDependencyCheck(Task):
         """
         # Flatten the product deps of this target.
         product_deps = set()
-        # TODO update actual deps will just be a list, not a dict when switching to
-        # product_deps_by_target_product.
-        for dep_entries in actual_deps.values():
+        for dep_entries in actual_deps:
             product_deps.update(dep_entries)
 
         # Determine which of the DEFAULT deps in the declared set of this target were used.
