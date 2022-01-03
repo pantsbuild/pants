@@ -71,13 +71,14 @@ async def push_docker_images(
         )
 
     env = await Get(Environment, EnvironmentRequest(options.env_vars))
-    process = docker.push_image(tags, env)
+    processes = zip(tags, docker.push_image(tags, env))
     return PublishProcesses(
         [
             PublishPackages(
-                names=tags,
-                process=InteractiveProcess.from_process(process) if process else None,
-            ),
+                names=(tag,),
+                process=InteractiveProcess.from_process(process),
+            )
+            for tag, process in processes
         ]
     )
 

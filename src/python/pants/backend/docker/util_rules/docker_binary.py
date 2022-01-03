@@ -64,15 +64,15 @@ class DockerBinary(BinaryPath):
 
     def push_image(
         self, tags: tuple[str, ...], env: Mapping[str, str] | None = None
-    ) -> Process | None:
-        if not tags:
-            return None
-
-        return Process(
-            argv=(self.path, "push", *tags),
-            cache_scope=ProcessCacheScope.PER_SESSION,
-            description=f"Pushing docker image {tags[0]}",
-            env=env,
+    ) -> tuple[Process, ...]:
+        return tuple(
+            Process(
+                argv=(self.path, "push", tag),
+                cache_scope=ProcessCacheScope.PER_SESSION,
+                description=f"Pushing docker image {tag}",
+                env=env,
+            )
+            for tag in tags
         )
 
 
