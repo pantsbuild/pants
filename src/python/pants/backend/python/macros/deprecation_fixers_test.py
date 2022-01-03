@@ -42,7 +42,6 @@ def rule_runner() -> RuleRunner:
     )
 
 
-@pytest.mark.xfail(reason="Fix ")
 def test_determine_macro_changes(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files(
         {

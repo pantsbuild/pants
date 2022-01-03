@@ -109,6 +109,8 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
             generator_name = "pipenv"
         elif generator_alias == "poetry_requirements":
             generator_name = "poetry"
+        # It's common to override `source=` for `python_requirements` to something other than
+        # `requirements.txt`. Hence why we don't use `elif` to check for a certain file name.
         else:
             generator_name = "reqs"
 
