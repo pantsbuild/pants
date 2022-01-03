@@ -5,16 +5,16 @@ import datetime
 import getpass
 import re
 import time
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 from freezegun import freeze_time
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import environment_as
 from pants.version import VERSION
 
 
@@ -38,7 +38,9 @@ def test_run_tracker_timing_output(tmp_path: Path, frozen_time: datetime.datetim
     [(PANTS_SUCCEEDED_EXIT_CODE, "SUCCESS"), (PANTS_FAILED_EXIT_CODE, "FAILURE")],
 )
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
-def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, frozen_time: datetime.datetime) -> None:
+def test_run_information(
+    exit_code: ExitCode, expected: str, tmp_path: Path, frozen_time: datetime.datetime
+) -> None:
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         spec = "test/example.py"
