@@ -4,5 +4,3 @@
 python_sources(dependencies=[":lockfile"])
 
 resource(name="lockfile", source="scrooge.default.lockfile.txt")
-
-python_tests(name="tests")
