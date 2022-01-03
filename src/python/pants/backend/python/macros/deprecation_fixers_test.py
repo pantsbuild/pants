@@ -12,6 +12,7 @@ from pants.backend.python.macros import deprecation_fixers
 from pants.backend.python.macros.deprecation_fixers import (
     GeneratorRename,
     MacroRenames,
+    MacroRenamesRequest,
     UpdatePythonMacrosRequest,
 )
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
@@ -30,7 +31,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
             *deprecation_fixers.rules(),
-            QueryRule(MacroRenames, []),
+            QueryRule(MacroRenames, [MacroRenamesRequest]),
             QueryRule(RewrittenBuildFile, [UpdatePythonMacrosRequest]),
         ),
         target_types=[GenericTarget, PythonRequirementsFileTarget, PythonRequirementTarget],
@@ -71,7 +72,7 @@ def test_determine_macro_changes(rule_runner: RuleRunner, caplog) -> None:
             "pipenv/BUILD": "pipenv_requirements()",
         }
     )
-    renames = rule_runner.request(MacroRenames, [])
+    renames = rule_runner.request(MacroRenames, [MacroRenamesRequest()])
     assert renames.generators == (
         GeneratorRename("BUILD", "python_requirements", "reqs"),
         GeneratorRename("pipenv/BUILD", "pipenv_requirements", None),

@@ -188,6 +188,7 @@ class RuleRunner:
         preserve_tmpdirs: bool = False,
         ca_certs_path: str | None = None,
         bootstrap_args: Iterable[str] = (),
+        use_deprecated_python_macros: bool = False,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -260,6 +261,7 @@ class RuleRunner:
             execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
             ca_certs_path=ca_certs_path,
             engine_visualize_to=None,
+            use_deprecated_python_macros=use_deprecated_python_macros,
         ).new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
