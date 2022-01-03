@@ -11,6 +11,7 @@ from pants.backend.java.dependency_inference.rules import (
     JavaInferredDependenciesAndExportsRequest,
 )
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
+from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -41,6 +42,7 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
 async def compile_java_source(
     bash: BashBinary,
     jdk_setup: JdkSetup,
+    javac: JavacSubsystem,
     zip_binary: ZipBinary,
     union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
@@ -161,6 +163,7 @@ async def compile_java_source(
                 *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
                 "com.sun.tools.javac.Main",
                 *(("-cp", classpath_arg) if classpath_arg else ()),
+                *javac.args,
                 "-d",
                 dest_dir,
                 *sorted(

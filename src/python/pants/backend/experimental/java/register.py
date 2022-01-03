@@ -18,7 +18,7 @@ from pants.jvm import classpath, jdk_rules, resources
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import coursier
-from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
+from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test import junit
 
@@ -43,7 +43,6 @@ def rules():
         *deploy_jar.rules(),
         *coursier.rules(),
         *coursier_fetch.rules(),
-        *coursier_setup.rules(),
         *java_parser.rules(),
         *java_parser_launcher.rules(),
         *resources.rules(),

@@ -40,9 +40,6 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 
 # TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -74,11 +71,7 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(
         # Makes JUnit output predictable and parseable across versions (#12933):
-        args=[
-            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
+        args=["--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
@@ -132,7 +125,7 @@ JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -179,7 +172,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -234,7 +227,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -298,7 +291,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT4_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -437,7 +430,7 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -487,7 +480,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -543,7 +536,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "coursier_resolve.lockfile": JUNIT5_RESOLVED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(

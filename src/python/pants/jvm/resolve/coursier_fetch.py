@@ -7,6 +7,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from itertools import chain
 from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
@@ -29,7 +30,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets
+from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
@@ -37,6 +38,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
+from pants.jvm.resolve import coursier_setup
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
@@ -48,12 +50,11 @@ from pants.jvm.target_types import (
     JvmArtifactTarget,
     JvmArtifactUrlField,
     JvmArtifactVersionField,
-    JvmCompatibleResolvesField,
-    JvmResolveField,
 )
 from pants.jvm.util_rules import ExtractFileDigest
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +67,48 @@ class CoursierError(Exception):
     """An exception relating to invoking Coursier or processing its output."""
 
 
+class NoCompatibleResolve(Exception):
+    """No compatible resolve could be found for a set of targets."""
+
+    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
+        targets_and_resolves_str = bullet_list(
+            f"{t.address.spec}\t{jvm.resolves_for_target(t)}" for t in incompatible_targets
+        )
+        super().__init__(
+            f"{msg_prefix}:\n"
+            f"{targets_and_resolves_str}\n"
+            "Targets which will be merged onto the same classpath must have at least one compatible "
+            f"resolve (from the [resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) or "
+            f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
+            "fields) in common."
+        )
+
+
+class InvalidCoordinateString(Exception):
+    """The coordinate string being passed is invalid or malformed."""
+
+    def __init__(self, coords: str) -> None:
+        super().__init__(f"Received invalid artifact coordinates: {coords}")
+
+
 @dataclass(frozen=True)
 class Coordinate:
-    """A single Maven-style coordinate for a JVM dependency."""
+    """A single Maven-style coordinate for a JVM dependency.
+
+    Coursier uses at least two string serializations of coordinates:
+    1. A format that is accepted by the Coursier CLI which uses trailing attributes to specify
+       optional fields like `packaging`/`type`, `classifier`, `url`, etc. See `to_coord_arg_str`.
+    2. A format in the JSON report, which uses token counts to specify optional fields. We
+       additionally use this format in our own lockfile. See `to_coord_str` and `from_coord_str`.
+    """
+
+    REGEX = re.compile("([^: ]+):([^: ]+)(:([^: ]*)(:([^: ]+))?)?:([^: ]+)")
 
     group: str
     artifact: str
     version: str
     packaging: str = "jar"
+    classifier: str | None = None
 
     # True to enforce that the exact declared version of a coordinate is fetched, rather than
     # allowing dependency resolution to adjust the version when conflicts occur.
@@ -86,6 +121,7 @@ class Coordinate:
             artifact=data["artifact"],
             version=data["version"],
             packaging=data.get("packaging", "jar"),
+            classifier=data.get("classifier", None),
         )
 
     def to_json_dict(self) -> dict:
@@ -94,29 +130,73 @@ class Coordinate:
             "artifact": self.artifact,
             "version": self.version,
             "packaging": self.packaging,
+            "classifier": self.classifier,
         }
         return ret
 
     @classmethod
     def from_coord_str(cls, s: str) -> Coordinate:
-        parts = s.split(":")
-        return cls(
-            group=parts[0],
-            artifact=parts[1],
-            version=parts[2],
-            packaging=parts[3] if len(parts) == 4 else "jar",
-        )
+        """Parses from a coordinate string with optional `packaging` and `classifier` coordinates.
+
+        See the classdoc for more information on the format.
+
+        Using Aether's implementation as reference
+        http://www.javased.com/index.php?source_dir=aether-core/aether-api/src/main/java/org/eclipse/aether/artifact/DefaultArtifact.java
+
+        ${organisation}:${artifact}[:${packaging}[:${classifier}]]:${version}
+
+        See also: `to_coord_str`.
+        """
+
+        parts = Coordinate.REGEX.match(s)
+        if parts is not None:
+            packaging_part = parts.group(4)
+            return cls(
+                group=parts.group(1),
+                artifact=parts.group(2),
+                packaging=packaging_part if packaging_part is not None else "jar",
+                classifier=parts.group(6),
+                version=parts.group(7),
+            )
+        else:
+            raise InvalidCoordinateString(s)
 
     def as_requirement(self) -> ArtifactRequirement:
         """Creates a `RequirementCoordinate` from a `Coordinate`."""
         return ArtifactRequirement(coordinate=self)
 
     def to_coord_str(self, versioned: bool = True) -> str:
+        """Renders the coordinate in Coursier's JSON-report format, which does not use attributes.
+
+        See also: `from_coord_str`.
+        """
         unversioned = f"{self.group}:{self.artifact}"
+        if self.classifier is not None:
+            unversioned += f":{self.packaging}:{self.classifier}"
+        elif self.packaging != "jar":
+            unversioned += f":{self.packaging}"
+
         version_suffix = ""
         if versioned:
             version_suffix = f":{self.version}"
         return f"{unversioned}{version_suffix}"
+
+    def to_coord_arg_str(self, extra_attrs: dict[str, str] | None = None) -> str:
+        """Renders the coordinate in Coursier's CLI input format.
+
+        The CLI input format uses trailing key-val attributes to specify `packaging`, `url`, etc.
+
+        See https://github.com/coursier/coursier/blob/b5d5429a909426f4465a9599d25c678189a54549/modules/coursier/shared/src/test/scala/coursier/parse/DependencyParserTests.scala#L7
+        """
+        attrs = dict(extra_attrs or {})
+        if self.packaging != "jar":
+            # NB: Coursier refers to `packaging` as `type` internally.
+            attrs["type"] = self.packaging
+        if self.classifier:
+            attrs["classifier"] = self.classifier
+        attrs_sep_str = "," if attrs else ""
+        attrs_str = ",".join((f"{k}={v}" for k, v in attrs.items()))
+        return f"{self.group}:{self.artifact}:{self.version}{attrs_sep_str}{attrs_str}"
 
 
 class Coordinates(DeduplicatedCollection[Coordinate]):
@@ -154,12 +234,10 @@ class ArtifactRequirement:
             ),
         )
 
-    def to_coord_str(self, versioned: bool = True) -> str:
-        without_url = self.coordinate.to_coord_str(versioned)
-        url_suffix = ""
-        if self.url:
-            url_suffix = f",url={url_quote_plus(self.url)}"
-        return f"{without_url}{url_suffix}"
+    def to_coord_arg_str(self) -> str:
+        return self.coordinate.to_coord_arg_str(
+            {"url": url_quote_plus(self.url)} if self.url else {}
+        )
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
@@ -327,7 +405,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 @dataclass(frozen=True)
 class CoursierResolveInfo:
-    coord_strings: FrozenSet[str]
+    coord_arg_strings: FrozenSet[str]
     digest: Digest
 
 
@@ -360,7 +438,7 @@ async def prepare_coursier_resolve_info(
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
     return CoursierResolveInfo(
-        coord_strings=frozenset(req.to_coord_str() for req in to_resolve),
+        coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
         digest=jar_files.snapshot.digest,
     )
 
@@ -409,7 +487,7 @@ async def coursier_resolve_lockfile(
             argv=coursier.args(
                 [
                     coursier_report_file_name,
-                    *coursier_resolve_info.coord_strings,
+                    *coursier_resolve_info.coord_arg_strings,
                     # TODO(#13496): Disable --strict-include to work around Coursier issue
                     # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
                     # artifact rules as malformed.
@@ -430,7 +508,7 @@ async def coursier_resolve_lockfile(
             description=(
                 "Running `coursier fetch` against "
                 f"{pluralize(len(artifact_requirements), 'requirement')}: "
-                f"{', '.join(req.to_coord_str() for req in artifact_requirements)}"
+                f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
             ),
             level=LogLevel.DEBUG,
         ),
@@ -565,7 +643,11 @@ async def coursier_fetch_one_coord(
         ProcessResult,
         Process(
             argv=coursier.args(
-                [coursier_report_file_name, "--intransitive", *coursier_resolve_info.coord_strings],
+                [
+                    coursier_report_file_name,
+                    "--intransitive",
+                    *coursier_resolve_info.coord_arg_strings,
+                ],
                 wrapper=[bash.path, coursier.wrapper_script],
             ),
             input_digest=coursier_resolve_info.digest,
@@ -593,7 +675,6 @@ async def coursier_fetch_one_coord(
         )
 
     dep = report_deps[0]
-
     resolved_coord = Coordinate.from_coord_str(dep["coord"])
     if resolved_coord != request.coord:
         raise CoursierError(
@@ -629,38 +710,50 @@ async def coursier_fetch_lockfile(lockfile: CoursierResolvedLockfile) -> Resolve
 
 @rule
 async def select_coursier_resolve_for_targets(
-    targets: Targets, jvm: JvmSubsystem
+    coarsened_targets: CoarsenedTargets, jvm: JvmSubsystem
 ) -> CoursierResolveKey:
-    encountered_resolves: list[str] = []
-    encountered_compatible_resolves: list[str] = []
-    for tgt in targets:
-        if tgt.has_field(JvmResolveField):
-            resolve = tgt[JvmResolveField].value or jvm.default_resolve
-            # TODO: remove once we always have a default resolve.
-            if resolve is None:
-                continue
-            encountered_resolves.append(resolve)
-        if tgt.has_field(JvmCompatibleResolvesField):
-            encountered_compatible_resolves.extend(
-                tgt[JvmCompatibleResolvesField].value
-                or ([jvm.default_resolve] if jvm.default_resolve is not None else [])
-            )
+    """Selects and validates (transitively) a single resolve for a set of roots in a compile graph.
 
-    # TODO: validate that all specified resolves are defined in [jvm].resolves and that all
-    #  encountered resolves are compatible with each other. Note that we don't validate that
-    #  dependencies are compatible, just the specified targets.
+    In most cases, a `CoursierResolveKey` should be requested for a single `CoarsenedTarget` root,
+    which avoids coupling un-related roots unnecessarily. But in other cases, a single compatible
+    resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
+    in that case there might be multiple CoarsenedTargets.
+    """
+    root_targets = [t for ct in coarsened_targets for t in ct.members]
 
-    if len(encountered_resolves) > 1:
-        raise AssertionError(f"Encountered >1 `resolve` field, which was not expected. {targets}")
-    elif len(encountered_resolves) == 1:
-        resolve = encountered_resolves[0]
-    elif encountered_compatible_resolves:
-        resolve = min(encountered_compatible_resolves)
-    else:
-        raise AssertionError(
-            f"No `resolve` or `compatible_resolves` specified for these targets: {targets}"
+    # Find the set of resolves that are compatible with all roots by ANDing them all together.
+    compatible_resolves: set[str] | None = None
+    for tgt in root_targets:
+        current_resolves = set(jvm.resolves_for_target(tgt))
+        if compatible_resolves is None:
+            compatible_resolves = current_resolves
+        else:
+            compatible_resolves &= current_resolves
+
+    # Select a resolve from the compatible set.
+    if not compatible_resolves:
+        raise NoCompatibleResolve(
+            jvm, "The selected targets did not have a resolve in common", root_targets
+        )
+    # Take the first compatible resolve.
+    resolve = min(compatible_resolves)
+
+    # Validate that the selected resolve is compatible with all transitive dependencies.
+    incompatible_targets = []
+    for ct in coarsened_targets.closure():
+        for t in ct.members:
+            target_resolves = jvm.resolves_for_target(t)
+            if target_resolves is not None and resolve not in target_resolves:
+                incompatible_targets.append(t)
+    if incompatible_targets:
+        raise NoCompatibleResolve(
+            jvm,
+            f"The resolve chosen for the root targets was {resolve}, but some of their "
+            "dependencies were not compatible with that resolve",
+            incompatible_targets,
         )
 
+    # Load the resolve.
     resolve_path = jvm.resolves[resolve]
     lockfile_source = PathGlobs(
         [resolve_path],
@@ -757,5 +850,6 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
 def rules():
     return [
         *collect_rules(),
+        *coursier_setup.rules(),
         UnionRule(ClasspathEntryRequest, CoursierFetchRequest),
     ]

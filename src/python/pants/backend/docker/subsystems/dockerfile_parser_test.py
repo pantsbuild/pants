@@ -107,6 +107,25 @@ def test_build_args(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_arg_names(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/upstream/BUILD": "docker_image(name='image')",
+            "test/upstream/Dockerfile": "FROM upstream",
+            "test/downstream/BUILD": "docker_image(name='image')",
+            "test/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=test/upstream:image
+                FROM ${BASE_IMAGE} AS base
+                """
+            ),
+        }
+    )
+    addr = Address("test/downstream", target_name="image")
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+    assert info.from_image_build_arg_names == ("BASE_IMAGE",)
+
+
 def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -129,3 +148,24 @@ def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
     )
     with pytest.raises(ExecutionError, match=err_msg):
         rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
+
+
+def test_copy_source_references(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": dedent(
+                """\
+                FROM base
+                COPY a b /
+                COPY --option c/d e/f/g /h
+                ADD ignored
+                COPY j k /
+                COPY
+                """
+            ),
+        }
+    )
+
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
+    assert info.copy_sources == ("a", "b", "c/d", "e/f/g", "j", "k")

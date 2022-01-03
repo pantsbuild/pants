@@ -633,15 +633,17 @@ impl<N: Node> Graph<N> {
       entry.cleaning_failed()
     }
 
-    // Otherwise, clear the deps.
-    // NB: Because `remove_edge` changes EdgeIndex values, we remove edges one at a time.
-    while let Some(dep_edge) = inner
+    // Otherwise, clear the deps. We remove edges in reverse index order, because `remove_edge` is
+    // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
+    // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
+    let mut edge_ids = inner
       .pg
       .edges_directed(entry_id, Direction::Outgoing)
-      .next()
-      .map(|edge| edge.id())
-    {
-      inner.pg.remove_edge(dep_edge);
+      .map(|e| e.id())
+      .collect::<Vec<_>>();
+    edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
+    for edge_id in edge_ids {
+      inner.pg.remove_edge(edge_id);
     }
   }
 

@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import partial
 from os import path
-from typing import Any, Iterator, Mapping
+from textwrap import dedent
+from typing import Iterator
 
+# Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
+# a dependency cycle from docker_build_context.
+from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
     DockerImageSourceField,
     DockerImageTagsField,
+    DockerImageTargetStageField,
     DockerRegistriesField,
     DockerRepositoryField,
 )
@@ -20,42 +26,39 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContext,
 )
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.backend.docker.utils import format_rename_suggestion
+from pants.backend.docker.value_interpolation import (
+    DockerInterpolationContext,
+    DockerInterpolationError,
+)
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.util.strutil import bullet_list, pluralize
+from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
 
-class DockerImageTagValueError(ValueError):
+class DockerImageTagValueError(DockerInterpolationError):
     pass
 
 
-class DockerRepositoryNameError(ValueError):
+class DockerRepositoryNameError(DockerInterpolationError):
     pass
 
 
-@dataclass(frozen=True)
-class BuiltDockerImage(BuiltPackageArtifact):
-    tags: tuple[str, ...] = ()
+class DockerBuildTargetStageError(ValueError):
+    pass
 
-    @classmethod
-    def create(cls, tags: tuple[str, ...]) -> BuiltDockerImage:
-        tags_string = tags[0] if len(tags) == 1 else (f"\n{bullet_list(tags)}")
-        return cls(
-            tags=tags,
-            relpath=None,
-            extra_log_lines=(
-                f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-            ),
-        )
+
+class DockerImageOptionValueError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -64,65 +67,48 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
     registries: DockerRegistriesField
     repository: DockerRepositoryField
+    source: DockerImageSourceField
     tags: DockerImageTagsField
+    target_stage: DockerImageTargetStageField
 
-    def format_tag(self, tag: str, version_context: DockerVersionContext) -> str:
-        try:
-            return tag.format(**version_context)
-        except (KeyError, ValueError) as e:
-            msg = (
-                "Invalid tag value for the `image_tags` field of the `docker_image` target at "
-                f"{self.address}: {tag!r}.\n\n"
-            )
-            if isinstance(e, KeyError):
-                msg += f"The placeholder {e} is unknown."
-                if version_context:
-                    msg += f' Try with one of: {", ".join(sorted(version_context.keys()))}.'
-                else:
-                    msg += (
-                        " There are currently no known placeholders to use. These placeholders "
-                        "can come from `[docker].build_args` or parsed FROM instructions of "
-                        "your `Dockerfile`."
-                    )
-            else:
-                msg += str(e)
-            raise DockerImageTagValueError(msg) from e
+    def format_tag(self, tag: str, interpolation_context: DockerInterpolationContext) -> str:
+        source = DockerInterpolationContext.TextSource(
+            address=self.address, target_alias="docker_image", field_alias=self.tags.alias
+        )
+        return interpolation_context.format(
+            tag, source=source, error_cls=DockerImageTagValueError
+        ).lower()
 
     def format_repository(
-        self, default_repository: str, repository_context: Mapping[str, Any]
+        self, default_repository: str, interpolation_context: DockerInterpolationContext
     ) -> str:
-        fmt_context = dict(
-            directory=path.basename(self.address.spec_path),
-            name=self.address.target_name,
-            parent_directory=path.basename(path.dirname(self.address.spec_path)),
-            **repository_context,
+        repository_context = DockerInterpolationContext.from_dict(
+            {
+                "directory": path.basename(self.address.spec_path),
+                "name": self.address.target_name,
+                "parent_directory": path.basename(path.dirname(self.address.spec_path)),
+                **interpolation_context,
+            }
         )
-        repository_fmt = self.repository.value or default_repository
-
-        try:
-            return repository_fmt.format(**fmt_context)
-        except (KeyError, ValueError) as e:
-            if self.repository.value:
-                source = f"`repository` field of the `docker_image` target at {self.address}"
-            else:
-                source = "`[docker].default_repository` configuration option"
-
-            msg = f"Invalid value for the {source}: {repository_fmt!r}.\n\n"
-
-            if isinstance(e, KeyError):
-                msg += (
-                    f"The placeholder {e} is unknown. "
-                    f'Try with one of: {", ".join(sorted(fmt_context.keys()))}.'
-                )
-            else:
-                msg += str(e)
-            raise DockerRepositoryNameError(msg) from e
+        if self.repository.value:
+            repository_text = self.repository.value
+            source = DockerInterpolationContext.TextSource(
+                address=self.address, target_alias="docker_image", field_alias=self.repository.alias
+            )
+        else:
+            repository_text = default_repository
+            source = DockerInterpolationContext.TextSource(
+                options_scope="[docker].default_repository"
+            )
+        return repository_context.format(
+            repository_text, source=source, error_cls=DockerRepositoryNameError
+        ).lower()
 
     def image_refs(
         self,
         default_repository: str,
         registries: DockerRegistries,
-        version_context: DockerVersionContext,
+        interpolation_context: DockerInterpolationContext,
     ) -> tuple[str, ...]:
         """The image refs are the full image name, including any registry and version tag.
 
@@ -141,13 +127,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         This method will always return a non-empty tuple.
         """
-        repository_context = {}
-        if "build_args" in version_context:
-            repository_context["build_args"] = version_context["build_args"]
-
-        repository = self.format_repository(default_repository, repository_context)
+        repository = self.format_repository(default_repository, interpolation_context)
         image_names = tuple(
-            ":".join(s for s in [repository, self.format_tag(tag, version_context)] if s)
+            ":".join(s for s in [repository, self.format_tag(tag, interpolation_context)] if s)
             for tag in self.tags.value or ()
         )
 
@@ -163,17 +145,54 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
 
-def get_build_options(target: Target) -> Iterator[str]:
+def get_build_options(
+    context: DockerBuildContext,
+    field_set: DockerFieldSet,
+    global_target_stage_option: str | None,
+    target: Target,
+) -> Iterator[str]:
+    # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
-            yield from target[field_type].options()
+            source = DockerInterpolationContext.TextSource(
+                address=target.address, target_alias=target.alias, field_alias=field_type.alias
+            )
+            format = partial(
+                context.interpolation_context.format,
+                source=source,
+                error_cls=DockerImageOptionValueError,
+            )
+            yield from target[field_type].options(format)
+
+    # Target stage
+    target_stage = None
+    if global_target_stage_option in context.stages:
+        target_stage = global_target_stage_option
+    elif field_set.target_stage.value:
+        target_stage = field_set.target_stage.value
+        if target_stage not in context.stages:
+            raise DockerBuildTargetStageError(
+                f"The {field_set.target_stage.alias!r} field in `{target.alias}` "
+                f"{field_set.address} was set to {target_stage!r}"
+                + (
+                    f", but there is no such stage in `{context.dockerfile}`. "
+                    f"Available stages: {', '.join(context.stages)}."
+                    if context.stages
+                    else f", but there are no named stages in `{context.dockerfile}`."
+                )
+            )
+
+    if target_stage:
+        yield from ("--target", target_stage)
 
 
 @rule
 async def build_docker_image(
     field_set: DockerFieldSet,
     options: DockerOptions,
+    global_options: GlobalOptions,
     docker: DockerBinary,
+    process_cleanup: ProcessCleanupOption,
 ) -> BuiltPackage:
     context, wrapped_target = await MultiGet(
         Get(
@@ -189,32 +208,100 @@ async def build_docker_image(
     tags = field_set.image_refs(
         default_repository=options.default_repository,
         registries=options.registries(),
-        version_context=context.version_context,
+        interpolation_context=context.interpolation_context,
     )
 
-    result = await Get(
-        ProcessResult,
-        Process,
-        docker.build_image(
-            build_args=context.build_args,
-            digest=context.digest,
-            dockerfile=context.dockerfile,
-            env=context.build_env.environment,
-            tags=tags,
-            extra_args=tuple(get_build_options(wrapped_target.target)),
+    process = docker.build_image(
+        build_args=context.build_args,
+        digest=context.digest,
+        dockerfile=context.dockerfile,
+        env=context.build_env.environment,
+        tags=tags,
+        extra_args=tuple(
+            get_build_options(
+                context=context,
+                field_set=field_set,
+                global_target_stage_option=options.build_target_stage,
+                target=wrapped_target.target,
+            )
         ),
     )
+    result = await Get(FallibleProcessResult, Process, process)
+
+    if result.exit_code != 0:
+        maybe_msg = docker_build_failed(
+            field_set.address,
+            context,
+            global_options.options.colors,
+        )
+        if maybe_msg:
+            logger.warning(maybe_msg)
+
+        raise ProcessExecutionFailure(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            process.description,
+            process_cleanup=process_cleanup.val,
+        )
 
     logger.debug(
-        f"Docker build output for {tags[0]}:\n"
-        f"{result.stdout.decode()}\n"
-        f"{result.stderr.decode()}"
+        dedent(
+            f"""\
+            Docker build output for {tags[0]}:
+            stdout:
+            {result.stdout.decode()}
+
+            stderr:
+            {result.stderr.decode()}
+            """
+        )
     )
 
     return BuiltPackage(
         result.output_digest,
         (BuiltDockerImage.create(tags),),
     )
+
+
+def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:
+    if not context.copy_source_vs_context_source:
+        return None
+
+    msg = (
+        f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY` "
+        "instructions where the source files may not have been found in the Docker build context."
+        "\n\n"
+    )
+
+    renames = [
+        format_rename_suggestion(src, dst, colors=colors)
+        for src, dst in context.copy_source_vs_context_source
+        if src and dst
+    ]
+    if renames:
+        msg += (
+            f"However there are possible matches. Please review the following list of suggested "
+            f"renames:\n\n{bullet_list(renames)}\n\n"
+        )
+
+    unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]
+    if unknown:
+        msg += (
+            f"The following files were not found in the Docker build context:\n\n"
+            f"{bullet_list(unknown)}\n\n"
+        )
+
+    unreferenced = [dst for src, dst in context.copy_source_vs_context_source if not src]
+    if unreferenced:
+        if len(unreferenced) > 10:
+            unreferenced = unreferenced[:9] + [f"... and {len(unreferenced)-9} more"]
+        msg += (
+            f"There are additional files in the Docker build context that were not referenced by "
+            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced)}\n\n"
+        )
+
+    return msg
 
 
 def rules():

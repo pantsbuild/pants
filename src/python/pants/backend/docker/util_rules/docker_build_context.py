@@ -6,8 +6,8 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import Mapping
 
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
@@ -20,12 +20,18 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
+from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.value_interpolation import (
+    DockerBuildArgsInterpolationValue,
+    DockerInterpolationContext,
+    DockerInterpolationValue,
+)
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -40,7 +46,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
@@ -49,37 +54,9 @@ class DockerBuildContextError(Exception):
     pass
 
 
-class DockerVersionContextError(ValueError):
-    pass
-
-
-class DockerVersionContextValue(FrozenDict[str, str]):
-    """Dict class suitable for use as a format string context object, as it allows to use attribute
-    access rather than item access."""
-
-    def __getattr__(self, attribute: str) -> str:
-        if attribute not in self:
-            raise DockerVersionContextError(
-                f"The placeholder {attribute!r} is unknown. Try with one of: "
-                f'{", ".join(self.keys())}.'
-            )
-        return self[attribute]
-
-
-class DockerVersionContext(FrozenDict[str, DockerVersionContextValue]):
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
-        return DockerVersionContext(
-            {key: DockerVersionContextValue(value) for key, value in data.items()}
-        )
-
-    def merge(self, other: Mapping[str, Mapping[str, str]]) -> DockerVersionContext:
-        return DockerVersionContext.from_dict({**self, **other})
-
-
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """This is a meta field for the context files generator, to tell the codegen machinery what
-    source fields are good to use.
+    source fields are good to use as-is.
 
     Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
     that should be accepted.
@@ -89,7 +66,7 @@ class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """
 
 
-DockerContextFilesAcceptableInputsField.register(FileSourceField)
+# These sources will be used to populate the build context as-is.
 DockerContextFilesAcceptableInputsField.register(ShellSourceField)
 
 
@@ -124,25 +101,31 @@ class DockerBuildContext:
     digest: Digest
     build_env: DockerBuildEnvironment
     dockerfile: str
-    version_context: DockerVersionContext
+    interpolation_context: DockerInterpolationContext
+    copy_source_vs_context_source: tuple[tuple[str, str], ...]
+    stages: tuple[str, ...]
 
     @classmethod
     def create(
         cls,
         build_args: DockerBuildArgs,
-        digest: Digest,
+        snapshot: Snapshot,
         build_env: DockerBuildEnvironment,
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
-        version_context: dict[str, dict[str, str]] = {}
+        interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
 
-        # FROM tags for all stages.
-        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
+        # Go over all FROM tags and names for all stages.
+        stage_names: set[str] = set()
+        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        for idx, (stage, tag) in enumerate(stage_tags):
+            if stage != f"stage{idx}":
+                stage_names.add(stage)
             value = {"tag": tag}
-            if not version_context:
+            if not interpolation_context:
                 # Expose the first (stage0) FROM directive as the "baseimage".
-                version_context["baseimage"] = value
-            version_context[stage] = value
+                interpolation_context["baseimage"] = value
+            interpolation_context[stage] = value
 
         if build_args:
             # Extract default arg values from the parsed Dockerfile.
@@ -154,7 +137,13 @@ class DockerBuildContext:
                 if has_default
             }
             try:
-                version_context["build_args"] = {
+                # Create build args context value, based on defined build_args and
+                # extra_build_args. We do _not_ auto "magically" pick up all ARG names from the
+                # Dockerfile as first class args to use as placeholders, to make it more explicit
+                # which args are actually being used by Pants. We do pick up any defined default ARG
+                # values from the Dockerfile however, in order to not having to duplicate them in
+                # the BUILD files.
+                interpolation_context["build_args"] = {
                     arg_name: arg_value
                     if has_value
                     else build_env.get(arg_name, build_arg_defaults.get(arg_name))
@@ -166,18 +155,35 @@ class DockerBuildContext:
                 raise DockerBuildContextError(
                     f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
                     "\n\nIf you did not intend to inherit the value for this build arg from the "
-                    "environment, provide a default value where it is defined either in "
-                    "`[docker].build_args` or in the `extra_build_args` field on the target "
-                    "definition. Alternatively, you may also provide a default value on the `ARG` "
-                    "instruction in the `Dockerfile`."
+                    "environment, provide a default value with the option `[docker].build_args` "
+                    "or in the `extra_build_args` field on the target definition. Alternatively, "
+                    "you may also provide a default value on the `ARG` instruction directly in "
+                    "the `Dockerfile`."
                 ) from e
+
+        # Override default value type for the `build_args` context to get helpful error messages.
+        interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
+            interpolation_context.get("build_args", {})
+        )
 
         return cls(
             build_args=build_args,
-            digest=digest,
+            digest=snapshot.digest,
             dockerfile=dockerfile_info.source,
             build_env=build_env,
-            version_context=DockerVersionContext.from_dict(version_context),
+            interpolation_context=DockerInterpolationContext.from_dict(interpolation_context),
+            copy_source_vs_context_source=tuple(
+                suggest_renames(
+                    tentative_paths=(
+                        # We don't want to include the Dockerfile as a suggested rename
+                        dockerfile_info.source,
+                        *dockerfile_info.copy_sources,
+                    ),
+                    actual_files=snapshot.files,
+                    actual_dirs=snapshot.dirs,
+                )
+            ),
+            stages=tuple(sorted(stage_names)),
         )
 
 
@@ -198,7 +204,10 @@ async def create_docker_build_context(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(DockerContextFilesSourcesField,),
+            for_sources_types=(
+                DockerContextFilesSourcesField,
+                FileSourceField,
+            ),
             enable_codegen=True,
         ),
     )
@@ -220,17 +229,29 @@ async def create_docker_build_context(
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if request.build_upstream_images
-        or not isinstance(getattr(field_set, "sources", None), DockerImageSourceField)
+        or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
     )
 
+    if request.build_upstream_images:
+        images_str = ", ".join(
+            a.tags[0] for p in embedded_pkgs for a in p.artifacts if isinstance(a, BuiltDockerImage)
+        )
+        if images_str:
+            logger.debug(f"Built upstream Docker images: {images_str}")
+        else:
+            logger.debug("Did not build any upstream Docker images")
+
     packages_str = ", ".join(a.relpath for p in embedded_pkgs for a in p.artifacts if a.relpath)
-    logger.debug(f"Packages for Docker image: {packages_str}")
+    if packages_str:
+        logger.debug(f"Built packages for Docker image: {packages_str}")
+    else:
+        logger.debug("Did not build any packages for Docker image")
 
     embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
-    context_request = Get(Digest, MergeDigests(d for d in all_digests if d))
+    context_request = Get(Snapshot, MergeDigests(d for d in all_digests if d))
 
     # Requests for build args and env
     build_args_request = Get(DockerBuildArgs, DockerBuildArgsRequest(docker_image))
@@ -239,9 +260,41 @@ async def create_docker_build_context(
         context_request, build_args_request, build_env_request
     )
 
+    if request.build_upstream_images:
+        # Update build arg values for FROM image build args.
+
+        # Get the FROM image build args with defined values in the Dockerfile.
+        dockerfile_build_args = {
+            arg_name: arg_value
+            for arg_name, arg_value in dockerfile_info.build_args.to_dict().items()
+            if arg_value and arg_name in dockerfile_info.from_image_build_arg_names
+        }
+        # Parse the build args values into Address instances.
+        from_image_addresses = await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                dockerfile_build_args.values(),
+                owning_address=dockerfile_info.address,
+            ),
+        )
+        # Map those addresses to the corresponding built image ref (tag).
+        address_to_built_image_tag = {
+            field_set.address: image.tags[0]
+            for field_set, built in zip(embedded_pkgs_per_target.field_sets, embedded_pkgs)
+            for image in built.artifacts
+            if isinstance(image, BuiltDockerImage)
+        }
+        # Create the FROM image build args.
+        from_image_build_args = [
+            f"{arg_name}={address_to_built_image_tag[addr]}"
+            for arg_name, addr in zip(dockerfile_build_args.keys(), from_image_addresses)
+        ]
+        # Merge all build args.
+        build_args = DockerBuildArgs.from_strings(*build_args, *from_image_build_args)
+
     return DockerBuildContext.create(
         build_args=build_args,
-        digest=context,
+        snapshot=context,
         dockerfile_info=dockerfile_info,
         build_env=build_env,
     )

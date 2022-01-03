@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+import difflib
+import os.path
+from fnmatch import fnmatch
+from typing import Callable, Iterable, Iterator, Sequence, TypeVar
 
+from pants.help.maybe_color import MaybeColor
 from pants.util.ordered_set import FrozenOrderedSet
 
 _T = TypeVar("_T", bound="KeyValueSequenceUtil")
@@ -47,3 +51,116 @@ class KeyValueSequenceUtil(FrozenOrderedSet[str]):
             entry_and_value[0] for entry_and_value in key_to_entry_and_value.values()
         )
         return cls(FrozenOrderedSet(deduped_entries))
+
+    def to_dict(
+        self, default: Callable[[str], str | None] = lambda x: None
+    ) -> dict[str, str | None]:
+        return {
+            key: value if has_value else default(key)
+            for key, has_value, value in [pair.partition("=") for pair in self]
+        }
+
+
+def suggest_renames(
+    tentative_paths: Iterable[str], actual_files: Sequence[str], actual_dirs: Sequence[str]
+) -> Iterator[tuple[str, str]]:
+    """Return each pair of `tentative_paths` matched to the best possible match of `actual_paths`
+    that are not an exact match.
+
+    A pair of `(tentative_path, "")` means there were no possible match to find in the
+    `actual_paths`, while a pair of `("", actual_path)` indicates a file in the build context that
+    is not taking part in any `COPY` instruction.
+    """
+
+    actual_paths = (*actual_files, *actual_dirs)
+    referenced: dict[str, set[str] | bool] = {}
+
+    def reference(path: str) -> None:
+        """Track which actual files has been referenced either explicitly by a tentative path, or as
+        a suggested rename."""
+        if path in actual_dirs:
+            referenced[path] = True
+        else:
+            dirname = os.path.dirname(path)
+            refs = referenced.setdefault(dirname, set())
+            if isinstance(refs, set):
+                refs.add(path)
+
+        # Recalculate possible matches, to avoid suggesting the same file twice.
+        nonlocal actual_paths
+        actual_paths = tuple(get_unreferenced(actual_files, actual_dirs))
+
+    def is_referenced(path: str, dirname: str | None = None) -> bool:
+        """Check the list of referenced files to see if `path` has been flagged.
+
+        Walks up the directory tree in case there is a recursive flag on one of the parent
+        directories.
+        """
+        if dirname is None:
+            dirname = os.path.dirname(path)
+        refs = referenced.get(dirname, set())
+        if isinstance(refs, bool):
+            return refs
+        if path in refs:
+            return True
+        parentdir = os.path.dirname(dirname)
+        if parentdir:
+            return is_referenced(path, parentdir)
+        return False
+
+    def get_unreferenced(files: Sequence[str] = (), dirs: Sequence[str] = ()) -> Iterator[str]:
+        unreferenced_files = tuple(path for path in files if not is_referenced(path))
+        yield from unreferenced_files
+        for path in dirs:
+            if not any(filename.startswith(path + "/") for filename in unreferenced_files):
+                # Skip paths where we don't have any unreferenced files any longer.
+                continue
+            if not is_referenced(path, path):
+                yield path
+
+    def get_matches(path: str) -> tuple[str, ...]:
+        is_pattern = any(all(c in path for c in cs) for cs in ["*", "?", "[]"])
+        if not is_pattern:
+            return (path,) if path in actual_paths else ()
+        #
+        # NOTICE: There is a slight difference in the pattern syntax used for the Dockerfile `COPY`
+        # instruction, than what is implemented by the `fnmatch` function in Python.
+        # https://docs.docker.com/engine/reference/builder/#copy which is implemented using
+        # https://golang.org/pkg/path/filepath#Match compared to
+        # https://docs.python.org/3/library/fnmatch.html#fnmatch.fnmatch
+        #
+        # For best experience when using globs, this should be addressed, but for now, I'll settle
+        # for a "close enough" approximation to get this moving.
+        return tuple(p for p in actual_paths if fnmatch(p, path))
+
+    # Go over exact matches first, so we don't target them as possible matches for renames.
+    unmatched_paths = set()
+    for path in tentative_paths:
+        matches = get_matches(path)
+        for match in matches:
+            reference(match)
+        if not matches:
+            unmatched_paths.add(path)
+
+    # List unknown files, possibly with a rename suggestion.
+    for path in sorted(unmatched_paths):
+        for suggestion in difflib.get_close_matches(path, actual_paths, n=1, cutoff=0.1):
+            # Suggest rename to match what files there are.
+            reference(suggestion)
+            yield path, suggestion
+            break
+        else:
+            # No match for this path.
+            yield path, ""
+
+    # List unused files.
+    for path in sorted(get_unreferenced(actual_files)):
+        yield "", path
+
+
+def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> str:
+    """Given two paths, formats a line showing what to change in `src_path` to get to `dst_path`."""
+    color = MaybeColor(colors)
+    rem = color.maybe_red(src_path)
+    add = color.maybe_green(dst_path)
+    return f"{rem} => {add}"

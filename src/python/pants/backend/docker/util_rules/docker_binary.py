@@ -40,14 +40,14 @@ class DockerBinary(BinaryPath):
         args = [self.path, "build", *extra_args]
 
         for tag in tags:
-            args.extend(["-t", tag])
+            args.extend(["--tag", tag])
 
         if build_args:
             for build_arg in build_args:
                 args.extend(["--build-arg", build_arg])
 
         if dockerfile:
-            args.extend(["-f", dockerfile])
+            args.extend(["--file", dockerfile])
 
         # Add build context root.
         args.append(".")
@@ -74,6 +74,21 @@ class DockerBinary(BinaryPath):
                 env=env,
             )
             for tag in tags
+        )
+
+    def run_image(
+        self,
+        tag: str,
+        *,
+        docker_run_args: tuple[str, ...] | None = None,
+        image_args: tuple[str, ...] | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> Process:
+        return Process(
+            argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Running docker image {tag}",
+            env=env,
         )
 
 

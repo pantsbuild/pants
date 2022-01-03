@@ -24,9 +24,8 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    InterpreterConstraintsField,
+    PythonCompatibleResolvesField,
     PythonRequirementsField,
-    PythonResolveField,
     UnrecognizedResolveNamesError,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -47,7 +46,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -77,7 +76,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for the different lockfiles used in your project. "
                 "For your own code's dependencies, these come from the option "
-                "`[python].experimental_resolves_to_lockfiles`. For tool lockfiles, resolve "
+                "`[python].experimental_resolves`. For tool lockfiles, resolve "
                 "names are the options scope for that tool such as `black`, `pytest`, and "
                 "`mypy-protobuf`.\n\n"
                 "For example, you can run `./pants generate-lockfiles --resolve=black "
@@ -269,51 +268,33 @@ class _UserLockfileRequests(Collection[PythonLockfileRequest]):
 async def setup_user_lockfile_requests(
     requested: _SpecifiedUserResolves, all_targets: AllTargets, python_setup: PythonSetup
 ) -> _UserLockfileRequests:
-    # First, associate all resolves with their consumers.
-    resolves_to_roots = defaultdict(list)
-    for tgt in all_targets:
-        if not tgt.has_field(PythonResolveField):
-            continue
-        tgt[PythonResolveField].validate(python_setup)
-        resolve = tgt[PythonResolveField].value
-        if resolve is None:
-            continue
-        resolves_to_roots[resolve].append(tgt.address)
+    if not python_setup.enable_resolves:
+        return _UserLockfileRequests()
 
-    # Expand the resolves for all specified.
-    transitive_targets_per_resolve = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest(resolves_to_roots[resolve]))
+    resolve_to_requirements_fields = defaultdict(set)
+    for tgt in all_targets:
+        if not tgt.has_field(PythonCompatibleResolvesField):
+            continue
+        tgt[PythonCompatibleResolvesField].validate(python_setup)
+        for resolve in tgt[PythonCompatibleResolvesField].value_or_default(python_setup):
+            resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+
+    # TODO: Figure out how to determine which interpreter constraints to use for each resolve...
+    #  Note that `python_requirement` does not have interpreter constraints, so we either need to
+    #  inspect all consumers of that resolve or start to closely couple the resolve with the
+    #  interpreter constraints (a "context").
+
+    return _UserLockfileRequests(
+        PythonLockfileRequest(
+            PexRequirements.create_from_requirement_fields(
+                resolve_to_requirements_fields[resolve]
+            ).req_strings,
+            InterpreterConstraints(python_setup.interpreter_constraints),
+            resolve_name=resolve,
+            lockfile_dest=python_setup.resolves[resolve],
+        )
         for resolve in requested
     )
-    pex_requirements_per_resolve = []
-    interpreter_constraints_per_resolve = []
-    for transitive_targets in transitive_targets_per_resolve:
-        req_fields = []
-        ic_fields = []
-        for tgt in transitive_targets.closure:
-            if tgt.has_field(PythonRequirementsField):
-                req_fields.append(tgt[PythonRequirementsField])
-            if tgt.has_field(InterpreterConstraintsField):
-                ic_fields.append(tgt[InterpreterConstraintsField])
-        pex_requirements_per_resolve.append(
-            PexRequirements.create_from_requirement_fields(req_fields)
-        )
-        interpreter_constraints_per_resolve.append(
-            InterpreterConstraints.create_from_compatibility_fields(ic_fields, python_setup)
-        )
-
-    requests = (
-        PythonLockfileRequest(
-            requirements.req_strings,
-            interpreter_constraints,
-            resolve_name=resolve,
-            lockfile_dest=python_setup.resolves_to_lockfiles[resolve],
-        )
-        for resolve, requirements, interpreter_constraints in zip(
-            requested, pex_requirements_per_resolve, interpreter_constraints_per_resolve
-        )
-    )
-    return _UserLockfileRequests(requests)
 
 
 # --------------------------------------------------------------------------------------
@@ -339,7 +320,7 @@ async def generate_lockfiles_goal(
         warn_python_repos("indexes")
 
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
-        python_setup.resolves_to_lockfiles.keys(),
+        python_setup.resolves.keys(),
         union_membership[PythonToolLockfileSentinel],
         generate_lockfiles_subsystem.resolve_names,
     )
@@ -386,20 +367,17 @@ class AmbiguousResolveNamesError(Exception):
     def __init__(self, ambiguous_names: list[str]) -> None:
         if len(ambiguous_names) == 1:
             first_paragraph = (
-                "A resolve name from the option "
-                "`[python].experimental_resolves_to_lockfiles` collides with the name of a "
-                f"tool resolve: {ambiguous_names[0]}"
+                "A resolve name from the option `[python].experimental_resolves` collides with the "
+                f"name of a tool resolve: {ambiguous_names[0]}"
             )
         else:
             first_paragraph = (
-                "Some resolve names from the option "
-                "`[python].experimental_resolves_to_lockfiles` collide with the names of "
-                f"tool resolves: {sorted(ambiguous_names)}"
+                "Some resolve names from the option `[python].experimental_resolves` collide with "
+                f"the names of tool resolves: {sorted(ambiguous_names)}"
             )
         super().__init__(
             f"{first_paragraph}\n\n"
-            "To fix, please update `[python].experimental_resolves_to_lockfiles` to use "
-            "different resolve names."
+            "To fix, please update `[python].experimental_resolves` to use different resolve names."
         )
 
 

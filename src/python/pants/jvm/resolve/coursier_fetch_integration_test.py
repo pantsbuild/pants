@@ -9,7 +9,6 @@ import pytest
 
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
@@ -24,7 +23,6 @@ from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
 )
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
@@ -44,8 +42,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
             QueryRule(Targets, [AddressSpecs]),
@@ -176,6 +172,80 @@ def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
                 ),
             ],
         )
+
+
+@maybe_skip_jdk_test
+def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
+    # Tests that an artifact pom which actually reports packaging ends up with proper version and
+    # packaging information.
+    #   see https://github.com/pantsbuild/pants/issues/13986
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements.from_coordinates(
+                [Coordinate(group="org.bouncycastle", artifact="bcutil-jdk15on", version="1.70")]
+            ),
+        ],
+    )
+
+    assert resolved_lockfile == CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.bouncycastle",
+                    artifact="bcprov-jdk15on",
+                    version="1.70",
+                    packaging="jar",
+                    strict=True,
+                ),
+                file_name="org.bouncycastle_bcprov-jdk15on_jar_1.70.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    "8f3c20e3e2d565d26f33e8d4857a37d0d7f8ac39b62a7026496fcab1bdac30d4", 5867298
+                ),
+                remote_url=None,
+                pants_address=None,
+            ),
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.bouncycastle",
+                    artifact="bcutil-jdk15on",
+                    version="1.70",
+                    packaging="jar",
+                    strict=True,
+                ),
+                file_name="org.bouncycastle_bcutil-jdk15on_1.70.jar",
+                direct_dependencies=Coordinates(
+                    [
+                        Coordinate(
+                            group="org.bouncycastle",
+                            artifact="bcprov-jdk15on",
+                            version="1.70",
+                            packaging="jar",
+                            strict=True,
+                        )
+                    ]
+                ),
+                dependencies=Coordinates(
+                    [
+                        Coordinate(
+                            group="org.bouncycastle",
+                            artifact="bcprov-jdk15on",
+                            version="1.70",
+                            packaging="jar",
+                            strict=True,
+                        )
+                    ]
+                ),
+                file_digest=FileDigest(
+                    "52dc5551b0257666526c5095424567fed7dc7b00d2b1ba7bd52298411112b1d0", 482530
+                ),
+                remote_url=None,
+                pants_address=None,
+            ),
+        )
+    )
 
 
 @maybe_skip_jdk_test
@@ -400,6 +470,35 @@ def test_fetch_one_coord_with_transitive_deps(rule_runner: RuleRunner) -> None:
         fingerprint="8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
         serialized_bytes_length=384581,
     )
+
+
+@maybe_skip_jdk_test
+def test_fetch_one_coord_with_classifier(rule_runner: RuleRunner) -> None:
+    # Has as a transitive dependency an artifact with both a `classifier` and `packaging`.
+    coordinate = Coordinate(group="org.apache.avro", artifact="avro-tools", version="1.11.0")
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements.from_coordinates([coordinate])],
+    )
+
+    entries = [
+        e
+        for e in resolved_lockfile.entries
+        if e.coord
+        == Coordinate(
+            group="org.apache.avro",
+            artifact="trevni-avro",
+            version="1.11.0",
+            packaging="jar",
+            classifier="tests",
+            strict=True,
+        )
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+
+    classpath_entry = rule_runner.request(ClasspathEntry, [entry])
+    assert classpath_entry.filenames == ("org.apache.avro_trevni-avro_jar_tests_1.11.0.jar",)
 
 
 @maybe_skip_jdk_test

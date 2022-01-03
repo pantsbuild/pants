@@ -269,6 +269,45 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     get_pex_request(None, resolve_all_constraints=None)
 
 
+@pytest.mark.parametrize("include_requirements", [False, True])
+def test_exclude_requirements(
+    include_requirements: bool, tmp_path_factory: TempPathFactory, rule_runner: RuleRunner
+) -> None:
+    find_links = create_dists(tmp_path_factory.mktemp("sdists"), Project("baz", "2.2.2"))
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                python_requirement(name="baz", requirements=["foo==1.2.3"])
+                python_sources(name="app", sources=["app.py"], dependencies=[":baz"])
+                """
+            ),
+            "constraints.txt": dedent("foo==1.2.3"),
+            "app.py": "",
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-repos-indexes=[]",
+            f"--python-repos-repos={find_links}",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    request = PexFromTargetsRequest(
+        [Address("", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=True,
+        include_requirements=include_requirements,
+    )
+    pex_request = rule_runner.request(PexRequest, [request])
+    assert isinstance(pex_request.requirements, PexRequirements)
+    assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
+
+
 def test_issue_12222(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

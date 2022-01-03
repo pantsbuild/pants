@@ -3,10 +3,16 @@
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerDependenciesField
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.core.goals.package import PackageFieldSet
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, Targets
+from pants.engine.target import (
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    Targets,
+)
 from pants.engine.unions import UnionRule
 
 
@@ -20,15 +26,18 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     dockerfile_info = await Get(
         DockerfileInfo, DockerfileInfoRequest(request.dependencies_field.address)
     )
+
     targets = await Get(
         Targets,
         UnparsedAddressInputs(
             dockerfile_info.putative_target_addresses,
-            owning_address=None,
+            owning_address=dockerfile_info.address,
         ),
     )
-
-    referenced_targets = (tgt.address for tgt in targets if PexBinaryFieldSet.is_applicable(tgt))
+    package = await Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets))
+    referenced_targets = (
+        field_sets[0].address for field_sets in package.collection if len(field_sets) > 0
+    )
     return InjectedDependencies(Addresses(referenced_targets))
 
 

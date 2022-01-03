@@ -1,13 +1,19 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
+from pants.backend.java.target_types import (
+    JavaSourcesGeneratorTarget,
+    JavaSourceTarget,
+    JunitTestsGeneratorTarget,
+)
 from pants.backend.java.target_types import rules as java_target_rules
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -32,9 +38,6 @@ from pants.testutil.rule_runner import (
     logging,
 )
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -53,11 +56,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ThirdPartyPackageToArtifactMapping, []),
         ],
-        target_types=[JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget, JvmArtifactTarget],
+        target_types=[
+            JavaSourceTarget,
+            JavaSourcesGeneratorTarget,
+            JunitTestsGeneratorTarget,
+            JvmArtifactTarget,
+        ],
     )
-    rule_runner.set_options(
-        args=[NAMED_RESOLVE_OPTIONS, DEFAULT_RESOLVE_OPTION], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -108,7 +114,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     )
 
     mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
-    root_node = mapping.mapping_root
+    root_node = mapping.mapping_roots["jvm-default"]
 
     # Handy trie traversal function to placate mypy
     def traverse(*children) -> FrozenTrieNode:
@@ -117,7 +123,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             new_node = node.find_child(child)
             if not new_node:
                 coord = ".".join(children)
-                raise Exception(f"Could not find the package specifed by {coord}.")
+                raise Exception(f"Could not find the package specified by {coord}.")
             node = new_node
         return node
 
@@ -143,23 +149,29 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
+def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
+    """Dependencies are only resolved on artifacts in the relevant resolves."""
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        [
+            "--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}",
+            "--jvm-resolves={'a': '', 'b': '', 'c': ''}",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                jvm_artifact(
-                    name = "joda-time_joda-time",
-                    group = "joda-time",
-                    artifact = "joda-time",
-                    version = "2.10.10",
-                )
+                artifact_args = {"group": "joda-time", "artifact": "joda-time", "version": "2.10.10"}
 
-                java_sources(name = 'lib')
+                jvm_artifact(name="artifact_a", **artifact_args, compatible_resolves=["a"])
+                jvm_artifact(name="artifact_b", **artifact_args, compatible_resolves=["b"])
+                jvm_artifact(name="artifact_c", **artifact_args, compatible_resolves=["c"])
+
+                java_source(name='lib_a', source='PrintDate.java', compatible_resolves=['a'])
+                java_source(name='lib_b', source='PrintDate.java', compatible_resolves=['b'])
+                java_source(name='lib_c', source='PrintDate.java', compatible_resolves=['c'])
+                java_source(name='lib_ambiguous', source='PrintDate.java', compatible_resolves=['a', 'b'])
                 """
             ),
             "PrintDate.java": dedent(
@@ -167,24 +179,21 @@ def test_third_party_dep_inference(rule_runner: RuleRunner) -> None:
                 package org.pantsbuild.example;
 
                 import org.joda.time.DateTime;
-
-                public class PrintDate {
-                    public static void main(String[] args) {
-                        DateTime dt = new DateTime();
-                        System.out.println(dt.toString());
-                    }
-                }
                 """
             ),
         }
     )
 
-    lib = rule_runner.get_target(
-        Address("", target_name="lib", relative_file_path="PrintDate.java")
-    )
-    assert rule_runner.request(Addresses, [DependenciesRequest(lib[Dependencies])]) == Addresses(
-        [Address("", target_name="joda-time_joda-time")]
-    )
+    def assert_inferred(lib_name: str, expected: list[str]) -> None:
+        lib = rule_runner.get_target(Address("", target_name=lib_name))
+        assert rule_runner.request(
+            Addresses, [DependenciesRequest(lib[Dependencies])]
+        ) == Addresses(Address("", target_name=name) for name in expected)
+
+    assert_inferred("lib_a", ["artifact_a"])
+    assert_inferred("lib_b", ["artifact_b"])
+    assert_inferred("lib_c", ["artifact_c"])
+    assert_inferred("lib_ambiguous", [])
 
 
 @maybe_skip_jdk_test
@@ -234,7 +243,7 @@ def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
 def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}"
+            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -313,7 +322,7 @@ def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None
 def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}"
+            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -380,7 +389,7 @@ def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> Non
 def test_third_party_dep_inference_with_incorrect_provides(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}"
+            "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

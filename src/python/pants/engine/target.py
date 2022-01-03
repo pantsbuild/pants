@@ -54,7 +54,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -672,6 +672,10 @@ class CoarsenedTarget(EngineAwareParameter):
     def representative(self) -> Target:
         """A stable "representative" target in the cycle."""
         return next(iter(self.members))
+
+    def bullet_list(self) -> str:
+        """The addresses and type aliases of all members of the cycle."""
+        return bullet_list(sorted(f"{t.address.spec}\t({type(t).alias})" for t in self.members))
 
     def __hash__(self) -> int:
         return self._hashcode
@@ -1576,12 +1580,6 @@ class SourcesField(AsyncFieldMixin, Field):
         To enforce that there are only a certain number of resulting files, such as binary targets
         checking for only 0-1 sources, set the class property `expected_num_files`.
         """
-
-        if not self.required and not self.value:
-            # If this field isn't required or set, validation is done against the default value
-            # which is probably not valuable (See #13851).
-            return None
-
         if self.expected_file_extensions is not None:
             bad_files = [
                 fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
@@ -1737,14 +1735,16 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         return self.value or ()
 
 
-class SingleSourceField(SourcesField, StringField):
+class OptionalSingleSourceField(SourcesField, StringField):
     """The `source: str` field.
 
     See the docstring for `SourcesField` for some class properties you can set, such as
     `expected_file_extensions`.
 
     When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
-    `tgt.get(SingleSourceField)`.
+    `tgt.get(OptionalSingleSourceField)`.
+
+    Use `SingleSourceField` if the source must exist.
     """
 
     alias = "source"
@@ -1752,8 +1752,9 @@ class SingleSourceField(SourcesField, StringField):
         "A single file that belongs to this target.\n\n"
         "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
     )
-    required = True
-    expected_num_files: ClassVar[int | range] = 1  # Can set to `range(0, 2)` for 0-1 files.
+    required = False
+    default: ClassVar[str | None] = None
+    expected_num_files: ClassVar[int | range] = range(0, 2)
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
@@ -1781,8 +1782,7 @@ class SingleSourceField(SourcesField, StringField):
         This works without hydration because we validate that `*` globs and `!` ignores are not
         used. However, consider still hydrating so that you verify the source file actually exists.
 
-        The return type is optional because it's possible to have 0-1 files. Most subclasses
-        will have 1 file, though.
+        The return type is optional because it's possible to have 0-1 files.
         """
         if self.value is None:
             return None
@@ -1790,10 +1790,33 @@ class SingleSourceField(SourcesField, StringField):
 
     @property
     def globs(self) -> tuple[str, ...]:
-        # Subclasses might override `required = False`, so `self.value` could be `None`.
         if self.value is None:
             return ()
         return (self.value,)
+
+
+class SingleSourceField(OptionalSingleSourceField):
+    """The `source: str` field.
+
+    Unlike `OptionalSingleSourceField`, the `.value` must be defined, whether by setting the
+    `default` or making the field `required`.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(SingleSourceField)`.
+    """
+
+    required = True
+    expected_num_files = 1
+    value: str
+
+    @property
+    def file_path(self) -> str:
+        result = super().file_path
+        assert result is not None
+        return result
 
 
 @frozen_after_init
@@ -2363,6 +2386,28 @@ class OverridesField(AsyncFieldMixin, Field):
             )
             for globs in self.value
         )
+
+    def flatten(self) -> dict[str, dict[str, Any]]:
+        """Combine all overrides for every key into a single dictionary."""
+        result: dict[str, dict[str, Any]] = {}
+        for keys, override in (self.value or {}).items():
+            for key in keys:
+                for field, value in override.items():
+                    if key not in result:
+                        result[key] = {field: value}
+                        continue
+                    if field not in result[key]:
+                        result[key][field] = value
+                        continue
+                    raise InvalidFieldException(
+                        f"Conflicting overrides in the `{self.alias}` field of "
+                        f"`{self.address}` for the key `{key}` for "
+                        f"the field `{field}`. You cannot specify the same field name "
+                        "multiple times for the same key.\n\n"
+                        f"(One override sets the field to `{repr(result[key][field])}` "
+                        f"but another sets to `{repr(value)}`.)"
+                    )
+        return result
 
     def flatten_paths(
         self, paths_to_overrides: Mapping[Paths, dict[str, Any]]

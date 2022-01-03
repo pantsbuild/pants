@@ -49,7 +49,7 @@ from pants.backend.python.util_rules.python_sources import rules as python_sourc
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -68,7 +68,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     SourcesField,
-    SourcesPaths,
     Target,
     Targets,
     TransitiveTargets,
@@ -502,15 +501,13 @@ async def generate_chroot(
         # is just a dummy string, required because our source root stripping mechanism assumes
         # that paths are files and starts searching from the parent dir. It doesn't correspond
         # to an actual file on disk, so there are no collision issues.
-        # TODO: Add source root stripping functionality for directories.
         stripped = await Get(
-            StrippedSourceFileNames,
-            SourcesPaths(
-                files=(os.path.join(request.exported_target.target.address.spec_path, "dummy.py"),),
-                dirs=(),
+            StrippedFileName,
+            StrippedFileNameRequest(
+                os.path.join(request.exported_target.target.address.spec_path, "dummy.py")
             ),
         )
-        working_directory = os.path.dirname(stripped[0])
+        working_directory = os.path.dirname(stripped.value)
         chroot_digest = sources.digest
     return DistBuildChroot(chroot_digest, working_directory)
 
@@ -847,7 +844,6 @@ def find_packages(
     """
     # Find all packages implied by all the sources.
     packages: set[str] = set()
-    package_data: DefaultDict[str, list[str]] = defaultdict(list)
     for file_path in itertools.chain(python_files, resource_files):
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
@@ -855,16 +851,25 @@ def find_packages(
             packages.add(os.path.dirname(file_path).replace(os.path.sep, "."))
 
     # Now find all package_data.
-    for resource_file in resource_files:
-        # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
-        maybe_package: str = os.path.dirname(resource_file).replace(os.path.sep, ".")
+    package_data: DefaultDict[str, list[str]] = defaultdict(list)
+
+    def maybe_add_resource(fp: str) -> None:
+        # Find the closest enclosing package, if any. Resources will be loaded relative to that.
+        maybe_package: str = os.path.dirname(fp).replace(os.path.sep, ".")
         while maybe_package and maybe_package not in packages:
             maybe_package = maybe_package.rpartition(".")[0]
         # If resource is not in a package, ignore it. There's no principled way to load it anyway.
-        if maybe_package:
-            package_data[maybe_package].append(
-                os.path.relpath(resource_file, maybe_package.replace(".", os.path.sep))
-            )
+        if not maybe_package:
+            return
+        package_data[maybe_package].append(
+            os.path.relpath(fp, maybe_package.replace(".", os.path.sep))
+        )
+
+    for resource_file in resource_files:
+        maybe_add_resource(resource_file)
+    for py_file in python_files:
+        if py_file.endswith(".pyi"):
+            maybe_add_resource(py_file)
 
     # See which packages are pkg_resources-style namespace packages.
     # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages

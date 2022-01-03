@@ -2,16 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import itertools
-
-from pants.backend.scala.compile.scala_subsystem import ScalaSubsystem
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
@@ -32,13 +29,8 @@ class ScalaRepl(ReplImplementation):
 async def create_scala_repl_request(
     repl: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    dependencies_for_each_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt[Dependencies])) for tgt in repl.targets
-    )
-    dependencies = list(itertools.chain.from_iterable(dependencies_for_each_target))
-
     user_classpath, tool_classpath = await MultiGet(
-        Get(Classpath, Addresses(dependencies)),
+        Get(Classpath, Addresses(t.address for t in repl.targets)),
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(

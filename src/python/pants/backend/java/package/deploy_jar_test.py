@@ -52,10 +52,7 @@ def rule_runner() -> RuleRunner:
             DeployJarTarget,
         ],
     )
-    rule_runner.set_options(
-        args=['--jvm-resolves={"test": "coursier_resolve.lockfile"}', "--jvm-default-resolve=test"],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -230,9 +227,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
             "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
         }
     )
@@ -261,9 +256,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "coursier_resolve.lockfile": CoursierResolvedLockfile(entries=())
-            .to_json()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
             "Example.java": JAVA_MAIN_SOURCE,
             "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }
@@ -303,7 +296,7 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "coursier_resolve.lockfile": COURSIER_LOCKFILE_SOURCE,
+            "3rdparty/jvm/default.lock": COURSIER_LOCKFILE_SOURCE,
             "Example.java": JAVA_MAIN_SOURCE,
             "lib/ExampleLib.java": JAVA_JSON_MANGLING_LIB_SOURCE,
         }

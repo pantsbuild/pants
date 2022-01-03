@@ -312,7 +312,7 @@ def test_infer_python_strict(caplog) -> None:
 
     caplog.clear()
 
-    # All modes should be fine if the module is explictly declared as a requirement
+    # All modes should be fine if the module is explicitly declared as a requirement
     rule_runner.write_files(
         {
             "src/python/BUILD": dedent(

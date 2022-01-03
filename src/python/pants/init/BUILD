@@ -8,7 +8,11 @@ target(
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
+        "src/python/pants/backend/experimental/codegen/protobuf/java",
         "src/python/pants/backend/experimental/codegen/protobuf/scala",
+        "src/python/pants/backend/experimental/codegen/thrift/apache/java",
+        "src/python/pants/backend/experimental/codegen/thrift/apache/python",
+        "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
         "src/python/pants/backend/experimental/docker/lint/hadolint",

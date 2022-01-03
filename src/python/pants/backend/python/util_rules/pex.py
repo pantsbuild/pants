@@ -288,12 +288,13 @@ async def find_interpreter(
         ProcessResult,
         PexCliProcess(
             description=f"Find interpreter for constraints: {formatted_constraints}",
+            subcommand=(),
             # Here, we run the Pex CLI with no requirements, which just selects an interpreter.
             # Normally, this would start an isolated repl. By passing `--`, we force the repl to
             # instead act as an interpreter (the selected one) and tell us about itself. The upshot
             # is we run the Pex interpreter selection logic unperturbed but without resolving any
             # distributions.
-            argv=(
+            extra_args=(
                 *interpreter_constraints.generate_pex_arg_list(),
                 "--",
                 "-c",
@@ -530,7 +531,8 @@ async def build_pex(
         Process,
         PexCliProcess(
             python=python,
-            argv=argv,
+            subcommand=(),
+            extra_args=argv,
             additional_input_digest=merged_digest,
             description=_build_pex_description(request),
             output_files=output_files,
@@ -857,15 +859,26 @@ class VenvPex:
 class VenvPexRequest:
     pex_request: PexRequest
     bin_names: tuple[str, ...] = ()
+    site_packages_copies: bool = False
 
-    def __init__(self, pex_request: PexRequest, bin_names: Iterable[str] = ()) -> None:
+    def __init__(
+        self,
+        pex_request: PexRequest,
+        bin_names: Iterable[str] = (),
+        site_packages_copies: bool = False,
+    ) -> None:
         """A request for a PEX that runs in a venv and optionally exposes select venv `bin` scripts.
 
         :param pex_request: The details of the desired PEX.
         :param bin_names: The names of venv `bin` scripts to expose for execution.
+        :param site_packages_copies: `True` to use copies (hardlinks when possible) of PEX
+            dependencies when installing them in the venv site-packages directory. By default this
+            is `False` and symlinks are used instead which is a win in the time and space dimensions
+            but results in a non-standard venv structure that does trip up some libraries.
         """
         self.pex_request = pex_request
         self.bin_names = tuple(bin_names)
+        self.site_packages_copies = site_packages_copies
 
 
 @rule
@@ -906,7 +919,16 @@ async def create_venv_pex(
 
     pex_request = request.pex_request
     seeded_venv_request = dataclasses.replace(
-        pex_request, additional_args=pex_request.additional_args + ("--venv", "--seed", "verbose")
+        pex_request,
+        additional_args=pex_request.additional_args
+        + (
+            "--venv",
+            "--seed",
+            "verbose",
+            pex_environment.venv_site_packages_copies_option(
+                use_copies=request.site_packages_copies
+            ),
+        ),
     )
     venv_pex_result = await Get(BuildPexResult, PexRequest, seeded_venv_request)
     # Pex verbose --seed mode outputs the absolute path of the PEX executable as well as the

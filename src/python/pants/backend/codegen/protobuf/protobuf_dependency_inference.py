@@ -10,7 +10,7 @@ from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -22,7 +22,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    SourcesPathsRequest,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -41,22 +40,20 @@ class ProtobufMapping:
 
 @rule(desc="Creating map of Protobuf file names to Protobuf targets", level=LogLevel.DEBUG)
 async def map_protobuf_files(protobuf_targets: AllProtobufTargets) -> ProtobufMapping:
-    stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[ProtobufSourceField]))
+    stripped_file_per_target = await MultiGet(
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 
     stripped_files_to_addresses: dict[str, Address] = {}
     stripped_files_with_multiple_owners: DefaultDict[str, set[Address]] = defaultdict(set)
-    for tgt, stripped_sources in zip(protobuf_targets, stripped_sources_per_target):
-        assert len(stripped_sources) == 1
-        stripped_f = stripped_sources[0]
-        if stripped_f in stripped_files_to_addresses:
-            stripped_files_with_multiple_owners[stripped_f].update(
-                {stripped_files_to_addresses[stripped_f], tgt.address}
+    for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target):
+        if stripped_file.value in stripped_files_to_addresses:
+            stripped_files_with_multiple_owners[stripped_file.value].update(
+                {stripped_files_to_addresses[stripped_file.value], tgt.address}
             )
         else:
-            stripped_files_to_addresses[stripped_f] = tgt.address
+            stripped_files_to_addresses[stripped_file.value] = tgt.address
 
     # Remove files with ambiguous owners.
     for ambiguous_stripped_f in stripped_files_with_multiple_owners:

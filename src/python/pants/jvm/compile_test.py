@@ -59,9 +59,6 @@ from pants.jvm.testutil import (
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
-NAMED_RESOLVE_OPTIONS = '--jvm-resolves={"test": "coursier_resolve.lockfile"}'
-DEFAULT_RESOLVE_OPTION = "--jvm-default-resolve=test"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -89,13 +86,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifactTarget],
     )
-    rule_runner.set_options(
-        args=[
-            NAMED_RESOLVE_OPTIONS,
-            DEFAULT_RESOLVE_OPTION,
-        ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -216,7 +207,7 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "scala_sources(name='main')",
-            "coursier_resolve.lockfile": "[]",
+            "3rdparty/jvm/default.lock": "[]",
             "Example.scala": scala_main_source(),
             "lib/BUILD": "java_sources()",
             "lib/C.java": java_lib_source(),
@@ -243,7 +234,7 @@ def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "scala_sources(name='main')",
-            "coursier_resolve.lockfile": "[]",
+            "3rdparty/jvm/default.lock": "[]",
             "Example.scala": scala_main_source(),
             "lib/BUILD": "java_sources()",
             "lib/C.java": java_lib_source(["org.pantsbuild.example.Main"]),

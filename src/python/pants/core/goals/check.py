@@ -136,9 +136,6 @@ class CheckSubsystem(GoalSubsystem):
     name = "check"
     help = "Run type checking or the lightest variant of compilation available for a language."
 
-    deprecated_options_scope = "typecheck"
-    deprecated_options_scope_removal_version = "2.10.0.dev0"
-
     required_union_implementations = (CheckRequest,)
 
 

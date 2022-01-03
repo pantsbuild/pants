@@ -8,17 +8,29 @@ from typing import Any, ContextManager
 
 import pytest
 
-from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
+from pants.backend.docker.goals import package_image
+from pants.backend.docker.subsystems import dockerfile_parser
+from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules.docker_build_args import docker_build_args
+from pants.backend.docker.util_rules import (
+    dependencies,
+    docker_binary,
+    docker_build_args,
+    docker_build_context,
+    docker_build_env,
+    dockerfile,
+)
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerVersionContext,
 )
-from pants.backend.docker.util_rules.docker_build_context import rules as context_rules
-from pants.backend.docker.util_rules.docker_build_env import docker_build_environment_vars
-from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
+from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
+from pants.backend.docker.value_interpolation import (
+    DockerBuildArgsInterpolationValue,
+    DockerInterpolationContext,
+    DockerInterpolationValue,
+)
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -30,26 +42,28 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+def create_rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *context_rules(),
             *core_target_types_rules(),
-            *dockerfile_rules(),
+            *dependencies.rules(),
+            *docker_binary.rules(),
+            *docker_build_args.rules(),
+            *docker_build_context.rules(),
+            *docker_build_env.rules(),
+            *dockerfile.rules(),
+            *dockerfile_parser.rules(),
+            *package_image.rules(),
             *package_pex_binary.rules(),
-            *parser_rules(),
             *pex_from_targets.rules(),
             *shell_target_types_rules(),
             *target_types_rules.rules(),
-            docker_build_args,
-            docker_build_environment_vars,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
@@ -64,15 +78,22 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return create_rule_runner()
+
+
 def assert_build_context(
     rule_runner: RuleRunner,
     address: Address,
     *,
+    build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_version_context: dict[str, dict[str, str]] | None = None,
+    expected_interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue]
+    | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
-) -> None:
+) -> DockerBuildContext:
     if runner_options is None:
         runner_options = {}
     runner_options.setdefault("env_inherit", set()).update({"PATH", "PYENV_ROOT", "HOME"})
@@ -82,15 +103,22 @@ def assert_build_context(
         [
             DockerBuildContextRequest(
                 address=address,
-                build_upstream_images=False,
+                build_upstream_images=build_upstream_images,
             )
         ],
     )
 
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
-    if expected_version_context is not None:
-        assert context.version_context == DockerVersionContext.from_dict(expected_version_context)
+    if expected_interpolation_context is not None:
+        if "build_args" in expected_interpolation_context:
+            expected_interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
+                expected_interpolation_context["build_args"]
+            )
+        assert context.interpolation_context == DockerInterpolationContext.from_dict(
+            expected_interpolation_context
+        )
+    return context
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:
@@ -155,6 +183,43 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  instructions=["FROM alpine"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "baseimage": {"tag": "latest"},
+            "stage0": {"tag": "latest"},
+            "build_args": {
+                "BASE_IMAGE": "upstream/image:latest",
+            },
+        },
+    )
+
+
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
     rule_runner.write_files(
@@ -207,7 +272,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
+def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/docker/BUILD": "docker_image()",
@@ -226,12 +291,13 @@ def test_version_context_from_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
             "interim": {"tag": "latest"},
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
+            "build_args": {},
         },
     )
 
@@ -258,12 +324,13 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/docker"),
         expected_files=["src/docker/Dockerfile.docker"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
             "interim": {"tag": "latest"},
             "stage2": {"tag": "latest"},
             "output": {"tag": "1-1"},
+            "build_args": {},
         },
     )
 
@@ -298,7 +365,7 @@ def test_shell_source_dependencies(rule_runner: RuleRunner) -> None:
 
 
 def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
-    # Test that only explicitly defined build args in the BUILD file or pants configuraiton use the
+    # Test that only explicitly defined build args in the BUILD file or pants configuration use the
     # environment for its values.
     rule_runner.write_files(
         {
@@ -333,7 +400,7 @@ def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
             },
         },
         expected_files=["src/docker/Dockerfile"],
-        expected_version_context={
+        expected_interpolation_context={
             "baseimage": {"tag": "${base_version}"},
             "stage0": {"tag": "${base_version}"},
             "build_args": {
@@ -420,3 +487,82 @@ def test_undefined_env_var_behavior(
             Address("src/docker"),
             expected_files=["src/docker/Dockerfile"],
         )
+
+
+@pytest.fixture(scope="session")
+def build_context() -> DockerBuildContext:
+    rule_runner = create_rule_runner()
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  extra_build_args=["DEF_ARG"],
+                  instructions=[
+                    "FROM python:3.8",
+                    "ARG MY_ARG",
+                    "ARG DEF_ARG=some-value",
+                  ],
+                )
+                """
+            ),
+        }
+    )
+
+    return assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile.docker"],
+    )
+
+
+@pytest.mark.parametrize(
+    "fmt_string, result, expectation",
+    [
+        pytest.param(
+            "{build_args.MY_ARG}",
+            None,
+            pytest.raises(
+                ValueError,
+                match=(r"The build arg 'MY_ARG' is undefined\. Defined build args are: DEF_ARG\."),
+            ),
+            id="ARG_NAME",
+        ),
+        pytest.param(
+            "{build_args.DEF_ARG}",
+            "some-value",
+            no_exception(),
+            id="DEF_ARG",
+        ),
+    ],
+)
+def test_build_arg_behavior(
+    build_context: DockerBuildContext,
+    fmt_string: str,
+    result: str | None,
+    expectation: ContextManager,
+) -> None:
+    with expectation:
+        assert fmt_string.format(**build_context.interpolation_context) == result
+
+
+def test_create_docker_build_context() -> None:
+    context = DockerBuildContext.create(
+        build_args=DockerBuildArgs.from_strings("ARGNAME=value1"),
+        snapshot=EMPTY_SNAPSHOT,
+        build_env=DockerBuildEnvironment.create({"ENVNAME": "value2"}),
+        dockerfile_info=DockerfileInfo(
+            address=Address("test"),
+            digest=EMPTY_DIGEST,
+            source="test/Dockerfile",
+            putative_target_addresses=(),
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
+            build_args=DockerBuildArgs.from_strings(),
+            from_image_build_arg_names=(),
+            copy_sources=(),
+        ),
+    )
+    assert list(context.build_args) == ["ARGNAME=value1"]
+    assert dict(context.build_env.environment) == {"ENVNAME": "value2"}
+    assert context.dockerfile == "test/Dockerfile"
+    assert context.stages == ("base", "dev", "prod")

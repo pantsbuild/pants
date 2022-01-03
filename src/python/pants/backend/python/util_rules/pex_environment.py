@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Mapping, cast
 
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
@@ -49,27 +48,25 @@ class PexRuntimeEnvironment(Subsystem):
             ),
         )
         register(
-            "--bootstrap-interpreter-names",
-            advanced=True,
-            type=list,
-            default=["python", "python3", "python2"],
-            metavar="<bootstrap-python-names>",
-            removal_version="2.10.0.dev0",
-            removal_hint="Moved to `[python-bootstrap] names`.",
-            help=(
-                "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
-                "does not impact which Python interpreter is used to run your code, only what is "
-                "used to run the PEX tool. See the `interpreter_search_paths` option in "
-                "`[python]` to influence where interpreters are searched for."
-            ),
-        )
-        register(
             "--verbosity",
             advanced=True,
             type=int,
             default=0,
             help=(
                 "Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."
+            ),
+        )
+        register(
+            "--venv-use-symlinks",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                "When possible, use venvs whose site-packages directories are populated with"
+                "symlinks.\n\nEnabling this can save space in the `--named-caches-dir` directory "
+                "and lead to slightly faster execution times for Pants Python goals. Some "
+                "distributions do not work with symlinked venvs though, so you may not be able to "
+                "enable this optimization as a result."
             ),
         )
 
@@ -87,15 +84,15 @@ class PexRuntimeEnvironment(Subsystem):
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
-    def bootstrap_interpreter_names(self) -> tuple[str, ...]:
-        return tuple(self.options.bootstrap_interpreter_names)
-
-    @property
     def verbosity(self) -> int:
         level = cast(int, self.options.verbosity)
         if level < 0 or level > 9:
             raise ValueError("verbosity level must be between 0 and 9")
         return level
+
+    @property
+    def venv_use_symlinks(self) -> bool:
+        return cast(bool, self.options.venv_use_symlinks)
 
 
 class PythonExecutable(BinaryPath, EngineAwareReturnType):
@@ -122,6 +119,7 @@ class PexEnvironment(EngineAwareReturnType):
     subprocess_environment_dict: FrozenDict[str, str]
     named_caches_dir: PurePath
     bootstrap_python: PythonExecutable | None = None
+    venv_use_symlinks: bool = False
 
     _PEX_ROOT_DIRNAME = "pex_root"
 
@@ -160,10 +158,14 @@ class PexEnvironment(EngineAwareReturnType):
             append_only_caches=FrozenDict(),
         )
 
+    def venv_site_packages_copies_option(self, use_copies: bool) -> str:
+        if self.venv_use_symlinks and not use_copies:
+            return "--no-venv-site-packages-copies"
+        return "--venv-site-packages-copies"
+
 
 @rule(desc="Prepare environment for running PEXes", level=LogLevel.DEBUG)
 async def find_pex_python(
-    python_setup: PythonSetup,
     python_bootstrap: PythonBootstrap,
     python_binary: PythonBinary,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -172,14 +174,13 @@ async def find_pex_python(
 ) -> PexEnvironment:
     return PexEnvironment(
         path=pex_runtime_env.path(python_bootstrap.environment),
-        interpreter_search_paths=tuple(
-            python_setup.interpreter_search_paths(python_bootstrap.environment)
-        ),
+        interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
         subprocess_environment_dict=subprocess_env_vars.vars,
         # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
         #  the normalization only once, via the options system?
         named_caches_dir=Path(global_options.options.named_caches_dir).resolve(),
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),
+        venv_use_symlinks=pex_runtime_env.venv_use_symlinks,
     )
 
 
