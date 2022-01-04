@@ -17,7 +17,7 @@ from pants.backend.python.typecheck.mypy.subsystem import (
     MyPyFirstPartyPlugins,
     MyPyLockfileSentinel,
 )
-from pants.backend.python.util_rules import pex_from_targets, python_sources
+from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
@@ -35,7 +35,6 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *python_sources.rules(),
             *target_types_rules.rules(),
-            *pex_from_targets.rules(),
             QueryRule(MyPyConfigFile, []),
             QueryRule(MyPyFirstPartyPlugins, []),
             QueryRule(PythonLockfileRequest, [MyPyLockfileSentinel]),
