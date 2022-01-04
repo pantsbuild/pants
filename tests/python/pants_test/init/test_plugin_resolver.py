@@ -1,13 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import shutil
 import sys
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Sequence
 
 import pytest
 from pex.interpreter import PythonInterpreter
@@ -108,9 +111,21 @@ def _run_setup_py(
         shutil.copy(PurePath(rule_runner.build_root, "output", path), install_dir)
 
 
+@dataclass
+class Plugin:
+    name: str
+    version: str | None = None
+
+
 @contextmanager
 def plugin_resolution(
-    rule_runner: RuleRunner, *, interpreter=None, chroot=None, plugins=None, sdist=True
+    rule_runner: RuleRunner,
+    *,
+    interpreter=None,
+    chroot=None,
+    plugins: Sequence[Plugin] = (),
+    sdist=True,
+    working_set_entries=(),
 ):
     @contextmanager
     def provide_chroot(existing):
@@ -140,15 +155,13 @@ def plugin_resolution(
             )
             plugin_list = []
             for plugin in plugins:
-                version = None
-                if isinstance(plugin, tuple):
-                    plugin, version = plugin
-                plugin_list.append(f"{plugin}=={version}" if version else plugin)
+                version = plugin.version
+                plugin_list.append(f"{plugin.name}=={version}" if version else plugin.name)
                 if create_artifacts:
                     setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
                     _run_setup_py(
                         rule_runner,
-                        plugin,
+                        plugin.name,
                         artifact_interpreter_constraints,
                         version,
                         setup_py_args,
@@ -170,7 +183,10 @@ def plugin_resolution(
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         working_set = plugin_resolver.resolve(
-            options_bootstrapper, complete_env, interpreter_constraints, WorkingSet(entries=[])
+            options_bootstrapper,
+            complete_env,
+            interpreter_constraints,
+            WorkingSet(entries=list(working_set_entries)),
         )
         for dist in working_set:
             assert (
@@ -194,7 +210,9 @@ def test_plugins_bdist(rule_runner: RuleRunner) -> None:
 
 
 def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
-    with plugin_resolution(rule_runner, plugins=[("jake", "1.2.3"), "jane"], sdist=sdist) as (
+    with plugin_resolution(
+        rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane")], sdist=sdist
+    ) as (
         working_set,
         _,
         _,
@@ -218,17 +236,17 @@ def test_exact_requirements_bdist(rule_runner: RuleRunner) -> None:
 
 def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
-        rule_runner, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], sdist=sdist
+        rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")], sdist=sdist
     ) as results:
         working_set, chroot, repo_dir = results
 
-        # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
+        # Kill the repo source dir and re-resolve. If the PluginResolver truly detects exact
         # requirements it should skip any resolves and load directly from the still intact
         # cache.
         safe_rmtree(repo_dir)
 
         with plugin_resolution(
-            rule_runner, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
+            rule_runner, chroot=chroot, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")]
         ) as results2:
 
             working_set2, _, _ = results2
@@ -253,7 +271,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
     with plugin_resolution(
         rule_runner,
         interpreter=python36,
-        plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+        plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
 
@@ -265,7 +283,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
                 rule_runner,
                 interpreter=python37,
                 chroot=chroot,
-                plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+                plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
             ):
                 pytest.fail(
                     "Plugin re-resolution is expected for an incompatible interpreter and it is "
@@ -278,7 +296,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
             rule_runner,
             interpreter=python36,
             chroot=chroot,
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+            plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
 
             working_set2, _, _ = results2
