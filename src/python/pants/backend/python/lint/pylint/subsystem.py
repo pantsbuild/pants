@@ -219,7 +219,8 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 
     return PylintFirstPartyPlugins(
         requirement_strings=PexRequirements.create_from_requirement_fields(
-            requirements_fields
+            requirements_fields,
+            constraints_strings=(),
         ).req_strings,
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
