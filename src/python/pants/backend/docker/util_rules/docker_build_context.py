@@ -20,7 +20,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
-from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.utils import get_hash, suggest_renames
 from pants.backend.docker.value_interpolation import (
     DockerBuildArgsInterpolationValue,
     DockerInterpolationContext,
@@ -165,6 +165,12 @@ class DockerBuildContext:
         interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
             interpolation_context.get("build_args", {})
         )
+
+        # Data from Pants.
+        interpolation_context["pants"] = {
+            # Present hash for all inputs that can be used for image tagging.
+            "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+        }
 
         return cls(
             build_args=build_args,
