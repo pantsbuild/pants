@@ -45,7 +45,7 @@ class JvmSubsystem(Subsystem):
             default="jvm-default",
             help=(
                 "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
-                "The name must be defined as a resolve in `[jvm].resolves`.",
+                "The name must be defined as a resolve in `[jvm].resolves`."
             ),
         )
         register(
@@ -56,7 +56,7 @@ class JvmSubsystem(Subsystem):
             help=(
                 "Extra JVM arguments to use when running tests in debug mode.\n\n"
                 "For example, if you want to attach a remote debugger, use something like "
-                "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']",
+                "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']"
             ),
         )
 

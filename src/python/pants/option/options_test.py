@@ -27,6 +27,7 @@ from pants.option.errors import (
     BooleanOptionNameWithNo,
     DefaultValueType,
     FromfileError,
+    HelpType,
     ImplicitValIsNone,
     InvalidKwarg,
     InvalidMemberType,
@@ -1061,7 +1062,8 @@ class OptionsTest(unittest.TestCase):
         assertError(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
         assertError(InvalidMemberType, "--foo", type=list, member_type=set)
         assertError(InvalidMemberType, "--foo", type=list, member_type=list)
-        assertError(InvalidMemberType, "--foo", type=list, member_type=list)
+        assertError(HelpType, "--foo", help=())
+        assertError(HelpType, "--foo", help=("Help!",))
 
     def test_implicit_value(self) -> None:
         def check(*, flag: str = "", expected: str) -> None:

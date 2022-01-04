@@ -35,6 +35,7 @@ from pants.option.errors import (
     DefaultMemberValueType,
     DefaultValueType,
     FromfileError,
+    HelpType,
     ImplicitValIsNone,
     InvalidKwarg,
     InvalidKwargNonGlobalScope,
@@ -413,6 +414,10 @@ class Parser:
         is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
         if not is_enum and member_type not in self._allowed_member_types:
             error(InvalidMemberType, member_type=member_type.__name__)
+
+        help_arg = kwargs.get("help")
+        if help_arg is not None and not isinstance(help_arg, str):
+            error(HelpType, help_type=type(help_arg).__name__)
 
         # check type of default value
         default_value = kwargs.get("default")
