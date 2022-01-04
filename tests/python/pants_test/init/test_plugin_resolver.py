@@ -10,11 +10,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Dict, Iterable, Optional, Sequence
+from typing import Dict, Sequence
 
 import pytest
 from pex.interpreter import PythonInterpreter
-from pkg_resources import Requirement, WorkingSet
+from pkg_resources import Distribution, Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -75,18 +75,20 @@ def _run_setup_py(
     rule_runner: RuleRunner,
     plugin: str,
     interpreter_constraints: InterpreterConstraints,
-    version: Optional[str],
-    setup_py_args: Iterable[str],
+    version: str | None,
+    install_requires: Sequence[str] | None,
+    setup_py_args: Sequence[str],
     install_dir: str,
 ) -> None:
     pex_obj = _create_pex(rule_runner, interpreter_constraints)
+    install_requires_str = f", install_requires={install_requires!r}" if install_requires else ""
     setup_py_file = FileContent(
         "setup.py",
         dedent(
             f"""
                 from setuptools import setup
 
-                setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
+                setup(name="{plugin}", version="{version or DEFAULT_VERSION}"{install_requires_str})
             """
         ).encode(),
     )
@@ -115,17 +117,19 @@ def _run_setup_py(
 class Plugin:
     name: str
     version: str | None = None
+    install_requires: list[str] | None = None
 
 
 @contextmanager
 def plugin_resolution(
     rule_runner: RuleRunner,
     *,
-    interpreter=None,
-    chroot=None,
+    interpreter: PythonInterpreter | None = None,
+    chroot: str | None = None,
     plugins: Sequence[Plugin] = (),
-    sdist=True,
-    working_set_entries=(),
+    sdist: bool = True,
+    working_set_entries: Sequence[Distribution] = (),
+    use_pypi: bool = False,
 ):
     @contextmanager
     def provide_chroot(existing):
@@ -150,9 +154,10 @@ def plugin_resolution(
             repo_dir = os.path.join(root_dir, "repo")
             env.update(
                 PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
-                PANTS_PYTHON_REPOS_INDEXES="[]",
                 PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
             )
+            if not use_pypi:
+                env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
             plugin_list = []
             for plugin in plugins:
                 version = plugin.version
@@ -164,6 +169,7 @@ def plugin_resolution(
                         plugin.name,
                         artifact_interpreter_constraints,
                         version,
+                        plugin.install_requires,
                         setup_py_args,
                         repo_dir,
                     )
@@ -182,11 +188,14 @@ def plugin_resolution(
         plugin_resolver = PluginResolver(bootstrap_scheduler)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
+        input_working_set = WorkingSet(entries=[])
+        for dist in working_set_entries:
+            input_working_set.add(dist)
         working_set = plugin_resolver.resolve(
             options_bootstrapper,
             complete_env,
             interpreter_constraints,
-            WorkingSet(entries=list(working_set_entries)),
+            input_working_set,
         )
         for dist in working_set:
             assert (
@@ -252,6 +261,24 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
             working_set2, _, _ = results2
 
             assert list(working_set) == list(working_set2)
+
+
+def test_range_deps(rule_runner: RuleRunner) -> None:
+    # Test that when a plugin has a range dependency, specifying a working set constrains
+    # to a particular version, where otherwise we would get the highest released (2.27.0 in
+    # this case).
+    with plugin_resolution(
+        rule_runner,
+        plugins=[Plugin("jane", "3.4.5", ["requests>=2.25.1,<2.28.0"])],
+        working_set_entries=[Distribution(project_name="requests", version="2.26.0")],
+        # Because we're resolving real distributions, we enable access to pypi.
+        use_pypi=True,
+    ) as (
+        working_set,
+        _,
+        _,
+    ):
+        assert "2.26.0" == working_set.find(Requirement.parse("requests")).version
 
 
 @skip_unless_python36_and_python37_present
