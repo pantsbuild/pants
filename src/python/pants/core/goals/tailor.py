@@ -215,10 +215,10 @@ class PutativeTarget:
                 return f"[{val_str}\n{indent}]"
             return repr(v)
 
-        is_default_name = self.name == os.path.basename(self.path)
-        if self.kwargs or not is_default_name:
+        has_name = self.addressable and self.name != os.path.basename(self.path)
+        if self.kwargs or has_name:
             _kwargs = {
-                **({} if is_default_name else {"name": self.name}),
+                **({"name": self.name} if has_name else {}),
                 **self.kwargs,  # type: ignore[arg-type]
             }
             _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
