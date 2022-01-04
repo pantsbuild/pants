@@ -296,8 +296,6 @@ def validate_requirements(
     awaitables: Tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
-    if not cacheable:
-        return
     # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
     # part of the API, so it's OK for these errors not to mention them.
     for ty in parameter_types:
