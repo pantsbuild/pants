@@ -19,7 +19,7 @@ from pants.version import VERSION
 
 
 @freeze_time(datetime.datetime(2020, 1, 1, 12, 0, 0), as_kwarg="frozen_time")
-def test_run_tracker_timing_output(tmp_path: Path, frozen_time: datetime.datetime) -> None:
+def test_run_tracker_timing_output(tmp_path: Path, frozen_time) -> None:
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         ob = create_options_bootstrapper([])
@@ -38,9 +38,7 @@ def test_run_tracker_timing_output(tmp_path: Path, frozen_time: datetime.datetim
     [(PANTS_SUCCEEDED_EXIT_CODE, "SUCCESS"), (PANTS_FAILED_EXIT_CODE, "FAILURE")],
 )
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
-def test_run_information(
-    exit_code: ExitCode, expected: str, tmp_path: Path, frozen_time: datetime.datetime
-) -> None:
+def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, frozen_time) -> None:
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         spec = "test/example.py"
@@ -74,7 +72,7 @@ def test_run_information(
 
 
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
-def test_anonymous_telemetry(monkeypatch, tmp_path: Path, frozen_time: datetime.datetime) -> None:
+def test_anonymous_telemetry(monkeypatch, tmp_path: Path, frozen_time) -> None:
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         ob = create_options_bootstrapper([])
