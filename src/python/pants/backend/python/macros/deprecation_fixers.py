@@ -8,7 +8,7 @@ import os.path
 import tokenize
 from dataclasses import dataclass
 
-from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.build_graph.address import InvalidAddress
 from pants.core.goals.update_build_files import (
     DeprecationFixerRequest,
@@ -22,7 +22,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    MultipleSourcesField,
+    SingleSourceField,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
@@ -83,13 +83,13 @@ async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
     for python_req_deps_field, build_file_addr, deps in zip(
         python_requirement_dependencies_fields, build_file_addresses_per_tgt, deps_per_tgt
     ):
-        generator_tgt = next((tgt for tgt in deps if isinstance(tgt, PythonRequirementsFile)), None)
+        generator_tgt = next(
+            (tgt for tgt in deps if isinstance(tgt, PythonRequirementsFileTarget)), None
+        )
         if generator_tgt is None:
             continue
 
-        # Assume there is a single source. We should have changed this target to use
-        # `SingleSourceField`, alas.
-        generator_source = generator_tgt[MultipleSourcesField].value[0]  # type: ignore[index]
+        generator_source = generator_tgt[SingleSourceField].value
         if "Pipfile" in generator_source:
             generator_alias = "pipenv_requirements"
         elif "pyproject.toml" in generator_source:
