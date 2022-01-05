@@ -67,13 +67,13 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
 
 @maybe_skip_jdk_test
 def test_java_binary_system_version(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--javac-jdk=system"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-jdk=system"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert "openjdk version" in run_javac_version(rule_runner)
 
 
 @maybe_skip_jdk_test
 def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--javac-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         run_javac_version(rule_runner)
@@ -85,10 +85,10 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert "javac 11.0" in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--javac-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert "javac 1.8" in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--javac-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         assert "javac 16.0" in run_javac_version(rule_runner)

@@ -248,7 +248,9 @@ class MyPyFirstPartyPlugins:
 
 
 @rule("Prepare [mypy].source_plugins", level=LogLevel.DEBUG)
-async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
+async def mypy_first_party_plugins(
+    mypy: MyPy,
+) -> MyPyFirstPartyPlugins:
     if not mypy.source_plugins:
         return MyPyFirstPartyPlugins(FrozenOrderedSet(), EMPTY_DIGEST, ())
 
@@ -258,9 +260,12 @@ async def mypy_first_party_plugins(mypy: MyPy) -> MyPyFirstPartyPlugins:
     )
 
     requirements = PexRequirements.create_from_requirement_fields(
-        plugin_tgt[PythonRequirementsField]
-        for plugin_tgt in transitive_targets.closure
-        if plugin_tgt.has_field(PythonRequirementsField)
+        (
+            plugin_tgt[PythonRequirementsField]
+            for plugin_tgt in transitive_targets.closure
+            if plugin_tgt.has_field(PythonRequirementsField)
+        ),
+        constraints_strings=(),
     )
 
     sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))

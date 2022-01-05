@@ -20,7 +20,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
-from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.utils import get_hash, suggest_renames
 from pants.backend.docker.value_interpolation import (
     DockerBuildArgsInterpolationValue,
     DockerInterpolationContext,
@@ -56,7 +56,7 @@ class DockerBuildContextError(Exception):
 
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """This is a meta field for the context files generator, to tell the codegen machinery what
-    source fields are good to use.
+    source fields are good to use as-is.
 
     Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
     that should be accepted.
@@ -66,7 +66,7 @@ class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """
 
 
-DockerContextFilesAcceptableInputsField.register(FileSourceField)
+# These sources will be used to populate the build context as-is.
 DockerContextFilesAcceptableInputsField.register(ShellSourceField)
 
 
@@ -166,6 +166,12 @@ class DockerBuildContext:
             interpolation_context.get("build_args", {})
         )
 
+        # Data from Pants.
+        interpolation_context["pants"] = {
+            # Present hash for all inputs that can be used for image tagging.
+            "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+        }
+
         return cls(
             build_args=build_args,
             digest=snapshot.digest,
@@ -204,7 +210,10 @@ async def create_docker_build_context(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(DockerContextFilesSourcesField,),
+            for_sources_types=(
+                DockerContextFilesSourcesField,
+                FileSourceField,
+            ),
             enable_codegen=True,
         ),
     )

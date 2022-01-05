@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import partial
 from os import path
 from textwrap import dedent
 from typing import Iterator
@@ -53,6 +54,10 @@ class DockerRepositoryNameError(DockerInterpolationError):
 
 
 class DockerBuildTargetStageError(ValueError):
+    pass
+
+
+class DockerImageOptionValueError(ValueError):
     pass
 
 
@@ -149,7 +154,15 @@ def get_build_options(
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
-            yield from target[field_type].options()
+            source = DockerInterpolationContext.TextSource(
+                address=target.address, target_alias=target.alias, field_alias=field_type.alias
+            )
+            format = partial(
+                context.interpolation_context.format,
+                source=source,
+                error_cls=DockerImageOptionValueError,
+            )
+            yield from target[field_type].options(format)
 
     # Target stage
     target_stage = None

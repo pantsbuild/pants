@@ -99,7 +99,7 @@ class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
 @dataclass(unsafe_hash=True)
 class PexRequirements:
     req_strings: FrozenOrderedSet[str]
-    apply_constraints: bool
+    constraints_strings: FrozenOrderedSet[str]
     # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as part of
     # #12314, but in the meantime, it "acts like" a lockfile, but isn't actually typed as a Lockfile
     # because the constraints are modified in memory first. This flag marks a `PexRequirements`
@@ -111,19 +111,18 @@ class PexRequirements:
         self,
         req_strings: Iterable[str] = (),
         *,
-        apply_constraints: bool = False,
+        constraints_strings: Iterable[str] = (),
         is_all_constraints_resolve: bool = False,
         repository_pex: Pex | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
-        :param apply_constraints: Whether to apply any configured requirement_constraints while
-            building this PEX.
+        :param constraints_strings: Constraints strings to apply during the resolve.
         :param repository_pex: An optional PEX to resolve requirements from via the Pex CLI
             `--pex-repository` option.
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
-        self.apply_constraints = apply_constraints
+        self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
         self.is_all_constraints_resolve = is_all_constraints_resolve
         self.repository_pex = repository_pex
 
@@ -131,13 +130,14 @@ class PexRequirements:
     def create_from_requirement_fields(
         cls,
         fields: Iterable[PythonRequirementsField],
+        constraints_strings: Iterable[str],
         *,
         additional_requirements: Iterable[str] = (),
-        apply_constraints: bool = True,
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements(
-            {*field_requirements, *additional_requirements}, apply_constraints=apply_constraints
+            {*field_requirements, *additional_requirements},
+            constraints_strings=constraints_strings,
         )
 
     def __bool__(self) -> bool:
@@ -433,7 +433,7 @@ async def build_pex(
 
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
     repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
-    constraint_file_digest = EMPTY_DIGEST
+    constraints_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
 
     # TODO(#12314): Capture the resolve name for multiple user lockfiles.
@@ -483,19 +483,14 @@ async def build_pex(
         assert isinstance(request.requirements, PexRequirements)
         is_monolithic_resolve = request.requirements.is_all_constraints_resolve
 
-        if (
-            request.requirements.apply_constraints
-            and python_setup.requirement_constraints is not None
-        ):
-            argv.extend(["--constraints", python_setup.requirement_constraints])
-            constraint_file_digest = await Get(
+        if request.requirements.constraints_strings:
+            constraints_file = "__constraints.txt"
+            constaints_content = "\n".join(request.requirements.constraints_strings)
+            constraints_file_digest = await Get(
                 Digest,
-                PathGlobs(
-                    [python_setup.requirement_constraints],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin="the option `[python].requirement_constraints`",
-                ),
+                CreateDigest([FileContent(constraints_file, constaints_content.encode())]),
             )
+            argv.extend(["--constraints", constraints_file])
 
         argv.extend(request.requirements.req_strings)
 
@@ -505,7 +500,7 @@ async def build_pex(
             (
                 sources_digest_as_subdir,
                 additional_inputs_digest,
-                constraint_file_digest,
+                constraints_file_digest,
                 requirements_file_digest,
                 repository_pex_digest,
                 *(pex.digest for pex in request.pex_path),

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from typing import cast
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.option.custom_types import shell_str
 from pants.option.subsystem import Subsystem
 
@@ -28,21 +27,6 @@ class Scalac(Subsystem):
             ),
         )
         register(
-            "--global",
-            type=list,
-            member_type=str,
-            advanced=True,
-            default=[],
-            # NB: `global` is a python keyword.
-            dest="global_addresses",
-            removal_version="2.10.0.dev0",
-            removal_hint="Use `--plugins-global`, which behaves the same.",
-            help=(
-                "A list of addresses of `scalac_plugin` targets which should be used for "
-                "compilation of all Scala targets in a build."
-            ),
-        )
-        register(
             "--plugins-global",
             type=list,
             member_type=str,
@@ -52,15 +36,6 @@ class Scalac(Subsystem):
                 "A list of addresses of `scalac_plugin` targets which should be used for "
                 "compilation of all Scala targets in a build."
             ),
-        )
-        register(
-            "--lockfile",
-            type=str,
-            default="3rdparty/jvm/global_scalac_plugins.lockfile",
-            advanced=True,
-            removal_version="2.10.0.dev0",
-            removal_hint="Use `--plugins-global-lockfile`, which behaves the same.",
-            help=("The filename of a lockfile for global plugins."),
         )
         register(
             "--plugins-global-lockfile",
@@ -76,24 +51,8 @@ class Scalac(Subsystem):
 
     @property
     def plugins_global(self) -> list[str]:
-        plugins_global = resolve_conflicting_options(
-            old_option="global_addresses",
-            new_option="plugins_global",
-            old_scope="scalac",
-            new_scope="scalac",
-            old_container=self.options,
-            new_container=self.options,
-        )
-        return cast("list[str]", plugins_global)
+        return cast("list[str]", self.options.plugins_global)
 
     @property
     def plugins_global_lockfile(self) -> str:
-        plugins_global_lockfile = resolve_conflicting_options(
-            old_option="lockfile",
-            new_option="plugins_global_lockfile",
-            old_scope="scalac",
-            new_scope="scalac",
-            old_container=self.options,
-            new_container=self.options,
-        )
-        return cast(str, plugins_global_lockfile)
+        return cast(str, self.options.plugins_global_lockfile)

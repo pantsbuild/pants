@@ -52,7 +52,8 @@ class DockerOptions(Subsystem):
         )
         default_repository_help = (
             "Configure the default repository name used in the Docker image tag.\n\n"
-            "The value is formatted and may reference these variables:\n\n"
+            "The value is formatted and may reference these variables (in addition to the normal "
+            "placeheolders derived from the Dockerfile and build args etc):\n\n"
             + bullet_list(["name", "directory", "parent_directory"])
             + "\n\n"
             'Example: `--default-repository="{directory}/{name}"`.\n\n'
