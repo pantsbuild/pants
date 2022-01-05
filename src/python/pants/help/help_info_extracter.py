@@ -11,9 +11,10 @@ from enum import Enum
 from typing import Any, Callable, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
@@ -94,11 +95,13 @@ class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
     scope: The scope of the described options.
+    provider: Which backend or plugin that registered this scope.
     basic|advanced|deprecated: A list of OptionHelpInfo for the options in that group.
     """
 
     scope: str
     description: str
+    provider: str
     is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
     basic: tuple[OptionHelpInfo, ...]
     advanced: tuple[OptionHelpInfo, ...]
@@ -125,6 +128,7 @@ class GoalHelpInfo:
 
     name: str
     description: str
+    provider: str
     is_implemented: bool  # True iff all unions required by the goal are implemented.
     consumed_scopes: tuple[str, ...]  # The scopes of subsystems consumed by this goal.
 
@@ -148,13 +152,14 @@ class TargetFieldHelpInfo:
     """A container for help information for a field in a target type."""
 
     alias: str
+    provider: str
     description: str
     type_hint: str
     required: bool
     default: str | None
 
     @classmethod
-    def create(cls, field: type[Field]) -> TargetFieldHelpInfo:
+    def create(cls, field: type[Field], *, provider: str) -> TargetFieldHelpInfo:
         raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
 
@@ -176,6 +181,7 @@ class TargetFieldHelpInfo:
 
         return cls(
             alias=field.alias,
+            provider=provider,
             description=field.help,
             type_hint=type_hint,
             required=field.required,
@@ -190,20 +196,32 @@ class TargetTypeHelpInfo:
     """A container for help information for a target type."""
 
     alias: str
+    provider: str
     summary: str
     description: str
     fields: tuple[TargetFieldHelpInfo, ...]
 
     @classmethod
     def create(
-        cls, target_type: type[Target], *, union_membership: UnionMembership
+        cls,
+        target_type: type[Target],
+        *,
+        provider: str,
+        union_membership: UnionMembership,
+        get_field_type_provider: Callable[[type[Field]], str] | None,
     ) -> TargetTypeHelpInfo:
         return cls(
             alias=target_type.alias,
+            provider=provider,
             summary=first_paragraph(target_type.help),
             description=target_type.help,
             fields=tuple(
-                TargetFieldHelpInfo.create(field)
+                TargetFieldHelpInfo.create(
+                    field,
+                    provider=""
+                    if get_field_type_provider is None
+                    else get_field_type_provider(field),
+                )
                 for field in target_type.class_field_types(union_membership=union_membership)
                 if not field.alias.startswith("_") and field.removal_version is None
             ),
@@ -232,6 +250,7 @@ class HelpInfoExtracter:
         union_membership: UnionMembership,
         consumed_scopes_mapper: ConsumedScopesMapper,
         registered_target_types: RegisteredTargetTypes,
+        build_configuration: BuildConfiguration | None = None,
     ) -> AllHelpInfo:
         scope_to_help_info = {}
         name_to_goal_info = {}
@@ -248,9 +267,14 @@ class HelpInfoExtracter:
                     f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
                     f"Add a class property `help`."
                 )
+            provider = ""
+            if subsystem_cls is not None and build_configuration is not None:
+                provider = cls.get_first_provider(
+                    build_configuration.subsystem_to_providers.get(subsystem_cls)
+                )
             is_goal = subsystem_cls is not None and issubclass(subsystem_cls, GoalSubsystem)
             oshi = HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
-                scope_info.description, options.get_parser(scope_info.scope), is_goal
+                scope_info.description, options.get_parser(scope_info.scope), is_goal, provider
             )
             scope_to_help_info[oshi.scope] = oshi
 
@@ -262,12 +286,28 @@ class HelpInfoExtracter:
                 name_to_goal_info[scope_info.scope] = GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
+                    provider,
                     is_implemented,
                     consumed_scopes_mapper(scope_info.scope),
                 )
 
         name_to_target_type_info = {
-            alias: TargetTypeHelpInfo.create(target_type, union_membership=union_membership)
+            alias: TargetTypeHelpInfo.create(
+                target_type,
+                union_membership=union_membership,
+                provider=cls.get_first_provider(
+                    build_configuration
+                    and build_configuration.target_type_to_providers.get(target_type)
+                    or None
+                ),
+                get_field_type_provider=lambda field_type: cls.get_first_provider(
+                    build_configuration.union_rule_to_providers.get(
+                        UnionRule(target_type._plugin_field_cls, field_type)
+                    )
+                    if build_configuration is not None
+                    else None
+                ),
+            )
             for alias, target_type in registered_target_types.aliases_to_types.items()
             if (
                 not alias.startswith("_")
@@ -348,11 +388,19 @@ class HelpInfoExtracter:
         else:
             return None
 
+    @staticmethod
+    def get_first_provider(providers: tuple[str, ...] | None) -> str:
+        if not providers:
+            return ""
+        return providers[0]
+
     def __init__(self, scope: str):
         self._scope = scope
         self._scope_prefix = scope.replace(".", "-")
 
-    def get_option_scope_help_info(self, description: str, parser: Parser, is_goal: bool):
+    def get_option_scope_help_info(
+        self, description: str, parser: Parser, is_goal: bool, provider: str = ""
+    ):
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 
         basic_options = []
@@ -372,6 +420,7 @@ class HelpInfoExtracter:
         return OptionScopeHelpInfo(
             scope=self._scope,
             description=description,
+            provider=provider,
             is_goal=is_goal,
             basic=tuple(basic_options),
             advanced=tuple(advanced_options),
