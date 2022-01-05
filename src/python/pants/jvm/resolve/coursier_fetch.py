@@ -742,6 +742,8 @@ async def select_coursier_resolve_for_targets(
     incompatible_targets = []
     for ct in coarsened_targets.closure():
         for t in ct.members:
+            if not jvm.is_jvm_target(t):
+                continue
             target_resolves = jvm.resolves_for_target(t)
             if target_resolves is not None and resolve not in target_resolves:
                 incompatible_targets.append(t)
