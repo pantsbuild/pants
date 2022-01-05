@@ -322,7 +322,13 @@ class HelpPrinter(MaybeColor):
             print(self.maybe_magenta(rule_info.name))
             indent = "    "
             print(self.maybe_cyan(f"{indent}activated by"), rule_info.provider)
-            print(self.maybe_cyan(f"{indent}inputs:"), rule_info.input_types or "(none)")
+            if rule_info.input_types:
+                print(
+                    self.maybe_cyan(f"{indent}{pluralize(len(rule_info.input_types), 'input')}:"),
+                    ", ".join(rule_info.input_types),
+                )
+            else:
+                print(self.maybe_cyan(f"{indent}no inputs"))
             if rule_info.description:
                 print(f"{indent}{rule_info.description}")
             if rule_info.help:

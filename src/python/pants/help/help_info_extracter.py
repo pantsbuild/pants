@@ -236,7 +236,7 @@ class RuleInfo:
     description: str | None
     help: str | None
     provider: str
-    input_types: str
+    input_types: tuple[str, ...]
     output_type: str
     output_desc: str | None
 
@@ -430,7 +430,7 @@ class HelpInfoExtracter:
                 description=rule.desc,
                 help=cls.maybe_cleandoc(rule.func.__doc__),
                 provider=cls.get_first_provider(providers),
-                input_types=", ".join(selector.__name__ for selector in rule.input_selectors),
+                input_types=tuple(selector.__name__ for selector in rule.input_selectors),
                 output_type=rule.output_type.__name__,
                 output_desc=cls.maybe_cleandoc(rule.output_type.__doc__),
             )
