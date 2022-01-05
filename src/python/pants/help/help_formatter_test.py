@@ -65,7 +65,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         parser.register(*args, **kwargs)
         # Force a parse to generate the derivation history.
         parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [], False))
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "help.test")
         return HelpFormatter(
             show_advanced=show_advanced, show_deprecated=show_deprecated, color=False
         ).format_options(oshi)
@@ -87,3 +87,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, True, args, kwargs)
         assert len(lines) == 23
+
+    def test_provider_info(self):
+        lines = self._format_for_global_scope(False, False, ["--foo"], {})
+        assert len(lines) == 14
+        assert "Activated by help.test" in lines

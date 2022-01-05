@@ -154,3 +154,52 @@ def test_global_flag_in_scoped_position() -> None:
     pants_run.assert_failure()
     assert "Unknown flag --pants-distdir on test scope" in pants_run.stdout
     assert "Did you mean to use the global --pants-distdir?" in pants_run.stdout
+
+
+def test_help_provided_target_plugin_field() -> None:
+    pants_run = run_pants(
+        [
+            "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python']",
+            "help",
+            "python_distribution",
+        ]
+    )
+    pants_run.assert_success()
+
+    assert (
+        textwrap.dedent(
+            """
+            `python_distribution` target
+            ----------------------------
+
+            A publishable Python setuptools distribution (e.g. an sdist or wheel).
+
+            See https://www.pantsbuild.org/v2.10/docs/python-distributions.
+
+
+            Activated by pants.backend.python
+            Valid fields:
+            """
+        )
+        in pants_run.stdout
+    )
+
+    assert (
+        textwrap.dedent(
+            """
+            skip_twine
+                from: pants.backend.experimental.python
+                type: bool
+                default: False
+
+                If true, don't publish this target's packages using Twine.
+
+            tags
+                type: Iterable[str] | None
+                default: None
+
+                Arbitrary strings to describe a target.
+            """
+        )
+        in pants_run.stdout
+    )
