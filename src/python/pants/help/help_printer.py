@@ -117,7 +117,7 @@ class HelpPrinter(MaybeColor):
                 elif thing in self._all_help_info.name_to_target_type_info:
                     self._print_target_help(thing)
                 elif thing in self._all_help_info.rule_output_type_to_rule_infos:
-                    self._print_api_type_help(thing)
+                    self._print_api_type_help(thing, help_request.advanced)
                 else:
                     print(self.maybe_red(f"Unknown entity: {thing}"))
         else:
@@ -310,7 +310,7 @@ class HelpPrinter(MaybeColor):
                 print("\n" + formatted_desc)
         print()
 
-    def _print_api_type_help(self, output_type: str) -> None:
+    def _print_api_type_help(self, output_type: str, show_advanced: bool) -> None:
         self._print_title(f"`{output_type}` API type")
         rule_infos = self._all_help_info.rule_output_type_to_rule_infos[output_type]
         if rule_infos[0].output_desc:
@@ -329,6 +329,17 @@ class HelpPrinter(MaybeColor):
                 )
             else:
                 print(self.maybe_cyan(f"{indent}no inputs"))
+            if show_advanced and rule_info.input_gets:
+                print(
+                    f"\n{indent}".join(
+                        hard_wrap(
+                            self.maybe_cyan(f"{pluralize(len(rule_info.input_gets), 'get')}: ")
+                            + ", ".join(rule_info.input_gets),
+                            indent=4,
+                            width=self._width - 4,
+                        )
+                    )
+                )
             if rule_info.description:
                 print(f"{indent}{rule_info.description}")
             if rule_info.help:
