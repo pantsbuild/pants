@@ -19,7 +19,7 @@ from pants.backend.python.dependency_inference.rules import (
 )
 from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
 from pants.backend.python.target_types import (
-    PythonRequirementsFile,
+    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
@@ -265,7 +265,7 @@ def test_infer_python_strict(caplog) -> None:
         target_types=[
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
-            PythonRequirementsFile,
+            PythonRequirementsFileTarget,
         ],
         context_aware_object_factories={"python_requirements": PythonRequirementsCAOF},
     )

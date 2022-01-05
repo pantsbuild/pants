@@ -66,7 +66,7 @@ class PipenvRequirementsCAOF:
             self._parse_context.create_object(
                 "_python_requirements_file",
                 name=requirements_file_target_name,
-                sources=[source],
+                source=source,
             )
             requirements_dep = f":{requirements_file_target_name}"
 
