@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePath
+from textwrap import dedent
 
 import pytest
 from packaging.version import Version
 
+from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
+    GenerateFromPoetryRequirementsRequest,
+    PoetryRequirementsTargetGenerator,
     PyprojectAttr,
     PyProjectToml,
     add_markers,
@@ -20,6 +24,14 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_str_version,
 )
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.engine.addresses import Address
+from pants.engine.target import GeneratedTargets, Target
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+
+# ---------------------------------------------------------------------------------
+# pyproject.toml parsing
+# ---------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -378,3 +390,192 @@ def test_parse_multi_reqs() -> None:
         PipRequirement.parse("isort<5.6,>=5.5.1"),
     }
     assert retval == actual_reqs
+
+
+# ---------------------------------------------------------------------------------
+# Target generator
+# ---------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *poetry_requirements.rules(),
+            QueryRule(GeneratedTargets, [GenerateFromPoetryRequirementsRequest]),
+        ],
+        target_types=[PoetryRequirementsTargetGenerator],
+    )
+
+
+def assert_poetry_requirements(
+    rule_runner: RuleRunner,
+    build_file_entry: str,
+    pyproject_toml: str,
+    *,
+    expected_targets: set[Target],
+    pyproject_toml_relpath: str = "pyproject.toml",
+) -> None:
+    rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
+    generator = rule_runner.get_target(Address("", target_name="reqs"))
+    result = rule_runner.request(
+        GeneratedTargets, [GenerateFromPoetryRequirementsRequest(generator)]
+    )
+    assert set(result.values()) == expected_targets
+
+
+def test_pyproject_toml(rule_runner: RuleRunner) -> None:
+    """This tests that we correctly create a new python_requirement for each entry in a
+    pyproject.toml file.
+
+    Note that this just ensures proper targets are created; see prior tests for specific parsing
+    edge cases.
+    """
+    file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
+    assert_poetry_requirements(
+        rule_runner,
+        dedent(
+            """\
+            poetry_requirements(
+                name="reqs",
+                # module_mapping should work regardless of capitalization.
+                module_mapping={'ansiCOLORS': ['colors']},
+                type_stubs_module_mapping={'Django-types': ['django']},
+                overrides={"Django": {"dependencies": ["#Django-types"]}},
+            )
+            """
+        ),
+        dedent(
+            """\
+            [tool.poetry.dependencies]
+            Django = {version = "3.2", python = "3"}
+            Django-types = "2"
+            Un-Normalized-PROJECT = "1.0.0"
+            [tool.poetry.dev-dependencies]
+            ansicolors = ">=1.18.0"
+            """
+        ),
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["ansicolors>=1.18.0"],
+                    "modules": ["colors"],
+                },
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "dependencies": ["#Django-types", file_addr.spec],
+                    "requirements": ["Django==3.2 ; python_version == '3'"],
+                },
+                address=Address("", target_name="reqs", generated_name="Django"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["Django-types==2"],
+                    "type_stub_modules": ["django"],
+                },
+                address=Address("", target_name="reqs", generated_name="Django-types"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["Un_Normalized_PROJECT == 1.0.0"],
+                },
+                address=Address("", target_name="reqs", generated_name="Un-Normalized-PROJECT"),
+            ),
+            PythonRequirementsFileTarget({"source": "pyproject.toml"}, file_addr),
+        },
+    )
+
+
+def test_source_override(rule_runner: RuleRunner) -> None:
+    file_addr = Address("", target_name="reqs", relative_file_path="subdir/pyproject.toml")
+    assert_poetry_requirements(
+        rule_runner,
+        "poetry_requirements(name='reqs', source='subdir/pyproject.toml')",
+        dedent(
+            """\
+            [tool.poetry.dependencies]
+            ansicolors = ">=1.18.0"
+            [tool.poetry.dev-dependencies]
+            """
+        ),
+        pyproject_toml_relpath="subdir/pyproject.toml",
+        expected_targets={
+            PythonRequirementTarget(
+                {"dependencies": [file_addr.spec], "requirements": ["ansicolors>=1.18.0"]},
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            PythonRequirementsFileTarget({"source": "subdir/pyproject.toml"}, file_addr),
+        },
+    )
+
+
+def test_non_pep440_error(rule_runner: RuleRunner) -> None:
+    with engine_error(contains='Failed to parse requirement foo = "~r62b" in pyproject.toml'):
+        assert_poetry_requirements(
+            rule_runner,
+            "poetry_requirements(name='reqs')",
+            """
+            [tool.poetry.dependencies]
+            foo = "~r62b"
+            [tool.poetry.dev-dependencies]
+            """,
+            expected_targets=set(),
+        )
+
+
+def test_no_req_defined_warning(rule_runner: RuleRunner, caplog) -> None:
+    assert_poetry_requirements(
+        rule_runner,
+        "poetry_requirements(name='reqs')",
+        """
+        [tool.poetry.dependencies]
+        [tool.poetry.dev-dependencies]
+        """,
+        expected_targets={
+            PythonRequirementsFileTarget(
+                {"source": "pyproject.toml"},
+                Address("", target_name="reqs", relative_file_path="pyproject.toml"),
+            )
+        },
+    )
+    assert "No requirements defined" in caplog.text
+
+
+def test_bad_dict_format(rule_runner: RuleRunner) -> None:
+    with engine_error(contains="not formatted correctly; at"):
+        assert_poetry_requirements(
+            rule_runner,
+            "poetry_requirements(name='reqs')",
+            """
+            [tool.poetry.dependencies]
+            foo = {bad_req = "test"}
+            [tool.poetry.dev-dependencies]
+            """,
+            expected_targets=set(),
+        )
+
+
+def test_bad_req_type(rule_runner: RuleRunner) -> None:
+    with engine_error(contains="was of type int"):
+        assert_poetry_requirements(
+            rule_runner,
+            "poetry_requirements(name='reqs')",
+            """
+            [tool.poetry.dependencies]
+            foo = 4
+            [tool.poetry.dev-dependencies]
+            """,
+            expected_targets=set(),
+        )
+
+
+def test_no_tool_poetry(rule_runner: RuleRunner) -> None:
+    with engine_error(contains="`tool.poetry` found in pyproject.toml"):
+        assert_poetry_requirements(
+            rule_runner, "poetry_requirements(name='reqs')", "foo = 4", expected_targets=set()
+        )

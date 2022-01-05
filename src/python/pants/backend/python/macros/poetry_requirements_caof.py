@@ -80,7 +80,9 @@ class PoetryRequirementsCAOF:
             overrides, macro_name="python_requirements", build_file_dir=self._parse_context.rel_path
         )
 
-        requirements = parse_pyproject_toml(PyProjectToml.create(self._parse_context, source))
+        requirements = parse_pyproject_toml(
+            PyProjectToml.deprecated_macro_create(self._parse_context, source)
+        )
         for parsed_req in requirements:
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             self._parse_context.create_object(

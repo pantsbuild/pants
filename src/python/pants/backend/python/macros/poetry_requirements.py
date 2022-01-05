@@ -11,13 +11,45 @@ from pathlib import Path, PurePath
 from typing import Any, Iterator, Mapping, Sequence, cast
 
 import toml
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
 from typing_extensions import TypedDict
 
+from pants.backend.python.macros.common_fields import (
+    ModuleMappingField,
+    RequirementsOverrideField,
+    TypeStubsModuleMappingField,
+)
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementsField,
+    PythonRequirementsFileSourcesField,
+    PythonRequirementsFileTarget,
+    PythonRequirementTarget,
+    PythonRequirementTypeStubModulesField,
+)
+from pants.base.build_root import BuildRoot
 from pants.base.parse_context import ParseContext
+from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    InvalidFieldException,
+    SingleSourceField,
+    Target,
+)
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------------
+# pyproject.toml parsing
+# ---------------------------------------------------------------------------------
 
 
 class PyprojectAttr(TypedDict, total=False):
@@ -143,7 +175,9 @@ class PyProjectToml:
     toml_contents: str
 
     @classmethod
-    def create(cls, parse_context: ParseContext, pyproject_toml_relpath: str) -> PyProjectToml:
+    def deprecated_macro_create(
+        cls, parse_context: ParseContext, pyproject_toml_relpath: str
+    ) -> PyProjectToml:
         build_root = Path(parse_context.build_root)
         toml_relpath = PurePath(parse_context.rel_path, pyproject_toml_relpath)
         return cls(
@@ -347,3 +381,107 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
             for proj, attr in {**dependencies, **dev_dependencies, **group_deps}.items()
         )
     )
+
+
+# ---------------------------------------------------------------------------------
+# Target generator
+# ---------------------------------------------------------------------------------
+
+
+class PoetryRequirementsSourceField(SingleSourceField):
+    default = "pyproject.toml"
+    required = False
+
+
+class PoetryRequirementsTargetGenerator(Target):
+    alias = "poetry_requirements"
+    help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+        PoetryRequirementsSourceField,
+        RequirementsOverrideField,
+    )
+
+
+class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
+    generate_from = PoetryRequirementsTargetGenerator
+
+
+@rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
+async def generate_from_python_requirement(
+    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot
+) -> GeneratedTargets:
+    generator = request.generator
+    pyproject_rel_path = generator[PoetryRequirementsSourceField].value
+    pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
+
+    file_tgt = PythonRequirementsFileTarget(
+        {PythonRequirementsFileSourcesField.alias: pyproject_rel_path},
+        Address(
+            generator.address.spec_path,
+            target_name=generator.address.target_name,
+            relative_file_path=pyproject_rel_path,
+        ),
+    )
+
+    digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            [pyproject_full_path],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{generator}'s field `{PoetryRequirementsSourceField.alias}`",
+        ),
+    )
+
+    requirements = parse_pyproject_toml(
+        PyProjectToml(
+            build_root=PurePath(build_root.path),
+            toml_relpath=PurePath(pyproject_full_path),
+            toml_contents=digest_contents[0].content.decode(),
+        )
+    )
+
+    module_mapping = generator[ModuleMappingField].value
+    stubs_mapping = generator[TypeStubsModuleMappingField].value
+    overrides = generator[RequirementsOverrideField].flatten_and_normalize()
+
+    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
+        normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
+        tgt_overrides = overrides.pop(normalized_proj_name, {})
+        if Dependencies.alias in tgt_overrides:
+            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
+                file_tgt.address.spec
+            ]
+
+        # TODO: Consider letting you set metadata in the target generator and having it pass down
+        #  to all generated targets. Especially useful for compatible_resolves.
+        return PythonRequirementTarget(
+            {
+                PythonRequirementsField.alias: [parsed_req],
+                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
+                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
+                    normalized_proj_name
+                ),
+                # This may get overridden by `tgt_overrides`, which will have already added in
+                # the file tgt.
+                Dependencies.alias: [file_tgt.address.spec],
+                **tgt_overrides,
+            },
+            generator.address.create_generated(parsed_req.project_name),
+        )
+
+    result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
+
+    if overrides:
+        raise InvalidFieldException(
+            f"Unused key in the `overrides` field for {request.generator.address}: "
+            f"{sorted(overrides)}"
+        )
+
+    return GeneratedTargets(generator, result)
+
+
+def rules():
+    return collect_rules()
