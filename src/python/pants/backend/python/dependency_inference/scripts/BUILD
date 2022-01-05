@@ -1,3 +1,6 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 resource(name="import_parser", source="import_parser.py")
 
 # Also expose scripts as python sources so they get formatted/linted/checked.
