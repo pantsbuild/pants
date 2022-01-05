@@ -4,7 +4,7 @@
 python_sources(
     overrides={
         "import_parser.py": {
-            "dependencies": ["//src/python/pants/backend/python/dependency_inference/scripts:resources"]
+            "dependencies": ["./scripts/import_parser.py:resources"]
         }
     }
 )
