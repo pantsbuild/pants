@@ -3,8 +3,9 @@
 
 python_sources(
     overrides={
-        "import_parser.py": {
-            "dependencies": ["./scripts/import_parser.py:resources"]
+        "parse_python_imports.py": {
+            # This Python script is loaded as a resource, see parse_python_imports.py for more info
+            "dependencies": ["./scripts:import_parser"]
         }
     }
 )

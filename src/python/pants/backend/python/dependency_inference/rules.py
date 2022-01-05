@@ -6,15 +6,15 @@ import logging
 from enum import Enum
 from typing import cast
 
-from pants.backend.python.dependency_inference import import_parser, module_mapper
+from pants.backend.python.dependency_inference import module_mapper, parse_python_imports
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
-from pants.backend.python.dependency_inference.import_parser import (
+from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.parse_python_imports import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
 )
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField, PythonTestSourceField
 from pants.backend.python.util_rules import ancestor_files, pex
@@ -281,7 +281,7 @@ def import_rules():
     return [
         infer_python_dependencies_via_imports,
         *pex.rules(),
-        *import_parser.rules(),
+        *parse_python_imports.rules(),
         *module_mapper.rules(),
         *stripped_source_files.rules(),
         SubsystemRule(PythonInferSubsystem),

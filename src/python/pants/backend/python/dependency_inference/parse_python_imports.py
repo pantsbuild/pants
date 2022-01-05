@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import pkgutil
 from dataclasses import dataclass
 
@@ -15,8 +14,6 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
-
-logger = logging.Logger(__name__)
 
 
 class ParsedPythonImports(DeduplicatedCollection[str]):
