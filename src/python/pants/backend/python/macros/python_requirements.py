@@ -35,6 +35,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
 )
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
@@ -144,4 +145,7 @@ async def generate_from_python_requirement(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPythonRequirementsRequest),
+    )

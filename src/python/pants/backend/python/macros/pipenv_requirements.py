@@ -34,6 +34,7 @@ from pants.engine.target import (
     StringField,
     Target,
 )
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
@@ -146,4 +147,7 @@ async def generate_from_pipenv_requirement(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPipenvRequirementsRequest),
+    )
