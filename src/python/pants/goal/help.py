@@ -15,6 +15,8 @@ from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import GraphSession
 from pants.option.arg_splitter import (
+    NO_GOAL_NAME,
+    UNKNOWN_GOAL_NAME,
     AllHelp,
     HelpRequest,
     NoGoalHelp,
@@ -64,7 +66,7 @@ class AllHelpBuiltinGoal(HelpBuiltinGoalBase):
 
 
 class NoGoalHelpBuiltinGoal(HelpBuiltinGoalBase):
-    name = "__no_goal"
+    name = NO_GOAL_NAME
     help = "(internal goal not presented on the CLI)"
 
     def create_help_request(self, options: Options) -> HelpRequest:
@@ -103,7 +105,7 @@ class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
 
 
 class UnknownGoalHelpBuiltinGoal(HelpBuiltinGoalBase):
-    name = "__unknown_goal"
+    name = UNKNOWN_GOAL_NAME
     help = "(internal goal not presented on the CLI)"
 
     def create_help_request(self, options: Options) -> HelpRequest:

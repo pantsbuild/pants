@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from pants.goal.builtins import builtin_goals
-from pants.option.arg_splitter import ArgSplitter
+from pants.option.arg_splitter import NO_GOAL_NAME, UNKNOWN_GOAL_NAME, ArgSplitter
 from pants.option.scope import ScopeInfo
 
 
@@ -56,7 +56,7 @@ def assert_valid_split(
     assert expected_builtin_args == split_args.builtin_args
     assert expected_is_help == (
         split_args.builtin_goal
-        in ("help", "help-advanced", "help-all", "__unknown_goal", "__no_goal")
+        in ("help", "help-advanced", "help-all", UNKNOWN_GOAL_NAME, NO_GOAL_NAME)
     )
     assert expected_help_advanced == ("help-advanced" == split_args.builtin_goal)
     assert expected_help_all == ("help-all" == split_args.builtin_goal)
@@ -64,7 +64,7 @@ def assert_valid_split(
 
 def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: list[str]) -> None:
     split_args = splitter.split_args(shlex.split(args_str))
-    assert "__unknown_goal" == split_args.builtin_goal
+    assert UNKNOWN_GOAL_NAME == split_args.builtin_goal
     assert set(unknown_goals) == set(split_args.unknown_goals)
 
 
@@ -406,7 +406,7 @@ def test_unknown_goal_detection(
 @pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext"))
 def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
     split_args = splitter.split_args(shlex.split(f"./pants {extra_args}"))
-    assert "__no_goal" == split_args.builtin_goal
+    assert NO_GOAL_NAME == split_args.builtin_goal
 
 
 def test_subsystem_scope_is_unknown_goal(splitter: ArgSplitter) -> None:

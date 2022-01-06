@@ -62,6 +62,13 @@ class NoGoalHelp(HelpRequest):
     """The user specified no goals."""
 
 
+# These are the names for the built in goals to print help message when there is no goal, or any
+# unknown goals respectively. They begin with underlines to exclude them from the list of goals in
+# the goal help output.
+NO_GOAL_NAME = "__no_goal"
+UNKNOWN_GOAL_NAME = "__unknown_goal"
+
+
 class ArgSplitter:
     """Splits a command-line into scoped sets of flags and a set of specs.
 
@@ -177,10 +184,10 @@ class ArgSplitter:
                 add_goal(arg)
 
         if not builtin_goal:
-            if unknown_scopes and "__unknown_goal" in self._known_goal_scopes:
-                builtin_goal = "__unknown_goal"
-            elif not goals and "__no_goal" in self._known_goal_scopes:
-                builtin_goal = "__no_goal"
+            if unknown_scopes and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
+                builtin_goal = UNKNOWN_GOAL_NAME
+            elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
+                builtin_goal = NO_GOAL_NAME
 
         if builtin_goal:
             # Pass any unconsumed flags and args unparsed to the builtin goal.
