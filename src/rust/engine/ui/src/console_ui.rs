@@ -88,6 +88,9 @@ impl ConsoleUI {
     // We take exclusive access to stdio by registering a callback that is used to render stderr
     // while we're holding access. See the method doc.
     let stderr_dest_bar: Arc<Mutex<Option<WeakProgressBar>>> = Arc::new(Mutex::new(None));
+    // We acquire the lock before taking exclusive access, and don't release it until after
+    // initialization. That way, the exclusive callback can always assume that the destination
+    // is initialized (i.e., can `unwrap` it).
     let mut stderr_dest_bar_guard = stderr_dest_bar.lock();
     let (term_read, _, term_stderr_write) = {
       let stderr_dest_bar = stderr_dest_bar.clone();
