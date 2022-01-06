@@ -17,7 +17,10 @@ from _pytest.tmpdir import TempPathFactory
 from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    GlobalRequirementConstraints,
+    PexFromTargetsRequest,
+)
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -31,6 +34,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_from_targets.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
+            QueryRule(GlobalRequirementConstraints, ()),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
@@ -176,6 +180,13 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         }
     )
 
+    # Create and parse the constraints file.
+    constraints1_filename = "constraints1.txt"
+    rule_runner.set_options(
+        [f"--python-requirement-constraints={constraints1_filename}"], env_inherit={"PATH"}
+    )
+    constraints1_strings = [str(c) for c in rule_runner.request(GlobalRequirementConstraints, [])]
+
     def get_pex_request(
         constraints_file: str | None,
         resolve_all_constraints: bool | None,
@@ -207,18 +218,21 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     additional_args = ["--strip-pex-env"]
     additional_lockfile_args = ["--no-strip-pex-env"]
 
-    pex_req1 = get_pex_request("constraints1.txt", resolve_all_constraints=False)
+    pex_req1 = get_pex_request(constraints1_filename, resolve_all_constraints=False)
     assert pex_req1.requirements == PexRequirements(
-        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req], apply_constraints=True
+        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req],
+        constraints_strings=constraints1_strings,
     )
 
     pex_req1_direct = get_pex_request(
-        "constraints1.txt", resolve_all_constraints=False, direct_deps_only=True
+        constraints1_filename, resolve_all_constraints=False, direct_deps_only=True
     )
-    assert pex_req1_direct.requirements == PexRequirements(["baz", url_req], apply_constraints=True)
+    assert pex_req1_direct.requirements == PexRequirements(
+        ["baz", url_req], constraints_strings=constraints1_strings
+    )
 
     pex_req2 = get_pex_request(
-        "constraints1.txt",
+        constraints1_filename,
         resolve_all_constraints=True,
         additional_args=additional_args,
         additional_lockfile_args=additional_lockfile_args,
@@ -234,7 +248,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     pex_req2_direct = get_pex_request(
-        "constraints1.txt",
+        constraints1_filename,
         resolve_all_constraints=True,
         direct_deps_only=True,
         additional_args=additional_args,
@@ -247,7 +261,7 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
 
     pex_req3_direct = get_pex_request(
-        "constraints1.txt", resolve_all_constraints=True, direct_deps_only=True
+        constraints1_filename, resolve_all_constraints=True, direct_deps_only=True
     )
     pex_req3_reqs = pex_req3_direct.requirements
     assert isinstance(pex_req3_reqs, PexRequirements)
@@ -309,9 +323,10 @@ def test_exclude_requirements(
 
 
 def test_issue_12222(rule_runner: RuleRunner) -> None:
+    constraints = ["foo==1.0", "bar==1.0"]
     rule_runner.write_files(
         {
-            "constraints.txt": "foo==1.0\nbar==1.0",
+            "constraints.txt": "\n".join(constraints),
             "BUILD": dedent(
                 """
                 python_requirement(name="foo",requirements=["foo"])
@@ -335,4 +350,4 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.requirements == PexRequirements(["foo"], apply_constraints=True)
+    assert result.requirements == PexRequirements(["foo"], constraints_strings=constraints)

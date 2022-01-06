@@ -16,7 +16,7 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
-from pants.jvm import classpath, jdk_rules
+from pants.jvm import classpath, jdk_rules, resources
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import coursier
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
@@ -56,4 +56,5 @@ def rules():
         *dep_inf_rules.rules(),
         *target_types_rules(),
         *jvm_tool.rules(),
+        *resources.rules(),
     ]

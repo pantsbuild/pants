@@ -1,13 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import site
 import sys
 from dataclasses import dataclass
-from typing import Optional, TypeVar, cast
+from typing import Optional, cast
 
-from pkg_resources import WorkingSet
+from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -21,20 +23,19 @@ from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-
-S = TypeVar("S", bound=Subsystem)
 
 
 @dataclass(frozen=True)
 class PluginsRequest:
     # Interpreter constraints to resolve for, or None to resolve for the interpreter that Pants is
     # running under.
-    interpreter_constraints: Optional[InterpreterConstraints] = None
+    interpreter_constraints: InterpreterConstraints | None
+    # Requirement constraints to resolve with. If plugins will be loaded into the global working_set
+    # (i.e., onto the `sys.path`), then these should be the current contents of the working_set.
+    constraints: tuple[Requirement, ...]
 
 
 class ResolvedPluginDistributions(DeduplicatedCollection[str]):
@@ -51,9 +52,10 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
-    # The repository's constraints are not relevant here, because this resolve is mixed
-    # into the Pants' process' path, and never into user code.
-    requirements = PexRequirements(sorted(global_options.options.plugins), apply_constraints=False)
+    requirements = PexRequirements(
+        req_strings=sorted(global_options.options.plugins),
+        constraints_strings=(str(constraint) for constraint in request.constraints),
+    )
     if not requirements:
         return ResolvedPluginDistributions()
 
@@ -100,27 +102,22 @@ async def resolve_plugins(
 
 
 class PluginResolver:
-    def __init__(
-        self,
-        scheduler: BootstrapScheduler,
-        interpreter_constraints: Optional[InterpreterConstraints] = None,
-    ) -> None:
+    def __init__(self, scheduler: BootstrapScheduler) -> None:
         self._scheduler = scheduler
-        self._request = PluginsRequest(interpreter_constraints)
 
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironment,
+        interpreter_constraints: Optional[InterpreterConstraints] = None,
         working_set: Optional[WorkingSet] = None,
     ) -> WorkingSet:
-        """Resolves any configured plugins and adds them to the global working set.
-
-        :param working_set: The working set to add the resolved plugins to instead of the global
-                            working set (for testing).
-        """
+        """Resolves any configured plugins and adds them to the working_set."""
         working_set = working_set or global_working_set
-        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env):
+        request = PluginsRequest(
+            interpreter_constraints, tuple(dist.as_requirement() for dist in working_set)
+        )
+        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
             site.addsitedir(
                 resolved_plugin_location
             )  # Activate any .pth files plugin wheels may have.
@@ -131,6 +128,7 @@ class PluginResolver:
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironment,
+        request: PluginsRequest,
     ) -> ResolvedPluginDistributions:
         session = self._scheduler.scheduler.new_session(
             "plugin_resolver",
@@ -143,7 +141,7 @@ class PluginResolver:
         )
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [self._request])[0],
+            session.product_request(ResolvedPluginDistributions, [request])[0],
         )
 
 

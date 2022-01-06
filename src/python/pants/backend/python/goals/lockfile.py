@@ -287,7 +287,8 @@ async def setup_user_lockfile_requests(
     return _UserLockfileRequests(
         PythonLockfileRequest(
             PexRequirements.create_from_requirement_fields(
-                resolve_to_requirements_fields[resolve]
+                resolve_to_requirements_fields[resolve],
+                constraints_strings=(),
             ).req_strings,
             InterpreterConstraints(python_setup.interpreter_constraints),
             resolve_name=resolve,

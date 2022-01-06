@@ -57,6 +57,11 @@ _orgs = (
         "https://files.readme.io/aa53b52-foursquare-small.png",
     ),
     Org(
+        "Geminus",
+        "https://www.geminus.ai/",
+        "https://files.readme.io/0da3c3f-geminus-small.png",
+    ),
+    Org(
         "Grapl",
         "https://www.graplsecurity.com/",
         "https://files.readme.io/8802ffd-grapl-small.png",

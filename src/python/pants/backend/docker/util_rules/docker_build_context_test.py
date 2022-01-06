@@ -89,7 +89,7 @@ def assert_build_context(
     *,
     build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue]
+    expected_interpolation_context: dict[str, str | dict[str, str] | DockerInterpolationValue]
     | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
@@ -111,14 +111,41 @@ def assert_build_context(
     snapshot = rule_runner.request(Snapshot, [context.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
     if expected_interpolation_context is not None:
-        if "build_args" in expected_interpolation_context:
+        build_args = expected_interpolation_context.get("build_args")
+        if isinstance(build_args, dict):
             expected_interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
-                expected_interpolation_context["build_args"]
+                build_args
             )
+
+        if "pants" not in expected_interpolation_context:
+            expected_interpolation_context["pants"] = context.interpolation_context["pants"]
+
         assert context.interpolation_context == DockerInterpolationContext.from_dict(
             expected_interpolation_context
         )
+
     return context
+
+
+def test_pants_hash(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": "FROM base",
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("test"),
+        expected_files=["test/Dockerfile"],
+        expected_interpolation_context={
+            "baseimage": {"tag": "latest"},
+            "stage0": {"tag": "latest"},
+            "build_args": {},
+            "pants": {"hash": "fd19488a9b08a0184432762cab85f1370904d09bafd9df1a2f8a94614b2b7eb6"},
+        },
+    )
 
 
 def test_file_dependencies(rule_runner: RuleRunner) -> None:

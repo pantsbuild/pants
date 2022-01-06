@@ -17,7 +17,7 @@ from pants.backend.python.macros.deprecation_fixers import (
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
 from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
-from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.core.goals.update_build_files import RewrittenBuildFile
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(MacroRenames, []),
             QueryRule(RewrittenBuildFile, [UpdatePythonMacrosRequest]),
         ),
-        target_types=[GenericTarget, PythonRequirementsFile, PythonRequirementTarget],
+        target_types=[GenericTarget, PythonRequirementsFileTarget, PythonRequirementTarget],
         context_aware_object_factories={
             "python_requirements": PythonRequirementsCAOF,
             "poetry_requirements": PoetryRequirementsCAOF,

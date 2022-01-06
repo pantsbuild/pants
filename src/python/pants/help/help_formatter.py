@@ -38,6 +38,7 @@ class HelpFormatter(MaybeColor):
                 lines.append(self.maybe_green(f"{title}\n{'-' * len(title)}\n"))
                 lines.extend(hard_wrap(oshi.description, width=self._width))
                 lines.append(" ")
+                lines.append(f"Activated by {self.maybe_magenta(oshi.provider)}")
                 config_section = f"[{oshi.scope or 'GLOBAL'}]"
                 lines.append(f"Config section: {self.maybe_magenta(config_section)}")
             lines.append(" ")

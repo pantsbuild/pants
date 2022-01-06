@@ -20,7 +20,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.scope import normalize_scope
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import Changed
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,8 @@ class BuildConfiguration:
     registered_aliases: BuildFileAliases
     subsystem_to_providers: FrozenDict[type[Subsystem], tuple[str, ...]]
     target_type_to_providers: FrozenDict[type[Target], tuple[str, ...]]
-    rules: FrozenOrderedSet[Rule]
-    union_rules: FrozenOrderedSet[UnionRule]
+    rule_to_providers: FrozenDict[Rule, tuple[str, ...]]
+    union_rule_to_providers: FrozenDict[UnionRule, tuple[str, ...]]
     allow_unknown_options: bool
 
     @property
@@ -60,6 +60,14 @@ class BuildConfiguration:
     @property
     def target_types(self) -> tuple[type[Target], ...]:
         return tuple(sorted(self.target_type_to_providers.keys(), key=lambda x: x.alias))
+
+    @property
+    def rules(self) -> FrozenOrderedSet[Rule]:
+        return FrozenOrderedSet(self.rule_to_providers.keys())
+
+    @property
+    def union_rules(self) -> FrozenOrderedSet[UnionRule]:
+        return FrozenOrderedSet(self.union_rule_to_providers.keys())
 
     def __post_init__(self) -> None:
         class Category(Enum):
@@ -107,8 +115,10 @@ class BuildConfiguration:
         _target_type_to_providers: dict[type[Target], list[str]] = field(
             default_factory=lambda: defaultdict(list)
         )
-        _rules: OrderedSet = field(default_factory=OrderedSet)
-        _union_rules: OrderedSet = field(default_factory=OrderedSet)
+        _rule_to_providers: dict[Rule, list[str]] = field(default_factory=lambda: defaultdict(list))
+        _union_rule_to_providers: dict[UnionRule, list[str]] = field(
+            default_factory=lambda: defaultdict(list)
+        )
         _allow_unknown_options: bool = False
 
         def registered_aliases(self) -> BuildFileAliases:
@@ -193,14 +203,16 @@ class BuildConfiguration:
 
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
-            self._rules.update(rule_index.rules)
-            self._rules.update(rule_index.queries)
-            self._union_rules.update(rule_index.union_rules)
+            rules_and_queries = (*rule_index.rules, *rule_index.queries)
+            for rule in rules_and_queries:
+                self._rule_to_providers[rule].append(plugin_or_backend)
+            for union_rule in rule_index.union_rules:
+                self._union_rule_to_providers[union_rule].append(plugin_or_backend)
             self.register_subsystems(
                 plugin_or_backend,
                 (
                     rule.output_type
-                    for rule in self._rules
+                    for rule in rules_and_queries
                     if issubclass(rule.output_type, Subsystem)
                 ),
             )
@@ -252,7 +264,11 @@ class BuildConfiguration:
                 target_type_to_providers=FrozenDict(
                     (k, tuple(v)) for k, v in self._target_type_to_providers.items()
                 ),
-                rules=FrozenOrderedSet(self._rules),
-                union_rules=FrozenOrderedSet(self._union_rules),
+                rule_to_providers=FrozenDict(
+                    (k, tuple(v)) for k, v in self._rule_to_providers.items()
+                ),
+                union_rule_to_providers=FrozenDict(
+                    (k, tuple(v)) for k, v in self._union_rule_to_providers.items()
+                ),
                 allow_unknown_options=self._allow_unknown_options,
             )

@@ -70,7 +70,7 @@ class PythonRequirementsCAOF:
         req_file_tgt = self._parse_context.create_object(
             "_python_requirements_file",
             name=source.replace(os.path.sep, "_"),
-            sources=[source],
+            source=source,
         )
         requirements_dep = f":{req_file_tgt.name}"
 
