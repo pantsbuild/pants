@@ -20,6 +20,7 @@ from pants.backend.python.goals import (
     tailor,
 )
 from pants.backend.python.macros import (
+    deprecation_fixers,
     pipenv_requirements,
     poetry_requirements,
     python_requirements,
@@ -92,6 +93,7 @@ def rules():
         *tailor.rules(),
         *target_types_rules.rules(),
         # Macros.
+        *deprecation_fixers.rules(),
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),

@@ -14,6 +14,7 @@ from pants.core.goals.update_build_files import (
     DeprecationFixerRequest,
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
+    UpdateBuildFilesSubsystem,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -150,15 +151,19 @@ class UpdatePythonMacrosRequest(DeprecationFixerRequest):
 
 @rule(desc="Change Python macros to target generators", level=LogLevel.DEBUG)
 async def maybe_update_macros_references(
-    request: UpdatePythonMacrosRequest, global_options: GlobalOptions
+    request: UpdatePythonMacrosRequest,
+    global_options: GlobalOptions,
+    update_build_files_subsystem: UpdateBuildFilesSubsystem,
 ) -> RewrittenBuildFile:
-    if not global_options.options.use_deprecated_python_macros:
-        logger.debug(
-            "Skipping update of Python macros to target generators because "
-            "`[GLOBAL].use_deprecated_python_macros` is set to false, so target generators are "
-            "already used."
-        )
+    if not update_build_files_subsystem.fix_python_macros:
         return RewrittenBuildFile(request.path, request.lines, ())
+
+    if not global_options.options.use_deprecated_python_macros:
+        raise ValueError(
+            "`--update-build-files-fix-python-macros` specified when "
+            "`[GLOBAL].use_deprecated_python_macros` is already set to false, which means that "
+            "there is nothing left to fix."
+        )
 
     renames = await Get(MacroRenames, MacroRenamesRequest())
 

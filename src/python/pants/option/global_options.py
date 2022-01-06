@@ -23,6 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1629,3 +1630,25 @@ class ProcessCleanupOption:
     """
 
     val: bool
+
+
+def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer) -> None:
+    if bootstrap_options.is_default("use_deprecated_python_macros"):
+        warn_or_error(
+            "2.11.0.dev0",
+            "the option `--use-deprecated-python-macros` defaulting to true",
+            (
+                "In Pants 2.11, the default for the global option "
+                "`--use-deprecated-python-macros` will change to false.\n\n"
+                "To fix this deprecation, explicitly set `use_deprecated_python_macros = true` in "
+                "the `[GLOBAL]` section of `pants.toml`. Or, when you are ready to upgrade to "
+                "the improved target generation mechanism, follow these steps:\n\n"
+                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                "  2. Check the logs for an ERROR log to see if you have to manually add "
+                "`name=` anywhere.\n"
+                "  3. Set `use_deprecated_python_macros = false` in `[GLOBAL]` in pants.toml.\n\n"
+                "(Why upgrade from the old macro mechanism to target generation? Among other "
+                "benefits, it makes sure that the Pants daemon is properly invalidated when you "
+                "change `requirements.txt` and `pyproject.toml`.)"
+            ),
+        )
