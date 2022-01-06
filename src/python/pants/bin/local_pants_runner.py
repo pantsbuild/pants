@@ -205,30 +205,23 @@ class LocalPantsRunner:
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 
-    def _run_builtin_goals(self, builtin_goals: tuple[str, ...]) -> ExitCode | None:
-        for goal in builtin_goals:
-            scope_info = self.options.known_scope_to_info[goal]
-            if not scope_info.subsystem_cls:
-                continue
-            scoped_options = self.options.for_scope(goal)
-            goal = scope_info.subsystem_cls(scoped_options)
-            assert isinstance(goal, BuiltinGoal)
-            result = goal.run(
-                build_config=self.build_config,
-                graph_session=self.graph_session,
-                options=self.options,
-                specs=self.specs,
-                union_membership=self.union_membership,
-            )
-            if result is not None:
-                return result
-        return None
+    def _run_builtin_goal(self, builtin_goal: str) -> ExitCode:
+        scope_info = self.options.known_scope_to_info[builtin_goal]
+        assert scope_info.subsystem_cls
+        scoped_options = self.options.for_scope(builtin_goal)
+        goal = scope_info.subsystem_cls(scoped_options)
+        assert isinstance(goal, BuiltinGoal)
+        return goal.run(
+            build_config=self.build_config,
+            graph_session=self.graph_session,
+            options=self.options,
+            specs=self.specs,
+            union_membership=self.union_membership,
+        )
 
     def _run_inner(self) -> ExitCode:
-        if self.options.builtin_goals:
-            result = self._run_builtin_goals(tuple(self.options.builtin_goals))
-            if result is not None:
-                return result
+        if self.options.builtin_goal:
+            return self._run_builtin_goal(self.options.builtin_goal)
 
         goals = tuple(self.options.goals)
         if not goals:

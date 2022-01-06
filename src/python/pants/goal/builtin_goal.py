@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
+from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
@@ -15,9 +16,11 @@ from pants.option.options import Options
 from pants.option.scope import ScopeInfo
 
 
-class BuiltinGoal(GoalSubsystem):
-    """Builtin goals are executed before regular goals, and may preempt further processing by
-    returning an ExitCode other than None."""
+class BuiltinGoal(ABC, GoalSubsystem):
+    """Builtin goals have precedence over regular goal rules.
+
+    If a builtin goal is invoked, any remaining arguments are passed unaltered to the builtin goal.
+    """
 
     # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing builtin goals.
     aliases: ClassVar[tuple[str, ...]] = ()
@@ -26,6 +29,7 @@ class BuiltinGoal(GoalSubsystem):
     def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
         return super().create_scope_info(is_builtin=True, **scope_info_kwargs)
 
+    @abstractmethod
     def run(
         self,
         *,
@@ -34,7 +38,5 @@ class BuiltinGoal(GoalSubsystem):
         options: Options,
         specs: Specs,
         union_membership: UnionMembership,
-    ) -> ExitCode | None:
-        # Signal success by default. Returning `None` indicates to continue processing other builtin
-        # and regular goal rules as ususal.
-        return PANTS_SUCCEEDED_EXIT_CODE
+    ) -> ExitCode:
+        pass

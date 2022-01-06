@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
@@ -25,7 +25,7 @@ from pants.option.arg_splitter import (
 from pants.option.options import Options
 
 
-class HelpBuiltinGoalBase(ABC, BuiltinGoal):
+class HelpBuiltinGoalBase(BuiltinGoal):
     def run(
         self,
         build_config: BuildConfiguration,
@@ -33,7 +33,7 @@ class HelpBuiltinGoalBase(ABC, BuiltinGoal):
         options: Options,
         specs: Specs,
         union_membership: UnionMembership,
-    ) -> ExitCode | None:
+    ) -> ExitCode:
         all_help_info = HelpInfoExtracter.get_all_help_info(
             options,
             union_membership,
@@ -80,10 +80,9 @@ class ThingHelpBuiltinGoal(HelpBuiltinGoalBase):
     )
 
     def create_help_request(self, options: Options) -> HelpRequest:
-        options.builtin_goals.remove("help")
         return ThingHelp(
             advanced=False,
-            things=tuple(options.builtin_goals)
+            things=tuple(options.builtin_goal_args)
             + tuple(options.goals)
             + tuple(options.unknown_goals),
         )
@@ -95,10 +94,9 @@ class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
     aliases = ("--help-advanced",)
 
     def create_help_request(self, options: Options) -> HelpRequest:
-        options.builtin_goals.remove("help-advanced")
         return ThingHelp(
             advanced=True,
-            things=tuple(options.builtin_goals)
+            things=tuple(options.builtin_goal_args)
             + tuple(options.goals)
             + tuple(options.unknown_goals),
         )

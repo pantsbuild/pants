@@ -22,7 +22,8 @@ class ArgSplitterError(Exception):
 class SplitArgs:
     """The result of splitting args."""
 
-    builtin_goals: list[str]  # Requested builtin goals (explicitly or implicitly).
+    builtin_goal: tuple[str, list[str]] | None  # Requested builtin goal (explicitly or implicitly)
+    # and remaining args.
     goals: list[str]  # Explicitly requested goals.
     unknown_goals: list[str]  # Any unknown goals.
     scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
@@ -120,22 +121,28 @@ class ArgSplitter:
         specs: list[str] = []
         passthru: list[str] = []
         unknown_scopes: list[str] = []
+        builtin_goal: str | None = None
+        builtin_args: list[str] = []
 
         def add_scope(s: str) -> None:
             # Force the scope to appear, even if empty.
             if s not in scope_to_flags:
                 scope_to_flags[s] = []
 
-        def add_goal(s: str) -> None:
-            scope_info = self._known_goal_scopes.get(s)
+        def add_goal(scope: str) -> bool:
+            """If `scope` was for a known builtin goal, return False, else True."""
+            scope_info = self._known_goal_scopes.get(scope)
             if scope_info:
-                # Get scope from info in case we hit an aliased builtin goal.
-                scope = scope_info.scope
+                if scope_info.is_builtin:
+                    # Get scope from info in case we hit an aliased builtin goal.
+                    nonlocal builtin_goal
+                    builtin_goal = scope_info.scope
+                    return False
                 goals.add(scope)
             else:
-                scope = s
                 unknown_scopes.append(scope)
             add_scope(scope)
+            return True
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.
@@ -151,13 +158,12 @@ class ArgSplitter:
         for flag in global_flags:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
         scope, flags = self._consume_scope()
-        while scope:
-            add_goal(scope)
+        while scope and add_goal(scope):
             for flag in flags:
                 assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
 
-        while self._unconsumed_args and not self._at_double_dash():
+        while self._unconsumed_args and not builtin_goal and not self._at_double_dash():
             if self._at_flag():
                 arg = self._unconsumed_args.pop()
                 # We assume any args here are in global scope.
@@ -170,17 +176,19 @@ class ArgSplitter:
             else:
                 add_goal(arg)
 
-        if self._at_double_dash():
+        if not builtin_goal:
+            if unknown_scopes and "__unknown_goal" in self._known_goal_scopes:
+                builtin_goal = "__unknown_goal"
+            elif not goals and "__no_goal" in self._known_goal_scopes:
+                builtin_goal = "__no_goal"
+
+        if builtin_goal:
+            # Pass any unconsumed flags and args unparsed to the builtin goal.
+            builtin_args = flags + list(reversed(self._unconsumed_args))
+        elif self._at_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
-        if unknown_scopes and "__unknown_goal" in self._known_goal_scopes:
-            goals.add("__unknown_goal")
-
-        if not goals and "__no_goal" in self._known_goal_scopes:
-            goals.add("__no_goal")
-
-        builtin_goals: OrderedSet[str] = OrderedSet()
         for goal in goals:
             si = self._known_goal_scopes[goal]
             if (
@@ -194,12 +202,10 @@ class ArgSplitter:
                     f"the {si.deprecated_scope} goal",
                     f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
                 )
-            if si.is_builtin:
-                builtin_goals.add(goal)
 
         return SplitArgs(
-            builtin_goals=list(builtin_goals),
-            goals=list(goals.difference(builtin_goals)),
+            builtin_goal=(builtin_goal, builtin_args) if builtin_goal else None,
+            goals=list(goals),
             unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),
             specs=specs,
