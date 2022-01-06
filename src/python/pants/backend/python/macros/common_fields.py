@@ -7,7 +7,12 @@ from typing import Any, ClassVar, Dict, Iterable, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
-from pants.backend.python.target_types import normalize_module_mapping
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementTarget,
+    PythonRequirementTypeStubModulesField,
+    normalize_module_mapping,
+)
 from pants.engine.addresses import Address
 from pants.engine.target import DictStringToStringSequenceField, OverridesField
 from pants.util.frozendict import FrozenDict
@@ -18,9 +23,9 @@ class ModuleMappingField(DictStringToStringSequenceField):
     help = (
         "A mapping of requirement names to a list of the modules they provide.\n\n"
         'For example, `{"ansicolors": ["colors"]}`.\n\n'
-        "Any unspecified requirements will use the requirement name as the default module, "
-        'e.g. "Django" will default to `["django"]`.\n\n'
-        "This is used to infer dependencies."
+        "Any unspecified requirements will use a default. See the "
+        f"`{PythonRequirementModulesField.alias}` field from the `{PythonRequirementTarget.alias}` "
+        f"target for more information."
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
@@ -38,12 +43,9 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     help = (
         "A mapping of type-stub requirement names to a list of the modules they provide.\n\n"
         'For example, `{"types-requests": ["requests"]}`.\n\n'
-        "If the requirement is not specified _and_ it starts with `types-` or `stubs-`, or ends "
-        "with `-types` or `-stubs`, the requirement will be treated as a type stub for the "
-        'corresponding module, e.g. "types-request" has the module "requests". Otherwise, '
-        "the requirement is treated like a normal dependency (see the field "
-        f"{ModuleMappingField.alias}).\n\n"
-        "This is used to infer dependencies for type stubs."
+        "If the requirement is not specified _and_ its name looks like a type stub, Pants will "
+        f"use a default. See the `{PythonRequirementTypeStubModulesField.alias}` field from the "
+        f"`{PythonRequirementTarget.alias}` target for more information."
     )
     value: FrozenDict[str, tuple[str, ...]]
     default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
