@@ -561,7 +561,7 @@ def generate() -> dict[Path, str]:
     test_yaml = yaml.dump(
         {
             "name": test_workflow_name,
-            "on": ["push", "pull_request"],
+            "on": [{"push": {"branches-ignore": ["dependabot/*"]}}, "pull_request"],
             "jobs": test_workflow_jobs([PYTHON37_VERSION], cron=False),
             "env": global_env(),
         },
