@@ -42,7 +42,6 @@ pub struct ConsoleUI {
   local_parallelism: usize,
   // While the UI is running, there will be an Instance present.
   instance: Option<Instance>,
-  teardown_mpsc: (mpsc::Sender<()>, mpsc::Receiver<()>),
 }
 
 impl ConsoleUI {
@@ -51,7 +50,6 @@ impl ConsoleUI {
       workunit_store,
       local_parallelism,
       instance: None,
-      teardown_mpsc: mpsc::channel(),
     }
   }
 
@@ -207,16 +205,11 @@ impl ConsoleUI {
   ///
   pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
     if let Some(instance) = self.instance.take() {
-      let sender = self.teardown_mpsc.0.clone();
       // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
       // direct access to the Console.
       instance
         .multi_progress_task
         .map_err(|e| format!("Failed to render UI: {}", e))
-        .and_then(move |()| {
-          sender.send(()).unwrap();
-          future::ok(())
-        })
         .boxed()
     } else {
       future::ok(()).boxed()
