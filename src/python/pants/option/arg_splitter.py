@@ -22,12 +22,12 @@ class ArgSplitterError(Exception):
 class SplitArgs:
     """The result of splitting args."""
 
-    builtin_goal: tuple[str, list[str]] | None  # Requested builtin goal (explicitly or implicitly)
-    # and remaining args.
+    builtin_goal: str | None  # Requested builtin goal (explicitly or implicitly).
+    builtin_args: list[str]  # Unconsumed args passed unparsed to builtin goal.
     goals: list[str]  # Explicitly requested goals.
     unknown_goals: list[str]  # Any unknown goals.
     scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
-    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs
+    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs.
     passthru: list[str]  # Any remaining args specified after a -- separator.
 
 
@@ -204,7 +204,8 @@ class ArgSplitter:
                 )
 
         return SplitArgs(
-            builtin_goal=(builtin_goal, builtin_args) if builtin_goal else None,
+            builtin_goal=builtin_goal,
+            builtin_args=builtin_args,
             goals=list(goals),
             unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),

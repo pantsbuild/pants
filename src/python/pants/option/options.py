@@ -140,6 +140,7 @@ class Options:
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             builtin_goal=split_args.builtin_goal,
+            builtin_args=split_args.builtin_args,
             goals=split_args.goals,
             unknown_goals=split_args.unknown_goals,
             scope_to_flags=split_args.scope_to_flags,
@@ -153,7 +154,8 @@ class Options:
 
     def __init__(
         self,
-        builtin_goal: tuple[str, list[str]] | None,
+        builtin_goal: str | None,
+        builtin_args: list[str],
         goals: list[str],
         unknown_goals: list[str],
         scope_to_flags: dict[str, list[str]],
@@ -169,6 +171,7 @@ class Options:
         Dependees should use `Options.create` instead.
         """
         self._builtin_goal = builtin_goal
+        self._builtin_args = tuple(builtin_args)
         self._goals = goals
         self._unknown_goals = unknown_goals
         self._scope_to_flags = scope_to_flags
@@ -193,15 +196,11 @@ class Options:
 
         :API: public
         """
-        if self._builtin_goal is None:
-            return None
-        return self._builtin_goal[0]
+        return self._builtin_goal
 
     @property
     def builtin_goal_args(self) -> tuple[str, ...]:
-        if self._builtin_goal is None:
-            return ()
-        return tuple(self._builtin_goal[1])
+        return self._builtin_args
 
     @property
     def goals(self) -> list[str]:
