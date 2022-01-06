@@ -83,6 +83,10 @@ class JvmSubsystem(Subsystem):
     def debug_args(self) -> tuple[str, ...]:
         return cast("tuple[str, ...]", tuple(self.options.debug_args))
 
+    def is_jvm_target(self, target: Target) -> bool:
+        """Returns `True` only if the given target is a valid JVM source or destination target."""
+        return target.has_field(JvmResolveField) or target.has_field(JvmCompatibleResolvesField)
+
     def resolves_for_target(self, target: Target) -> tuple[str, ...]:
         if target.has_field(JvmResolveField):
             val = target[JvmResolveField].value or self.default_resolve

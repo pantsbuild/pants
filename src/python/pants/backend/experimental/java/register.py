@@ -14,7 +14,7 @@ from pants.backend.java.target_types import (
     JunitTestTarget,
 )
 from pants.backend.java.target_types import rules as target_types_rules
-from pants.jvm import classpath, jdk_rules
+from pants.jvm import classpath, jdk_rules, resources
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import coursier
@@ -45,6 +45,7 @@ def rules():
         *coursier_fetch.rules(),
         *java_parser.rules(),
         *java_parser_launcher.rules(),
+        *resources.rules(),
         *symbol_mapper.rules(),
         *dependency_inference_rules.rules(),
         *tailor.rules(),
