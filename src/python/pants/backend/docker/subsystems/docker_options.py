@@ -52,7 +52,8 @@ class DockerOptions(Subsystem):
         )
         default_repository_help = (
             "Configure the default repository name used in the Docker image tag.\n\n"
-            "The value is formatted and may reference these variables:\n\n"
+            "The value is formatted and may reference these variables (in addition to the normal "
+            "placeheolders derived from the Dockerfile and build args etc):\n\n"
             + bullet_list(["name", "directory", "parent_directory"])
             + "\n\n"
             'Example: `--default-repository="{directory}/{name}"`.\n\n'
@@ -97,6 +98,18 @@ class DockerOptions(Subsystem):
         )
 
         register(
+            "--build-target-stage",
+            type=str,
+            help=(
+                "Global default value for `target_stage` on `docker_image` targets, overriding "
+                "the field value on the targets, if there is a matching stage in the `Dockerfile`."
+                "\n\n"
+                "This is useful to provide from the command line, to specify the target stage to "
+                "build for at execution time."
+            ),
+        )
+
+        register(
             "--env-vars",
             type=list,
             member_type=shell_str,
@@ -131,6 +144,10 @@ class DockerOptions(Subsystem):
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
+
+    @property
+    def build_target_stage(self) -> str | None:
+        return cast("str | None", self.options.build_target_stage)
 
     @property
     def run_args(self) -> tuple[str, ...]:

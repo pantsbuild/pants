@@ -44,6 +44,15 @@ impl ImmutableInputs {
         let digest_str = digest.hash.to_hex();
 
         let path = self.workdir.path().join(digest_str);
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+          // TODO: If this error triggers, it indicates that we have previously checked out this
+          // directory, either due to a race condition, or due to a previous failure to
+          // materialize. See https://github.com/pantsbuild/pants/issues/13899
+          return Err(format!(
+            "Destination for immutable digest already exists: {:?}",
+            meta
+          ));
+        }
         self
           .store
           .materialize_directory(path.clone(), digest, Permissions::ReadOnly)

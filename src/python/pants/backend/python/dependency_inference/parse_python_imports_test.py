@@ -7,8 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.dependency_inference import import_parser
-from pants.backend.python.dependency_inference.import_parser import (
+from pants.backend.python.dependency_inference import parse_python_imports
+from pants.backend.python.dependency_inference.parse_python_imports import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
 )
@@ -29,7 +29,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *import_parser.rules(),
+            *parse_python_imports.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
             QueryRule(ParsedPythonImports, [ParsePythonImportsRequest]),

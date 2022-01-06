@@ -21,7 +21,13 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.session import RunId
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessResultMetadata,
+)
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
@@ -49,6 +55,7 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     address: Address
     output_setting: ShowOutput
+    result_metadata: ProcessResultMetadata | None
 
     coverage_data: CoverageData | None = None
     xml_results: Snapshot | None = None
@@ -68,6 +75,7 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=EMPTY_FILE_DIGEST,
             address=address,
             output_setting=output_setting,
+            result_metadata=None,
         )
 
     @classmethod
@@ -89,6 +97,7 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=process_result.stderr_digest,
             address=address,
             output_setting=output_setting,
+            result_metadata=process_result.metadata,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
@@ -96,7 +105,7 @@ class TestResult(EngineAwareReturnType):
 
     @property
     def skipped(self) -> bool:
-        return self.exit_code is None and not self.stdout and not self.stderr
+        return self.exit_code is None or self.result_metadata is None
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
@@ -105,9 +114,9 @@ class TestResult(EngineAwareReturnType):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.address.spec < other.address.spec
-        if self.exit_code is None:
+        if self.skipped or self.exit_code is None:
             return True
-        if other.exit_code is None:
+        if other.skipped or other.exit_code is None:
             return False
         return abs(self.exit_code) < abs(other.exit_code)
 
@@ -384,6 +393,7 @@ async def run_tests(
     workspace: Workspace,
     union_membership: UnionMembership,
     dist_dir: DistDir,
+    run_id: RunId,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
@@ -428,16 +438,11 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped:
-            continue
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
+        if result.exit_code != 0:
             exit_code = cast(int, result.exit_code)
-        console.print_stderr(f"{sigil} {result.address} {status}.")
+
+        console.print_stderr(_format_test_summary(result, run_id, console))
+
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
@@ -498,6 +503,42 @@ async def run_tests(
                 exit_code = 2
 
     return Test(exit_code)
+
+
+_SOURCE_MAP = {
+    ProcessResultMetadata.Source.MEMOIZED: "memoized",
+    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
+    ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
+}
+
+
+def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
+    """Format the test summary printed to the console."""
+    if result.result_metadata:
+        if result.exit_code == 0:
+            sigil = console.sigil_succeeded()
+            status = "succeeded"
+        else:
+            sigil = console.sigil_failed()
+            status = "failed"
+
+        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+        source_print = f" ({source})" if source else ""
+
+        elapsed_print = ""
+        total_elapsed_ms = result.result_metadata.total_elapsed_ms
+        if total_elapsed_ms is not None:
+            elapsed_secs = total_elapsed_ms / 1000
+            elapsed_print = f"in {elapsed_secs:.2f}s"
+
+        suffix = f" {elapsed_print}{source_print}"
+    else:
+        sigil = console.sigil_skipped()
+        status = "skipped"
+        suffix = ""
+
+    return f"{sigil} {result.address} {status}{suffix}."
 
 
 @dataclass(frozen=True)

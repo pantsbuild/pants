@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Mapping, cast
 
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.engine import process
@@ -49,21 +48,6 @@ class PexRuntimeEnvironment(Subsystem):
             ),
         )
         register(
-            "--bootstrap-interpreter-names",
-            advanced=True,
-            type=list,
-            default=["python", "python3", "python2"],
-            metavar="<bootstrap-python-names>",
-            removal_version="2.10.0.dev0",
-            removal_hint="Moved to `[python-bootstrap] names`.",
-            help=(
-                "The names of Python binaries to search for to bootstrap PEX files with.\n\nThis "
-                "does not impact which Python interpreter is used to run your code, only what is "
-                "used to run the PEX tool. See the `interpreter_search_paths` option in "
-                "`[python]` to influence where interpreters are searched for."
-            ),
-        )
-        register(
             "--verbosity",
             advanced=True,
             type=int,
@@ -98,10 +82,6 @@ class PexRuntimeEnvironment(Subsystem):
                     yield entry
 
         return tuple(OrderedSet(iter_path_entries()))
-
-    @property
-    def bootstrap_interpreter_names(self) -> tuple[str, ...]:
-        return tuple(self.options.bootstrap_interpreter_names)
 
     @property
     def verbosity(self) -> int:
@@ -186,7 +166,6 @@ class PexEnvironment(EngineAwareReturnType):
 
 @rule(desc="Prepare environment for running PEXes", level=LogLevel.DEBUG)
 async def find_pex_python(
-    python_setup: PythonSetup,
     python_bootstrap: PythonBootstrap,
     python_binary: PythonBinary,
     pex_runtime_env: PexRuntimeEnvironment,
@@ -195,9 +174,7 @@ async def find_pex_python(
 ) -> PexEnvironment:
     return PexEnvironment(
         path=pex_runtime_env.path(python_bootstrap.environment),
-        interpreter_search_paths=tuple(
-            python_setup.interpreter_search_paths(python_bootstrap.environment)
-        ),
+        interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
         subprocess_environment_dict=subprocess_env_vars.vars,
         # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
         #  the normalization only once, via the options system?

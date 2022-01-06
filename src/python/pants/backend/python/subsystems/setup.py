@@ -8,12 +8,9 @@ import logging
 import os
 from typing import Iterable, Optional, cast
 
-from pants.engine.environment import Environment
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.python.binaries import PythonBootstrap
 from pants.util.docutil import doc_url
-from pants.util.memo import memoized_method
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
@@ -29,9 +26,6 @@ class InvalidLockfileBehavior(enum.Enum):
 class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
-
-    deprecated_options_scope = "python-setup"
-    deprecated_options_scope_removal_version = "2.10.0.dev0"
 
     default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
@@ -196,32 +190,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--interpreter-search-paths",
-            advanced=True,
-            type=list,
-            default=["<PYENV>", "<PATH>"],
-            metavar="<binary-paths>",
-            removal_version="2.10.0.dev0",
-            removal_hint=("Moved to `[python-bootstrap] search_path`."),
-            help=(
-                "A list of paths to search for Python interpreters that match your project's "
-                "interpreter constraints.\n\n"
-                "You can specify absolute paths to interpreter binaries "
-                "and/or to directories containing interpreter binaries. The order of entries does "
-                "not matter.\n\n"
-                "The following special strings are supported:\n\n"
-                "* `<PATH>`, the contents of the PATH env var\n"
-                "* `<ASDF>`, all Python versions currently configured by ASDF "
-                "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
-                "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
-                "BUILD_ROOT/.tool-versions\n"
-                "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
-                "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
-                "BUILD_ROOT/.python-version\n"
-                "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
-            ),
-        )
-        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
@@ -325,14 +293,6 @@ class PythonSetup(Subsystem):
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
-
-    @memoized_method
-    def interpreter_search_paths(self, env: Environment):
-        # TODO: When the `interpreter_search_paths` option is removed, callers who need the
-        # interpreter search path should directly use `PythonBootstrap.interpreter_search_path`.
-        return PythonBootstrap.expand_interpreter_search_paths(
-            self.options.interpreter_search_paths, env
-        )
 
     @property
     def manylinux(self) -> str | None:

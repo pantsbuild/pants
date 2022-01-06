@@ -8,7 +8,7 @@ import pytest
 
 from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import AllTargets
@@ -18,7 +18,7 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[PythonRequirementTarget, PythonRequirementsFile],
+        target_types=[PythonRequirementTarget, PythonRequirementsFileTarget],
         context_aware_object_factories={"python_requirements": PythonRequirementsCAOF},
     )
 
@@ -28,7 +28,7 @@ def assert_python_requirements(
     build_file_entry: str,
     requirements_txt: str,
     *,
-    expected_file_dep: PythonRequirementsFile,
+    expected_file_dep: PythonRequirementsFileTarget,
     expected_targets: Iterable[PythonRequirementTarget],
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
@@ -68,8 +68,8 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
             pip@ git+https://github.com/pypa/pip.git
             """
         ),
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["requirements.txt"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "requirements.txt"},
             Address("", target_name="requirements.txt"),
         ),
         expected_targets=[
@@ -132,8 +132,8 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
             repletewateringcan>=7
             """
         ),
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["requirements.txt"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "requirements.txt"},
             Address("", target_name="requirements.txt"),
         ),
         expected_targets=[
@@ -167,7 +167,9 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
 
 def test_invalid_req(rule_runner: RuleRunner) -> None:
     """Test that we give a nice error message."""
-    fake_file_tgt = PythonRequirementsFile({"sources": ["doesnt matter"]}, Address("doesnt_matter"))
+    fake_file_tgt = PythonRequirementsFileTarget(
+        {"source": "doesnt matter"}, Address("doesnt_matter")
+    )
     with pytest.raises(ExecutionError) as exc:
         assert_python_requirements(
             rule_runner,
@@ -198,8 +200,8 @@ def test_source_override(rule_runner: RuleRunner) -> None:
         "python_requirements(source='subdir/requirements.txt')",
         "ansicolors>=1.18.0",
         requirements_txt_relpath="subdir/requirements.txt",
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["subdir/requirements.txt"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "subdir/requirements.txt"},
             Address("", target_name="subdir_requirements.txt"),
         ),
         expected_targets=[

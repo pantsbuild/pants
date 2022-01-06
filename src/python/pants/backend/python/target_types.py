@@ -125,6 +125,7 @@ class UnrecognizedResolveNamesError(Exception):
 
 class PythonResolveField(StringField, AsyncFieldMixin):
     alias = "experimental_resolve"
+    required = False
     help = (
         "The resolve from `[python].experimental_resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
@@ -158,8 +159,34 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return (resolve, python_setup.resolves[resolve])
 
 
+class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
+    alias = "experimental_compatible_resolves"
+    required = False
+    help = (
+        "The set of resolves from `[python].experimental_resolves` that this target is "
+        "compatible with.\n\n"
+        "If not defined, will default to `[python].default_resolve`.\n\n"
+        "Only applies if `[python].enable_resolves` is true.\n\n"
+        "This field is experimental and may change without the normal deprecation policy."
+        # TODO: Document expectations for dependencies once we validate that.
+    )
+
+    def value_or_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
+        return self.value or (python_setup.default_resolve,)
+
+    def validate(self, python_setup: PythonSetup) -> None:
+        """Check that the resolve names are recognized."""
+        invalid_resolves = set(self.value_or_default(python_setup)) - set(python_setup.resolves)
+        if invalid_resolves:
+            raise UnrecognizedResolveNamesError(
+                sorted(invalid_resolves),
+                python_setup.resolves.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
+
+
 # -----------------------------------------------------------------------------------------------
-# `pex_binary` target
+# `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -525,28 +552,33 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+_PEX_BINARY_COMMON_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    InterpreterConstraintsField,
+    PythonResolveField,
+    PexBinaryDependenciesField,
+    PexPlatformsField,
+    PexResolveLocalPlatformsField,
+    PexInheritPathField,
+    PexStripEnvField,
+    PexIgnoreErrorsField,
+    PexShebangField,
+    PexEmitWarningsField,
+    PexLayoutField,
+    PexExecutionModeField,
+    PexIncludeRequirementsField,
+    PexIncludeToolsField,
+    RestartableField,
+)
+
+
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
-        *COMMON_TARGET_FIELDS,
-        OutputPathField,
-        InterpreterConstraintsField,
-        PythonResolveField,
-        PexBinaryDependenciesField,
+        *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
-        PexPlatformsField,
-        PexResolveLocalPlatformsField,
-        PexInheritPathField,
-        PexStripEnvField,
-        PexIgnoreErrorsField,
-        PexShebangField,
-        PexEmitWarningsField,
-        PexLayoutField,
-        PexExecutionModeField,
-        PexIncludeRequirementsField,
-        PexIncludeToolsField,
-        RestartableField,
+        OutputPathField,
     )
     help = (
         "A Python target that can be converted into an executable PEX file.\n\nPEX files are "
@@ -561,6 +593,65 @@ class PexBinary(Target):
                 f"`{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at "
                 "the same time. To fix, please remove one."
             )
+
+
+class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
+    alias = "entry_points"
+    default = None
+    help = (
+        "The entry points for each binary, i.e. what gets run when when executing `./my_app.pex.`"
+        "\n\n"
+        "Use a file name, relative to the BUILD file, like `app.py`. You can also set the "
+        "function to run, like `app.py:func`. Pants will convert these file names into well-formed "
+        "entry points, like `app.py:func` into `path.to.app:func.`"
+        "\n\n"
+        "If you want the entry point to be for a third-party dependency or to use a console "
+        "script, use the `pex_binary` target directly."
+    )
+
+
+class PexBinariesOverrideField(OverridesField):
+    help = (
+        f"Override the field values for generated `{PexBinary.alias}` targets.\n\n"
+        "Expects a dictionary mapping values from the `entry_points` field to a dictionary for "
+        "their overrides. You may either use a single string or a tuple of strings to override "
+        "multiple targets.\n\n"
+        "For example:\n\n```\n"
+        "overrides={\n"
+        '  "foo.py": {"execution_mode": "venv"]},\n'
+        '  "bar.py:main": {"restartable": True]},\n'
+        '  ("foo.py", "bar.py:main"): {"tags": ["legacy"]},\n'
+        "}"
+        "\n```\n\n"
+        "Every key is validated to belong to this target's `entry_points` field.\n\n"
+        f"If you'd like to override a field's value for every `{PexBinary.alias}` target "
+        "generated by this target, change the field directly on this target rather than using the "
+        "`overrides` field.\n\n"
+        "You can specify the same entry_point in multiple keys, so long as you don't override the "
+        "same field more than one time for the entry_point."
+    )
+
+
+class PexBinariesGeneratorTarget(Target):
+    alias = "pex_binaries"
+    core_fields = (
+        *_PEX_BINARY_COMMON_FIELDS,
+        PexEntryPointsField,
+        PexBinariesOverrideField,
+    )
+    help = (
+        "Generate a `pex_binary` target for each entry_point in the `entry_points` field."
+        "\n\n"
+        "This is solely meant to reduce duplication when you have multiple scripts in the same "
+        "directory; it's valid to use a distinct `pex_binary` target for each script/binary "
+        "instead."
+        "\n\n"
+        "This target generator does not work well to generate `pex_binary` targets where the entry "
+        "point is for a third-party dependency. Dependency inference will not work for those, so "
+        "you will have to set lots of custom metadata for each binary; prefer an explicit "
+        "`pex_binary` target in that case. This target generator works best when the entry point "
+        "is a first-party file, like `app.py` or `app.py:main`."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -908,6 +999,21 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
+class PythonRequirementCompatibleResolvesField(PythonCompatibleResolvesField):
+    help = (
+        "The resolves from `[python].experimental_resolves` that this requirement should be "
+        "included in.\n\n"
+        "If not defined, will default to `[python].default_resolve`.\n\n"
+        "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
+        "it will include all requirements that are declared compatible with that resolve. "
+        "First-party targets like `python_source` and `pex_binary` then declare which resolve(s) "
+        "they use via the `experimental_resolve` and `experimental_compatible_resolves` field; so, "
+        "for your first-party code to use a particular `python_requirement` target, that "
+        "requirement must be included in the resolve(s) "
+        "used by that code."
+    )
+
+
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -916,6 +1022,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
+        PythonCompatibleResolvesField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
@@ -966,15 +1073,19 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
             )
 
 
-class PythonRequirementsFileSourcesField(MultipleSourcesField):
-    required = True
+class PythonRequirementsFileSourcesField(SingleSourceField):
     uses_source_roots = False
 
 
-class PythonRequirementsFile(Target):
+# This allows us to work around https://github.com/pantsbuild/pants/issues/13118. Because a
+# generated target does not depend on its target generator, `--changed-since --changed-dependees`
+# would not mark the generated targets as changing when the `requirements.txt` changes, even though
+# it may be impacted. Fixing that will be A Thing and requires design work, so instead we can
+# depend on this private target type that owns `requirements.txt` to get `--changed-since` working.
+class PythonRequirementsFileTarget(Target):
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
-    help = "A private helper target type for requirements.txt files."
+    help = "A private helper target type used by `python_requirement` target generators."
 
 
 # -----------------------------------------------------------------------------------------------

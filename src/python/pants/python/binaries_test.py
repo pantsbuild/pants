@@ -276,7 +276,7 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
                     "ASDF_DATA_DIR": asdf_dir,
                 }
             )
-            expanded_paths = PythonBootstrap.expand_interpreter_search_paths(
+            expanded_paths = PythonBootstrap._expand_interpreter_search_paths(
                 paths,
                 env,
             )

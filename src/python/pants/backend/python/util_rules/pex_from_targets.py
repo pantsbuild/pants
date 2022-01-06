@@ -38,6 +38,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.engine.addresses import Address, Addresses
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -248,6 +249,34 @@ async def interpreter_constraints_for_targets(
     return interpreter_constraints
 
 
+class GlobalRequirementConstraints(DeduplicatedCollection[PipRequirement]):
+    """Global constraints specified by the `[python].requirement_constraints` setting, if any."""
+
+
+@rule
+async def global_requirement_constraints(
+    python_setup: PythonSetup,
+) -> GlobalRequirementConstraints:
+    if not python_setup.requirement_constraints:
+        return GlobalRequirementConstraints()
+
+    constraints_file_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            [python_setup.requirement_constraints],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `[python].requirement_constraints`",
+        ),
+    )
+
+    return GlobalRequirementConstraints(
+        parse_requirements_file(
+            constraints_file_contents[0].content.decode(),
+            rel_path=constraints_file_contents[0].path,
+        )
+    )
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class _RepositoryPexRequest:
@@ -295,7 +324,10 @@ class _ConstraintsRepositoryPexRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
+async def pex_from_targets(
+    request: PexFromTargetsRequest,
+    global_requirement_constraints: GlobalRequirementConstraints,
+) -> PexRequest:
     interpreter_constraints = await Get(
         InterpreterConstraints,
         InterpreterConstraintsRequest,
@@ -359,7 +391,7 @@ async def pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
                 if tgt.has_field(PythonRequirementsField)
             ),
             additional_requirements=request.additional_requirements,
-            apply_constraints=True,
+            constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
         )
     else:
         requirements = PexRequirements()
@@ -462,7 +494,9 @@ async def get_repository_pex(
 
 @rule
 async def _setup_constraints_repository_pex(
-    constraints_request: _ConstraintsRepositoryPexRequest, python_setup: PythonSetup
+    constraints_request: _ConstraintsRepositoryPexRequest,
+    python_setup: PythonSetup,
+    global_requirement_constraints: GlobalRequirementConstraints,
 ) -> OptionalPexRequest:
     request = constraints_request.repository_pex_request
     # NB: it isn't safe to resolve against the whole constraints file if
@@ -472,20 +506,6 @@ async def _setup_constraints_repository_pex(
 
     constraints_path = python_setup.requirement_constraints
     assert constraints_path is not None
-
-    constraints_file_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [constraints_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `[python].requirement_constraints`",
-        ),
-    )
-    constraints_file_reqs = set(
-        parse_requirements_file(
-            constraints_file_contents[0].content.decode(), rel_path=constraints_path
-        )
-    )
 
     relevant_targets = await Get(
         _RelevantTargets,
@@ -499,7 +519,7 @@ async def _setup_constraints_repository_pex(
             if tgt.has_field(PythonRequirementsField)
         ),
         additional_requirements=request.additional_requirements,
-        apply_constraints=True,
+        constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
     )
 
     # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
@@ -508,6 +528,7 @@ async def _setup_constraints_repository_pex(
     url_reqs = set()  # E.g., 'foobar@ git+https://github.com/foo/bar.git@branch'
     name_reqs = set()  # E.g., foobar>=1.2.3
     name_req_projects = set()
+    constraints_file_reqs = set(global_requirement_constraints)
 
     for req_str in requirements.req_strings:
         req = PipRequirement.parse(req_str)
@@ -552,7 +573,7 @@ async def _setup_constraints_repository_pex(
         internal_only=request.internal_only,
         requirements=PexRequirements(
             all_constraints,
-            apply_constraints=True,
+            constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
             # TODO: See PexRequirements docs.
             is_all_constraints_resolve=True,
         ),

@@ -20,7 +20,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
-from pants.backend.docker.utils import suggest_renames
+from pants.backend.docker.utils import get_hash, suggest_renames
 from pants.backend.docker.value_interpolation import (
     DockerBuildArgsInterpolationValue,
     DockerInterpolationContext,
@@ -56,7 +56,7 @@ class DockerBuildContextError(Exception):
 
 class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """This is a meta field for the context files generator, to tell the codegen machinery what
-    source fields are good to use.
+    source fields are good to use as-is.
 
     Use `DockerContextFilesAcceptableInputsField.register(<SourceField>)` to register input fields
     that should be accepted.
@@ -66,7 +66,7 @@ class DockerContextFilesAcceptableInputsField(ABC, SourcesField):
     """
 
 
-DockerContextFilesAcceptableInputsField.register(FileSourceField)
+# These sources will be used to populate the build context as-is.
 DockerContextFilesAcceptableInputsField.register(ShellSourceField)
 
 
@@ -103,6 +103,7 @@ class DockerBuildContext:
     dockerfile: str
     interpolation_context: DockerInterpolationContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
+    stages: tuple[str, ...]
 
     @classmethod
     def create(
@@ -114,8 +115,12 @@ class DockerBuildContext:
     ) -> DockerBuildContext:
         interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
 
-        # FROM tags for all stages.
-        for stage, tag in [tag.split(maxsplit=1) for tag in dockerfile_info.version_tags]:
+        # Go over all FROM tags and names for all stages.
+        stage_names: set[str] = set()
+        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        for idx, (stage, tag) in enumerate(stage_tags):
+            if stage != f"stage{idx}":
+                stage_names.add(stage)
             value = {"tag": tag}
             if not interpolation_context:
                 # Expose the first (stage0) FROM directive as the "baseimage".
@@ -150,16 +155,22 @@ class DockerBuildContext:
                 raise DockerBuildContextError(
                     f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
                     "\n\nIf you did not intend to inherit the value for this build arg from the "
-                    "environment, provide a default value where it is defined either in "
-                    "`[docker].build_args` or in the `extra_build_args` field on the target "
-                    "definition. Alternatively, you may also provide a default value on the `ARG` "
-                    "instruction in the `Dockerfile`."
+                    "environment, provide a default value with the option `[docker].build_args` "
+                    "or in the `extra_build_args` field on the target definition. Alternatively, "
+                    "you may also provide a default value on the `ARG` instruction directly in "
+                    "the `Dockerfile`."
                 ) from e
 
         # Override default value type for the `build_args` context to get helpful error messages.
         interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
             interpolation_context.get("build_args", {})
         )
+
+        # Data from Pants.
+        interpolation_context["pants"] = {
+            # Present hash for all inputs that can be used for image tagging.
+            "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+        }
 
         return cls(
             build_args=build_args,
@@ -178,6 +189,7 @@ class DockerBuildContext:
                     actual_dirs=snapshot.dirs,
                 )
             ),
+            stages=tuple(sorted(stage_names)),
         )
 
 
@@ -198,7 +210,10 @@ async def create_docker_build_context(
         SourceFiles,
         SourceFilesRequest(
             sources_fields=[tgt.get(SourcesField) for tgt in root_dependencies],
-            for_sources_types=(DockerContextFilesSourcesField,),
+            for_sources_types=(
+                DockerContextFilesSourcesField,
+                FileSourceField,
+            ),
             enable_codegen=True,
         ),
     )

@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from typing import cast
 
-from pants.backend.java.subsystems.javac import JavacSubsystem
-from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.target import InvalidFieldException, Target
 from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
 from pants.option.subsystem import Subsystem
@@ -45,7 +43,7 @@ class JvmSubsystem(Subsystem):
             default="jvm-default",
             help=(
                 "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
-                "The name must be defined as a resolve in `[jvm].resolves`.",
+                "The name must be defined as a resolve in `[jvm].resolves`."
             ),
         )
         register(
@@ -56,20 +54,13 @@ class JvmSubsystem(Subsystem):
             help=(
                 "Extra JVM arguments to use when running tests in debug mode.\n\n"
                 "For example, if you want to attach a remote debugger, use something like "
-                "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']",
+                "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']"
             ),
         )
 
-    def jdk(self, javac_subsystem: JavacSubsystem) -> str:
-        jdk = resolve_conflicting_options(
-            old_option="jdk",
-            new_option="jdk",
-            old_scope=javac_subsystem.options_scope,
-            new_scope=self.options_scope,
-            old_container=javac_subsystem.options,
-            new_container=self.options,
-        )
-        return cast(str, jdk)
+    @property
+    def jdk(self) -> str:
+        return cast(str, self.options.jdk)
 
     @property
     def resolves(self) -> dict[str, str]:
@@ -82,6 +73,10 @@ class JvmSubsystem(Subsystem):
     @property
     def debug_args(self) -> tuple[str, ...]:
         return cast("tuple[str, ...]", tuple(self.options.debug_args))
+
+    def is_jvm_target(self, target: Target) -> bool:
+        """Returns `True` only if the given target is a valid JVM source or destination target."""
+        return target.has_field(JvmResolveField) or target.has_field(JvmCompatibleResolvesField)
 
     def resolves_for_target(self, target: Target) -> tuple[str, ...]:
         if target.has_field(JvmResolveField):

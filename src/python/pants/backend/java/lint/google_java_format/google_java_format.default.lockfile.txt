@@ -12,7 +12,9 @@
         "file_digest": {
             "fingerprint": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
             "serialized_bytes_length": 19936
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -27,7 +29,9 @@
         "file_digest": {
             "fingerprint": "ff80626baaf12a09342befd4e84cba9d50662f5fcd7f7a9b3490a6b7cf87e66c",
             "serialized_bytes_length": 13854
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -92,7 +96,9 @@
         "file_digest": {
             "fingerprint": "770ae53bd2f0b750bdbbda6e2c685d54378a71d276a64418333ccdde00d021ee",
             "serialized_bytes_length": 266289
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -107,7 +113,9 @@
         "file_digest": {
             "fingerprint": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
             "serialized_bytes_length": 4617
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -196,7 +204,9 @@
         "file_digest": {
             "fingerprint": "44ce229ce26d880bf3afc362bbfcec34d7e6903d195bbb1db9f3b6e0d9834f06",
             "serialized_bytes_length": 2874025
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -211,7 +221,9 @@
         "file_digest": {
             "fingerprint": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
             "serialized_bytes_length": 2199
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -226,7 +238,9 @@
         "file_digest": {
             "fingerprint": "21af30c92267bd6122c0e0b4d20cccb6641a37eaf956c6540ec471d584e64a7b",
             "serialized_bytes_length": 8781
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     },
     {
         "coord": {
@@ -241,6 +255,8 @@
         "file_digest": {
             "fingerprint": "c88c2e6a5fdaeb9f26fcf879264042de8a9ee9d376e2477838feaabcfa44dda6",
             "serialized_bytes_length": 230905
-        }
+        },
+        "remote_url": null,
+        "pants_address": null
     }
 ]

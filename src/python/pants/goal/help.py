@@ -39,6 +39,7 @@ class HelpBuiltinGoalBase(ABC, BuiltinGoal):
             union_membership,
             graph_session.goal_consumed_subsystem_scopes,
             RegisteredTargetTypes.create(build_config.target_types),
+            build_config,
         )
         global_options = options.for_global_scope()
         help_printer = HelpPrinter(

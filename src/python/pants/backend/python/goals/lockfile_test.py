@@ -3,18 +3,26 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.python.goals.lockfile import (
     AmbiguousResolveNamesError,
     PythonLockfileRequest,
     PythonToolLockfileSentinel,
+    _SpecifiedUserResolves,
+    _UserLockfileRequests,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
+    setup_user_lockfile_requests,
 )
 from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
-from pants.backend.python.target_types import UnrecognizedResolveNamesError
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonRequirementTarget, UnrecognizedResolveNamesError
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.engine.rules import SubsystemRule
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -111,3 +119,59 @@ def test_filter_tool_lockfile_requests() -> None:
     assert f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`" in str(
         exc.value
     )
+
+
+def test_multiple_resolves() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            setup_user_lockfile_requests,
+            SubsystemRule(PythonSetup),
+            QueryRule(_UserLockfileRequests, [_SpecifiedUserResolves]),
+        ],
+        target_types=[PythonRequirementTarget],
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement(
+                    name='both',
+                    requirements=['both1', 'both2'],
+                    experimental_compatible_resolves=['a', 'b'],
+                )
+                python_requirement(
+                    name='a',
+                    requirements=['a'],
+                    experimental_compatible_resolves=['a'],
+                )
+                python_requirement(
+                    name='b',
+                    requirements=['b'],
+                    experimental_compatible_resolves=['b'],
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--python-experimental-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            "--python-enable-resolves",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    result = rule_runner.request(_UserLockfileRequests, [_SpecifiedUserResolves(["a", "b"])])
+    assert set(result) == {
+        PythonLockfileRequest(
+            FrozenOrderedSet(["a", "both1", "both2"]),
+            InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+            resolve_name="a",
+            lockfile_dest="a.lock",
+        ),
+        PythonLockfileRequest(
+            FrozenOrderedSet(["b", "both1", "both2"]),
+            InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+            resolve_name="b",
+            lockfile_dest="b.lock",
+        ),
+    }
