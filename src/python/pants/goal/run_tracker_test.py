@@ -20,7 +20,7 @@ from pants.version import VERSION
 
 @freeze_time(datetime.datetime(2020, 1, 1, 12, 0, 0), as_kwarg="frozen_time")
 def test_run_tracker_timing_output(tmp_path: Path, **kwargs) -> None:
-    frozen_time = kwargs['frozen_time']
+    frozen_time = kwargs["frozen_time"]
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         ob = create_options_bootstrapper([])
@@ -40,7 +40,7 @@ def test_run_tracker_timing_output(tmp_path: Path, **kwargs) -> None:
 )
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
 def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, **kwargs) -> None:
-    frozen_time = kwargs['frozen_time']
+    frozen_time = kwargs["frozen_time"]
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         spec = "test/example.py"
@@ -67,7 +67,6 @@ def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, **k
         assert run_information["specs_from_command_line"] == [spec]
 
         frozen_time.tick(delta=datetime.timedelta(seconds=1))
-
         run_tracker.end_run(exit_code)
         run_information_after_ended = run_tracker.run_information()
         assert run_information_after_ended["outcome"] == expected
@@ -75,7 +74,7 @@ def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, **k
 
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
 def test_anonymous_telemetry(monkeypatch, tmp_path: Path, **kwargs) -> None:
-    frozen_time = kwargs['frozen_time']
+    frozen_time = kwargs["frozen_time"]
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         ob = create_options_bootstrapper([])
