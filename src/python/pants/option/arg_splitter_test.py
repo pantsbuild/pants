@@ -306,13 +306,7 @@ def help_no_arguments_test(command_line: str, *args, **expected):
         help_no_arguments_test("./pants -h"),
         help_no_arguments_test("./pants --help"),
         help_no_arguments_test("./pants help-advanced", expected_help_advanced=True),
-        # help_no_arguments_test(
-        #     "./pants help --help-advanced", expected_help_advanced=True
-        # ),
         help_no_arguments_test("./pants --help-advanced", expected_help_advanced=True),
-        # help_no_arguments_test(
-        #     "./pants --help --help-advanced", expected_help_advanced=True
-        # ),
         help_no_arguments_test(
             "./pants --help-advanced --help", "--help", expected_help_advanced=True
         ),
