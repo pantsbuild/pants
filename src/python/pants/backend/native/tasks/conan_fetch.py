@@ -36,7 +36,7 @@ class ConanFetch(SimpleCodegenTask):
         return PackagedNativeLibrary
 
     default_remotes = {
-        "conan-center": "https://conan.bintray.com",
+        "conan-center": "https://center.conan.io/",
     }
 
     @classmethod
