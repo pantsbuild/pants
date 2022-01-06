@@ -14,7 +14,6 @@ from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine
-from pants.engine.internals.builtin_goal import BuiltinGoal
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
@@ -24,6 +23,7 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactories,
 )
 from pants.engine.unions import UnionMembership
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.logging import stdio_destination_use_color

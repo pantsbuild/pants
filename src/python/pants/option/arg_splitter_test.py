@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from pants.core.register import builtin_goals
+from pants.goal.builtins import builtin_goals
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.scope import ScopeInfo
 

@@ -9,6 +9,7 @@ from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.goal.builtins import register_builtin_goals
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -40,6 +41,7 @@ def load_backends_and_plugins(
     bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
     load_plugins(bc_builder, plugins, working_set)
+    register_builtin_goals(bc_builder)
     return bc_builder.create()
 
 
@@ -149,6 +151,3 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     rules = invoke_entrypoint("rules")
     if rules:
         build_configuration.register_rules(backend_package, rules)
-    builtin_goals = invoke_entrypoint("builtin_goals")
-    if builtin_goals:
-        build_configuration.register_subsystems(backend_package, builtin_goals)

@@ -8,9 +8,9 @@ from abc import ABC, abstractmethod
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.internals.builtin_goal import BuiltinGoal
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import GraphSession
