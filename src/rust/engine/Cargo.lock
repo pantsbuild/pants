@@ -3586,6 +3586,7 @@ dependencies = [
  "indexmap",
  "indicatif",
  "logging",
+ "parking_lot",
  "stdio",
  "task_executor",
  "uuid",
