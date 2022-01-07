@@ -15,13 +15,13 @@ class Hadolint(TemplatedExternalTool):
     name = "hadolint"
     help = "A linter for Dockerfiles."
 
-    default_version = "v2.6.0"
+    default_version = "v2.8.0"
     # TODO: https://github.com/hadolint/hadolint/issues/411 tracks building and releasing
     #  hadolint for Linux ARM64.
     default_known_versions = [
-        "v2.6.0|macos_arm64 |7d41496bf591f2b9c7daa76d4aa1db04ea97b9e11b44a24a4e404a10aab33686|2392080",
-        "v2.6.0|macos_x86_64|7d41496bf591f2b9c7daa76d4aa1db04ea97b9e11b44a24a4e404a10aab33686|2392080",
-        "v2.6.0|linux_x86_64|152e3c3375f26711650d4e11f9e382cf1bdf3f912d7379823e8fac4b1bce88d6|5812840",
+        "v2.8.0|macos_x86_64|27985f257a216ecab06a16e643e8cb0123e7145b5d526cfcb4ce7a31fe99f357|2428944",
+        "v2.8.0|macos_arm64 |27985f257a216ecab06a16e643e8cb0123e7145b5d526cfcb4ce7a31fe99f357|2428944",  # same as mac x86
+        "v2.8.0|linux_x86_64|9dfc155139a1e1e9b3b28f3de9907736b9dfe7cead1c3a0ae7ff0158f3191674|5895708",
     ]
     default_url_template = (
         "https://github.com/hadolint/hadolint/releases/download/{version}/hadolint-{platform}"
