@@ -3,9 +3,10 @@
 
 from typing import Tuple, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
@@ -58,7 +59,7 @@ class Docformatter(PythonToolBase):
         return tuple(self.options.args)
 
 
-class DocformatterLockfileSentinel(PythonToolLockfileSentinel):
+class DocformatterLockfileSentinel(ToolLockfileSentinel):
     options_scope = Docformatter.options_scope
 
 
@@ -70,4 +71,4 @@ def setup_lockfile_request(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, DocformatterLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, DocformatterLockfileSentinel))

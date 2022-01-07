@@ -8,7 +8,7 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -24,6 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
@@ -232,7 +233,7 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(PythonToolLockfileSentinel):
+class PylintLockfileSentinel(ToolLockfileSentinel):
     options_scope = Pylint.options_scope
 
 
@@ -295,4 +296,4 @@ async def setup_pylint_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, PylintLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, PylintLockfileSentinel))

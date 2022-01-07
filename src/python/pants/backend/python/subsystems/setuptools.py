@@ -4,11 +4,12 @@
 import itertools
 from dataclasses import dataclass
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -42,7 +43,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel(PythonToolLockfileSentinel):
+class SetuptoolsLockfileSentinel(ToolLockfileSentinel):
     options_scope = Setuptools.options_scope
 
 
@@ -74,4 +75,4 @@ async def setup_setuptools_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, SetuptoolsLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, SetuptoolsLockfileSentinel))

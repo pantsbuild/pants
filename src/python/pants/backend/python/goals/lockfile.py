@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Sequence, cast
+from typing import Iterable, Sequence, cast
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.poetry import (
@@ -34,6 +34,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     calculate_invalidation_digest,
 )
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.core.goals.generate_lockfiles import Lockfile, ToolLockfileSentinel
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     CreateDigest,
@@ -47,22 +48,17 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
 
-@union
-class PythonToolLockfileSentinel:
-    options_scope: ClassVar[str]
-
-
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    required_union_implementations = (PythonToolLockfileSentinel,)
+    required_union_implementations = (ToolLockfileSentinel,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -110,13 +106,6 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 # --------------------------------------------------------------------------------------
 # Generic lockfile generation
 # --------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class PythonLockfile:
-    digest: Digest
-    resolve_name: str
-    path: str
 
 
 @dataclass(frozen=True)
@@ -173,7 +162,7 @@ async def generate_lockfile(
     req: PythonLockfileRequest,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-) -> PythonLockfile:
+) -> Lockfile:
     pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
     pyproject_toml_digest, launcher_digest = await MultiGet(
         Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
@@ -248,7 +237,7 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return PythonLockfile(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+    return Lockfile(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
 
 
 # --------------------------------------------------------------------------------------
@@ -322,7 +311,7 @@ async def generate_lockfiles_goal(
 
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
         python_setup.resolves.keys(),
-        union_membership[PythonToolLockfileSentinel],
+        union_membership[ToolLockfileSentinel],
         generate_lockfiles_subsystem.resolve_names,
     )
 
@@ -330,7 +319,7 @@ async def generate_lockfiles_goal(
         _UserLockfileRequests, _SpecifiedUserResolves(specified_user_resolves)
     )
     specified_tool_requests = await MultiGet(
-        Get(PythonLockfileRequest, PythonToolLockfileSentinel, sentinel())
+        Get(PythonLockfileRequest, ToolLockfileSentinel, sentinel())
         for sentinel in specified_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
@@ -339,7 +328,7 @@ async def generate_lockfiles_goal(
     )
 
     results = await MultiGet(
-        Get(PythonLockfile, PythonLockfileRequest, req)
+        Get(Lockfile, PythonLockfileRequest, req)
         for req in (*specified_user_requests, *applicable_tool_requests)
     )
 
@@ -384,9 +373,9 @@ class AmbiguousResolveNamesError(Exception):
 
 def determine_resolves_to_generate(
     all_user_resolves: Iterable[str],
-    all_tool_sentinels: Iterable[type[PythonToolLockfileSentinel]],
+    all_tool_sentinels: Iterable[type[ToolLockfileSentinel]],
     requested_resolve_names: Sequence[str],
-) -> tuple[list[str], list[type[PythonToolLockfileSentinel]]]:
+) -> tuple[list[str], list[type[ToolLockfileSentinel]]]:
     """Apply the `--resolve` option to determine which resolves are specified.
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.

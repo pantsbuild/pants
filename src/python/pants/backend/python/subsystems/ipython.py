@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import itertools
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
@@ -46,7 +47,7 @@ class IPython(PythonToolBase):
         )
 
 
-class IPythonLockfileSentinel(PythonToolLockfileSentinel):
+class IPythonLockfileSentinel(ToolLockfileSentinel):
     options_scope = IPython.options_scope
 
 
@@ -85,4 +86,4 @@ async def setup_ipython_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, IPythonLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, IPythonLockfileSentinel))

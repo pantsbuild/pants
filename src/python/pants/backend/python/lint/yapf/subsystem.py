@@ -6,9 +6,10 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -116,7 +117,7 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel(PythonToolLockfileSentinel):
+class YapfLockfileSentinel(ToolLockfileSentinel):
     options_scope = Yapf.options_scope
 
 
@@ -126,4 +127,4 @@ def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> PythonLockfileRe
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, YapfLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, YapfLockfileSentinel))

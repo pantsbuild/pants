@@ -10,7 +10,7 @@ from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -24,6 +24,7 @@ from pants.backend.python.target_types import (
     format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -202,7 +203,7 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel(PythonToolLockfileSentinel):
+class PytestLockfileSentinel(ToolLockfileSentinel):
     options_scope = PyTest.options_scope
 
 
@@ -243,4 +244,4 @@ async def setup_pytest_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, PytestLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, PytestLockfileSentinel))

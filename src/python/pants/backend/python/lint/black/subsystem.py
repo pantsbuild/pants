@@ -6,12 +6,13 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
@@ -105,7 +106,7 @@ class Black(PythonToolBase):
         )
 
 
-class BlackLockfileSentinel(PythonToolLockfileSentinel):
+class BlackLockfileSentinel(ToolLockfileSentinel):
     options_scope = Black.options_scope
 
 
@@ -133,4 +134,4 @@ async def setup_black_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, BlackLockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, BlackLockfileSentinel))

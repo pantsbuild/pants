@@ -10,7 +10,6 @@ import pytest
 from pants.backend.python.goals.lockfile import (
     AmbiguousResolveNamesError,
     PythonLockfileRequest,
-    PythonToolLockfileSentinel,
     _SpecifiedUserResolves,
     _UserLockfileRequests,
     determine_resolves_to_generate,
@@ -21,19 +20,20 @@ from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFI
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget, UnrecognizedResolveNamesError
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
 
 def test_determine_tool_sentinels_to_generate() -> None:
-    class Tool1(PythonToolLockfileSentinel):
+    class Tool1(ToolLockfileSentinel):
         options_scope = "tool1"
 
-    class Tool2(PythonToolLockfileSentinel):
+    class Tool2(ToolLockfileSentinel):
         options_scope = "tool2"
 
-    class Tool3(PythonToolLockfileSentinel):
+    class Tool3(ToolLockfileSentinel):
         options_scope = "tool3"
 
     all_user_resolves = ["u1", "u2", "u3"]
@@ -41,7 +41,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
     def assert_chosen(
         requested: list[str],
         expected_user_resolves: list[str],
-        expected_tools: list[type[PythonToolLockfileSentinel]],
+        expected_tools: list[type[ToolLockfileSentinel]],
     ) -> None:
         user_resolves, tools = determine_resolves_to_generate(
             all_user_resolves, [Tool1, Tool2, Tool3], requested
@@ -67,7 +67,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         assert_chosen(["fake"], expected_user_resolves=[], expected_tools=[])
 
     # Error if same resolve name used for tool lockfiles and user lockfiles.
-    class AmbiguousTool(PythonToolLockfileSentinel):
+    class AmbiguousTool(ToolLockfileSentinel):
         options_scope = "ambiguous"
 
     with pytest.raises(AmbiguousResolveNamesError):

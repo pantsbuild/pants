@@ -7,7 +7,7 @@ import itertools
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -17,6 +17,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
@@ -118,7 +119,7 @@ class Flake8(PythonToolBase):
         )
 
 
-class Flake8LockfileSentinel(PythonToolLockfileSentinel):
+class Flake8LockfileSentinel(ToolLockfileSentinel):
     options_scope = Flake8.options_scope
 
 
@@ -153,4 +154,4 @@ async def setup_flake8_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, Flake8LockfileSentinel))
+    return (*collect_rules(), UnionRule(ToolLockfileSentinel, Flake8LockfileSentinel))
