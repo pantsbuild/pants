@@ -169,5 +169,6 @@ def rules():
         *collect_rules(),
         *java_fmt.rules(),
         UnionRule(JavaFmtRequest, GoogleJavaFormatRequest),
+        UnionRule(LintRequest, GoogleJavaFormatRequest),
         UnionRule(JvmToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]
