@@ -716,4 +716,4 @@ name: Pull Request CI
   pull_request: {}
   push:
     branches-ignore:
-    - dependabot/*
+    - dependabot/**
