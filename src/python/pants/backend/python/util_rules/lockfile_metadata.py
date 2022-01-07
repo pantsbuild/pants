@@ -146,7 +146,7 @@ class LockfileMetadata:
         """
 
         raise NotImplementedError(
-            "`LockfileMetadata._from_json_dict` should not be directly " "called."
+            "`LockfileMetadata._from_json_dict` should not be directly called."
         )
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:

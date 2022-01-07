@@ -506,7 +506,7 @@ class SchedulerSession:
         else:
             exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
             raise ExecutionError(
-                f"{exception_noun} encountered:\n\n" f"  {exception_strs}\n",
+                f"{exception_noun} encountered:\n\n  {exception_strs}\n",
                 wrapped_exceptions=tuple(t.exc for t in throws),
             )
 

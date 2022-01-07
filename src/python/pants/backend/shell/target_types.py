@@ -301,9 +301,7 @@ async def generate_targets_from_shell_sources(
 class ShellCommandCommandField(StringField):
     alias = "command"
     required = True
-    help = (
-        "Shell command to execute.\n\n" "The command is executed as 'bash -c <command>' by default."
-    )
+    help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
 
 
 class ShellCommandOutputsField(StringSequenceField):
