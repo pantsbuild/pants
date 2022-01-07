@@ -56,7 +56,7 @@ class AvroSourceTarget(Target):
         AvroDependenciesField,
         AvroSourceField,
     )
-    help = "A single Avro file used to generate various languages.\n\n" f"See {doc_url('avro')}."
+    help = f"A single Avro file used to generate various languages.\n\nSee {doc_url('avro')}."
 
 
 # -----------------------------------------------------------------------------------------------
