@@ -1812,6 +1812,11 @@ class SingleSourceField(OptionalSingleSourceField):
     expected_num_files = 1
     value: str
 
+    # Unlike the wider set of source globs, a `SingleSourceField` is expected to be used
+    # exclusively for a single, existing, literal file, and `expected_num_files` asserts that.
+    # If the file is not matched on disk, we can fail earlier with a better error message.
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.error
+
     @property
     def file_path(self) -> str:
         result = super().file_path
