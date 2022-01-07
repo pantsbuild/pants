@@ -7,7 +7,7 @@ import re
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
@@ -144,13 +144,16 @@ class SourceFileValidation(Subsystem):
         return MultiMatcher(ValidationConfig.from_dict(self.options.config))
 
     def detail_level(self, validate_subsystem: ValidateSubsystem) -> DetailLevel:
-        return resolve_conflicting_options(
-            old_option="detail_level",
-            new_option="detail_level",
-            old_container=validate_subsystem.options,
-            new_container=self.options,
-            old_scope=validate_subsystem.name,
-            new_scope=self.options_scope,
+        return cast(
+            DetailLevel,
+            resolve_conflicting_options(
+                old_option="detail_level",
+                new_option="detail_level",
+                old_container=validate_subsystem.options,
+                new_container=self.options,
+                old_scope=validate_subsystem.name,
+                new_scope=self.options_scope,
+            ),
         )
 
 
