@@ -26,9 +26,8 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
-    InvalidLockfileError,
-    InvalidLockfileReason,
-    LockfileMetadata,
+    InvalidPythonLockfileReason,
+    PythonLockfileMetadata,
 )
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
@@ -37,6 +36,7 @@ from pants.backend.python.util_rules.pex_environment import (
     PexRuntimeEnvironment,
     PythonExecutable,
 )
+from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -457,7 +457,7 @@ async def build_pex(
             InvalidLockfileBehavior.error,
         }:
             requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
-            metadata = LockfileMetadata.from_lockfile(
+            metadata = PythonLockfileMetadata.from_lockfile(
                 requirements_file_digest_contents[0].content,
                 request.requirements.file_path,
                 resolve_name,
@@ -474,7 +474,7 @@ async def build_pex(
             InvalidLockfileBehavior.warn,
             InvalidLockfileBehavior.error,
         }:
-            metadata = LockfileMetadata.from_lockfile(
+            metadata = PythonLockfileMetadata.from_lockfile(
                 file_content.content, resolve_name=resolve_name
             )
             _validate_metadata(metadata, request, request.requirements, python_setup)
@@ -561,7 +561,7 @@ async def build_pex(
 
 
 def _validate_metadata(
-    metadata: LockfileMetadata,
+    metadata: PythonLockfileMetadata,
     request: PexRequest,
     requirements: (Lockfile | LockfileContent),
     python_setup: PythonSetup,
@@ -607,8 +607,8 @@ def _validate_metadata(
         )
 
         if any(
-            i == InvalidLockfileReason.INVALIDATION_DIGEST_MISMATCH
-            or i == InvalidLockfileReason.REQUIREMENTS_MISMATCH
+            i == InvalidPythonLockfileReason.INVALIDATION_DIGEST_MISMATCH
+            or i == InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH
             for i in validation.failure_reasons
         ):
             # TODO(12314): Add message showing _which_ requirements diverged.
@@ -627,7 +627,10 @@ def _validate_metadata(
                 "\n"
             )
 
-        if InvalidLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+        if (
+            InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH
+            in validation.failure_reasons
+        ):
             yield (
                 f"- You have set interpreter constraints (`{request.interpreter_constraints}`) that "
                 "are not compatible with those used to generate the lockfile "

@@ -1,0 +1,246 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, TypeVar
+
+from pants.util.ordered_set import FrozenOrderedSet
+
+BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
+END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
+
+
+class LockfileScope(Enum):
+    PYTHON = "python"
+
+
+_concrete_metadata_classes: dict[Tuple[LockfileScope, int], type[LockfileMetadata]] = {}
+
+
+# Registrar types (pre-declaring to avoid repetition)
+RegisterClassForVersion = Callable[[type["LockfileMetadata"]], type["LockfileMetadata"]]
+
+
+def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], RegisterClassForVersion]:
+    """Decorator factory -- returns a decorator that can be used to register Lockfile metadata
+    version subclasses belonging to a specific `LockfileScope`."""
+
+    def _lockfile_metadata_version(
+        version: int,
+    ) -> RegisterClassForVersion:
+        """Decorator to register a Lockfile metadata version subclass with a given version number.
+
+        The class must be a frozen dataclass
+        """
+
+        def _dec(cls: type[LockfileMetadata]) -> type[LockfileMetadata]:
+
+            # Only frozen dataclasses may be registered as lockfile metadata:
+            cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
+            if not cls_dataclass_params or not cls_dataclass_params.frozen:
+                raise ValueError(
+                    "Classes registered with `_lockfile_metadata_version` may only be "
+                    "frozen dataclasses"
+                )
+            _concrete_metadata_classes[(scope, version)] = cls
+            return cls
+
+        return _dec
+
+    return _lockfile_metadata_version
+
+
+class InvalidLockfileError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class LockfileMetadata:
+    """Base class for metadata that is attached to a given lockfiles.
+
+    This class, and provides the external API for serializing, deserializing, and validating the
+    contents of individual lockfiles. New versions of metadata implement a concrete subclass and
+    provide deserialization and validation logic, along with specialist serialization logic.
+
+    To construct an instance of the most recent concrete subclass, call `LockfileMetadata.new()`.
+    """
+
+    _LockfileMetadataSubclass = TypeVar("_LockfileMetadataSubclass", bound="LockfileMetadata")
+
+    scope: ClassVar[LockfileScope]
+
+    @staticmethod
+    def from_lockfile_for_scope(
+        scope: LockfileScope,
+        lockfile: bytes,
+        lockfile_path: str | None = None,
+        resolve_name: str | None = None,
+    ) -> LockfileMetadata:
+        """Parse all relevant metadata from the lockfile's header."""
+        in_metadata_block = False
+        metadata_lines = []
+        for line in lockfile.splitlines():
+            if line == BEGIN_LOCKFILE_HEADER:
+                in_metadata_block = True
+            elif line == END_LOCKFILE_HEADER:
+                break
+            elif in_metadata_block:
+                metadata_lines.append(line[2:])
+
+        error_suffix = (
+            "To resolve this error, you will need to regenerate the lockfile by running "
+            "`./pants generate-lockfiles"
+        )
+        if resolve_name:
+            error_suffix += " --resolve={tool_name}"
+        error_suffix += "`."
+
+        if lockfile_path is not None and resolve_name is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}` for `{resolve_name}`"
+        elif lockfile_path is not None:
+            lockfile_description = f"the lockfile `{lockfile_path}`"
+        elif resolve_name is not None:
+            lockfile_description = f"the lockfile for `{resolve_name}`"
+        else:
+            lockfile_description = "this lockfile"
+
+        if not metadata_lines:
+            raise InvalidLockfileError(
+                f"Could not find a Pants metadata block in {lockfile_description}. {error_suffix}"
+            )
+
+        try:
+            metadata = json.loads(b"\n".join(metadata_lines))
+        except json.decoder.JSONDecodeError:
+            raise InvalidLockfileError(
+                f"Metadata header in {lockfile_description} is not a valid JSON string and can't "
+                "be decoded. " + error_suffix
+            )
+
+        version = metadata.get("version", 1)
+        concrete_class = _concrete_metadata_classes[(scope, version)]
+
+        return concrete_class._from_json_dict(metadata, lockfile_description, error_suffix)
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[_LockfileMetadataSubclass],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> _LockfileMetadataSubclass:
+        """Construct a `LockfileMetadata` subclass from the supplied JSON dict.
+
+        *** Not implemented. Subclasses should override. ***
+
+
+        `lockfile_description` is a detailed, human-readable description of the lockfile, which can
+        be read by the user to figure out which lockfile is broken in case of an error.
+
+        `error_suffix` is a string describing how to fix the lockfile.
+        """
+
+        raise NotImplementedError(
+            "`LockfileMetadata._from_json_dict` should not be directly " "called."
+        )
+
+    def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
+        metadata_dict = self._header_dict()
+        metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
+        metadata_as_a_comment = "\n".join(f"# {l}" for l in metadata_json).encode("ascii")
+        header = b"%b\n%b\n%b" % (BEGIN_LOCKFILE_HEADER, metadata_as_a_comment, END_LOCKFILE_HEADER)
+
+        regenerate_command_bytes = (
+            f"# This lockfile was autogenerated by Pants. To regenerate, run:\n#\n"
+            f"#    {regenerate_command}"
+        ).encode()
+
+        return b"%b\n#\n%b\n\n%b" % (regenerate_command_bytes, header, lockfile)
+
+    def _header_dict(self) -> dict[Any, Any]:
+        """Produce a dictionary to be serialized into the lockfile header.
+
+        Subclasses should call `super` and update the resulting dictionary.
+        """
+
+        version: int
+        for (scope, ver), cls in _concrete_metadata_classes.items():
+            if isinstance(self, cls):
+                version = ver
+                break
+        else:
+            raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
+
+        return {
+            "version": version,
+        }
+
+
+def calculate_invalidation_digest(requirements: Iterable[str]) -> str:
+    """Returns an invalidation digest for the given requirements."""
+    m = hashlib.sha256()
+    inputs = {
+        # `FrozenOrderedSet` deduplicates while keeping ordering, which speeds up the sorting if
+        # the input was already sorted.
+        "requirements": sorted(FrozenOrderedSet(requirements)),
+    }
+    m.update(json.dumps(inputs).encode("utf-8"))
+    return m.hexdigest()
+
+
+T = TypeVar("T")
+
+
+class LockfileMetadataValidation(Generic[T]):
+    """Boolean-like value which additionally carries reasons why a validation failed."""
+
+    failure_reasons: set[T]
+
+    def __init__(self, failure_reasons: Iterable[T] = ()):
+        self.failure_reasons = set(failure_reasons)
+
+    def __bool__(self):
+        return not self.failure_reasons
+
+
+def _get_metadata(
+    metadata: dict[Any, Any],
+    lockfile_description: str,
+    error_suffix: str,
+) -> Callable[[str, type[T], Callable[[Any], T] | None], T]:
+    """Returns a function that will get a given key from the `metadata` dict, and optionally do some
+    verification and post-processing to return a value of the correct type."""
+
+    def get_metadata(key: str, type_: type[T], coerce: Callable[[Any], T] | None) -> T:
+        val: Any
+        try:
+            val = metadata[key]
+        except KeyError:
+            raise InvalidLockfileError(
+                f"Required key `{key}` is not present in metadata header for "
+                f"{lockfile_description}. {error_suffix}"
+            )
+
+        if not coerce:
+            if isinstance(val, type_):
+                return val
+
+            raise InvalidLockfileError(
+                f"Metadata value `{key}` in {lockfile_description} must "
+                f"be a {type(type_).__name__}. {error_suffix}"
+            )
+        else:
+            try:
+                return coerce(val)
+            except Exception:
+                raise InvalidLockfileError(
+                    f"Metadata value `{key}` in {lockfile_description} must be able to "
+                    f"be converted to a {type(type_).__name__}. {error_suffix}"
+                )
+
+    return get_metadata

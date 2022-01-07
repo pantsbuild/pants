@@ -11,11 +11,11 @@ import pytest
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
-    LockfileMetadata,
-    LockfileMetadataV1,
-    LockfileMetadataV2,
-    calculate_invalidation_digest,
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV1,
+    PythonLockfileMetadataV2,
 )
+from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 
 INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
@@ -25,14 +25,14 @@ def reqset(*a) -> set[PipRequirement]:
 
 
 def test_metadata_header_round_trip() -> None:
-    input_metadata = LockfileMetadata.new(
+    input_metadata = PythonLockfileMetadata.new(
         InterpreterConstraints(["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]),
         reqset("ansicolors==0.1.0"),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock"
     )
-    output_metadata = LockfileMetadata.from_lockfile(serialized_lockfile)
+    output_metadata = PythonLockfileMetadata.from_lockfile(serialized_lockfile)
     assert input_metadata == output_metadata
 
 
@@ -64,7 +64,9 @@ dave==3.1.4 \\
     def line_by_line(b: bytes) -> list[bytes]:
         return [i for i in (j.strip() for j in b.splitlines()) if i]
 
-    metadata = LockfileMetadata.new(InterpreterConstraints([">=3.7"]), reqset("ansicolors==0.1.0"))
+    metadata = PythonLockfileMetadata.new(
+        InterpreterConstraints([">=3.7"]), reqset("ansicolors==0.1.0")
+    )
     result = metadata.add_header_to_lockfile(input_lockfile, regenerate_command="./pants lock")
     assert line_by_line(result) == line_by_line(expected)
 
@@ -134,8 +136,8 @@ def test_invalidation_digest() -> None:
     ],
 )
 def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
-    m: LockfileMetadata
-    m = LockfileMetadataV1(InterpreterConstraints(expected_ic), expected_digest)
+    m: PythonLockfileMetadata
+    m = PythonLockfileMetadataV1(InterpreterConstraints(expected_ic), expected_digest)
     assert (
         bool(
             m.is_valid_for(
@@ -185,5 +187,5 @@ def test_is_valid_for_v2_only(
 ) -> None:
     user_ic = InterpreterConstraints(user_ics_iter)
     expected_ic = InterpreterConstraints(expected_ics_iter)
-    m = LockfileMetadataV2(expected_ic, reqset(*expected_reqs))
+    m = PythonLockfileMetadataV2(expected_ic, reqset(*expected_reqs))
     assert bool(m.is_valid_for("", user_ic, INTERPRETER_UNIVERSE, reqset(*user_reqs))) == matches
