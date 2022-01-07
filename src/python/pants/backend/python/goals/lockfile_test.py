@@ -20,7 +20,11 @@ from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFI
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget, UnrecognizedResolveNamesError
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import (
+    LockfileRequest,
+    ToolLockfileSentinel,
+    WrappedLockfileRequest,
+)
 from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -77,13 +81,8 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
 
 def test_filter_tool_lockfile_requests() -> None:
-    def create_request(name: str, lockfile_dest: str | None = None) -> PythonLockfileRequest:
-        return PythonLockfileRequest(
-            FrozenOrderedSet(),
-            InterpreterConstraints(),
-            resolve_name=name,
-            lockfile_dest=lockfile_dest or f"{name}.txt",
-        )
+    def create_request(name: str, lockfile_dest: str | None = None) -> LockfileRequest:
+        return LockfileRequest(resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt")
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
@@ -91,13 +90,13 @@ def test_filter_tool_lockfile_requests() -> None:
     default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
 
     def assert_filtered(
-        extra_request: PythonLockfileRequest | None,
+        extra_request: LockfileRequest | None,
         *,
         resolve_specified: bool,
     ) -> None:
-        requests = [tool1, tool2]
+        requests = [WrappedLockfileRequest(tool1), WrappedLockfileRequest(tool2)]
         if extra_request:
-            requests.append(extra_request)
+            requests.append(WrappedLockfileRequest(extra_request))
         assert filter_tool_lockfile_requests(requests, resolve_specified=resolve_specified) == [
             tool1,
             tool2,
@@ -163,14 +162,18 @@ def test_multiple_resolves() -> None:
     result = rule_runner.request(_UserLockfileRequests, [_SpecifiedUserResolves(["a", "b"])])
     assert set(result) == {
         PythonLockfileRequest(
-            FrozenOrderedSet(["a", "both1", "both2"]),
-            InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+            requirements=FrozenOrderedSet(["a", "both1", "both2"]),
+            interpreter_constraints=InterpreterConstraints(
+                PythonSetup.default_interpreter_constraints
+            ),
             resolve_name="a",
             lockfile_dest="a.lock",
         ),
         PythonLockfileRequest(
-            FrozenOrderedSet(["b", "both1", "both2"]),
-            InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+            requirements=FrozenOrderedSet(["b", "both1", "both2"]),
+            interpreter_constraints=InterpreterConstraints(
+                PythonSetup.default_interpreter_constraints
+            ),
             resolve_name="b",
             lockfile_dest="b.lock",
         ),

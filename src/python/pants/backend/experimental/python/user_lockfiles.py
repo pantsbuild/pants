@@ -68,9 +68,9 @@ async def generate_user_lockfile_goal(
     result = await Get(
         Lockfile,
         PythonLockfileRequest(
-            req_strings,
+            requirements=req_strings,
             # TODO(#12314): Use interpreter constraints from the transitive closure.
-            InterpreterConstraints(python_setup.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
             resolve_name="not yet implemented",
             lockfile_dest=python_setup.lockfile,
             _description=(

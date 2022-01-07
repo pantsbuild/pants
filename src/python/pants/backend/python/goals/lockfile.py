@@ -34,7 +34,12 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     calculate_invalidation_digest,
 )
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
-from pants.core.goals.generate_lockfiles import Lockfile, ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import (
+    Lockfile,
+    LockfileRequest,
+    ToolLockfileSentinel,
+    WrappedLockfileRequest,
+)
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     CreateDigest,
@@ -48,7 +53,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -109,11 +114,9 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
 
 @dataclass(frozen=True)
-class PythonLockfileRequest:
+class PythonLockfileRequest(LockfileRequest):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-    resolve_name: str
-    lockfile_dest: str
     # Only kept for `[python].experimental_lockfile`, which is not using the new
     # "named resolve" semantics yet.
     _description: str | None = None
@@ -135,8 +138,8 @@ class PythonLockfileRequest:
         """
         if not subsystem.uses_lockfile:
             return cls(
-                FrozenOrderedSet(),
-                InterpreterConstraints(),
+                requirements=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints(),
                 resolve_name=subsystem.options_scope,
                 lockfile_dest=subsystem.lockfile,
             )
@@ -157,7 +160,12 @@ class PythonLockfileRequest:
         return calculate_invalidation_digest(self.requirements)
 
 
-@rule(desc="Generate lockfile", level=LogLevel.DEBUG)
+@rule
+def wrap_python_lockfile_request(request: PythonLockfileRequest) -> WrappedLockfileRequest:
+    return WrappedLockfileRequest(request)
+
+
+@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: PythonLockfileRequest,
     poetry_subsystem: PoetrySubsystem,
@@ -275,11 +283,11 @@ async def setup_user_lockfile_requests(
 
     return _UserLockfileRequests(
         PythonLockfileRequest(
-            PexRequirements.create_from_requirement_fields(
+            requirements=PexRequirements.create_from_requirement_fields(
                 resolve_to_requirements_fields[resolve],
                 constraints_strings=(),
             ).req_strings,
-            InterpreterConstraints(python_setup.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
         )
@@ -319,7 +327,7 @@ async def generate_lockfiles_goal(
         _UserLockfileRequests, _SpecifiedUserResolves(specified_user_resolves)
     )
     specified_tool_requests = await MultiGet(
-        Get(PythonLockfileRequest, ToolLockfileSentinel, sentinel())
+        Get(WrappedLockfileRequest, ToolLockfileSentinel, sentinel())
         for sentinel in specified_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
@@ -328,7 +336,7 @@ async def generate_lockfiles_goal(
     )
 
     results = await MultiGet(
-        Get(Lockfile, PythonLockfileRequest, req)
+        Get(Lockfile, LockfileRequest, req)
         for req in (*specified_user_requests, *applicable_tool_requests)
     )
 
@@ -418,10 +426,11 @@ def determine_resolves_to_generate(
 
 
 def filter_tool_lockfile_requests(
-    specified_requests: Sequence[PythonLockfileRequest], *, resolve_specified: bool
-) -> list[PythonLockfileRequest]:
+    specified_requests: Sequence[WrappedLockfileRequest], *, resolve_specified: bool
+) -> list[LockfileRequest]:
     result = []
-    for req in specified_requests:
+    for wrapped_req in specified_requests:
+        req = wrapped_req.request
         if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
             result.append(req)
             continue
@@ -441,4 +450,4 @@ def filter_tool_lockfile_requests(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(LockfileRequest, PythonLockfileRequest))
