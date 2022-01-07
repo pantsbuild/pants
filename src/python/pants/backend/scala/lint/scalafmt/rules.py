@@ -327,5 +327,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(ScalaLangFmtRequest, ScalafmtRequest),
+        UnionRule(LintRequest, ScalafmtRequest),
         UnionRule(JvmToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]
