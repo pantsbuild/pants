@@ -1022,7 +1022,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        PythonCompatibleResolvesField,
+        PythonRequirementCompatibleResolvesField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"

@@ -34,6 +34,7 @@ from pants.backend.python.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 def test_default_module_mapping_is_normalized() -> None:
@@ -124,16 +125,23 @@ def test_third_party_modules_mapping() -> None:
     )
     mapping = ThirdPartyPythonModuleMapping(
         {
-            "colors": (colors_provider, colors_stubs_provider),
-            "pants": (pants_provider,),
-            "req.submodule": (submodule_provider,),
-            "pants.testutil": (pants_testutil_provider,),
-            "ambiguous": (colors_provider, pants_provider),
+            "default-resolve": FrozenDict(
+                {
+                    "colors": (colors_provider, colors_stubs_provider),
+                    "pants": (pants_provider,),
+                    "req.submodule": (submodule_provider,),
+                    "pants.testutil": (pants_testutil_provider,),
+                    "two_resolves": (colors_provider,),
+                }
+            ),
+            "another-resolve": FrozenDict({"two_resolves": (pants_provider,)}),
         }
     )
 
-    def assert_addresses(mod: str, expected: tuple[ModuleProvider, ...]) -> None:
-        assert mapping.providers_for_module(mod) == expected
+    def assert_addresses(
+        mod: str, expected: tuple[ModuleProvider, ...], *, resolves: list[str] | None = None
+    ) -> None:
+        assert mapping.providers_for_module(mod, resolves) == expected
 
     assert_addresses("colors", (colors_provider, colors_stubs_provider))
     assert_addresses("colors.red", (colors_provider, colors_stubs_provider))
@@ -154,9 +162,20 @@ def test_third_party_modules_mapping() -> None:
     assert_addresses("unknown", ())
     assert_addresses("unknown.pants", ())
 
-    assert_addresses("ambiguous", (colors_provider, pants_provider))
-    assert_addresses("ambiguous.foo", (colors_provider, pants_provider))
-    assert_addresses("ambiguous.foo.bar", (colors_provider, pants_provider))
+    assert_addresses("two_resolves", (colors_provider, pants_provider), resolves=None)
+    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolves=None)
+    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolves=None)
+    assert_addresses("two_resolves", (colors_provider,), resolves=["default-resolve"])
+    assert_addresses("two_resolves", (pants_provider,), resolves=["another-resolve"])
+    assert_addresses(
+        "two_resolves",
+        (
+            colors_provider,
+            pants_provider,
+        ),
+        resolves=["default-resolve", "another-resolve"],
+    )
+    assert_addresses("two_resolves", (), resolves=[])
 
 
 @pytest.fixture
@@ -280,11 +299,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         *,
         modules: list[str] | None = None,
         stub_modules: list[str] | None = None,
+        resolves: list[str] | None = None,
     ) -> str:
         return (
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"modules={modules or []},"
-            f"type_stub_modules={stub_modules or []})"
+            f"type_stub_modules={stub_modules or []},"
+            f"experimental_compatible_resolves={resolves or ['default']})"
         )
 
     build_file = "\n\n".join(
@@ -302,59 +323,89 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("typed-dep5", "typed-dep5-foo", stub_modules=["typed_dep5"]),
             # A 3rd-party dependency can have both a type stub and implementation.
             req("multiple_owners1", "multiple_owners==1"),
-            req("multiple_owners2", "multiple_owners==2"),
-            req("multiple_owners_types", "types-multiple_owners==1"),
+            req("multiple_owners2", "multiple_owners==2", resolves=["another"]),
+            req("multiple_owners_types", "types-multiple_owners==1", resolves=["another"]),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
+    rule_runner.set_options(["--python-experimental-resolves={'default': '', 'another': ''}"])
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
         {
-            "file_dist": (
-                ModuleProvider(Address("", target_name="file_dist"), ModuleProviderType.IMPL),
+            "another": FrozenDict(
+                {
+                    "multiple_owners": (
+                        ModuleProvider(
+                            Address("", target_name="multiple_owners2"), ModuleProviderType.IMPL
+                        ),
+                        ModuleProvider(
+                            Address("", target_name="multiple_owners_types"),
+                            ModuleProviderType.TYPE_STUB,
+                        ),
+                    ),
+                }
             ),
-            "looks_like_stubs": (
-                ModuleProvider(
-                    Address("", target_name="looks_like_stubs"), ModuleProviderType.IMPL
-                ),
-            ),
-            "mapped_module": (
-                ModuleProvider(Address("", target_name="modules"), ModuleProviderType.IMPL),
-            ),
-            "multiple_owners": (
-                ModuleProvider(
-                    Address("", target_name="multiple_owners1"), ModuleProviderType.IMPL
-                ),
-                ModuleProvider(
-                    Address("", target_name="multiple_owners2"), ModuleProviderType.IMPL
-                ),
-                ModuleProvider(
-                    Address("", target_name="multiple_owners_types"), ModuleProviderType.TYPE_STUB
-                ),
-            ),
-            "req1": (ModuleProvider(Address("", target_name="req1"), ModuleProviderType.IMPL),),
-            "typed_dep1": (
-                ModuleProvider(Address("", target_name="typed-dep1"), ModuleProviderType.TYPE_STUB),
-            ),
-            "typed_dep2": (
-                ModuleProvider(Address("", target_name="typed-dep2"), ModuleProviderType.TYPE_STUB),
-            ),
-            "typed_dep3": (
-                ModuleProvider(Address("", target_name="typed-dep3"), ModuleProviderType.TYPE_STUB),
-            ),
-            "typed_dep4": (
-                ModuleProvider(Address("", target_name="typed-dep4"), ModuleProviderType.TYPE_STUB),
-            ),
-            "typed_dep5": (
-                ModuleProvider(Address("", target_name="typed-dep5"), ModuleProviderType.TYPE_STUB),
-            ),
-            "un_normalized_project": (
-                ModuleProvider(Address("", target_name="un_normalized"), ModuleProviderType.IMPL),
-            ),
-            "vcs_dist": (
-                ModuleProvider(Address("", target_name="vcs_dist"), ModuleProviderType.IMPL),
+            "default": FrozenDict(
+                {
+                    "file_dist": (
+                        ModuleProvider(
+                            Address("", target_name="file_dist"), ModuleProviderType.IMPL
+                        ),
+                    ),
+                    "looks_like_stubs": (
+                        ModuleProvider(
+                            Address("", target_name="looks_like_stubs"), ModuleProviderType.IMPL
+                        ),
+                    ),
+                    "mapped_module": (
+                        ModuleProvider(Address("", target_name="modules"), ModuleProviderType.IMPL),
+                    ),
+                    "multiple_owners": (
+                        ModuleProvider(
+                            Address("", target_name="multiple_owners1"), ModuleProviderType.IMPL
+                        ),
+                    ),
+                    "req1": (
+                        ModuleProvider(Address("", target_name="req1"), ModuleProviderType.IMPL),
+                    ),
+                    "typed_dep1": (
+                        ModuleProvider(
+                            Address("", target_name="typed-dep1"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                    "typed_dep2": (
+                        ModuleProvider(
+                            Address("", target_name="typed-dep2"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                    "typed_dep3": (
+                        ModuleProvider(
+                            Address("", target_name="typed-dep3"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                    "typed_dep4": (
+                        ModuleProvider(
+                            Address("", target_name="typed-dep4"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                    "typed_dep5": (
+                        ModuleProvider(
+                            Address("", target_name="typed-dep5"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                    "un_normalized_project": (
+                        ModuleProvider(
+                            Address("", target_name="un_normalized"), ModuleProviderType.IMPL
+                        ),
+                    ),
+                    "vcs_dist": (
+                        ModuleProvider(
+                            Address("", target_name="vcs_dist"), ModuleProviderType.IMPL
+                        ),
+                    ),
+                }
             ),
         }
     )
