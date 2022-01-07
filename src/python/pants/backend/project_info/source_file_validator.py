@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import textwrap
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
+
+logger = logging.getLogger(__name__)
 
 
 class DetailLevel(Enum):
@@ -133,8 +136,12 @@ class SourceFileValidation(Subsystem):
         register("--config", type=dict, fromfile=True, help=schema_help)
 
     @memoized_method
-    def get_multi_matcher(self):
-        return MultiMatcher(ValidationConfig.from_dict(self.options.config))
+    def get_multi_matcher(self) -> MultiMatcher | None:
+        return (
+            MultiMatcher(ValidationConfig.from_dict(self.options.config))
+            if self.options.config
+            else None
+        )
 
 
 @dataclass(frozen=True)
@@ -285,6 +292,13 @@ async def validate(
     source_file_validation: SourceFileValidation,
 ) -> Validate:
     multi_matcher = source_file_validation.get_multi_matcher()
+    if multi_matcher is None:
+        logger.error(
+            "You must set the option `[sourcefile-validation].config` for the "
+            "`validate` goal to work. Run `./pants help sourcefile-validation`."
+        )
+        return Validate(PANTS_FAILED_EXIT_CODE)
+
     digest_contents = await Get(DigestContents, Digest, specs_snapshot.snapshot.digest)
     regex_match_results = RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
