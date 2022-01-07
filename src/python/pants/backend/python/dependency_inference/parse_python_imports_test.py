@@ -84,6 +84,12 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
         from project.demo import OriginalName as Renamed
+        import pragma_ignored  # pants: ignore
+        from also_pragma_ignored import doesnt_matter  # pants: ignore
+        from multiline_import import (
+            not_ignored,
+            should_be_ignored_but_isnt  # pants: ignore
+        )
 
         if TYPE_CHECKING:
             from project.circular_dep import CircularDep
@@ -94,6 +100,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             import subprocess23 as subprocess
 
         __import__("pkg_resources")
+        __import("dunder_import_ignored")  # pants: ignore
         """
     )
     assert_imports_parsed(
@@ -108,6 +115,8 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "demo",
             "project.demo.Demo",
             "project.demo.OriginalName",
+            "multiline_import.not_ignored",
+            "multiline_import.should_be_ignored_but_isnt",
             "project.circular_dep.CircularDep",
             "subprocess",
             "subprocess23",

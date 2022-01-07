@@ -23,17 +23,22 @@ STRING_IMPORT_REGEX = re.compile(
 
 
 class AstVisitor(ast.NodeVisitor):
-    def __init__(self, package_parts):
+    def __init__(self, package_parts, contents):
         self._package_parts = package_parts
+        self._contents_lines = contents.splitlines()
         self.imports = set()
 
     def maybe_add_string_import(self, s):
         if STRING_IMPORT_REGEX.match(s):
             self.imports.add(s)
 
+    def maybe_add_import(self, node, name):
+        if "# pants: ignore" not in self._contents_lines[node.lineno - 1].decode(errors="ignore"):
+            self.imports.add(name)
+
     def visit_Import(self, node):
         for alias in node.names:
-            self.imports.add(alias.name)
+            self.maybe_add_import(node, alias.name)
 
     def visit_ImportFrom(self, node):
         if node.level:
@@ -46,7 +51,7 @@ class AstVisitor(ast.NodeVisitor):
         else:
             abs_module = node.module
         for alias in node.names:
-            self.imports.add("{}.{}".format(abs_module, alias.name))
+            self.maybe_add_import(node, "{}.{}".format(abs_module, alias.name))
 
     def visit_Call(self, node):
         # Handle __import__("string_literal").  This is commonly used in __init__.py files,
@@ -55,10 +60,10 @@ class AstVisitor(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
             if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
                 arg_s = node.args[0].s
-                self.imports.add(arg_s)
+                self.maybe_add_import(node, arg_s)
                 return
             elif isinstance(node.args[0], ast.Constant):
-                self.imports.add(str(node.args[0].value))
+                self.maybe_add_import(node, str(node.args[0].value))
                 return
         self.generic_visit(node)
 
@@ -93,22 +98,16 @@ if os.environ["STRING_IMPORTS"] == "y":
         setattr(AstVisitor, "visit_Constant", visit_Constant)
 
 
-def parse_file(filename):
+def main(filename):
     with open(filename, "rb") as f:
         content = f.read()
     try:
-        return ast.parse(content, filename=filename)
+        tree = ast.parse(content, filename=filename)
     except SyntaxError:
-        return None
-
-
-def main(filename):
-    tree = parse_file(filename)
-    if not tree:
         return
 
     package_parts = os.path.dirname(filename).split(os.path.sep)
-    visitor = AstVisitor(package_parts)
+    visitor = AstVisitor(package_parts, content)
     visitor.visit(tree)
 
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
