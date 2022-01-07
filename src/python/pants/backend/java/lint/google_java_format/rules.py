@@ -87,9 +87,9 @@ async def setup_google_java_format(
         toolcp_relpath: tool_classpath.digest,
     }
 
-    maybe_java16_or_higher_options = []
-    if jdk_setup.jre_major_version >= 16:
-        maybe_java16_or_higher_options = [
+    maybe_java11_or_higher_options = []
+    if jdk_setup.jre_major_version >= 11:
+        maybe_java11_or_higher_options = [
             "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
@@ -99,7 +99,7 @@ async def setup_google_java_format(
 
     args = [
         *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
-        *maybe_java16_or_higher_options,
+        *maybe_java11_or_higher_options,
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
         "--dry-run" if setup_request.check_only else "--replace",

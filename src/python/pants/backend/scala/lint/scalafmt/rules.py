@@ -170,6 +170,8 @@ async def setup_scalafmt_partition(
     ]
     if request.check_only:
         args.append("--list")
+    else:
+        args.append("--quiet")
     args.extend(request.files)
 
     process = Process(
