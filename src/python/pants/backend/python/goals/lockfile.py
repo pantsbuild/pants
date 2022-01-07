@@ -157,11 +157,37 @@ def wrap_python_lockfile_request(request: PythonLockfileRequest) -> WrappedLockf
     return WrappedLockfileRequest(request)
 
 
+class MaybeWarnPythonRepos:
+    pass
+
+
+@rule
+def maybe_warn_python_repos(python_repos: PythonRepos) -> MaybeWarnPythonRepos:
+    def warn_python_repos(option: str) -> None:
+        logger.warning(
+            f"The option `[python-repos].{option}` is configured, but it does not currently work "
+            "with lockfile generation. Lockfile generation will fail if the relevant requirements "
+            "cannot be located on PyPI.\n\n"
+            "If lockfile generation fails, you can disable lockfiles by setting "
+            "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
+            "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
+            "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
+            "lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
+        )
+
+    if python_repos.repos:
+        warn_python_repos("repos")
+    if python_repos.indexes != [python_repos.pypi_index]:
+        warn_python_repos("indexes")
+    return MaybeWarnPythonRepos()
+
+
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: PythonLockfileRequest,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    _: MaybeWarnPythonRepos,
 ) -> Lockfile:
     pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
     pyproject_toml_digest, launcher_digest = await MultiGet(
@@ -292,13 +318,7 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
-    python_repos: PythonRepos,
 ) -> GenerateLockfilesGoal:
-    if python_repos.repos:
-        warn_python_repos("repos")
-    if python_repos.indexes != [python_repos.pypi_index]:
-        warn_python_repos("indexes")
-
     specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
         python_setup.resolves.keys(),
         union_membership[ToolLockfileSentinel],
@@ -328,19 +348,6 @@ async def generate_lockfiles_goal(
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
-
-
-def warn_python_repos(option: str) -> None:
-    logger.warning(
-        f"The option `[python-repos].{option}` is configured, but it does not currently work "
-        "with lockfile generation. Lockfile generation will fail if the relevant requirements "
-        "cannot be located on PyPI.\n\n"
-        "If lockfile generation fails, you can disable lockfiles by setting "
-        "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
-        "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
-        "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
-        "lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
-    )
 
 
 def rules():
