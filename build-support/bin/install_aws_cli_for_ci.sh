@@ -19,11 +19,12 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
   TMPDIR=$(mktemp -d)
 
   pushd "${TMPDIR}"
-  curl --fail "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip awscliv2.zip
+
+  curl --fail "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+  unzip awscli-bundle.zip
   # NB: We must run this with python3 because it defaults to `python`, which refers to Python 2 in Linux GitHub
   # Actions CI job and is no longer supported.
-  python3 ./aws/install --install-dir "${AWS_CLI_ROOT}"
+  python3 ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
 
   popd
 
