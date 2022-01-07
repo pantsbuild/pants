@@ -17,4 +17,4 @@ petgraph = "0.5"
 log = "0.4"
 strum = "0.20"
 strum_macros = "0.20"
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4"] }
