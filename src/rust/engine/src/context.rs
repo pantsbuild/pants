@@ -17,8 +17,8 @@ use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
+use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use double_checked_cell_async::DoubleCheckedCell;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
@@ -133,7 +133,7 @@ impl Core {
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     let local_only = Store::local_only_with_options(
       executor.clone(),
@@ -213,7 +213,7 @@ impl Core {
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Box<dyn CommandRunner>, String> {
     let remote_caching_used =
       exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
@@ -363,7 +363,7 @@ impl Core {
       && remoting_opts.execution_address == remoting_opts.store_address
       && remoting_opts.execution_headers == remoting_opts.store_headers
     {
-      Some(Arc::new(DoubleCheckedCell::new()))
+      Some(Arc::new(OnceCell::new()))
     } else {
       None
     };
