@@ -7,13 +7,13 @@ from textwrap import dedent
 
 from pants.backend.python.goals.lockfile import (
     PythonLockfileRequest,
-    _SpecifiedUserResolves,
-    _UserLockfileRequests,
+    RequestedPythonUserResolveNames,
     setup_user_lockfile_requests,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import UserLockfileRequests
 from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -24,7 +24,7 @@ def test_multiple_resolves() -> None:
         rules=[
             setup_user_lockfile_requests,
             SubsystemRule(PythonSetup),
-            QueryRule(_UserLockfileRequests, [_SpecifiedUserResolves]),
+            QueryRule(UserLockfileRequests, [RequestedPythonUserResolveNames]),
         ],
         target_types=[PythonRequirementTarget],
     )
@@ -58,7 +58,9 @@ def test_multiple_resolves() -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    result = rule_runner.request(_UserLockfileRequests, [_SpecifiedUserResolves(["a", "b"])])
+    result = rule_runner.request(
+        UserLockfileRequests, [RequestedPythonUserResolveNames(["a", "b"])]
+    )
     assert set(result) == {
         PythonLockfileRequest(
             requirements=FrozenOrderedSet(["a", "both1", "both2"]),

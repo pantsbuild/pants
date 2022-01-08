@@ -30,14 +30,17 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 )
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import (
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
     Lockfile,
     LockfileRequest,
+    RequestedUserResolveNames,
     ToolLockfileSentinel,
+    UserLockfileRequests,
     WrappedLockfileRequest,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
-from pants.engine.collection import Collection
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -60,7 +63,7 @@ logger = logging.getLogger(__name__)
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    required_union_implementations = (ToolLockfileSentinel,)
+    required_union_implementations = (ToolLockfileSentinel, KnownUserResolveNames)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -266,20 +269,31 @@ async def generate_lockfile(
     return Lockfile(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
 
 
-class _SpecifiedUserResolves(Collection[str]):
+class RequestedPythonUserResolveNames(RequestedUserResolveNames):
     pass
 
 
-class _UserLockfileRequests(Collection[PythonLockfileRequest]):
+class KnownPythonUserResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
 @rule
+def determine_python_user_resolves(
+    _: KnownPythonUserResolveNamesRequest, python_setup: PythonSetup
+) -> KnownUserResolveNames:
+    return KnownUserResolveNames(
+        names=tuple(python_setup.resolves.keys()),
+        option_name="[python].experimental_resolves",
+        requested_resolve_names_cls=RequestedPythonUserResolveNames,
+    )
+
+
+@rule
 async def setup_user_lockfile_requests(
-    requested: _SpecifiedUserResolves, all_targets: AllTargets, python_setup: PythonSetup
-) -> _UserLockfileRequests:
+    requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
+) -> UserLockfileRequests:
     if not python_setup.enable_resolves:
-        return _UserLockfileRequests()
+        return UserLockfileRequests()
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
@@ -294,7 +308,7 @@ async def setup_user_lockfile_requests(
     #  inspect all consumers of that resolve or start to closely couple the resolve with the
     #  interpreter constraints (a "context").
 
-    return _UserLockfileRequests(
+    return UserLockfileRequests(
         PythonLockfileRequest(
             requirements=PexRequirements.create_from_requirement_fields(
                 resolve_to_requirements_fields[resolve],
@@ -317,20 +331,24 @@ async def generate_lockfiles_goal(
     workspace: Workspace,
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-    python_setup: PythonSetup,
 ) -> GenerateLockfilesGoal:
-    specified_user_resolves, specified_tool_sentinels = determine_resolves_to_generate(
-        python_setup.resolves.keys(),
-        union_membership[ToolLockfileSentinel],
-        generate_lockfiles_subsystem.resolve_names,
+    known_user_resolve_names = await MultiGet(
+        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+        for request in union_membership.get(KnownUserResolveNamesRequest)
+    )
+    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
+        known_user_resolve_names,
+        union_membership.get(ToolLockfileSentinel),
+        set(generate_lockfiles_subsystem.resolve_names),
     )
 
-    specified_user_requests = await Get(
-        _UserLockfileRequests, _SpecifiedUserResolves(specified_user_resolves)
+    all_specified_user_requests = await MultiGet(
+        Get(UserLockfileRequests, RequestedUserResolveNames, resolve_names)
+        for resolve_names in requested_user_resolve_names
     )
     specified_tool_requests = await MultiGet(
         Get(WrappedLockfileRequest, ToolLockfileSentinel, sentinel())
-        for sentinel in specified_tool_sentinels
+        for sentinel in requested_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
         specified_tool_requests,
@@ -339,7 +357,10 @@ async def generate_lockfiles_goal(
 
     results = await MultiGet(
         Get(Lockfile, LockfileRequest, req)
-        for req in (*specified_user_requests, *applicable_tool_requests)
+        for req in (
+            *(req for reqs in all_specified_user_requests for req in reqs),
+            *applicable_tool_requests,
+        )
     )
 
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
@@ -351,4 +372,9 @@ async def generate_lockfiles_goal(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(LockfileRequest, PythonLockfileRequest))
+    return (
+        *collect_rules(),
+        UnionRule(LockfileRequest, PythonLockfileRequest),
+        UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
+        UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
+    )

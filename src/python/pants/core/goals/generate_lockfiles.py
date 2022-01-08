@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence
 
+from pants.engine.collection import Collection
 from pants.engine.fs import Digest
 from pants.engine.unions import union
 
@@ -56,6 +58,48 @@ class ToolLockfileSentinel:
     options_scope: ClassVar[str]
 
 
+class UserLockfileRequests(Collection[LockfileRequest]):
+    """All user resolves for a particular language ecosystem to build.
+
+    Each language ecosystem should set up a subclass of `RequestedUserResolveNames` (see its
+    docstring), and implement a rule going from that subclass -> UserLockfileRequests. Each element
+    in the returned `UserLockfileRequests` should be a subclass of `LockfileRequest`, like
+    `PythonLockfileRequest`.
+    """
+
+
+@union
+class KnownUserResolveNamesRequest:
+    """A hook for a language ecosystem to declare which resolves it has defined.
+
+    Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
+    rule that goes from the subclass -> KnownUserResolveNames, usually by simply reading the
+    `resolves` option from the relevant subsystem.
+    """
+
+
+@dataclass(frozen=True)
+class KnownUserResolveNames:
+    """All defined user resolves for a particular language ecosystem.
+
+    See KnownUserResolveNamesRequest for how to use this type. `option_name` should be formatted
+    like `[options-scope].resolves`
+    """
+
+    names: tuple[str, ...]
+    option_name: str
+    requested_resolve_names_cls: type[RequestedUserResolveNames]
+
+
+@union
+class RequestedUserResolveNames(Collection[str]):
+    """The user resolves requested for a particular language ecosystem.
+
+    Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
+    rule that goes from the subclass -> UserLockfileRequests.
+    """
+
+
 DEFAULT_TOOL_LOCKFILE = "<default>"
 NO_TOOL_LOCKFILE = "<none>"
 
@@ -100,10 +144,10 @@ class AmbiguousResolveNamesError(Exception):
 
 
 def determine_resolves_to_generate(
-    all_user_resolves: Iterable[str],
+    all_known_user_resolve_names: Iterable[KnownUserResolveNames],
     all_tool_sentinels: Iterable[type[ToolLockfileSentinel]],
-    requested_resolve_names: Sequence[str],
-) -> tuple[list[str], list[type[ToolLockfileSentinel]]]:
+    requested_resolve_names: set[str],
+) -> tuple[list[RequestedUserResolveNames], list[type[ToolLockfileSentinel]]]:
     """Apply the `--resolve` option to determine which resolves are specified.
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
@@ -112,37 +156,45 @@ def determine_resolves_to_generate(
         sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
     }
 
-    ambiguous_resolve_names = [
-        resolve_name
-        for resolve_name in all_user_resolves
-        if resolve_name in resolve_names_to_sentinels
-    ]
-    if ambiguous_resolve_names:
-        raise AmbiguousResolveNamesError(ambiguous_resolve_names)
+    # TODO: check for ambiguity: between tools and user resolves, and across distinct
+    #  `KnownUserResolveNames`s. Update AmbiguousResolveNamesError to say where the resolve
+    #  name is defined, whereas right now we hardcode it to be the `[python]` option.
 
     if not requested_resolve_names:
-        return list(all_user_resolves), list(all_tool_sentinels)
+        return [
+            known_resolve_names.requested_resolve_names_cls(known_resolve_names.names)
+            for known_resolve_names in all_known_user_resolve_names
+        ], list(all_tool_sentinels)
 
-    specified_user_resolves = []
+    requested_user_resolve_names = []
+    for known_resolve_names in all_known_user_resolve_names:
+        requested = requested_resolve_names.intersection(known_resolve_names.names)
+        if requested:
+            requested_resolve_names -= requested
+            requested_user_resolve_names.append(
+                known_resolve_names.requested_resolve_names_cls(requested)
+            )
+
     specified_sentinels = []
-    unrecognized_resolve_names = []
-    for resolve_name in requested_resolve_names:
-        sentinel = resolve_names_to_sentinels.get(resolve_name)
-        if sentinel:
+    for resolve, sentinel in resolve_names_to_sentinels.items():
+        if resolve in requested_resolve_names:
+            requested_resolve_names.discard(resolve)
             specified_sentinels.append(sentinel)
-        elif resolve_name in all_user_resolves:
-            specified_user_resolves.append(resolve_name)
-        else:
-            unrecognized_resolve_names.append(resolve_name)
 
-    if unrecognized_resolve_names:
+    if requested_resolve_names:
         raise UnrecognizedResolveNamesError(
-            unrecognized_resolve_names,
-            {*all_user_resolves, *resolve_names_to_sentinels.keys()},
+            unrecognized_resolve_names=sorted(requested_resolve_names),
+            all_valid_names={
+                *itertools.chain.from_iterable(
+                    known_resolve_names.names
+                    for known_resolve_names in all_known_user_resolve_names
+                ),
+                *resolve_names_to_sentinels.keys(),
+            },
             description_of_origin="the option `--generate-lockfiles-resolve`",
         )
 
-    return specified_user_resolves, specified_sentinels
+    return requested_user_resolve_names, specified_sentinels
 
 
 def filter_tool_lockfile_requests(
