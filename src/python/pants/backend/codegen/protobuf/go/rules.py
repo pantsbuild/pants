@@ -18,6 +18,7 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     Directory,
+    FileContent,
     MergeDigests,
     RemovePrefix,
     Snapshot,
@@ -136,15 +137,74 @@ async def generate_go_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
+# Note: The versions of the Go protoc and gRPC plugins are hard coded in the following go.mod. To update,
+# copy the following go.mod and go.sum contents to go.mod and go.sum files in a new directory. Then update the
+# versions and run `go mod download all`. Copy the go.mod and go.sum contents back into these constants,
+# making sure to repalce tabs with `\t`.
+
+GO_PROTOBUF_GO_MOD = """\
+module org.pantsbuild.backend.go.protobuf
+
+go 1.17
+
+require (
+\tgoogle.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
+\tgoogle.golang.org/protobuf v1.27.1
+)
+
+require (
+\tgithub.com/golang/protobuf v1.5.0 // indirect
+\tgithub.com/google/go-cmp v0.5.5 // indirect
+\tgolang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
+)
+"""
+
+GO_PROTOBUF_GO_SUM = """\
+github.com/golang/protobuf v1.5.0 h1:LUVKkCeviFUMKqHa4tXIIij/lbhnMbP7Fn5wKdKkRh4=
+github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
+github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
+github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+google.golang.org/grpc v1.2.0 h1:v8eFdETH8nqZHQ9x+0f2PLuU6W7zo5PFZuVEwH5126Y=
+google.golang.org/grpc v1.2.0/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
+google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 h1:TLkBREm4nIsEcexnCjgQd5GQWaHcqMzwQV0TX9pq8S0=
+google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0/go.mod h1:DNq5QpG7LJqD2AamLZ7zvKE0DEpVl2BSEVjFycAAjRY=
+google.golang.org/protobuf v1.27.1 h1:SnqbnDw1V7RiZcXPx5MEeqPv2s79L9i7BJUlG/+RurQ=
+google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
+"""
+
+
 @rule
-async def setup_go_protoc_plugin(go_protobuf: GoProtobufSubsystem) -> SetupGoProtocPlugin:
+async def setup_go_protoc_plugin() -> SetupGoProtocPlugin:
+    go_mod_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent("go.mod", GO_PROTOBUF_GO_MOD.encode()),
+                FileContent("go.sum", GO_PROTOBUF_GO_SUM.encode()),
+            ]
+        ),
+    )
+
+    download_sources_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            ["mod", "download", "all"],
+            input_digest=go_mod_digest,
+            output_directories=("gopath",),
+            description="Download Go `protoc` plugin sources.",
+            allow_downloads=True,
+        ),
+    )
+
     go_plugin_build_result, go_grpc_plugin_build_result = await MultiGet(
         Get(
             ProcessResult,
             GoSdkProcess(
-                ["install", f"google.golang.org/protobuf/cmd/protoc-gen-go@{go_protobuf.version}"],
+                ["install", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1"],
+                input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
-                allow_downloads=True,
                 description="Build Go protobuf plugin for `protoc`.",
             ),
         ),
@@ -153,10 +213,10 @@ async def setup_go_protoc_plugin(go_protobuf: GoProtobufSubsystem) -> SetupGoPro
             GoSdkProcess(
                 [
                     "install",
-                    f"google.golang.org/grpc/cmd/protoc-gen-go-grpc@{go_protobuf.grpc_version}",
+                    "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0",
                 ],
+                input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
-                allow_downloads=True,
                 description="Build Go gRPC protobuf plugin for `protoc`.",
             ),
         ),
