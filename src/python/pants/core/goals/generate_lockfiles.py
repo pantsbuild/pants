@@ -4,12 +4,18 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Sequence
+from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.engine.collection import Collection
-from pants.engine.fs import Digest
-from pants.engine.unions import union
+from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.unions import UnionMembership, union
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -219,3 +225,104 @@ def filter_tool_lockfile_requests(
             )
 
     return result
+
+
+class GenerateLockfilesSubsystem(GoalSubsystem):
+    name = "generate-lockfiles"
+    help = "Generate lockfiles for Python third-party dependencies."
+    required_union_implementations = (ToolLockfileSentinel, KnownUserResolveNames)
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--resolve",
+            type=list,
+            member_type=str,
+            advanced=False,
+            help=(
+                "Only generate lockfiles for the specified resolve(s).\n\n"
+                "Resolves are the logical names for the different lockfiles used in your project. "
+                "For your own code's dependencies, these come from the option "
+                "`[python].experimental_resolves`. For tool lockfiles, resolve "
+                "names are the options scope for that tool such as `black`, `pytest`, and "
+                "`mypy-protobuf`.\n\n"
+                "For example, you can run `./pants generate-lockfiles --resolve=black "
+                "--resolve=pytest --resolve=data-science` to only generate lockfiles for those "
+                "two tools and your resolve named `data-science`.\n\n"
+                "If you specify an invalid resolve name, like 'fake', Pants will output all "
+                "possible values.\n\n"
+                "If not specified, Pants will generate lockfiles for all resolves."
+            ),
+        )
+        register(
+            "--custom-command",
+            advanced=True,
+            type=str,
+            default=None,
+            help=(
+                "If set, lockfile headers will say to run this command to regenerate the lockfile, "
+                "rather than running `./pants generate-lockfiles --resolve=<name>` like normal."
+            ),
+        )
+
+    @property
+    def resolve_names(self) -> tuple[str, ...]:
+        return tuple(self.options.resolve)
+
+    @property
+    def custom_command(self) -> str | None:
+        return cast("str | None", self.options.custom_command)
+
+
+class GenerateLockfilesGoal(Goal):
+    subsystem_cls = GenerateLockfilesSubsystem
+
+
+@goal_rule
+async def generate_lockfiles_goal(
+    workspace: Workspace,
+    union_membership: UnionMembership,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+) -> GenerateLockfilesGoal:
+    known_user_resolve_names = await MultiGet(
+        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+        for request in union_membership.get(KnownUserResolveNamesRequest)
+    )
+    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
+        known_user_resolve_names,
+        union_membership.get(ToolLockfileSentinel),
+        set(generate_lockfiles_subsystem.resolve_names),
+    )
+
+    all_specified_user_requests = await MultiGet(
+        Get(UserLockfileRequests, RequestedUserResolveNames, resolve_names)
+        for resolve_names in requested_user_resolve_names
+    )
+    specified_tool_requests = await MultiGet(
+        Get(WrappedLockfileRequest, ToolLockfileSentinel, sentinel())
+        for sentinel in requested_tool_sentinels
+    )
+    applicable_tool_requests = filter_tool_lockfile_requests(
+        specified_tool_requests,
+        resolve_specified=bool(generate_lockfiles_subsystem.resolve_names),
+    )
+
+    results = await MultiGet(
+        Get(Lockfile, LockfileRequest, req)
+        for req in (
+            *(req for reqs in all_specified_user_requests for req in reqs),
+            *applicable_tool_requests,
+        )
+    )
+
+    merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
+    workspace.write_digest(merged_digest)
+    for result in results:
+        logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+
+    return GenerateLockfilesGoal(exit_code=0)
+
+
+def rules():
+    return collect_rules()
