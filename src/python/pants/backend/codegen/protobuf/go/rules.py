@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.go.subsystem import GoProtobufSubsystem
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.go.target_types import GoPackageSourcesField
@@ -54,7 +53,6 @@ async def generate_go_from_protobuf(
     request: GenerateGoFromProtobufRequest,
     protoc: Protoc,
     go_protoc_plugin: SetupGoProtocPlugin,
-    go_protobuf: GoProtobufSubsystem,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -206,7 +204,7 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
-                env={"__GO_PROTOBUF_PLATFORM": str(Platform.current)},
+                env={"__GO_PROTOBUF_PLATFORM": str(platform)},
             ),
         ),
         Get(
@@ -219,7 +217,7 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
-                env={"__GO_PROTOBUF_PLATFORM": str(Platform.current)},
+                env={"__GO_PROTOBUF_PLATFORM": str(platform)},
             ),
         ),
     )
