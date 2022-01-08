@@ -23,7 +23,7 @@ class ThriftSubsystem(Subsystem):
             # TODO: Implement dependency inference at a later point in this PR.
             default=True,
             help=(
-                "Infer Thrift dependencies on other Thrift files by analyzing import " "statements."
+                "Infer Thrift dependencies on other Thrift files by analyzing import statements."
             ),
         )
         register(
