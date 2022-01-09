@@ -325,7 +325,9 @@ def linux_shard(
         "python": ["2.7", "3.6", "3.7"],
         "addons": {
             "apt": {
+                "update": True,
                 "packages": [
+                    "ca-certificates",
                     "lib32stdc++6",
                     "lib32z1",
                     "lib32z1-dev",

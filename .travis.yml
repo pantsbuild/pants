@@ -34,7 +34,9 @@ jobs:
   include:
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -87,7 +89,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -222,7 +226,9 @@ jobs:
     stage: Bootstrap Pants (Cron)
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -280,7 +286,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -373,7 +381,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -431,7 +441,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -490,7 +502,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -545,7 +559,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -600,7 +616,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -655,7 +673,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -710,7 +730,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -765,7 +787,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -820,7 +844,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -876,7 +902,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -932,7 +960,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -988,7 +1018,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1044,7 +1076,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1100,7 +1134,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1156,7 +1192,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1211,7 +1249,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1266,7 +1306,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1321,7 +1363,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1376,7 +1420,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1431,7 +1477,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1486,7 +1534,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1541,7 +1591,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1597,7 +1649,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1653,7 +1707,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1709,7 +1765,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1765,7 +1823,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1821,7 +1881,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -1877,7 +1939,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -2001,7 +2065,9 @@ jobs:
     stage: Test Pants
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -2261,7 +2327,9 @@ jobs:
     stage: Test Pants (Cron)
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -2320,7 +2388,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -2380,7 +2450,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
@@ -2446,7 +2518,9 @@ jobs:
     sudo: required
   - addons:
       apt:
+        update: true
         packages:
+        - ca-certificates
         - lib32stdc++6
         - lib32z1
         - lib32z1-dev
