@@ -112,7 +112,7 @@ protos = { path = "protos" }
 bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5"
 derivative = "2.2"
 async-oncecell = "0.2"
 either = "1.6"
