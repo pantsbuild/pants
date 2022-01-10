@@ -7,11 +7,11 @@
 from __future__ import print_function, unicode_literals
 
 import ast
-import os
-import tokenize
 import itertools
+import os
 import re
 import sys
+import tokenize
 from io import open
 
 MIN_DOTS = os.environ["MIN_DOTS"]
@@ -22,6 +22,7 @@ STRING_IMPORT_REGEX = re.compile(
     r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
     re.UNICODE,
 )
+
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -89,7 +90,6 @@ class AstVisitor(ast.NodeVisitor):
                 if not self._is_pragma_ignored(node.args[0]):
                     self.imports.add(name)
                 return
-
 
         self.generic_visit(node)
 
