@@ -26,7 +26,7 @@ class UnsetBool:
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "UnsetBool cannot be instantiated. It should only be used as a " "sentinel type."
+            "UnsetBool cannot be instantiated. It should only be used as a sentinel type."
         )
 
     @classmethod

@@ -44,9 +44,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
-use double_checked_cell_async::DoubleCheckedCell;
 use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, Permissions, RelativePath};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -235,7 +235,7 @@ impl Store {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {

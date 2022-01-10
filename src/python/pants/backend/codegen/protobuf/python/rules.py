@@ -1,6 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
@@ -138,9 +138,9 @@ async def generate_python_from_protobuf(
         else None
     )
 
+    protoc_relpath = "__protoc"
     unmerged_digests = [
         all_sources_stripped.snapshot.digest,
-        downloaded_protoc_binary.digest,
         empty_output_dir,
     ]
     if mypy_pex:
@@ -149,7 +149,7 @@ async def generate_python_from_protobuf(
         unmerged_digests.append(downloaded_grpc_plugin.digest)
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
-    argv = [downloaded_protoc_binary.exe, "--python_out", output_dir]
+    argv = [os.path.join(protoc_relpath, downloaded_protoc_binary.exe), "--python_out", output_dir]
     if mypy_pex:
         argv.extend(
             [
@@ -178,6 +178,9 @@ async def generate_python_from_protobuf(
         Process(
             argv,
             input_digest=input_digest,
+            immutable_input_digests={
+                protoc_relpath: downloaded_protoc_binary.digest,
+            },
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),

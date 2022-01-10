@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen.thrift.subsystem import ThriftSubsystem
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -27,85 +26,84 @@ from pants.util.logging import LogLevel
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# `thrift_source` targets.
-class ThriftDependenciesField(Dependencies):
+# `avro_source` targets.
+class AvroDependenciesField(Dependencies):
     pass
 
 
-class AllThriftTargets(Targets):
+class AllAvroTargets(Targets):
     pass
 
 
-@rule(desc="Find all Thrift targets in project", level=LogLevel.DEBUG)
-def find_all_thrift_targets(targets: AllTargets) -> AllThriftTargets:
-    return AllThriftTargets(tgt for tgt in targets if tgt.has_field(ThriftSourceField))
+@rule(desc="Find all Avro targets in project", level=LogLevel.DEBUG)
+def find_all_avro_targets(targets: AllTargets) -> AllAvroTargets:
+    return AllAvroTargets(tgt for tgt in targets if tgt.has_field(AvroSourceField))
 
 
 # -----------------------------------------------------------------------------------------------
-# `thrift_source` target
+# `avro_source` target
 # -----------------------------------------------------------------------------------------------
 
 
-class ThriftSourceField(SingleSourceField):
-    expected_file_extensions = (".thrift",)
+class AvroSourceField(SingleSourceField):
+    expected_file_extensions = (".avsc", ".avpr", ".avdl")
 
 
-class ThriftSourceTarget(Target):
-    alias = "thrift_source"
+class AvroSourceTarget(Target):
+    alias = "avro_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
-        ThriftSourceField,
+        AvroDependenciesField,
+        AvroSourceField,
     )
-    help = f"A single Thrift file used to generate various languages.\n\nSee {doc_url('thrift')}."
+    help = "A single Avro file used to generate various languages.\n\n" f"See {doc_url('avro')}."
 
 
 # -----------------------------------------------------------------------------------------------
-# `thrift_sources` target generator
+# `avro_sources` target generator
 # -----------------------------------------------------------------------------------------------
 
 
-class ThriftSourcesGeneratingSourcesField(MultipleSourcesField):
-    default = ("*.thrift",)
-    expected_file_extensions = (".thrift",)
+class AvroSourcesGeneratingSourcesField(MultipleSourcesField):
+    default = ("*.avsc", "*.avpr", "*.avdl")
+    expected_file_extensions = (".avsc", ".avpr", ".avdl")
 
 
-class ThriftSourcesOverridesField(OverridesField):
+class AvroSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
-        ThriftSourceTarget.alias,
+        AvroSourceTarget.alias,
         (
             "overrides={\n"
-            '  "bar.thrift": {"description": "our user model"]},\n'
-            '  ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},\n'
+            '  "bar.proto": {"description": "our user model"]},\n'
+            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
             "}"
         ),
     )
 
 
-class ThriftSourcesGeneratorTarget(Target):
-    alias = "thrift_sources"
+class AvroSourcesGeneratorTarget(Target):
+    alias = "avro_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
-        ThriftSourcesGeneratingSourcesField,
-        ThriftSourcesOverridesField,
+        AvroDependenciesField,
+        AvroSourcesGeneratingSourcesField,
+        AvroSourcesOverridesField,
     )
-    help = "Generate a `thrift_source` target for each file in the `sources` field."
+    help = "Generate a `avro_source` target for each file in the `sources` field."
 
 
-class GenerateTargetsFromThriftSources(GenerateTargetsRequest):
-    generate_from = ThriftSourcesGeneratorTarget
+class GenerateTargetsFromAvroSources(GenerateTargetsRequest):
+    generate_from = AvroSourcesGeneratorTarget
 
 
 @rule
-async def generate_targets_from_thrift_sources(
-    request: GenerateTargetsFromThriftSources,
+async def generate_targets_from_avro_sources(
+    request: GenerateTargetsFromAvroSources,
     files_not_found_behavior: FilesNotFoundBehavior,
-    thrift: ThriftSubsystem,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ThriftSourcesGeneratingSourcesField])
+        SourcesPaths, SourcesPathsRequest(request.generator[AvroSourcesGeneratingSourcesField])
     )
 
     all_overrides = {}
@@ -120,11 +118,12 @@ async def generate_targets_from_thrift_sources(
         )
 
     return generate_file_level_targets(
-        ThriftSourceTarget,
+        AvroSourceTarget,
         request.generator,
         sources_paths.files,
         union_membership,
-        add_dependencies_on_all_siblings=not thrift.dependency_inference,
+        # Note: Avro files cannot import from other Avro files, so do not add dependencies.
+        add_dependencies_on_all_siblings=False,
         overrides=all_overrides,
     )
 
@@ -132,5 +131,5 @@ async def generate_targets_from_thrift_sources(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromThriftSources),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromAvroSources),
     )

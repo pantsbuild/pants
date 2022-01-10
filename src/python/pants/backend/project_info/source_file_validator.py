@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -52,11 +53,11 @@ class ValidateSubsystem(GoalSubsystem):
             type=DetailLevel,
             default=DetailLevel.nonmatching,
             help="How much detail to emit to the console.",
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Use `[sourcefile-validation].detail_level` instead, which behaves the same."
+            ),
         )
-
-    @property
-    def detail_level(self) -> DetailLevel:
-        return cast(DetailLevel, self.options.detail_level)
 
 
 class Validate(Goal):
@@ -134,6 +135,12 @@ class SourceFileValidation(Subsystem):
         )
         super().register_options(register)
         register("--config", type=dict, fromfile=True, help=schema_help)
+        register(
+            "--detail-level",
+            type=DetailLevel,
+            default=DetailLevel.nonmatching,
+            help="How much detail to include in the result.",
+        )
 
     @memoized_method
     def get_multi_matcher(self) -> MultiMatcher | None:
@@ -141,6 +148,19 @@ class SourceFileValidation(Subsystem):
             MultiMatcher(ValidationConfig.from_dict(self.options.config))
             if self.options.config
             else None
+        )
+
+    def detail_level(self, validate_subsystem: ValidateSubsystem) -> DetailLevel:
+        return cast(
+            DetailLevel,
+            resolve_conflicting_options(
+                old_option="detail_level",
+                new_option="detail_level",
+                old_container=validate_subsystem.options,
+                new_container=self.options,
+                old_scope=validate_subsystem.name,
+                new_scope=self.options_scope,
+            ),
         )
 
 
@@ -305,7 +325,7 @@ async def validate(
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)
     )
 
-    detail_level = validate_subsystem.detail_level
+    detail_level = source_file_validation.detail_level(validate_subsystem)
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:

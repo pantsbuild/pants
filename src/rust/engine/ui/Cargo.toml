@@ -16,5 +16,5 @@ logging = { path = "../logging" }
 parking_lot = "0.11"
 stdio = { path = "../stdio" }
 task_executor = { path = "../task_executor" }
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
