@@ -8,6 +8,8 @@ from __future__ import print_function, unicode_literals
 
 import ast
 import os
+import tokenize
+import itertools
 import re
 import sys
 from io import open
@@ -21,24 +23,44 @@ STRING_IMPORT_REGEX = re.compile(
     re.UNICODE,
 )
 
-
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
         self._package_parts = package_parts
-        self._contents_lines = contents.splitlines()
+        self._contents_lines = contents.decode(errors="ignore").splitlines()
         self.imports = set()
 
     def maybe_add_string_import(self, s):
         if STRING_IMPORT_REGEX.match(s):
             self.imports.add(s)
 
-    def maybe_add_import(self, node, name):
-        if "# pants: ignore" not in self._contents_lines[node.lineno - 1].decode(errors="ignore"):
-            self.imports.add(name)
+    @staticmethod
+    def _is_pragma_ignored(line):
+        return "# pants: ignore" in line
+
+    def _visit_import_stmt(self, node, import_prefix):
+        # N.B. We only add imports whose line doesn't contain "# pants: ignore"
+        # However, `ast` doesn't expose the exact lines each specific import is on,
+        # so we are forced to tokenize the import statement to tease out which imported
+        # name is on which line so we can check for the ignore pragma.
+        node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
+        token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
+
+        def consume_until(string):
+            return list(itertools.takewhile(lambda t: t[1] != string, token_iter))
+
+        consume_until("import")
+
+        for alias in node.names:
+            consume_until(alias.name.split(".")[-1])
+            token = next(token_iter)
+            line = self._contents_lines[node.lineno + token[2][0] - 2]
+            if not self._is_pragma_ignored(line):
+                self.imports.add(import_prefix + alias.name)
+            if alias.asname:
+                consume_until(alias.asname)
 
     def visit_Import(self, node):
-        for alias in node.names:
-            self.maybe_add_import(node, alias.name)
+        self._visit_import_stmt(node, "")
 
     def visit_ImportFrom(self, node):
         if node.level:
@@ -50,21 +72,25 @@ class AstVisitor(ast.NodeVisitor):
             )
         else:
             abs_module = node.module
-        for alias in node.names:
-            self.maybe_add_import(node, "{}.{}".format(abs_module, alias.name))
+        self._visit_import_stmt(node, abs_module + ".")
 
     def visit_Call(self, node):
         # Handle __import__("string_literal").  This is commonly used in __init__.py files,
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
+            name = None
             if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-                arg_s = node.args[0].s
-                self.maybe_add_import(node, arg_s)
-                return
+                name = node.args[0].s
             elif isinstance(node.args[0], ast.Constant):
-                self.maybe_add_import(node, str(node.args[0].value))
+                name = str(node.args[0].value)
+
+            if name is not None:
+                if not self._is_pragma_ignored(node.args[0]):
+                    self.imports.add(name)
                 return
+
+
         self.generic_visit(node)
 
 

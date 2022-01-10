@@ -86,10 +86,16 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         from project.demo import OriginalName as Renamed
         import pragma_ignored  # pants: ignore
         from also_pragma_ignored import doesnt_matter  # pants: ignore
-        from multiline_import import (
-            not_ignored,
-            should_be_ignored_but_isnt  # pants: ignore
+        from multiline_import1 import (
+            not_ignored1,
+            ignored1 as alias1,  # pants: ignore
+            ignored2 as \\
+                alias2,  # pants: ignore
+            ignored3 as alias3, ignored4,  # pants: ignore
+            not_ignored2,
         )
+        from multiline_import2 import (ignored1,  # pants: ignore
+            not_ignored)
 
         if TYPE_CHECKING:
             from project.circular_dep import CircularDep
@@ -100,7 +106,16 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             import subprocess23 as subprocess
 
         __import__("pkg_resources")
-        __import("dunder_import_ignored")  # pants: ignore
+        __import__("dunder_import_ignored")  # pants: ignore
+        __import__(  # pants: ignore
+            "not_ignored_but_looks_like_it_could_be"
+        )
+        __import__(
+            "ignored"  # pants: ignore
+        )
+        __import__(  # pants: ignore
+            "also_not_ignored_but_looks_like_it_could_be"
+        )
         """
     )
     assert_imports_parsed(
@@ -115,8 +130,11 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "demo",
             "project.demo.Demo",
             "project.demo.OriginalName",
-            "multiline_import.not_ignored",
-            "multiline_import.should_be_ignored_but_isnt",
+            "multiline_import.not_ignored1",
+            "multiline_import.not_ignored2",
+            "multiline_import2.not_ignored",
+            "not_ignored_but_looks_like_it_could_be",
+            "also_not_ignored_but_looks_like_it_could_be",
             "project.circular_dep.CircularDep",
             "subprocess",
             "subprocess23",
@@ -133,6 +151,10 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
         from .sibling import Nibling
         from .subdir.child import Child
         from ..parent import Parent
+        from ..parent import (
+            Parent1,
+            Guardian as Parent2
+        )
         """
     )
     assert_imports_parsed(
@@ -144,6 +166,8 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
             "project.util.sibling.Nibling",
             "project.util.subdir.child.Child",
             "project.parent.Parent",
+            "project.parent.Parent1",
+            "project.parent.Guardian",
         ],
     )
 
