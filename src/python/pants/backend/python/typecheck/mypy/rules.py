@@ -69,7 +69,7 @@ def generate_argv(
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={venv_python}", *mypy.args]
+    args = [f"--python-executable={venv_python}", "--no-error-summary", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
