@@ -203,7 +203,7 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
-            "src/docker/Dockerfile": """FROM python""",
+            "src/docker/Dockerfile": """FROM python:3.8""",
             "src/python/proj/cli/BUILD": """pex_binary(name="bin", entry_point="main.py")""",
             "src/python/proj/cli/main.py": """print("cli main")""",
         }
@@ -509,3 +509,38 @@ def test_create_docker_build_context() -> None:
     assert dict(context.build_env.environment) == {"ENVNAME": "value2"}
     assert context.dockerfile == "test/Dockerfile"
     assert context.stages == ("base", "dev", "prod")
+
+
+def test_pex_custom_output_path_issue14031(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "project/test/BUILD": dedent(
+                """\
+                pex_binary(
+                  name="test",
+                  entry_point="main.py",
+                  output_path="project/test.pex",
+                )
+
+                docker_image(
+                  name="test-image",
+                  dependencies=[":test"],
+                )
+                """
+            ),
+            "project/test/main.py": "print('Hello')",
+            "project/test/Dockerfile": dedent(
+                """\
+                FROM python:3.8
+                COPY project/test.pex .
+                CMD ["./test.pex"]
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("project/test", target_name="test-image"),
+        expected_files=["project/test/Dockerfile", "project/test.pex"],
+    )
