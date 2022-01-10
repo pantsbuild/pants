@@ -53,11 +53,17 @@ class AstVisitor(ast.NodeVisitor):
 
         for alias in node.names:
             consume_until(alias.name.split(".")[-1])
-            token = next(token_iter)
-            line = self._contents_lines[node.lineno + token[2][0] - 2]
+
+            # N.B. Keep consuming lines while they end in a line-continuation
+            #   (unfortunately `tokenize` doesn't capture this)
+            line = "\\"
+            while line.endswith("\\"):
+                token = next(token_iter)
+                line = token[4]
+
             if not self._is_pragma_ignored(line):
                 self.imports.add(import_prefix + alias.name)
-            if alias.asname:
+            if alias.asname and token[1] != alias.asname:
                 consume_until(alias.asname)
 
     def visit_Import(self, node):
@@ -87,7 +93,7 @@ class AstVisitor(ast.NodeVisitor):
                 name = str(node.args[0].value)
 
             if name is not None:
-                if not self._is_pragma_ignored(node.args[0]):
+                if not self._is_pragma_ignored(self._contents_lines[node.args[0].lineno - 1]):
                     self.imports.add(name)
                 return
 

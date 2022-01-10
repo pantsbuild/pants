@@ -91,7 +91,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             ignored1 as alias1,  # pants: ignore
             ignored2 as \\
                 alias2,  # pants: ignore
-            ignored3 as alias3, ignored4,  # pants: ignore
+            ignored3 as  # pants: ignore
+                alias3,
+            ignored4 as alias4, ignored4,  # pants: ignore
             not_ignored2,
         )
         from multiline_import2 import (ignored1,  # pants: ignore
@@ -123,22 +125,22 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         content,
         expected=[
             "__future__.print_function",
-            "os",
-            "os.path",
-            "typing.TYPE_CHECKING",
-            "requests",
+            "also_not_ignored_but_looks_like_it_could_be",
             "demo",
-            "project.demo.Demo",
-            "project.demo.OriginalName",
-            "multiline_import.not_ignored1",
-            "multiline_import.not_ignored2",
+            "multiline_import1.not_ignored1",
+            "multiline_import1.not_ignored2",
             "multiline_import2.not_ignored",
             "not_ignored_but_looks_like_it_could_be",
-            "also_not_ignored_but_looks_like_it_could_be",
+            "os",
+            "os.path",
+            "requests",
             "project.circular_dep.CircularDep",
+            "project.demo.Demo",
+            "project.demo.OriginalName",
+            "pkg_resources",
             "subprocess",
             "subprocess23",
-            "pkg_resources",
+            "typing.TYPE_CHECKING",
         ],
     )
 
