@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -19,11 +19,11 @@ class LockfileScope(Enum):
     PYTHON = "python"
 
 
-_concrete_metadata_classes: dict[Tuple[LockfileScope, int], type[LockfileMetadata]] = {}
+_concrete_metadata_classes: dict[Tuple[LockfileScope, int], Type[LockfileMetadata]] = {}
 
 
 # Registrar types (pre-declaring to avoid repetition)
-RegisterClassForVersion = Callable[[type["LockfileMetadata"]], type["LockfileMetadata"]]
+RegisterClassForVersion = Callable[[Type["LockfileMetadata"]], Type["LockfileMetadata"]]
 
 
 def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], RegisterClassForVersion]:
@@ -38,7 +38,7 @@ def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], Registe
         The class must be a frozen dataclass
         """
 
-        def _dec(cls: type[LockfileMetadata]) -> type[LockfileMetadata]:
+        def _dec(cls: Type[LockfileMetadata]) -> Type[LockfileMetadata]:
 
             # Only frozen dataclasses may be registered as lockfile metadata:
             cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
