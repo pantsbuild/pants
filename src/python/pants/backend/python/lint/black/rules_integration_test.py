@@ -111,8 +111,6 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
@@ -123,8 +121,6 @@ def test_failing(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_black(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "1 file would be reformatted" in lint_results[0].stderr
-    assert "1 file reformatted" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
@@ -140,8 +136,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_black(rule_runner, tgts)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
-    assert "1 file would be reformatted, 1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
@@ -164,8 +158,6 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     lint_results, fmt_result = run_black(rule_runner, [tgt], extra_args=extra_args)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
@@ -178,8 +170,6 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     )
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
@@ -217,8 +207,6 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_black(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
@@ -241,8 +229,6 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_black(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
-    assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
@@ -264,10 +250,6 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     ]
     lint_results, fmt_result = run_black(rule_runner, good_tgts)
     assert len(lint_results) == 1 and lint_results[0].exit_code == 0
-    assert (
-        "2 files would be left unchanged" in lint_results[0].stderr
-        and "2 files left unchanged" in fmt_result.stderr
-    )
     assert fmt_result.output == get_digest(
         rule_runner, {"good.pyi": GOOD_FILE, "good.py": GOOD_FILE}
     )
@@ -279,10 +261,6 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     ]
     lint_results, fmt_result = run_black(rule_runner, bad_tgts)
     assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert (
-        "2 files would be reformatted" in lint_results[0].stderr
-        and "2 files reformatted" in fmt_result.stderr
-    )
     assert fmt_result.output == get_digest(
         rule_runner, {"bad.pyi": FIXED_BAD_FILE, "bad.py": FIXED_BAD_FILE}
     )

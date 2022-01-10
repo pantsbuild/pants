@@ -98,7 +98,6 @@ def assert_success(
     result = run_mypy(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -144,7 +143,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/good.py" not in result[0].stdout
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
-    assert "checked 2 source files" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -191,7 +189,6 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     result = run_mypy(rule_runner, [tgt], extra_args=["--mypy-args='--linecount-report=reports'"])
     assert len(result) == 1
     assert result[0].exit_code == 0
-    assert "Success: no issues found" in result[0].stdout.strip()
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
     assert "4       4      1      1 f" in report_files[0].content.decode()
@@ -452,11 +449,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
 
     assert py2_result.exit_code == 0
     assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
-    assert "Success: no issues found" in py2_result.stdout
 
     assert py3_result.exit_code == 0
     assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
-    assert "Success: no issues found" in py3_result.stdout
 
 
 def test_run_only_on_specified_files(rule_runner: RuleRunner) -> None:
@@ -616,6 +611,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             rule_runner,
             [tgt],
             extra_args=[
+                "--mypy-args='--error-summary'",
                 "--mypy-source-plugins=['pants-plugins/plugins']",
                 "--mypy-lockfile=<none>",
                 "--source-root-patterns=['pants-plugins', 'src/py']",
