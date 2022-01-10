@@ -19,6 +19,7 @@ from pants.backend.go.util_rules import (
     go_mod,
     import_analysis,
     link,
+    pkg_analyzer,
     sdk,
     third_party_pkg,
 )
@@ -39,6 +40,7 @@ def rule_runner() -> RuleRunner:
             *import_analysis.rules(),
             *link.rules(),
             *go_mod.rules(),
+            *pkg_analyzer.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),

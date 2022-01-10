@@ -8,15 +8,27 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.go import target_type_rules
+from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    import_analysis,
+    link,
+    pkg_analyzer,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
-    ThirdPartyPkgInfo,
+    ThirdPartyPkgAnalysis,
     ThirdPartyPkgInfoRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -28,8 +40,17 @@ def rule_runner() -> RuleRunner:
         rules=[
             *sdk.rules(),
             *third_party_pkg.rules(),
+            *first_party_pkg.rules(),
+            *pkg_analyzer.rules(),
+            *load_go_binary.rules(),
+            *build_pkg.rules(),
+            *import_analysis.rules(),
+            *link.rules(),
+            *assembly.rules(),
+            *target_type_rules.rules(),
+            *go_mod.rules(),
             QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
-            QueryRule(ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgInfoRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -156,7 +177,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
 
     assert_pkg_info(
         import_path="github.com/google/uuid",
-        dir_path="github.com/google/uuid@v1.3.0",
+        dir_path="gopath/pkg/mod/github.com/google/uuid@v1.3.0",
         imports=(
             "bytes",
             "crypto/md5",
@@ -209,7 +230,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     )
     assert_pkg_info(
         import_path="golang.org/x/text/unicode/bidi",
-        dir_path="golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
+        dir_path="gopath/pkg/mod/golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
         imports=("container/list", "fmt", "log", "sort", "unicode/utf8"),
         go_files=("bidi.go", "bracket.go", "core.go", "prop.go", "tables.go", "trieval.go"),
         extra_files=(
@@ -298,7 +319,7 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
         AssertionError, contains="The package `another_project.org/foo` was not downloaded"
     ):
         rule_runner.request(
-            ThirdPartyPkgInfo,
+            ThirdPartyPkgAnalysis,
             [ThirdPartyPkgInfoRequest("another_project.org/foo", digest, "go.mod")],
         )
 
@@ -393,7 +414,7 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
+        ThirdPartyPkgAnalysis,
         [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
     )
     assert pkg_info.error is not None
@@ -514,39 +535,8 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
+        ThirdPartyPkgAnalysis,
         [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
     )
-    assert pkg_info.dir_path == "github.com/hashicorp/consul/api@v1.3.0"
+    assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
-
-
-def test_ambiguous_package(rule_runner: RuleRunner) -> None:
-    digest = set_up_go_mod(
-        rule_runner,
-        dedent(
-            """\
-            module example.com/third-party-module
-            go 1.16
-            require github.com/ugorji/go v1.1.4
-            require github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8
-            """
-        ),
-        dedent(
-            """\
-            github.com/ugorji/go v1.1.4 h1:j4s+tAvLfL3bZyefP2SEWmhBzmuIlH/eqNuPdFPgngw=
-            github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
-            github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 h1:3SVOIvH7Ae1KRYyQWRjXWJEA9sS/c/pjvH++55Gr648=
-            github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
-            """
-        ),
-    )
-    pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("github.com/ugorji/go/codec", digest, "go.mod")],
-    )
-    assert pkg_info.error is not None
-    # This particular error is tricky because `Dir` will not have been set, which we need to
-    # determine the dir_path and the digest.
-    assert pkg_info.dir_path == ""
-    assert pkg_info.digest == EMPTY_DIGEST

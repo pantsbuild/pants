@@ -30,7 +30,7 @@ from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
-    ThirdPartyPkgInfo,
+    ThirdPartyPkgAnalysis,
     ThirdPartyPkgInfoRequest,
 )
 from pants.base.exceptions import ResolveError
@@ -163,7 +163,7 @@ async def inject_go_third_party_package_dependencies(
     )
     tgt = wrapped_target.target
     pkg_info = await Get(
-        ThirdPartyPkgInfo,
+        ThirdPartyPkgAnalysis,
         ThirdPartyPkgInfoRequest(
             tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
         ),
@@ -212,7 +212,7 @@ async def generate_targets_from_go_mod(
         AllThirdPartyPackagesRequest(go_mod_info.digest, go_mod_info.mod_path),
     )
 
-    def create_tgt(pkg_info: ThirdPartyPkgInfo) -> GoThirdPartyPackageTarget:
+    def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {GoImportPathField.alias: pkg_info.import_path},
             # E.g. `src/go:mod#github.com/google/uuid`.

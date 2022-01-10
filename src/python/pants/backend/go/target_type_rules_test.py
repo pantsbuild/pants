@@ -29,6 +29,7 @@ from pants.backend.go.util_rules import (
     first_party_pkg,
     go_mod,
     link,
+    pkg_analyzer,
     sdk,
     third_party_pkg,
 )
@@ -57,6 +58,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_mod.rules(),
+            *pkg_analyzer.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *sdk.rules(),
