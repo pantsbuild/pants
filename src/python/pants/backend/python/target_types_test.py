@@ -37,7 +37,6 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
-    UnrecognizedResolveNamesError,
     normalize_module_mapping,
     parse_requirements_file,
 )
@@ -51,6 +50,7 @@ from pants.backend.python.target_types_rules import (
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (

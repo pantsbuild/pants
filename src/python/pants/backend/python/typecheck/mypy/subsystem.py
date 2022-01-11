@@ -8,7 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -23,6 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
@@ -281,7 +283,7 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-class MyPyLockfileSentinel(PythonToolLockfileSentinel):
+class MyPyLockfileSentinel(ToolLockfileSentinel):
     options_scope = MyPy.options_scope
 
 
@@ -320,4 +322,8 @@ async def setup_mypy_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, MyPyLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, MyPyLockfileSentinel),
+    )

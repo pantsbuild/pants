@@ -4,8 +4,10 @@
 from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
@@ -72,7 +74,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class MypyProtobufLockfileSentinel(PythonToolLockfileSentinel):
+class MypyProtobufLockfileSentinel(ToolLockfileSentinel):
     options_scope = PythonProtobufMypyPlugin.options_scope
 
 
@@ -98,6 +100,7 @@ async def inject_dependencies(
 def rules():
     return [
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(InjectDependenciesRequest, InjectPythonProtobufDependencies),
-        UnionRule(PythonToolLockfileSentinel, MypyProtobufLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, MypyProtobufLockfileSentinel),
     ]
