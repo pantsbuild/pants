@@ -265,3 +265,18 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner, {"bad.pyi": FIXED_BAD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change
+
+def test_verbosity(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+
+    lint_results, fmt_result = run_black(rule_runner, [tgt])
+    assert "1 file would be left unchanged" not in lint_results[0].stderr
+    assert "1 file left unchanged" not in fmt_result.stderr
+
+    # If the user wants to increase verbosity, they should be able to
+    lint_results, fmt_result = run_black(
+        rule_runner, [tgt], extra_args=["--black-args='--verbose'"]
+    )
+    assert "1 file would be left unchanged" in lint_results[0].stderr
+    assert "1 file left unchanged" in fmt_result.stderr

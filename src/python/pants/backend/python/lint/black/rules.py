@@ -54,7 +54,7 @@ class Setup:
 
 
 def generate_argv(source_files: SourceFiles, black: Black, *, check_only: bool) -> Tuple[str, ...]:
-    args = ["-q"]
+    args = ["--quiet"]
     if check_only:
         args.append("--check")
     if black.config:

@@ -691,3 +691,16 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
     assert determine_python_files(["f.json"]) == ()
+
+def test_verbosity(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    result = run_mypy(rule_runner, [tgt])
+    assert "Success: no issues found" not in result[0].stdout.strip()
+
+    # If the user wants error summaries, they should have them
+    result = run_mypy(
+        rule_runner, [tgt], extra_args=["--mypy-args='--error-summary'"]
+    )
+    assert "Success: no issues found" in result[0].stdout.strip()
