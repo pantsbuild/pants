@@ -713,5 +713,7 @@ jobs:
     timeout-minutes: 40
 name: Pull Request CI
 'on':
-- push
-- pull_request
+  pull_request: {}
+  push:
+    branches-ignore:
+    - dependabot/**

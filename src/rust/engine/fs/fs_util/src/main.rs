@@ -649,7 +649,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.hash, digest.size_bytes))
+                  .map(|(name, digest)| {
+                    format!("{} {:<16} {}\n", digest.hash, digest.size_bytes, name)
+                  })
                   .collect::<Vec<String>>()
                   .join("")
               })

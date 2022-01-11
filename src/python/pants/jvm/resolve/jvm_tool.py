@@ -8,8 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence, cast
 
-from pants.backend.python.target_types import UnrecognizedResolveNamesError
 from pants.build_graph.address import Address, AddressInput
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,

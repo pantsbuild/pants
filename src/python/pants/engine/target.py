@@ -159,7 +159,7 @@ class Field:
         warn_or_error(
             cls.removal_version,
             entity=f"the {repr(cls.alias)} field",
-            hint=(f"Using the `{cls.alias}` field in the target {address}. " f"{cls.removal_hint}"),
+            hint=(f"Using the `{cls.alias}` field in the target {address}. {cls.removal_hint}"),
         )
 
     def __repr__(self) -> str:
