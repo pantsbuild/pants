@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 arc-swap = "1.2"
-colored = "1.9.0"
+colored = "2.0.0"
 chrono = "0.4.10"
 lazy_static = "1"
 log = "0.4"

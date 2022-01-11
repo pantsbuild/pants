@@ -28,6 +28,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import RuntimePackageDependenciesField
@@ -100,27 +101,6 @@ class InterpreterConstraintsField(StringSequenceField):
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         return python_setup.compatibility_or_constraints(self.value)
-
-
-class UnrecognizedResolveNamesError(Exception):
-    def __init__(
-        self,
-        unrecognized_resolve_names: list[str],
-        all_valid_names: Iterable[str],
-        *,
-        description_of_origin: str,
-    ) -> None:
-        # TODO(#12314): maybe implement "Did you mean?"
-        if len(unrecognized_resolve_names) == 1:
-            unrecognized_str = unrecognized_resolve_names[0]
-            name_description = "name"
-        else:
-            unrecognized_str = str(sorted(unrecognized_resolve_names))
-            name_description = "names"
-        super().__init__(
-            f"Unrecognized resolve {name_description} from {description_of_origin}: "
-            f"{unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}"
-        )
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):

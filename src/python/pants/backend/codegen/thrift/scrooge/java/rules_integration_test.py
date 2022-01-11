@@ -7,9 +7,9 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.codegen.thrift.rules import rules as thrift_rules
+from pants.backend.codegen.thrift.scrooge.java.rules import GenerateJavaFromThriftRequest
+from pants.backend.codegen.thrift.scrooge.java.rules import rules as scrooge_java_rules
 from pants.backend.codegen.thrift.scrooge.rules import rules as scrooge_rules
-from pants.backend.codegen.thrift.scrooge.scala.rules import GenerateScalaFromThriftRequest
-from pants.backend.codegen.thrift.scrooge.scala.rules import rules as scrooge_scala_rules
 from pants.backend.codegen.thrift.target_types import (
     ThriftSourceField,
     ThriftSourcesGeneratorTarget,
@@ -27,7 +27,7 @@ from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *thrift_rules(),
             *scrooge_rules(),
-            *scrooge_scala_rules(),
+            *scrooge_java_rules(),
             *config_files.rules(),
             *classpath.rules(),
             *coursier_fetch_rules(),
@@ -49,7 +49,7 @@ def rule_runner() -> RuleRunner:
             *target_types.rules(),
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [GenerateScalaFromThriftRequest]),
+            QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -80,13 +80,12 @@ def assert_files_generated(
     )
     generated_sources = rule_runner.request(
         GeneratedSources,
-        [GenerateScalaFromThriftRequest(thrift_sources.snapshot, tgt)],
+        [GenerateJavaFromThriftRequest(thrift_sources.snapshot, tgt)],
     )
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
-@logging
-def test_generates_python(rule_runner: RuleRunner) -> None:
+def test_generates_java(rule_runner: RuleRunner) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Thrift files can import other thrift files, and those can import others
@@ -96,7 +95,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         {
             "src/thrift/dir1/f.thrift": dedent(
                 """\
-                #@namespace scala org.pantsbuild.example
+                namespace java org.pantsbuild.example
                 struct Person {
                   1: string name
                   2: i32 id
@@ -106,7 +105,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             ),
             "src/thrift/dir1/f2.thrift": dedent(
                 """\
-                #@namespace scala org.pantsbuild.example
+                namespace java org.pantsbuild.example
                 include "dir1/f.thrift"
                 struct ManagedPerson {
                   1: f.Person employee
@@ -117,7 +116,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/g.thrift": dedent(
                 """\
-                #@namespace scala org.pantsbuild.example
+                namespace java org.pantsbuild.example
                 include "dir1/f2.thrift"
                 struct ManagedPersonWrapper {
                   1: f2.ManagedPerson managed_person
@@ -128,7 +127,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             # Test another source root.
             "tests/thrift/test_thrifts/f.thrift": dedent(
                 """\
-                #@namespace scala org.pantsbuild.example
+                namespace java org.pantsbuild.example
                 include "dir2/g.thrift"
                 struct Executive {
                   1: g.ManagedPersonWrapper managed_person_wrapper
@@ -150,24 +149,24 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/Person.scala",
+            "src/thrift/org/pantsbuild/example/Person.java",
         ],
     )
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f2.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/ManagedPerson.scala",
+            "src/thrift/org/pantsbuild/example/ManagedPerson.java",
         ],
     )
     assert_gen(
         Address("src/thrift/dir2", relative_file_path="g.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/ManagedPersonWrapper.scala",
+            "src/thrift/org/pantsbuild/example/ManagedPersonWrapper.java",
         ],
     )
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
-            "tests/thrift/org/pantsbuild/example/Executive.scala",
+            "tests/thrift/org/pantsbuild/example/Executive.java",
         ],
     )
