@@ -63,7 +63,7 @@ class InvalidLockfileError(Exception):
 class LockfileMetadata:
     """Base class for metadata that is attached to a given lockfiles.
 
-    This class, and provides the external API for serializing, deserializing, and validating the
+    This class provides the external API for serializing, deserializing, and validating the
     contents of individual lockfiles. New versions of metadata implement a concrete subclass and
     provide deserialization and validation logic, along with specialist serialization logic.
 
