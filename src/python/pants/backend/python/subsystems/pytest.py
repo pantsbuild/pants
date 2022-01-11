@@ -10,6 +10,7 @@ from typing import Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -244,4 +245,8 @@ async def setup_pytest_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, PytestLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, PytestLockfileSentinel),
+    )

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -134,4 +135,8 @@ async def setup_black_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, BlackLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, BlackLockfileSentinel),
+    )

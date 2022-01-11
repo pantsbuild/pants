@@ -7,6 +7,7 @@ import itertools
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -145,4 +146,8 @@ async def setup_bandit_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, BanditLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, BanditLockfileSentinel),
+    )

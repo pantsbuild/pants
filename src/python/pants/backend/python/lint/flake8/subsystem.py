@@ -7,6 +7,7 @@ import itertools
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -154,4 +155,8 @@ async def setup_flake8_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, Flake8LockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, Flake8LockfileSentinel),
+    )

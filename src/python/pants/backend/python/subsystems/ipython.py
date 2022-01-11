@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -86,4 +87,8 @@ async def setup_ipython_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, IPythonLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, IPythonLockfileSentinel),
+    )

@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -39,4 +40,8 @@ def setup_lambdex_lockfile(_: LambdexLockfileSentinel, lambdex: Lambdex) -> Pyth
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, LambdexLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, LambdexLockfileSentinel),
+    )

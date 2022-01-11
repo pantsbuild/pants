@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import cast
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -138,4 +139,8 @@ def setup_twine_lockfile(_: TwineLockfileSentinel, twine: TwineSubsystem) -> Pyt
 
 
 def rules():
-    return (*collect_rules(), UnionRule(ToolLockfileSentinel, TwineLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, TwineLockfileSentinel),
+    )

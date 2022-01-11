@@ -10,6 +10,7 @@ from typing import Iterator
 
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
@@ -199,5 +200,6 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
 def rules():
     return (
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(ToolLockfileSentinel, DockerfileParserLockfileSentinel),
     )
