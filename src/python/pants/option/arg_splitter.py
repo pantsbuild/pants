@@ -23,7 +23,6 @@ class SplitArgs:
     """The result of splitting args."""
 
     builtin_goal: str | None  # Requested builtin goal (explicitly or implicitly).
-    builtin_args: list[str]  # Unconsumed args passed unparsed to builtin goal.
     goals: list[str]  # Explicitly requested goals.
     unknown_goals: list[str]  # Any unknown goals.
     scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
@@ -129,27 +128,30 @@ class ArgSplitter:
         passthru: list[str] = []
         unknown_scopes: list[str] = []
         builtin_goal: str | None = None
-        builtin_args: list[str] = []
 
         def add_scope(s: str) -> None:
             # Force the scope to appear, even if empty.
             if s not in scope_to_flags:
                 scope_to_flags[s] = []
 
-        def add_goal(scope: str) -> bool:
-            """If `scope` was for a known builtin goal, return False, else True."""
+        def add_goal(scope: str) -> str:
+            """Returns the scope name to assign flags to."""
             scope_info = self._known_goal_scopes.get(scope)
-            if scope_info:
-                if scope_info.is_builtin:
-                    # Get scope from info in case we hit an aliased builtin goal.
-                    nonlocal builtin_goal
-                    builtin_goal = scope_info.scope
-                    return False
-                goals.add(scope)
-            else:
+            if not scope_info:
                 unknown_scopes.append(scope)
-            add_scope(scope)
-            return True
+                add_scope(scope)
+                return scope
+
+            nonlocal builtin_goal
+            if scope_info.is_builtin and not builtin_goal:
+                # Get scope from info in case we hit an aliased builtin goal.
+                builtin_goal = scope_info.scope
+            else:
+                goals.add(scope_info.scope)
+            add_scope(scope_info.scope)
+
+            # Use builtin goal as default scope for args.
+            return builtin_goal or scope_info.scope
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.
@@ -165,12 +167,14 @@ class ArgSplitter:
         for flag in global_flags:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
         scope, flags = self._consume_scope()
-        while scope and add_goal(scope):
+        while scope:
+            # `add_goal` returns the currently active scope to assign flags to.
+            scope = add_goal(scope)
             for flag in flags:
                 assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
 
-        while self._unconsumed_args and not builtin_goal and not self._at_double_dash():
+        while self._unconsumed_args and not self._at_double_dash():
             if self._at_flag():
                 arg = self._unconsumed_args.pop()
                 # We assume any args here are in global scope.
@@ -189,10 +193,7 @@ class ArgSplitter:
             elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
                 builtin_goal = NO_GOAL_NAME
 
-        if builtin_goal:
-            # Pass any unconsumed flags and args unparsed to the builtin goal.
-            builtin_args = flags + list(reversed(self._unconsumed_args))
-        elif self._at_double_dash():
+        if self._at_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
@@ -212,7 +213,6 @@ class ArgSplitter:
 
         return SplitArgs(
             builtin_goal=builtin_goal,
-            builtin_args=builtin_args,
             goals=list(goals),
             unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),

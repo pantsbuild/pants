@@ -43,7 +43,6 @@ def assert_valid_split(
     expected_is_help: bool = False,
     expected_help_advanced: bool = False,
     expected_help_all: bool = False,
-    expected_builtin_args: list[str] = [],
 ) -> None:
     expected_passthru = expected_passthru or []
     args = shlex.split(args_str)
@@ -53,7 +52,6 @@ def assert_valid_split(
     assert expected_specs == split_args.specs
     assert expected_passthru == split_args.passthru
 
-    assert expected_builtin_args == split_args.builtin_args
     assert expected_is_help == (
         split_args.builtin_goal
         in ("help", "help-advanced", "help-all", UNKNOWN_GOAL_NAME, NO_GOAL_NAME)
@@ -275,24 +273,22 @@ def test_subsystem_flags(splitter: ArgSplitter) -> None:
     )
 
 
-def help_test(command_line: str, *args: str, **expected):
+def help_test(command_line: str, **expected):
     return (
         command_line,
         {
             **expected,
             "expected_passthru": None,
             "expected_is_help": True,
-            "expected_builtin_args": list(args),
         },
     )
 
 
-def help_no_arguments_test(command_line: str, *args, **expected):
+def help_no_arguments_test(command_line: str, *scopes: str, **expected):
     return help_test(
         command_line,
-        *args,
         expected_goals=[],
-        expected_scope_to_flags={"": []},
+        expected_scope_to_flags={scope: [] for scope in ("", *scopes)},
         expected_specs=[],
         **expected,
     )
@@ -302,15 +298,34 @@ def help_no_arguments_test(command_line: str, *args, **expected):
     "command_line, expected",
     [
         help_no_arguments_test("./pants"),
-        help_no_arguments_test("./pants help"),
-        help_no_arguments_test("./pants -h"),
-        help_no_arguments_test("./pants --help"),
-        help_no_arguments_test("./pants help-advanced", expected_help_advanced=True),
-        help_no_arguments_test("./pants --help-advanced", expected_help_advanced=True),
+        help_no_arguments_test("./pants help", "help"),
+        help_no_arguments_test("./pants -h", "help"),
+        help_no_arguments_test("./pants --help", "help"),
         help_no_arguments_test(
-            "./pants --help-advanced --help", "--help", expected_help_advanced=True
+            "./pants help-advanced", "help-advanced", expected_help_advanced=True
         ),
-        help_no_arguments_test("./pants help-all", expected_help_all=True),
+        help_no_arguments_test(
+            "./pants --help-advanced", "help-advanced", expected_help_advanced=True
+        ),
+        help_no_arguments_test("./pants help-all", "help-all", expected_help_all=True),
+        help_test(
+            "./pants --help-advanced --help",
+            expected_goals=["help"],
+            expected_scope_to_flags={"": [], "help": [], "help-advanced": []},
+            expected_specs=[],
+            expected_help_advanced=True,
+        ),
+        help_test(
+            "./pants --help --help-advanced --builtin-option --help-advanced-option",
+            expected_goals=["help-advanced"],
+            expected_scope_to_flags={
+                "": [],
+                "help": ["--builtin-option"],
+                "help-advanced": ["--option"],
+            },
+            expected_specs=[],
+            expected_help_advanced=False,
+        ),
         help_test(
             "./pants -f",
             expected_goals=[],
@@ -319,53 +334,46 @@ def help_no_arguments_test(command_line: str, *args, **expected):
         ),
         help_test(
             "./pants help check -x",
-            "check",
-            "-x",
-            expected_goals=[],
-            expected_scope_to_flags={"": []},
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "help": ["-x"], "check": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check -h",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_scope_to_flags={"": [], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check --help test",
-            "test",
-            expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_goals=["check", "test"],
+            expected_scope_to_flags={"": [], "check": [], "help": [], "test": []},
             expected_specs=[],
         ),
         help_test(
             "./pants test src/foo/bar:baz -h",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": []},
+            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants check --help-advanced test",
-            "test",
-            expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_goals=["check", "test"],
+            expected_scope_to_flags={"": [], "check": [], "help-advanced": [], "test": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants help-advanced check",
-            "check",
-            expected_goals=[],
-            expected_scope_to_flags={"": []},
+            expected_goals=["check"],
+            expected_scope_to_flags={"": [], "check": [], "help-advanced": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants check help-all test --help",
-            "test",
-            "--help",
-            expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_goals=["check", "test", "help"],
+            expected_scope_to_flags={"": [], "check": [], "help": [], "help-all": [], "test": []},
             expected_specs=[],
             expected_help_all=True,
         ),
