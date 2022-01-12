@@ -51,6 +51,7 @@ class AstVisitor(ast.NodeVisitor):
 
         consume_until("import")
 
+        # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
             consume_until(alias.name.split(".")[-1])
 
