@@ -23,7 +23,7 @@ class ConanFetchTest(TaskTestBase):
         self.assertIsNone(context.products.get_data(ConanPrep.tool_instance_cls))
 
     def test_rewrites_remotes_according_to_options(self):
-        self.set_options(conan_remotes={"pants-conan": "https://conan.bintray.com"})
+        self.set_options(conan_remotes={"pants-conan": "https://center.conan.io"})
         conan_prep_task_type = self.synthesize_task_subtype(ConanPrep, "conan_prep_scope")
         # We need at least one library to resolve here so that the conan pex is generated.
         dummy_target = self.make_target(
@@ -41,4 +41,4 @@ class ConanFetchTest(TaskTestBase):
             ["remote", "list"], env={"CONAN_USER_HOME": user_home}
         )
         self.assertEqual(0, exit_code)
-        self.assertEqual(stdout, "pants-conan: https://conan.bintray.com [Verify SSL: True]\n")
+        self.assertEqual(stdout, "pants-conan: https://center.conan.io [Verify SSL: True]\n")
