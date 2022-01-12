@@ -115,9 +115,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         __import__(
             "ignored"  # pants: ignore
         )
-        __import__(  # pants: ignore
+        __import__(
             "also_not_ignored_but_looks_like_it_could_be"
-        )
+        )  # pants: ignore
         """
     )
     assert_imports_parsed(
