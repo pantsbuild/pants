@@ -7,10 +7,10 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::{Duration, Instant};
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use double_checked_cell_async::DoubleCheckedCell;
 use fs::{self, File, PathStat};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
@@ -104,7 +104,7 @@ pub struct CommandRunner {
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
   retry_interval_duration: Duration,
-  capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
+  capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
 }
 
@@ -127,7 +127,7 @@ impl CommandRunner {
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
     cache_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
     let store_use_tls = store_address.starts_with("https://");
@@ -177,8 +177,7 @@ impl CommandRunner {
       platform,
       overall_deadline,
       retry_interval_duration,
-      capabilities_cell: capabilities_cell_opt
-        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
+      capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
     };
 

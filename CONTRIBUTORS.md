@@ -1,5 +1,6 @@
 Created by running `./pants run build-support/bin/contributors.py`.
 
++ A. Alonso Dominguez
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
@@ -247,4 +248,5 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + billybecker
 + eugene yokota
 + hephex
++ wimax-grapl
 + Ólafur Páll Geirsson

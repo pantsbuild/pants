@@ -57,9 +57,7 @@ class ThriftSourceTarget(Target):
         ThriftDependenciesField,
         ThriftSourceField,
     )
-    help = (
-        "A single Thrift file used to generate various languages.\n\n" f"See {doc_url('thrift')}."
-    )
+    help = f"A single Thrift file used to generate various languages.\n\nSee {doc_url('thrift')}."
 
 
 # -----------------------------------------------------------------------------------------------

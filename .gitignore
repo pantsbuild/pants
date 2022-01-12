@@ -56,5 +56,6 @@ GSYMS
 GTAGS
 .mypy_cache/
 /.pants
+/.pants.rc
 /.venv
 .tool-versions

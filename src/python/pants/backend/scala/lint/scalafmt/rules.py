@@ -170,6 +170,8 @@ async def setup_scalafmt_partition(
     ]
     if request.check_only:
         args.append("--list")
+    else:
+        args.append("--quiet")
     args.extend(request.files)
 
     process = Process(
@@ -325,5 +327,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(ScalaLangFmtRequest, ScalafmtRequest),
+        UnionRule(LintRequest, ScalafmtRequest),
         UnionRule(JvmToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

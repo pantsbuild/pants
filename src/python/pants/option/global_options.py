@@ -663,7 +663,7 @@ class GlobalOptions(Subsystem):
             metavar="<path>",
             # NB: See `--pants-config-files`.
             fingerprint=False,
-            default=["/etc/pantsrc", "~/.pants.rc"],
+            default=["/etc/pantsrc", "~/.pants.rc", ".pants.rc"],
             help=(
                 "Override config with values from these files, using syntax matching that of "
                 "`--pants-config-files`."

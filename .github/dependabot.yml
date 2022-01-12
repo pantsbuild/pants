@@ -2,16 +2,13 @@ version: 2
 updates:
   - package-ecosystem: "cargo"
     directory: "/src/rust/engine"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     rebase-strategy: auto
     schedule:
       interval: "weekly" 
-      day: "thursday"
-      time: "12:00"
+      day: "wednesday"
+      time: "03:00"
       timezone: "US/Pacific"
     reviewers:
       - Eric-Arellano
       - stuhood
-    labels:
-      - "rust"
-      - "dependencies"

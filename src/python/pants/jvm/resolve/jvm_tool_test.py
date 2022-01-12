@@ -7,8 +7,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFILE
-from pants.backend.python.target_types import UnrecognizedResolveNamesError
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, UnrecognizedResolveNamesError
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents

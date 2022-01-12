@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
   Debug,
   strum_macros::AsRefStr,
   strum_macros::EnumIter,
-  strum_macros::ToString,
+  strum_macros::Display,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum Metric {
