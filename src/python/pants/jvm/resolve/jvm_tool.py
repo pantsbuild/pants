@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.resources
-import json
 import logging
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence, cast
@@ -125,8 +124,7 @@ class JvmToolBase(Subsystem):
 
     def resolved_lockfile(self) -> CoursierResolvedLockfile:
         lockfile_content = self.lockfile_content()
-        lockfile_content_json = json.loads(lockfile_content)
-        return CoursierResolvedLockfile.from_json_dict(lockfile_content_json)
+        return CoursierResolvedLockfile.from_serialized(lockfile_content)
 
 
 @union

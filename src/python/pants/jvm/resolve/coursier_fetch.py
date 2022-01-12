@@ -377,10 +377,18 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dict(cls, lockfile) -> CoursierResolvedLockfile:
+    def from_json_dict(cls, json_lock_entries) -> CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
 
-        return cls(entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in lockfile))
+        return cls(
+            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
+        )
+
+    @classmethod
+    def from_serialized(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
+        """Construct a CoursierResolvedLockfile from its serialized JSON dictionary
+        representation."""
+        return cls.from_json_dict(json.loads(lockfile))
 
     def to_json(self) -> bytes:
         """Export this CoursierResolvedLockfile to human-readable JSON.
@@ -772,7 +780,7 @@ async def get_coursier_lockfile_for_resolve(
 ) -> CoursierResolvedLockfile:
     lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
-    return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
+    return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
 
 @dataclass(frozen=True)
