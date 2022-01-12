@@ -24,10 +24,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import (
-    LockfileMetadata,
-    calculate_invalidation_digest,
-)
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfilesSubsystem,
@@ -39,6 +36,7 @@ from pants.core.goals.generate_lockfiles import (
     UserLockfileRequests,
     WrappedLockfileRequest,
 )
+from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -193,7 +191,7 @@ async def generate_lockfile(
         DigestContents, Digest, poetry_export_result.output_digest
     )
     # TODO(#12314) Improve error message on `Requirement.parse`
-    metadata = LockfileMetadata.new(
+    metadata = PythonLockfileMetadata.new(
         req.interpreter_constraints,
         {PipRequirement.parse(i) for i in req.requirements},
     )
