@@ -6,7 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-arc-swap = "1.2"
+arc-swap = "1.5"
 colored = "2.0.0"
 chrono = "0.4.10"
 lazy_static = "1"
