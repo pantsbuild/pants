@@ -21,7 +21,6 @@ __pycache__/
 .idea
 /.vscode/
 .cache
-.pantsrc
 .pants.d
 .pants.run
 .pants.workdir.file_lock
@@ -57,5 +56,6 @@ GSYMS
 GTAGS
 .mypy_cache/
 /.pants
+/.pantsrc
 /.venv
 .tool-versions
