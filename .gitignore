@@ -21,6 +21,7 @@ __pycache__/
 .idea
 /.vscode/
 .cache
+.pantsrc
 .pants.d
 .pants.run
 .pants.workdir.file_lock
