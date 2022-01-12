@@ -16,6 +16,7 @@ END_LOCKFILE_HEADER = b"# --- END PANTS LOCKFILE METADATA ---"
 
 
 class LockfileScope(Enum):
+    JVM = "jvm"
     PYTHON = "python"
 
 
