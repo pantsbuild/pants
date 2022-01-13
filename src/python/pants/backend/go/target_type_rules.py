@@ -31,7 +31,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
     ThirdPartyPkgAnalysis,
-    ThirdPartyPkgInfoRequest,
+    ThirdPartyPkgAnalysisRequest,
 )
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, SiblingAddresses
@@ -164,7 +164,7 @@ async def inject_go_third_party_package_dependencies(
     tgt = wrapped_target.target
     pkg_info = await Get(
         ThirdPartyPkgAnalysis,
-        ThirdPartyPkgInfoRequest(
+        ThirdPartyPkgAnalysisRequest(
             tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
         ),
     )

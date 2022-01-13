@@ -26,7 +26,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
     ThirdPartyPkgAnalysis,
-    ThirdPartyPkgInfoRequest,
+    ThirdPartyPkgAnalysisRequest,
 )
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import ProcessExecutionFailure
@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *go_mod.rules(),
             QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
-            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgInfoRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -320,7 +320,7 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
     ):
         rule_runner.request(
             ThirdPartyPkgAnalysis,
-            [ThirdPartyPkgInfoRequest("another_project.org/foo", digest, "go.mod")],
+            [ThirdPartyPkgAnalysisRequest("another_project.org/foo", digest, "go.mod")],
         )
 
 
@@ -415,7 +415,7 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
+        [ThirdPartyPkgAnalysisRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
     )
     assert pkg_info.error is not None
 
@@ -536,7 +536,7 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
+        [ThirdPartyPkgAnalysisRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
     )
     assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files

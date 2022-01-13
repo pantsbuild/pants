@@ -25,7 +25,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
-    ThirdPartyPkgInfoRequest,
+    ThirdPartyPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -107,7 +107,7 @@ async def setup_build_go_package_target_request(
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgAnalysis,
-            ThirdPartyPkgInfoRequest(import_path, _go_mod_info.digest, _go_mod_info.mod_path),
+            ThirdPartyPkgAnalysisRequest(import_path, _go_mod_info.digest, _go_mod_info.mod_path),
         )
 
         # We error if trying to _build_ a package with issues (vs. only generating the target and

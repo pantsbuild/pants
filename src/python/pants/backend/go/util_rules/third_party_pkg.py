@@ -63,7 +63,7 @@ class ThirdPartyPkgAnalysis:
 
 
 @dataclass(frozen=True)
-class ThirdPartyPkgInfoRequest(EngineAwareParameter):
+class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     """Request the info and digest needed to build a third-party package.
 
     The package's module must be included in the input `go.mod`/`go.sum`.
@@ -449,7 +449,7 @@ async def download_and_analyze_third_party_packages(
 
 
 @rule
-async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyPkgAnalysis:
+async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
