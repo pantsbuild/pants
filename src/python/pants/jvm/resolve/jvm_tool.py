@@ -299,16 +299,25 @@ async def load_jvm_lockfile(
     if not lockfile_snapshot.files:
         raise ValueError(
             f"JVM tool `{request.resolve_name}` does not have a lockfile generated. "
-            f"Run `{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name} to "
+            f"Run `{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name}` to "
             "generate it."
         )
 
-    return await Get(
+    resolved_lockfile = await Get(
         CoursierResolvedLockfile,
         CoursierResolveKey(
             name=request.resolve_name, path=request.lockfile_dest, digest=lockfile_snapshot.digest
         ),
     )
+
+    if resolved_lockfile.metadata and resolved_lockfile.metadata.is_valid_for(request.artifact_inputs):
+        raise ValueError(
+            f"The lockfile JVM tool `{request.resolve_name} was generated with different "
+            "requirements, and needs to be regenerated using "
+            f"`{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name}`"
+        )
+
+    return resolved_lockfile
 
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
