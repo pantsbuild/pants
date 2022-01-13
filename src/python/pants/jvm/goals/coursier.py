@@ -21,12 +21,8 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets
-from pants.jvm.resolve.coursier_fetch import (
-    ArtifactRequirement,
-    ArtifactRequirements,
-    CoursierError,
-    CoursierResolvedLockfile,
-)
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coursier_fetch import CoursierError, CoursierResolvedLockfile
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.frozendict import FrozenDict

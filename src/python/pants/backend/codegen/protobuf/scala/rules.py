@@ -44,12 +44,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    ArtifactRequirements,
-    Coordinate,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import (
     GatherJvmCoordinatesRequest,
     JvmToolLockfileRequest,
