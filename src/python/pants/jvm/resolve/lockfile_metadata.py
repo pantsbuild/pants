@@ -14,7 +14,7 @@ from pants.core.util_rules.lockfile_metadata import (
     _get_metadata,
     lockfile_metadata_registrar,
 )
-from pants.jvm.resolve.coursier_fetch import ArtifactRequirement
+from pants.jvm.resolve.common import ArtifactRequirement
 
 _jvm_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.JVM)
 
