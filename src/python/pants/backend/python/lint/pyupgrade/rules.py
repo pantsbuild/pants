@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -33,7 +32,7 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(PythonFmtRequest, LintRequest):
+class PyUpgradeRequest(FmtRequest, LintRequest):
     field_set_type = PyUpgradeFieldSet
 
 
@@ -106,7 +105,7 @@ async def pyupgrade_lint(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> LintR
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, PyUpgradeRequest),
+        UnionRule(FmtRequest, PyUpgradeRequest),
         UnionRule(LintRequest, PyUpgradeRequest),
         *pex.rules(),
     ]

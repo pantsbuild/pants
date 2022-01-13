@@ -27,7 +27,7 @@ _FS = TypeVar("_FS", bound=FieldSet)
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
-    """A request to style or lint a collection of `FieldSet`s.
+    """A request to format or lint a collection of `FieldSet`s.
 
     Should be subclassed for a particular style engine in order to support autoformatting or
     linting.
@@ -36,6 +36,7 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     field_set_type: ClassVar[type[_FS]]
 
     field_sets: Collection[_FS]
+    # TODO: Move this onto `FmtRequest`.
     prior_formatter_result: Snapshot | None = None
 
     def __init__(

@@ -3,12 +3,10 @@
 import dataclasses
 from dataclasses import dataclass
 
-from pants.backend.java.lint import java_fmt
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
-from pants.backend.java.lint.java_fmt import JavaFmtRequest
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -35,7 +33,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(JavaFmtRequest, LintRequest):
+class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
 
 
@@ -167,8 +165,7 @@ async def generate_google_java_format_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        *java_fmt.rules(),
-        UnionRule(JavaFmtRequest, GoogleJavaFormatRequest),
+        UnionRule(FmtRequest, GoogleJavaFormatRequest),
         UnionRule(LintRequest, GoogleJavaFormatRequest),
         UnionRule(JvmToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]
