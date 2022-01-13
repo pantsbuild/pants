@@ -10,9 +10,12 @@ import os
 import re
 from dataclasses import dataclass
 from itertools import chain
-from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
 from urllib.parse import quote_plus as url_quote_plus
 
+import toml
+
+from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
@@ -55,6 +58,9 @@ from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
+
+if TYPE_CHECKING:
+    from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +349,7 @@ class CoursierResolvedLockfile:
     """
 
     entries: tuple[CoursierLockfileEntry, ...]
+    metadata: JVMLockfileMetadata | None = None
 
     @classmethod
     def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
@@ -377,7 +384,7 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dict(cls, json_lock_entries) -> CoursierResolvedLockfile:
+    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
 
         return cls(
@@ -385,20 +392,55 @@ class CoursierResolvedLockfile:
         )
 
     @classmethod
-    def from_serialized(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its serialized JSON dictionary
-        representation."""
-        return cls.from_json_dict(json.loads(lockfile))
+    def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
+        """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
 
-    def to_json(self) -> bytes:
-        """Export this CoursierResolvedLockfile to human-readable JSON.
-
-        This JSON is intended to be checked in to the user's repo as a hermetic snapshot of a
-        Coursier resolved JVM classpath.
+        The toml file should consist of an `[entries]` block, followed by several entries.
         """
-        return json.dumps([entry.to_json_dict() for entry in self.entries], indent=4).encode(
-            "utf-8"
+
+        lockfile_str: str
+        lockfile_bytes: bytes
+        if isinstance(lockfile, str):
+            lockfile_str = lockfile
+            lockfile_bytes = lockfile.encode("utf-8")
+        else:
+            lockfile_str = lockfile.decode("utf-8")
+            lockfile_bytes = lockfile
+
+        contents = toml.loads(lockfile_str)
+        entries = contents["entries"]
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
+
+        return cls(
+            entries=entries,
+            metadata=metadata,
         )
+
+    @classmethod
+    def from_serialized(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
+        """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
+        attached metadata, or old-style JSON.)."""
+
+        try:
+            return cls.from_toml(lockfile)
+        except Exception:  # toml.TomlDecodeError:
+            deprecated.warn_or_error(
+                "2.11.0dev", "JSON-encoded JVM lockfile", "run `./pants generate-lockfiles"
+            )
+            return cls.from_json_dicts(json.loads(lockfile))
+
+    def to_serialized(self) -> bytes:
+        """Export this CoursierResolvedLockfile to a human-readable serialized form.
+
+        This serialized form is intended to be checked in to the user's repo as a hermetic snapshot
+        of a Coursier resolved JVM classpath.
+        """
+
+        lockfile = {
+            "entries": [entry.to_json_dict() for entry in self.entries],
+        }
+
+        return toml.dumps(lockfile).encode("utf-8")
 
 
 def classpath_dest_filename(coord: str, src_filename: str) -> str:

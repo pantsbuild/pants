@@ -227,7 +227,7 @@ def test_deploy_jar_no_deps(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
             "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
         }
     )
@@ -256,7 +256,7 @@ def test_deploy_jar_local_deps(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
             "Example.java": JAVA_MAIN_SOURCE,
             "lib/ExampleLib.java": JAVA_LIB_SOURCE,
         }

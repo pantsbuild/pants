@@ -106,7 +106,7 @@ async def coursier_generate_lockfile(
         # Note that it's legal to have a resolve with no artifacts.
         ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ())),
     )
-    resolved_lockfile_json = resolved_lockfile.to_json()
+    resolved_lockfile_json = resolved_lockfile.to_serialized()
     lockfile_path = jvm.resolves[request.resolve]
 
     # If the lockfile hasn't changed, don't overwrite it.

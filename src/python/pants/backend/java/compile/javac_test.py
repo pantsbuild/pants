@@ -107,7 +107,9 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "java_sources(name='lib')",
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -147,7 +149,9 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -182,7 +186,9 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "ExampleLib.java": JAVA_LIB_SOURCE,
             "OtherLib.java": dedent(
                 """\
@@ -260,7 +266,9 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -346,7 +354,9 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 public class Main implements A {}
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -430,7 +440,9 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 class Other implements B {}
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "lib/BUILD": dedent(
                 """\
                 java_sources(
@@ -489,7 +501,9 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -530,7 +544,9 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "package-info.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -569,7 +585,9 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
         }
     )
     request = CompileJavaSourceRequest(
@@ -619,7 +637,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_json().decode(),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_serialized().decode(),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -660,7 +678,9 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(entries=())
+            .to_serialized()
+            .decode(),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;

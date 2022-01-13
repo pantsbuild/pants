@@ -124,6 +124,7 @@ class JvmToolBase(Subsystem):
 
     def resolved_lockfile(self) -> CoursierResolvedLockfile:
         lockfile_content = self.lockfile_content()
+        logger.warning("%s", f"Tool: {self}, reqs: {self.artifact_inputs}")
         return CoursierResolvedLockfile.from_serialized(lockfile_content)
 
 
@@ -319,7 +320,7 @@ async def generate_jvm_lockfile(
         GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
     )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
-    lockfile_content = resolved_lockfile.to_json()
+    lockfile_content = resolved_lockfile.to_serialized()
     lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])
     )

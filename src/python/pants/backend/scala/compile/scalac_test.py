@@ -102,7 +102,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
@@ -152,7 +152,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -197,7 +197,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
         }
     )
     request = CompileScalaSourceRequest(
@@ -246,7 +246,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_json().decode(),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_serialized().decode(),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -294,7 +294,9 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(())
+            .to_serialized()
+            .decode("utf-8"),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -341,7 +343,7 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_json().decode(),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -410,7 +412,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                     ),
                 )
             )
-            .to_json()
+            .to_serialized()
             .decode("utf-8"),
             "lib/A.scala": dedent(
                 """
@@ -788,7 +790,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                     ),
                 )
             )
-            .to_json()
+            .to_serialized()
             .decode("utf-8"),
             "lib/A.scala": dedent(
                 """\

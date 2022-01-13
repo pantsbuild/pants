@@ -72,7 +72,9 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest = rule_runner.request(Scalatest, [])
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": scalatest.resolved_lockfile().to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": scalatest.resolved_lockfile()
+            .to_serialized()
+            .decode("utf-8"),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
