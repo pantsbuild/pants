@@ -6,10 +6,9 @@
 A tool  to automatically upgrade syntax for newer versions of the language.
 """
 
-from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.pyupgrade import rules as pyupgrade_rules
 from pants.backend.python.lint.pyupgrade import skip_field, subsystem
 
 
 def rules():
-    return (*pyupgrade_rules.rules(), *python_fmt.rules(), *skip_field.rules(), *subsystem.rules())
+    return (*pyupgrade_rules.rules(), *skip_field.rules(), *subsystem.rules())

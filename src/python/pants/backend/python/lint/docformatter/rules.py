@@ -6,11 +6,10 @@ from typing import Tuple
 
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -33,7 +32,7 @@ class DocformatterFieldSet(FieldSet):
         return tgt.get(SkipDocformatterField).value
 
 
-class DocformatterRequest(PythonFmtRequest, LintRequest):
+class DocformatterRequest(FmtRequest, LintRequest):
     field_set_type = DocformatterFieldSet
 
 
@@ -127,7 +126,7 @@ async def docformatter_lint(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, DocformatterRequest),
+        UnionRule(FmtRequest, DocformatterRequest),
         UnionRule(LintRequest, DocformatterRequest),
         *pex.rules(),
     ]

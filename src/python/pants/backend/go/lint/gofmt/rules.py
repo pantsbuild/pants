@@ -7,13 +7,12 @@ import dataclasses
 import os.path
 from dataclasses import dataclass
 
-from pants.backend.go.lint.fmt import GoLangFmtRequest
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
 from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.target_types import GoPackageSourcesField
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -37,7 +36,7 @@ class GofmtFieldSet(FieldSet):
         return tgt.get(SkipGofmtField).value
 
 
-class GofmtRequest(GoLangFmtRequest):
+class GofmtRequest(FmtRequest):
     field_set_type = GofmtFieldSet
 
 
@@ -113,6 +112,6 @@ def rules():
     return [
         *collect_rules(),
         *golang.rules(),
-        UnionRule(GoLangFmtRequest, GofmtRequest),
+        UnionRule(FmtRequest, GofmtRequest),
         UnionRule(LintRequest, GofmtRequest),
     ]

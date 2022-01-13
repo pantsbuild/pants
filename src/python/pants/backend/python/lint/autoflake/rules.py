@@ -6,11 +6,10 @@ from typing import Tuple
 
 from pants.backend.python.lint.autoflake.skip_field import SkipAutoflakeField
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -34,7 +33,7 @@ class AutoflakeFieldSet(FieldSet):
         return tgt.get(SkipAutoflakeField).value
 
 
-class AutoflakeRequest(PythonFmtRequest, LintRequest):
+class AutoflakeRequest(FmtRequest, LintRequest):
     field_set_type = AutoflakeFieldSet
 
 
@@ -142,7 +141,7 @@ async def autoflake_lint(request: AutoflakeRequest, autoflake: Autoflake) -> Lin
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, AutoflakeRequest),
+        UnionRule(FmtRequest, AutoflakeRequest),
         UnionRule(LintRequest, AutoflakeRequest),
         *pex.rules(),
     ]
