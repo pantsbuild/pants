@@ -73,4 +73,5 @@ def rules():
         *collect_rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
+        UnionRule(InjectDependenciesRequest, InjectApacheThriftJavaDependencies),
     )
