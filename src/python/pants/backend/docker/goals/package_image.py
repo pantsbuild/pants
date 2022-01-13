@@ -16,7 +16,7 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
-    DockerImageBuildRootField,
+    DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
     DockerImageSourceField,
@@ -66,7 +66,7 @@ class DockerImageOptionValueError(ValueError):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
-    build_root: DockerImageBuildRootField
+    context_root: DockerImageContextRootField
     registries: DockerImageRegistriesField
     repository: DockerImageRepositoryField
     source: DockerImageSourceField
@@ -146,19 +146,19 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             for registry in registries_options
         )
 
-    def get_build_root(self, default_build_root: str) -> str:
-        build_root = self.build_root.value or default_build_root
-        if build_root.startswith("BUILD:"):
-            build_root = path.join(self.address.spec_path, build_root[6:])
-        if path.isabs(build_root):
-            if self.build_root.value:
-                source = f"{self.build_root.alias!r} field in target {self.address}"
+    def get_context_root(self, default_context_root: str) -> str:
+        context_root = self.context_root.value or default_context_root
+        if context_root.startswith("BUILD:"):
+            context_root = path.join(self.address.spec_path, context_root[6:])
+        if path.isabs(context_root):
+            if self.context_root.value:
+                source = f"{self.context_root.alias!r} field in target {self.address}"
             else:
-                source = "[docker].default_build_root configuration option"
+                source = "[docker].default_context_root configuration option"
             raise InvalidFieldException(
-                f"The {source} must be a relative path, but was {build_root!r}."
+                f"The {source} must be a relative path, but was {context_root!r}."
             )
-        return path.normpath(build_root)
+        return path.normpath(context_root)
 
 
 def get_build_options(
@@ -227,12 +227,12 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
-    build_root = field_set.get_build_root(options.default_build_root)
+    context_root = field_set.get_context_root(options.default_context_root)
     process = docker.build_image(
         build_args=context.build_args,
         digest=context.digest,
         dockerfile=context.dockerfile,
-        build_root=build_root,
+        context_root=context_root,
         env=context.build_env.environment,
         tags=tags,
         extra_args=tuple(
@@ -249,7 +249,7 @@ async def build_docker_image(
     if result.exit_code != 0:
         maybe_msg = format_docker_build_context_help_message(
             address=field_set.address,
-            build_root=build_root,
+            context_root=context_root,
             context=context,
             colors=global_options.options.colors,
         )
@@ -284,29 +284,29 @@ async def build_docker_image(
 
 
 def format_docker_build_context_help_message(
-    address: Address, build_root: str, context: DockerBuildContext, colors: bool
+    address: Address, context_root: str, context: DockerBuildContext, colors: bool
 ) -> str | None:
-    paths_outside_build_root: list[str] = []
+    paths_outside_context_root: list[str] = []
 
     def _chroot_context_paths(paths: tuple[str, str]) -> tuple[str, str]:
-        """Adjust the context paths in `copy_source_vs_context_source` for `build_root`."""
+        """Adjust the context paths in `copy_source_vs_context_source` for `context_root`."""
         instruction_path, context_path = paths
         if not context_path:
             return paths
-        dst = path.relpath(context_path, build_root)
+        dst = path.relpath(context_path, context_root)
         if dst.startswith("."):
-            paths_outside_build_root.append(context_path)
+            paths_outside_context_root.append(context_path)
             return ("", "")
         if instruction_path == dst:
             return ("", "")
         return instruction_path, dst
 
-    # Adjust context paths based on `build_root`.
+    # Adjust context paths based on `context_root`.
     copy_source_vs_context_source: tuple[tuple[str, str], ...] = tuple(
         filter(any, map(_chroot_context_paths, context.copy_source_vs_context_source))
     )
 
-    if not (copy_source_vs_context_source or paths_outside_build_root):
+    if not (copy_source_vs_context_source or paths_outside_context_root):
         # No issues found.
         return None
 
@@ -341,15 +341,15 @@ def format_docker_build_context_help_message(
             f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced, 10)}\n\n"
         )
 
-    if paths_outside_build_root:
-        unreachable = sorted({path.dirname(pth) for pth in paths_outside_build_root})
+    if paths_outside_context_root:
+        unreachable = sorted({path.dirname(pth) for pth in paths_outside_context_root})
         context_paths = tuple(dst for src, dst in context.copy_source_vs_context_source if dst)
-        new_build_root = path.commonpath(context_paths) or "."
+        new_context_root = path.commonpath(context_paths) or "."
         msg += (
             "There are unreachable files in these directories, excluded from the build context "
-            f"due to `build_root` being {build_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
-            f"Suggested `build_root` setting is {new_build_root!r} in order to include all files "
-            "in the build context, or relocate them to be part of the current `build_root`."
+            f"due to `context_root` being {context_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
+            f"Suggested `context_root` setting is {new_context_root!r} in order to include all files "
+            "in the build context, or relocate them to be part of the current `context_root`."
         )
 
     return msg

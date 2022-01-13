@@ -31,7 +31,7 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         tags=tags,
         digest=digest,
         dockerfile=dockerfile,
-        build_root="build/context",
+        context_root="build/context",
         extra_args=("--pull", "--squash"),
     )
 

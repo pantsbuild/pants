@@ -34,7 +34,7 @@ class DockerBinary(BinaryPath):
         digest: Digest,
         dockerfile: str | None = None,
         build_args: DockerBuildArgs | None = None,
-        build_root: str = ".",
+        context_root: str = ".",
         env: Mapping[str, str] | None = None,
         extra_args: tuple[str, ...] = (),
     ) -> Process:
@@ -51,7 +51,7 @@ class DockerBinary(BinaryPath):
             args.extend(["--file", dockerfile])
 
         # Docker context root.
-        args.append(build_root)
+        args.append(context_root)
 
         return Process(
             argv=tuple(args),
