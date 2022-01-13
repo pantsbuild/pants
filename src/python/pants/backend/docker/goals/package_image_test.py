@@ -695,9 +695,10 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "copy_sources, build_context_files, expect_logged, fail_log_contains",
+    "build_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
         (
+            None,
             ("src/project/bin.pex",),
             (
                 "src.project/binary.pex",
@@ -710,18 +711,44 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "  * src/project/app.py\n\n",
             ],
         ),
+        (
+            "BUILD:.",
+            ("config.txt",),
+            ("docker/test/conf/config.txt",),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
+            [
+                "suggested renames:\n\n  * config.txt => conf/config.txt\n\n",
+            ],
+        ),
+        (
+            "BUILD:.",
+            ("conf/config.txt",),
+            (
+                "docker/test/conf/config.txt",
+                "src.project/binary.pex",
+            ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
+            [
+                "There are unreachable files in these directories, excluded from the build context "
+                "due to `build_root` being 'docker/test':\n\n"
+                "  * src.project\n\n"
+                "Suggested `build_root` setting is '.' in order to include all files in the "
+                "build context, or relocate them to be part of the current `build_root`."
+            ],
+        ),
     ],
 )
 def test_docker_build_fail_logs(
     rule_runner: RuleRunner,
     caplog,
+    build_root: str | None,
     copy_sources: tuple[str, ...],
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
 ) -> None:
     caplog.set_level(logging.INFO)
-    rule_runner.write_files({"docker/test/BUILD": "docker_image()"})
+    rule_runner.write_files({"docker/test/BUILD": f"docker_image(build_root={build_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
     with pytest.raises(ProcessExecutionFailure):

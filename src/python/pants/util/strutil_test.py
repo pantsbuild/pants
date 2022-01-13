@@ -151,3 +151,12 @@ def test_bullet_list() -> None:
     )
     assert bullet_list(["a"]) == "  * a"
     assert bullet_list([]) == ""
+
+
+def test_bullet_list_max_elements() -> None:
+    assert bullet_list(list("abcdefg"), 3) == (
+        """\
+  * a
+  * b
+  * ... and 5 more"""
+    )

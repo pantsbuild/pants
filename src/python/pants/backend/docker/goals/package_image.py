@@ -247,7 +247,7 @@ async def build_docker_image(
     result = await Get(FallibleProcessResult, Process, process)
 
     if result.exit_code != 0:
-        maybe_msg = docker_build_failed(
+        maybe_msg = format_docker_build_context_help_message(
             address=field_set.address,
             build_root=build_root,
             context=context,
@@ -283,10 +283,31 @@ async def build_docker_image(
     )
 
 
-def docker_build_failed(
+def format_docker_build_context_help_message(
     address: Address, build_root: str, context: DockerBuildContext, colors: bool
 ) -> str | None:
-    if not context.copy_source_vs_context_source:
+    paths_outside_build_root: list[str] = []
+
+    def _chroot_context_paths(paths: tuple[str, str]) -> tuple[str, str]:
+        """Adjust the context paths in `copy_source_vs_context_source` for `build_root`."""
+        instruction_path, context_path = paths
+        if not context_path:
+            return paths
+        dst = path.relpath(context_path, build_root)
+        if dst.startswith("."):
+            paths_outside_build_root.append(context_path)
+            return ("", "")
+        if instruction_path == dst:
+            return ("", "")
+        return instruction_path, dst
+
+    # Adjust context paths based on `build_root`.
+    copy_source_vs_context_source: tuple[tuple[str, str], ...] = tuple(
+        filter(any, map(_chroot_context_paths, context.copy_source_vs_context_source))
+    )
+
+    if not (copy_source_vs_context_source or paths_outside_build_root):
+        # No issues found.
         return None
 
     msg = (
@@ -295,31 +316,40 @@ def docker_build_failed(
         "\n\n"
     )
 
-    renames = [
+    renames = sorted(
         format_rename_suggestion(src, dst, colors=colors)
-        for src, dst in context.copy_source_vs_context_source
+        for src, dst in copy_source_vs_context_source
         if src and dst
-    ]
+    )
     if renames:
         msg += (
             f"However there are possible matches. Please review the following list of suggested "
             f"renames:\n\n{bullet_list(renames)}\n\n"
         )
 
-    unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]
+    unknown = sorted(src for src, dst in copy_source_vs_context_source if src and not dst)
     if unknown:
         msg += (
             f"The following files were not found in the Docker build context:\n\n"
             f"{bullet_list(unknown)}\n\n"
         )
 
-    unreferenced = [dst for src, dst in context.copy_source_vs_context_source if not src]
+    unreferenced = sorted(dst for src, dst in copy_source_vs_context_source if dst and not src)
     if unreferenced:
-        if len(unreferenced) > 10:
-            unreferenced = unreferenced[:9] + [f"... and {len(unreferenced)-9} more"]
         msg += (
             f"There are additional files in the Docker build context that were not referenced by "
-            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced)}\n\n"
+            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced, 10)}\n\n"
+        )
+
+    if paths_outside_build_root:
+        unreachable = sorted({path.dirname(pth) for pth in paths_outside_build_root})
+        context_paths = tuple(dst for src, dst in context.copy_source_vs_context_source if dst)
+        new_build_root = path.commonpath(context_paths) or "."
+        msg += (
+            "There are unreachable files in these directories, excluded from the build context "
+            f"due to `build_root` being {build_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
+            f"Suggested `build_root` setting is {new_build_root!r} in order to include all files "
+            "in the build context, or relocate them to be part of the current `build_root`."
         )
 
     return msg
