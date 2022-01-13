@@ -13,12 +13,8 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.jvm.goals.coursier import CoursierResolve
 from pants.jvm.goals.coursier import rules as coursier_goal_rules
-from pants.jvm.resolve.coursier_fetch import (
-    Coordinate,
-    Coordinates,
-    CoursierLockfileEntry,
-    CoursierResolvedLockfile,
-)
+from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
