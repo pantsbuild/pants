@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerBuildArgsField
+from pants.backend.docker.target_types import DockerImageBuildArgsField
 from pants.backend.docker.utils import KeyValueSequenceUtil
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
@@ -27,7 +27,7 @@ async def docker_build_args(
 ) -> DockerBuildArgs:
     return DockerBuildArgs.from_strings(
         *docker_options.build_args,
-        *(request.target.get(DockerBuildArgsField).value or ()),
+        *(request.target.get(DockerImageBuildArgsField).value or ()),
     )
 
 

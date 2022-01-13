@@ -16,11 +16,11 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerImageRegistriesField,
+    DockerImageRepositoryField,
     DockerImageSourceField,
     DockerImageTagsField,
     DockerImageTargetStageField,
-    DockerRegistriesField,
-    DockerRepositoryField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
@@ -65,8 +65,8 @@ class DockerImageOptionValueError(ValueError):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
-    registries: DockerRegistriesField
-    repository: DockerRepositoryField
+    registries: DockerImageRegistriesField
+    repository: DockerImageRepositoryField
     source: DockerImageSourceField
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField

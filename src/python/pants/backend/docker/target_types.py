@@ -35,7 +35,7 @@ _interpolation_help = (
 )
 
 
-class DockerBuildArgsField(StringSequenceField):
+class DockerImageBuildArgsField(StringSequenceField):
     alias = "extra_build_args"
     default = ()
     help = (
@@ -108,11 +108,11 @@ class DockerImageTargetStageField(StringField):
     )
 
 
-class DockerDependenciesField(Dependencies):
+class DockerImageDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class DockerRegistriesField(StringSequenceField):
+class DockerImageRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_REGISTRIES,)
     help = (
@@ -148,7 +148,7 @@ class DockerRegistriesField(StringSequenceField):
     )
 
 
-class DockerRepositoryField(StringField):
+class DockerImageRepositoryField(StringField):
     alias = "repository"
     help = (
         'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
@@ -160,7 +160,7 @@ class DockerRepositoryField(StringField):
     )
 
 
-class DockerSkipPushField(BoolField):
+class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
     help = "If set to true, do not push this image to registries when running `./pants publish`."
@@ -185,7 +185,7 @@ class DockerBuildOptionFieldMixin(ABC):
             yield from (self.docker_build_option, value)
 
 
-class DockerBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
+class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
     alias = "image_labels"
     help = (
         "Provide image metadata.\n\n"
@@ -200,7 +200,7 @@ class DockerBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringT
             yield f"{label}={value_formatter(value)}"
 
 
-class DockerBuildSecretsOptionField(
+class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
@@ -240,7 +240,7 @@ class DockerBuildSecretsOptionField(
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
-class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
+class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
     alias = "ssh"
     default = ()
     help = (
@@ -263,17 +263,17 @@ class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        DockerBuildArgsField,
-        DockerDependenciesField,
+        DockerImageBuildArgsField,
+        DockerImageDependenciesField,
         DockerImageSourceField,
         DockerImageInstructionsField,
         DockerImageTagsField,
-        DockerRegistriesField,
-        DockerRepositoryField,
-        DockerBuildImageLabelsOptionField,
-        DockerBuildSecretsOptionField,
-        DockerBuildSSHOptionField,
-        DockerSkipPushField,
+        DockerImageRegistriesField,
+        DockerImageRepositoryField,
+        DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildSecretsOptionField,
+        DockerImageBuildSSHOptionField,
+        DockerImageSkipPushField,
         DockerImageTargetStageField,
         RestartableField,
     )

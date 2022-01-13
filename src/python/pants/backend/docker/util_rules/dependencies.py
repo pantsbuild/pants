@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
-from pants.backend.docker.target_types import DockerDependenciesField
+from pants.backend.docker.target_types import DockerImageDependenciesField
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
@@ -18,7 +18,7 @@ from pants.engine.unions import UnionRule
 
 
 class InjectDockerDependencies(InjectDependenciesRequest):
-    inject_for = DockerDependenciesField
+    inject_for = DockerImageDependenciesField
 
 
 @rule
