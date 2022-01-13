@@ -41,6 +41,6 @@ external_native_library(
 external_native_library(
   name='cereal',
   packages=[
-    conan_requirement('cereal/1.2.2@conan/stable'),
+    conan_requirement('cereal/1.3.0@conan/stable'),
   ],
 )
