@@ -245,6 +245,14 @@ class ArtifactRequirement:
             {"url": url_quote_plus(self.url)} if self.url else {}
         )
 
+    def to_metadata_str(self) -> str:
+        return self.coordinate.to_coord_arg_str(
+            {
+                "url": self.url or "not_provided",
+                "jar": self.jar.address.spec if self.jar else "not_provided",
+            }
+        )
+
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
 class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
@@ -423,7 +431,7 @@ class CoursierResolvedLockfile:
 
         try:
             return cls.from_toml(lockfile)
-        except Exception:  # toml.TomlDecodeError:
+        except toml.TomlDecodeError:
             deprecated.warn_or_error(
                 "2.11.0dev", "JSON-encoded JVM lockfile", "run `./pants generate-lockfiles"
             )

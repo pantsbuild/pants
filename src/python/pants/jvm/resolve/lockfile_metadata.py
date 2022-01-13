@@ -14,7 +14,7 @@ from pants.core.util_rules.lockfile_metadata import (
     _get_metadata,
     lockfile_metadata_registrar,
 )
-from pants.jvm.resolve.coursier_fetch import Coordinate
+from pants.jvm.resolve.coursier_fetch import ArtifactRequirement
 
 _jvm_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.JVM)
 
@@ -30,7 +30,7 @@ class JVMLockfileMetadata(LockfileMetadata):
 
     @staticmethod
     def new(
-        requirements: set[Coordinate],
+        requirements: Iterable[ArtifactRequirement],
     ) -> LockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -40,7 +40,7 @@ class JVMLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return JVMLockfileMetadataV1(requirements)
+        return JVMLockfileMetadataV1.from_artifact_requirements(requirements)
 
     @classmethod
     def from_lockfile(
@@ -64,7 +64,7 @@ class JVMLockfileMetadata(LockfileMetadata):
 
     def is_valid_for(
         self,
-        requirements: Iterable[Coordinate] | None,
+        requirements: Iterable[ArtifactRequirement] | None,
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `JVMLockfileMetadata` can be used in the current execution
         context."""
@@ -81,7 +81,13 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     those in the stored requirements.
     """
 
-    requirements: set[Coordinate]
+    requirements: set[str]
+
+    @classmethod
+    def from_artifact_requirements(
+        cls, requirements: Iterable[ArtifactRequirement]
+    ) -> JVMLockfileMetadataV1:
+        return cls({i.to_metadata_str() for i in requirements})
 
     @classmethod
     def _from_json_dict(
@@ -94,8 +100,8 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
 
         requirements = metadata(
             "generated_with_requirements",
-            Set[Coordinate],
-            lambda l: {Coordinate.from_coord_str(i) for i in l},
+            Set[str],
+            set,
         )
 
         return JVMLockfileMetadataV1(requirements)
@@ -103,22 +109,18 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     def _header_dict(self) -> dict[Any, Any]:
         out = super()._header_dict()
 
-        # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
-        # followed by stringifying does not produce a meaningful result.
         out["generated_with_requirements"] = (
-            sorted(i.to_coord_str() for i in self.requirements)
-            if self.requirements is not None
-            else None
+            sorted(self.requirements) if self.requirements is not None else None
         )
         return out
 
     def is_valid_for(
         self,
-        requirements: Iterable[Coordinate] | None,
+        requirements: Iterable[ArtifactRequirement] | None,
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidJVMLockfileReason] = set()
 
-        if self.requirements != set(requirements or []):
+        if self.requirements != set(i.to_metadata_str() for i in requirements or []):
             failure_reasons.add(InvalidJVMLockfileReason.REQUIREMENTS_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)
