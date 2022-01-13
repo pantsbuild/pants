@@ -27,7 +27,13 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         "test:0.1.0",
         "test:latest",
     )
-    build_request = docker.build_image(tags, digest, dockerfile, extra_args=("--pull", "--squash"))
+    build_request = docker.build_image(
+        tags=tags,
+        digest=digest,
+        dockerfile=dockerfile,
+        build_root="build/context",
+        extra_args=("--pull", "--squash"),
+    )
 
     assert build_request == Process(
         argv=(
@@ -41,7 +47,7 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
             tags[1],
             "--file",
             dockerfile,
-            ".",
+            "build/context",
         ),
         input_digest=digest,
         cache_scope=ProcessCacheScope.PER_SESSION,

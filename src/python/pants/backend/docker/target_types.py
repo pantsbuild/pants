@@ -46,6 +46,16 @@ class DockerImageBuildArgsField(StringSequenceField):
     )
 
 
+class DockerImageBuildRootField(StringField):
+    alias = "build_root"
+    help = (
+        "Specify which directory to use as the Docker build context root, relative to the project "
+        "build root by default. With a `BUILD:` prefix it is relative to the directory of the "
+        "BUILD file. This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
+        "default build root is specified in the `[docker].default_build_root` configuration option."
+    )
+
+
 class DockerImageSourceField(OptionalSingleSourceField):
     default = "Dockerfile"
 
@@ -267,6 +277,7 @@ class DockerImageTarget(Target):
         DockerImageDependenciesField,
         DockerImageSourceField,
         DockerImageInstructionsField,
+        DockerImageBuildRootField,
         DockerImageTagsField,
         DockerImageRegistriesField,
         DockerImageRepositoryField,

@@ -74,6 +74,22 @@ class DockerOptions(Subsystem):
         )
 
         register(
+            "--default-build-root",
+            type=str,
+            default=".",
+            help=(
+                "Provide a default Docker build context root path for `docker_image` targets that "
+                "does not specify their own `build_root`.\n\n"
+                "The build root is relative to the project root by default, but may be prefixed "
+                "with `BUILD:` to be relative to the directory of the BUILD file of the "
+                "`docker_image`.\n\n"
+                "Examples:\n\n"
+                "    --default-build-root=src/docker\n"
+                "    --default-build-root=BUILD:per/image/root\n\n"
+            ),
+        )
+
+        register(
             "--build-args",
             type=list,
             member_type=shell_str,
@@ -156,6 +172,10 @@ class DockerOptions(Subsystem):
     @property
     def env_vars(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.env_vars)))
+
+    @property
+    def default_build_root(self) -> str:
+        return cast(str, self.options.default_build_root)
 
     @property
     def default_repository(self) -> str:

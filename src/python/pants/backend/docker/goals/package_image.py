@@ -16,6 +16,7 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerImageBuildRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
     DockerImageSourceField,
@@ -37,7 +38,7 @@ from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import InvalidFieldException, Target, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.util.strutil import bullet_list
@@ -65,6 +66,7 @@ class DockerImageOptionValueError(ValueError):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
+    build_root: DockerImageBuildRootField
     registries: DockerImageRegistriesField
     repository: DockerImageRepositoryField
     source: DockerImageSourceField
@@ -144,6 +146,20 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             for registry in registries_options
         )
 
+    def get_build_root(self, default_build_root: str) -> str:
+        build_root = self.build_root.value or default_build_root
+        if build_root.startswith("BUILD:"):
+            build_root = path.join(self.address.spec_path, build_root[6:])
+        if path.isabs(build_root):
+            if self.build_root.value:
+                source = f"{self.build_root.alias!r} field in target {self.address}"
+            else:
+                source = "[docker].default_build_root configuration option"
+            raise InvalidFieldException(
+                f"The {source} must be a relative path, but was {build_root!r}."
+            )
+        return path.normpath(build_root)
+
 
 def get_build_options(
     context: DockerBuildContext,
@@ -211,10 +227,12 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
+    build_root = field_set.get_build_root(options.default_build_root)
     process = docker.build_image(
         build_args=context.build_args,
         digest=context.digest,
         dockerfile=context.dockerfile,
+        build_root=build_root,
         env=context.build_env.environment,
         tags=tags,
         extra_args=tuple(
@@ -230,9 +248,10 @@ async def build_docker_image(
 
     if result.exit_code != 0:
         maybe_msg = docker_build_failed(
-            field_set.address,
-            context,
-            global_options.options.colors,
+            address=field_set.address,
+            build_root=build_root,
+            context=context,
+            colors=global_options.options.colors,
         )
         if maybe_msg:
             logger.warning(maybe_msg)
@@ -264,7 +283,9 @@ async def build_docker_image(
     )
 
 
-def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:
+def docker_build_failed(
+    address: Address, build_root: str, context: DockerBuildContext, colors: bool
+) -> str | None:
     if not context.copy_source_vs_context_source:
         return None
 

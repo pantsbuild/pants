@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os.path
 from textwrap import dedent
-from typing import Callable
+from typing import Callable, ContextManager
 
 import pytest
 
@@ -47,10 +47,10 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import WrappedTarget
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.pytest_util import assert_logged
+from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -118,7 +118,8 @@ def assert_build(
     if options:
         opts = options or {}
         opts.setdefault("registries", {})
-        opts.setdefault("default_repository", "{directory}/{name}")
+        opts.setdefault("default_repository", "{name}")
+        opts.setdefault("default_build_root", ".")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
         opts.setdefault("env_vars", [])
@@ -805,4 +806,104 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
             rule_runner,
             Address("", target_name="image"),
             version_tags=("build latest", "dev latest", "prod latest"),
+        )
+
+
+@pytest.mark.parametrize(
+    "expected_build_root, build_root, options",
+    [
+        (".", None, None),
+        ("src/docker", "src/docker", None),
+        ("src/docker", "BUILD:", None),
+        ("src/docker", "BUILD:.", None),
+        ("src", "BUILD:..", None),
+        ("src/docker/build/context", "BUILD:build/context", None),
+        ("src/docker", "src/docker", {"default_build_root": "default/path"}),
+        ("src/docker", None, {"default_build_root": "src/docker"}),
+        ("src/build/context", None, {"default_build_root": "BUILD:../build/context"}),
+    ],
+)
+def test_build_root(
+    rule_runner: RuleRunner, build_root: str | None, options: dict | None, expected_build_root: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": f"docker_image(name='image', build_root={build_root!r})",
+            "src/docker/Dockerfile": "FROM python:3.8",
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--tag",
+            "image:latest",
+            "--file",
+            "src/docker/Dockerfile",
+            expected_build_root,
+        )
+
+    assert_build(
+        rule_runner,
+        Address("src/docker", target_name="image"),
+        options=options,
+        process_assertions=check_docker_proc,
+    )
+
+
+@pytest.mark.parametrize(
+    "build_root, options, raises",
+    [
+        (None, None, no_exception()),
+        (
+            "/abs/path",
+            None,
+            pytest.raises(
+                InvalidFieldException,
+                match=(
+                    r"The 'build_root' field in target src/docker:image must be a relative path, "
+                    r"but was '/abs/path'\."
+                ),
+            ),
+        ),
+        (
+            "BUILD:/abs/path",
+            None,
+            pytest.raises(
+                InvalidFieldException,
+                match=(
+                    r"The 'build_root' field in target src/docker:image must be a relative path, "
+                    r"but was '/abs/path'\."
+                ),
+            ),
+        ),
+        (
+            None,
+            {"default_build_root": "/abs/path"},
+            pytest.raises(
+                InvalidFieldException,
+                match=(
+                    r"The \[docker\]\.default_build_root configuration option must be a relative path, "
+                    r"but was '/abs/path'\."
+                ),
+            ),
+        ),
+    ],
+)
+def test_invalid_build_root(
+    rule_runner: RuleRunner, build_root: str | None, options: dict | None, raises: ContextManager
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/BUILD": f"docker_image(name='image', build_root={build_root!r})",
+            "src/docker/Dockerfile": "FROM python:3.8",
+        }
+    )
+
+    with raises:
+        assert_build(
+            rule_runner,
+            Address("src/docker", target_name="image"),
+            options=options,
         )
