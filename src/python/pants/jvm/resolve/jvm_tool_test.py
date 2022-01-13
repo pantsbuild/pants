@@ -13,7 +13,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import SubsystemRule, rule
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import (
