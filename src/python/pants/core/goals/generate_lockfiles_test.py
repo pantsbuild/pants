@@ -8,6 +8,7 @@ import pytest
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
     NO_TOOL_LOCKFILE,
+    AmbiguousResolveNamesError,
     KnownUserResolveNames,
     LockfileRequest,
     RequestedUserResolveNames,
@@ -74,15 +75,39 @@ def test_determine_tool_sentinels_to_generate() -> None:
     with pytest.raises(UnrecognizedResolveNamesError):
         assert_chosen({"fake"}, expected_user_resolves=[], expected_tools=[])
 
-    # TODO: Add ambiguity checks.
     # Error if same resolve name used for tool lockfiles and user lockfiles.
-    # class AmbiguousTool(ToolLockfileSentinel):
-    #     options_scope = "ambiguous"
-    #
-    # with pytest.raises(AmbiguousResolveNamesError):
-    #     determine_resolves_to_generate(
-    #         {"ambiguous": "lockfile.txt"}, [AmbiguousTool], ["ambiguous"]
-    #     )
+    class AmbiguousTool(ToolLockfileSentinel):
+        options_scope = "ambiguous"
+
+    with pytest.raises(AmbiguousResolveNamesError):
+        determine_resolves_to_generate(
+            [
+                KnownUserResolveNames(
+                    ("ambiguous",),
+                    "[ambiguous].resolves",
+                    requested_resolve_names_cls=Lang1Requested,
+                )
+            ],
+            [AmbiguousTool],
+            set(),
+        )
+    with pytest.raises(AmbiguousResolveNamesError):
+        determine_resolves_to_generate(
+            [
+                KnownUserResolveNames(
+                    ("ambiguous",),
+                    "[ambiguous1].resolves",
+                    requested_resolve_names_cls=Lang1Requested,
+                ),
+                KnownUserResolveNames(
+                    ("ambiguous",),
+                    "[ambiguous2].resolves",
+                    requested_resolve_names_cls=Lang1Requested,
+                ),
+            ],
+            [],
+            set(),
+        )
 
 
 def test_filter_tool_lockfile_requests() -> None:
