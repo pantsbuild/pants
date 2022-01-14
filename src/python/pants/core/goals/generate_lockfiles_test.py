@@ -84,7 +84,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
             [
                 KnownUserResolveNames(
                     ("ambiguous",),
-                    "[ambiguous].resolves",
+                    "[lang].resolves",
                     requested_resolve_names_cls=Lang1Requested,
                 )
             ],
@@ -96,12 +96,12 @@ def test_determine_tool_sentinels_to_generate() -> None:
             [
                 KnownUserResolveNames(
                     ("ambiguous",),
-                    "[ambiguous1].resolves",
+                    "[lang1].resolves",
                     requested_resolve_names_cls=Lang1Requested,
                 ),
                 KnownUserResolveNames(
                     ("ambiguous",),
-                    "[ambiguous2].resolves",
+                    "[lang2].resolves",
                     requested_resolve_names_cls=Lang1Requested,
                 ),
             ],
