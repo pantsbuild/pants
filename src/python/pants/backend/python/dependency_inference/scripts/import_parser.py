@@ -7,9 +7,11 @@
 from __future__ import print_function, unicode_literals
 
 import ast
+import itertools
 import os
 import re
 import sys
+import tokenize
 from io import open
 
 MIN_DOTS = os.environ["MIN_DOTS"]
@@ -23,17 +25,50 @@ STRING_IMPORT_REGEX = re.compile(
 
 
 class AstVisitor(ast.NodeVisitor):
-    def __init__(self, package_parts):
+    def __init__(self, package_parts, contents):
         self._package_parts = package_parts
+        self._contents_lines = contents.decode(errors="ignore").splitlines()
         self.imports = set()
 
     def maybe_add_string_import(self, s):
         if STRING_IMPORT_REGEX.match(s):
             self.imports.add(s)
 
-    def visit_Import(self, node):
+    @staticmethod
+    def _is_pragma_ignored(line):
+        return "# pants: ignore" in line
+
+    def _visit_import_stmt(self, node, import_prefix):
+        # N.B. We only add imports whose line doesn't contain "# pants: ignore"
+        # However, `ast` doesn't expose the exact lines each specific import is on,
+        # so we are forced to tokenize the import statement to tease out which imported
+        # name is on which line so we can check for the ignore pragma.
+        node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
+        token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
+
+        def consume_until(string):
+            return list(itertools.takewhile(lambda t: t[1] != string, token_iter))
+
+        consume_until("import")
+
+        # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
-            self.imports.add(alias.name)
+            consume_until(alias.name.split(".")[-1])
+
+            # N.B. Keep consuming lines while they end in a line-continuation
+            #   (unfortunately `tokenize` doesn't capture this)
+            line = "\\"
+            while line.endswith("\\"):
+                token = next(token_iter)
+                line = token[4]
+
+            if not self._is_pragma_ignored(line):
+                self.imports.add(import_prefix + alias.name)
+            if alias.asname and token[1] != alias.asname:
+                consume_until(alias.asname)
+
+    def visit_Import(self, node):
+        self._visit_import_stmt(node, "")
 
     def visit_ImportFrom(self, node):
         if node.level:
@@ -45,21 +80,24 @@ class AstVisitor(ast.NodeVisitor):
             )
         else:
             abs_module = node.module
-        for alias in node.names:
-            self.imports.add("{}.{}".format(abs_module, alias.name))
+        self._visit_import_stmt(node, abs_module + ".")
 
     def visit_Call(self, node):
         # Handle __import__("string_literal").  This is commonly used in __init__.py files,
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
+            name = None
             if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-                arg_s = node.args[0].s
-                self.imports.add(arg_s)
-                return
+                name = node.args[0].s
             elif isinstance(node.args[0], ast.Constant):
-                self.imports.add(str(node.args[0].value))
+                name = str(node.args[0].value)
+
+            if name is not None:
+                if not self._is_pragma_ignored(self._contents_lines[node.args[0].lineno - 1]):
+                    self.imports.add(name)
                 return
+
         self.generic_visit(node)
 
 
@@ -93,22 +131,16 @@ if os.environ["STRING_IMPORTS"] == "y":
         setattr(AstVisitor, "visit_Constant", visit_Constant)
 
 
-def parse_file(filename):
+def main(filename):
     with open(filename, "rb") as f:
         content = f.read()
     try:
-        return ast.parse(content, filename=filename)
+        tree = ast.parse(content, filename=filename)
     except SyntaxError:
-        return None
-
-
-def main(filename):
-    tree = parse_file(filename)
-    if not tree:
         return
 
     package_parts = os.path.dirname(filename).split(os.path.sep)
-    visitor = AstVisitor(package_parts)
+    visitor = AstVisitor(package_parts, content)
     visitor.visit(tree)
 
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.

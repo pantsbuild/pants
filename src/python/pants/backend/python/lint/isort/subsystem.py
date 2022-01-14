@@ -6,9 +6,11 @@ from __future__ import annotations
 import os.path
 from typing import Iterable, cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -124,7 +126,7 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel(PythonToolLockfileSentinel):
+class IsortLockfileSentinel(ToolLockfileSentinel):
     options_scope = Isort.options_scope
 
 
@@ -134,4 +136,8 @@ def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> PythonLockfi
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, IsortLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, IsortLockfileSentinel),
+    )

@@ -7,7 +7,8 @@ import itertools
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -17,6 +18,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
@@ -109,7 +111,7 @@ class Bandit(PythonToolBase):
         )
 
 
-class BanditLockfileSentinel(PythonToolLockfileSentinel):
+class BanditLockfileSentinel(ToolLockfileSentinel):
     options_scope = Bandit.options_scope
 
 
@@ -144,4 +146,8 @@ async def setup_bandit_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, BanditLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, BanditLockfileSentinel),
+    )

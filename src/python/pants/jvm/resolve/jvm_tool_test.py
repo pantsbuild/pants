@@ -7,14 +7,13 @@ import textwrap
 
 import pytest
 
-from pants.backend.python.subsystems.python_tool_base import DEFAULT_TOOL_LOCKFILE
-from pants.backend.python.target_types import UnrecognizedResolveNamesError
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, UnrecognizedResolveNamesError
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import SubsystemRule, rule
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import (

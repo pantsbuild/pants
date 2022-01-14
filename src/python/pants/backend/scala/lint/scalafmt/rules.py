@@ -7,12 +7,11 @@ import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.scala.lint.scala_lang_fmt import ScalaLangFmtRequest
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -50,7 +49,7 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(ScalaLangFmtRequest, LintRequest):
+class ScalafmtRequest(FmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
 
 
@@ -170,6 +169,8 @@ async def setup_scalafmt_partition(
     ]
     if request.check_only:
         args.append("--list")
+    else:
+        args.append("--quiet")
     args.extend(request.files)
 
     process = Process(
@@ -324,6 +325,7 @@ async def generate_scalafmt_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(ScalaLangFmtRequest, ScalafmtRequest),
+        UnionRule(FmtRequest, ScalafmtRequest),
+        UnionRule(LintRequest, ScalafmtRequest),
         UnionRule(JvmToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

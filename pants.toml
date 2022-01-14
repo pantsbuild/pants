@@ -26,6 +26,7 @@ backend_packages.add = [
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.codegen.avro.java",
   "pants.backend.experimental.codegen.protobuf.scala",
   "pants.backend.experimental.codegen.thrift.scrooge.scala",
   "pants.backend.experimental.scala.debug_goals",
@@ -181,6 +182,9 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
+
+[avro-java]
+lockfile = "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
 
 [junit]
 lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"

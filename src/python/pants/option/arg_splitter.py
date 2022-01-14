@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import dataclasses
 import os.path
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Sequence
+from typing import DefaultDict, Iterable, Iterator, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -23,9 +22,11 @@ class ArgSplitterError(Exception):
 class SplitArgs:
     """The result of splitting args."""
 
+    builtin_goal: str | None  # Requested builtin goal (explicitly or implicitly).
     goals: list[str]  # Explicitly requested goals.
+    unknown_goals: list[str]  # Any unknown goals.
     scope_to_flags: dict[str, list[str]]  # Scope name -> list of flags in that scope.
-    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs
+    specs: list[str]  # The specifications for what to run against, e.g. the targets or files/dirs.
     passthru: list[str]  # Any remaining args specified after a -- separator.
 
 
@@ -60,6 +61,13 @@ class NoGoalHelp(HelpRequest):
     """The user specified no goals."""
 
 
+# These are the names for the built in goals to print help message when there is no goal, or any
+# unknown goals respectively. They begin with underlines to exclude them from the list of goals in
+# the goal help output.
+NO_GOAL_NAME = "__no_goal"
+UNKNOWN_GOAL_NAME = "__unknown_goal"
+
+
 class ArgSplitter:
     """Splits a command-line into scoped sets of flags and a set of specs.
 
@@ -70,35 +78,18 @@ class ArgSplitter:
     ./pants --global-opt check target1: dir f.ext --check-flag
     ./pants --check-flag check target1: dir f.ext
     ./pants goal -- passthru foo
-
-    Handles help and version args specially.
     """
-
-    _HELP_BASIC_ARGS = ("-h", "--help", "help")
-    _HELP_ADVANCED_ARGS = ("--help-advanced", "help-advanced")
-    _HELP_VERSION_ARGS = ("-v", "-V", "--version", "version")
-    _HELP_ALL_SCOPES_ARGS = ("help-all",)
-    _HELP_ARGS = (
-        *_HELP_BASIC_ARGS,
-        *_HELP_ADVANCED_ARGS,
-        *_HELP_VERSION_ARGS,
-        *_HELP_ALL_SCOPES_ARGS,
-    )
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
         self._buildroot = buildroot
         self._known_scope_infos = known_scope_infos
-        self._known_scopes = {si.scope for si in known_scope_infos} | {
-            "version",
-            "help",
-            "help-advanced",
-            "help-all",
-        }
-        self._known_goal_scopes = {si.scope: si for si in known_scope_infos if si.is_goal}
+        self._known_goal_scopes = dict(self._get_known_goal_scopes(known_scope_infos))
+        self._known_scopes = {si.scope for si in known_scope_infos} | set(
+            self._known_goal_scopes.keys()
+        )
         self._unconsumed_args: list[
             str
         ] = []  # In reverse order, for efficient popping off the end.
-        self._help_request: HelpRequest | None = None  # Will be set if we encounter any help flags.
 
         # We allow --scope-flag-name anywhere on the cmd line, as an alternative to ...
         # scope --flag-name.
@@ -113,26 +104,16 @@ class ArgSplitter:
         # List of pairs (prefix, ScopeInfo).
         self._known_scoping_prefixes = [(f"{si.scope}-", si) for si in sorted_scope_infos]
 
-    @property
-    def help_request(self) -> HelpRequest | None:
-        return self._help_request
-
-    def _check_for_help_request(self, arg: str) -> bool:
-        if arg not in self._HELP_ARGS:
-            return False
-        if arg in self._HELP_VERSION_ARGS:
-            self._help_request = VersionHelp()
-        elif arg in self._HELP_ALL_SCOPES_ARGS:
-            self._help_request = AllHelp()
-        else:
-            # First ensure that we have a basic OptionsHelp.
-            if not self._help_request:
-                self._help_request = ThingHelp()
-            # Now see if we need to enhance it.
-            if isinstance(self._help_request, ThingHelp):
-                advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-                self._help_request = dataclasses.replace(self._help_request, advanced=advanced)
-        return True
+    @staticmethod
+    def _get_known_goal_scopes(
+        known_scope_infos: Iterable[ScopeInfo],
+    ) -> Iterator[tuple[str, ScopeInfo]]:
+        for si in known_scope_infos:
+            if not si.is_goal:
+                continue
+            yield si.scope, si
+            for alias in si.scope_aliases:
+                yield alias, si
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
         """Split the specified arg list (or sys.argv if unspecified).
@@ -143,15 +124,34 @@ class ArgSplitter:
         """
         goals: OrderedSet[str] = OrderedSet()
         scope_to_flags: DefaultDict[str, list[str]] = defaultdict(list)
+        specs: list[str] = []
+        passthru: list[str] = []
+        unknown_scopes: list[str] = []
+        builtin_goal: str | None = None
 
         def add_scope(s: str) -> None:
             # Force the scope to appear, even if empty.
             if s not in scope_to_flags:
                 scope_to_flags[s] = []
 
-        specs: list[str] = []
-        passthru: list[str] = []
-        unknown_scopes: list[str] = []
+        def add_goal(scope: str) -> str:
+            """Returns the scope name to assign flags to."""
+            scope_info = self._known_goal_scopes.get(scope)
+            if not scope_info:
+                unknown_scopes.append(scope)
+                add_scope(scope)
+                return scope
+
+            nonlocal builtin_goal
+            if scope_info.is_builtin and not builtin_goal:
+                # Get scope from info in case we hit an aliased builtin goal.
+                builtin_goal = scope_info.scope
+            else:
+                goals.add(scope_info.scope)
+            add_scope(scope_info.scope)
+
+            # Use builtin goal as default scope for args.
+            return builtin_goal or scope_info.scope
 
         self._unconsumed_args = list(reversed(args))
         # The first token is the binary name, so skip it.
@@ -168,36 +168,34 @@ class ArgSplitter:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
         scope, flags = self._consume_scope()
         while scope:
-            if not self._check_for_help_request(scope.lower()):
-                add_scope(scope)
-                if scope in self._known_goal_scopes:
-                    goals.add(scope)
-                else:
-                    unknown_scopes.append(scope)
-                for flag in flags:
-                    assign_flag_to_scope(flag, scope)
+            # `add_goal` returns the currently active scope to assign flags to.
+            scope = add_goal(scope)
+            for flag in flags:
+                assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
 
         while self._unconsumed_args and not self._at_double_dash():
-            arg = self._unconsumed_args.pop()
-            if arg.startswith("-"):
+            if self._at_flag():
+                arg = self._unconsumed_args.pop()
                 # We assume any args here are in global scope.
-                if not self._check_for_help_request(arg):
-                    assign_flag_to_scope(arg, GLOBAL_SCOPE)
-            elif self.likely_a_spec(arg):
+                assign_flag_to_scope(arg, GLOBAL_SCOPE)
+                continue
+
+            arg = self._unconsumed_args.pop()
+            if self.likely_a_spec(arg):
                 specs.append(arg)
-            elif arg not in self._known_scopes:
-                unknown_scopes.append(arg)
+            else:
+                add_goal(arg)
+
+        if not builtin_goal:
+            if unknown_scopes and UNKNOWN_GOAL_NAME in self._known_goal_scopes:
+                builtin_goal = UNKNOWN_GOAL_NAME
+            elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
+                builtin_goal = NO_GOAL_NAME
 
         if self._at_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
-
-        if unknown_scopes and not self._help_request:
-            self._help_request = UnknownGoalHelp(tuple(unknown_scopes))
-
-        if not goals and not self._help_request:
-            self._help_request = NoGoalHelp()
 
         for goal in goals:
             si = self._known_goal_scopes[goal]
@@ -213,12 +211,10 @@ class ArgSplitter:
                     f"The {si.deprecated_scope} goal was renamed to {si.subsystem_cls.options_scope}",
                 )
 
-        if isinstance(self._help_request, ThingHelp):
-            self._help_request = dataclasses.replace(
-                self._help_request, things=tuple(goals) + tuple(unknown_scopes)
-            )
         return SplitArgs(
+            builtin_goal=builtin_goal,
             goals=list(goals),
+            unknown_goals=unknown_scopes,
             scope_to_flags=dict(scope_to_flags),
             specs=specs,
             passthru=passthru,
@@ -257,8 +253,7 @@ class ArgSplitter:
         flags = []
         while self._at_flag():
             flag = self._unconsumed_args.pop()
-            if not self._check_for_help_request(flag):
-                flags.append(flag)
+            flags.append(flag)
         return flags
 
     def _descope_flag(self, flag: str, default_scope: str) -> tuple[str, str]:
@@ -282,6 +277,7 @@ class ArgSplitter:
             bool(self._unconsumed_args)
             and self._unconsumed_args[-1].startswith("-")
             and not self._at_double_dash()
+            and not self._at_scope()
         )
 
     def _at_scope(self) -> bool:

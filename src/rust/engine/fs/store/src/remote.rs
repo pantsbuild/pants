@@ -6,8 +6,8 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use async_oncecell::OnceCell;
 use bytes::{Bytes, BytesMut};
-use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -32,7 +32,7 @@ pub struct ByteStore {
   _rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
-  capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
+  capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
   batch_api_size_limit: usize,
 }
@@ -76,7 +76,7 @@ impl ByteStore {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
@@ -107,8 +107,7 @@ impl ByteStore {
       _rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
-      capabilities_cell: capabilities_cell_opt
-        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
+      capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
       batch_api_size_limit,
     })

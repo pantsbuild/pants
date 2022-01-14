@@ -8,7 +8,6 @@ from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.backend.python.util_rules.pex import (
     Lockfile,
     LockfileContent,
@@ -16,13 +15,12 @@ from pants.backend.python.util_rules.pex import (
     ToolCustomLockfile,
     ToolDefaultLockfile,
 )
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
+from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
-
-DEFAULT_TOOL_LOCKFILE = "<default>"
-NO_TOOL_LOCKFILE = "<none>"
 
 
 class PythonToolRequirementsBase(Subsystem):

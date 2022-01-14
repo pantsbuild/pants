@@ -9,7 +9,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
@@ -96,8 +96,8 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
     )
-    merged_snapshot = await Get(Snapshot, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
+    merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
+    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []

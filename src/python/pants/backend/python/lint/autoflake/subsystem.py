@@ -5,9 +5,11 @@ from __future__ import annotations
 
 from typing import cast
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
@@ -60,7 +62,7 @@ class Autoflake(PythonToolBase):
         return tuple(self.options.args)
 
 
-class AutoflakeLockfileSentinel(PythonToolLockfileSentinel):
+class AutoflakeLockfileSentinel(ToolLockfileSentinel):
     options_scope = Autoflake.options_scope
 
 
@@ -72,4 +74,8 @@ async def setup_autoflake_lockfile(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PythonToolLockfileSentinel, AutoflakeLockfileSentinel))
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, AutoflakeLockfileSentinel),
+    )

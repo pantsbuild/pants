@@ -8,8 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence, cast
 
-from pants.backend.python.target_types import UnrecognizedResolveNamesError
 from pants.build_graph.address import Address, AddressInput
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
@@ -26,12 +26,8 @@ from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve import coursier_fetch
-from pants.jvm.resolve.coursier_fetch import (
-    ArtifactRequirement,
-    ArtifactRequirements,
-    Coordinate,
-    CoursierResolvedLockfile,
-)
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
+from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem

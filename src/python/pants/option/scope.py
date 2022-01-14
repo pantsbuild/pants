@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Type, cast
+from typing import Optional, Tuple, Type, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -33,8 +33,11 @@ class ScopeInfo:
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
 
-    # command line goal scope flag
+    # Command line goal scope flag.
     is_goal: bool = False
+
+    # Builtin goals, such as `help` and `version` etc.
+    is_builtin: bool = False
 
     @property
     def description(self) -> str:
@@ -51,8 +54,13 @@ class ScopeInfo:
             self._subsystem_cls_attr("deprecated_options_scope_removal_version"),
         )
 
+    @property
+    def scope_aliases(self) -> Tuple[str, ...]:
+        """BuiltinGoal subsystems may define aliases."""
+        return cast(Tuple[str, ...], self._subsystem_cls_attr("aliases", ()))
+
     def _subsystem_cls_attr(self, name: str, default=None):
-        return getattr(self.subsystem_cls, name) if self.subsystem_cls else default
+        return getattr(self.subsystem_cls, name, default) if self.subsystem_cls else default
 
 
 @dataclass(frozen=True)
