@@ -57,6 +57,13 @@ class ParseState(threading.local):
         return list(self._target_adapters)
 
 
+_AMBIGUOUS_PYTHON_MACRO_SYMBOLS = {
+    "python_requirements",
+    "pipenv_requirements",
+    "poetry_requirements",
+}
+
+
 class Parser:
     def __init__(
         self,
@@ -64,9 +71,10 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        use_deprecated_python_macros: bool = True,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
-            build_root, target_type_aliases, object_aliases
+            build_root, target_type_aliases, object_aliases, use_deprecated_python_macros
         )
 
     @staticmethod
@@ -74,6 +82,7 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        use_deprecated_python_macros: bool,
     ) -> tuple[dict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
@@ -99,13 +108,18 @@ class Parser:
                 return target_adaptor
 
         symbols: dict[str, Any] = dict(object_aliases.objects)
-        symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
+        symbols.update(
+            (alias, Registrar(alias))
+            for alias in target_type_aliases
+            if not use_deprecated_python_macros or alias not in _AMBIGUOUS_PYTHON_MACRO_SYMBOLS
+        )
 
         parse_context = ParseContext(
             build_root=build_root, type_aliases=symbols, rel_path_oracle=parse_state
         )
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
-            symbols[alias] = object_factory(parse_context)
+            if use_deprecated_python_macros or alias not in _AMBIGUOUS_PYTHON_MACRO_SYMBOLS:
+                symbols[alias] = object_factory(parse_context)
 
         return symbols, parse_state
 

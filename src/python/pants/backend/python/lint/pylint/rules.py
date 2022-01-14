@@ -33,7 +33,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Target, Targets
+from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -207,8 +207,8 @@ async def pylint_lint(
     linted_targets = await Get(
         Targets, Addresses(field_set.address for field_set in request.field_sets)
     )
-    per_target_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies))
+    transitive_targets_per_field_set = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
         for field_set in request.field_sets
     )
 
@@ -217,15 +217,15 @@ async def pylint_lint(
     # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
     # targets in this interpreter constraints calculation.
     interpreter_constraints_to_target_setup = defaultdict(set)
-    for field_set, tgt, dependencies in zip(
-        request.field_sets, linted_targets, per_target_dependencies
+    for field_set, tgt, transitive_targets in zip(
+        request.field_sets, linted_targets, transitive_targets_per_field_set
     ):
-        target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
+        target_setup = PylintTargetSetup(field_set, Targets([tgt, *transitive_targets.closure]))
         interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
             (
                 *(
                     tgt[InterpreterConstraintsField]
-                    for tgt in [tgt, *dependencies]
+                    for tgt in [tgt, *transitive_targets.closure]
                     if tgt.has_field(InterpreterConstraintsField)
                 ),
                 *first_party_plugins.interpreter_constraints_fields,
