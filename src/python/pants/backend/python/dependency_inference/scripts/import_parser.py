@@ -3,11 +3,14 @@
 # -*- coding: utf-8 -*-
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
+# NB: If you're needing to debug this, an easy way is to just invoke it on a file.
+#   E.g. `MIN_DOTS=1 STRING_IMPORTS=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
 import ast
 import itertools
+import json
 import os
 import re
 import sys
@@ -28,11 +31,12 @@ class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
         self._package_parts = package_parts
         self._contents_lines = contents.decode(errors="ignore").splitlines()
-        self.imports = set()
+        # N.B. use `setdefault` when adding imports
+        self.imports = {}  # maps module_name to first lineno of occurance
 
-    def maybe_add_string_import(self, s):
+    def maybe_add_string_import(self, node, s):
         if STRING_IMPORT_REGEX.match(s):
-            self.imports.add(s)
+            self.imports.setdefault(s, node.lineno)
 
     @staticmethod
     def _is_pragma_ignored(line):
@@ -47,23 +51,23 @@ class AstVisitor(ast.NodeVisitor):
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
         def consume_until(string):
-            return list(itertools.takewhile(lambda t: t[1] != string, token_iter))
+            for token in token_iter:
+                if token[1] == string:
+                    return token
 
         consume_until("import")
 
         # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
-            consume_until(alias.name.split(".")[-1])
+            token = consume_until(alias.name.split(".")[-1])
 
             # N.B. Keep consuming lines while they end in a line-continuation
             #   (unfortunately `tokenize` doesn't capture this)
-            line = "\\"
-            while line.endswith("\\"):
+            while token[4].endswith("\\"):
                 token = next(token_iter)
-                line = token[4]
 
-            if not self._is_pragma_ignored(line):
-                self.imports.add(import_prefix + alias.name)
+            if not self._is_pragma_ignored(token[4]):
+                self.imports.setdefault(import_prefix + alias.name, token[3][0] + node.lineno - 1)
             if alias.asname and token[1] != alias.asname:
                 consume_until(alias.asname)
 
@@ -94,8 +98,9 @@ class AstVisitor(ast.NodeVisitor):
                 name = str(node.args[0].value)
 
             if name is not None:
-                if not self._is_pragma_ignored(self._contents_lines[node.args[0].lineno - 1]):
-                    self.imports.add(name)
+                lineno = node.args[0].lineno
+                if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
+                    self.imports.setdefault(name, lineno)
                 return
 
         self.generic_visit(node)
@@ -109,7 +114,7 @@ if os.environ["STRING_IMPORTS"] == "y":
         def visit_Str(self, node):
             try:
                 val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
-                self.maybe_add_string_import(val)
+                self.maybe_add_string_import(node, val)
             except UnicodeError:
                 pass
 
@@ -118,7 +123,7 @@ if os.environ["STRING_IMPORTS"] == "y":
     elif sys.version_info[0:2] < (3, 8):
 
         def visit_Str(self, node):
-            self.maybe_add_string_import(node.s)
+            self.maybe_add_string_import(node, node.s)
 
         setattr(AstVisitor, "visit_Str", visit_Str)
 
@@ -126,7 +131,7 @@ if os.environ["STRING_IMPORTS"] == "y":
 
         def visit_Constant(self, node):
             if isinstance(node.value, str):
-                self.maybe_add_string_import(node.value)
+                self.maybe_add_string_import(node, node.value)
 
         setattr(AstVisitor, "visit_Constant", visit_Constant)
 
@@ -146,7 +151,8 @@ def main(filename):
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
     # See below for where we explicitly decode.
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
-    buffer.write("\n".join(sorted(visitor.imports)).encode("utf8"))
+    output = json.dumps(visitor.imports)
+    buffer.write(output.encode("utf8"))
 
 
 if __name__ == "__main__":

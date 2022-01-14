@@ -187,7 +187,7 @@ async def infer_python_dependencies_via_imports(
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModule(imported_module))
-        for imported_module in detected_imports
+        for imported_module in detected_imports.keys()
     )
 
     merged_result: set[Address] = set()
@@ -210,10 +210,14 @@ async def infer_python_dependencies_via_imports(
 
     unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
+        unowned_imports_with_lines = [
+            f"{module_name} ({request.sources_field.file_path}:{detected_imports[module_name]})"
+            for module_name in sorted(unowned_imports)
+        ]
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
         log = logger.error if raise_error else logger.warning
         log(
-            f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports)}\n\n"
+            f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports_with_lines)}\n\n"
             "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
             "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
             "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred.\n"
