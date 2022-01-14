@@ -178,6 +178,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             input_digest=request.digest,
             output_directories=("gopath",),
             working_dir=request.path if request.path else None,
+            # Allow downloads of the module metadata (i.e., go.mod files).
             allow_downloads=True,
             description="Analyze Go module dependencies.",
         ),
@@ -262,6 +263,7 @@ async def analyze_go_third_party_module(
             ("mod", "download", "-json", f"{request.name}@{request.version}"),
             input_digest=request.go_mod_digest,  # for go.sum
             working_dir=request.go_mod_path if request.go_mod_path else None,
+            # Allow downloads of the module sources.
             allow_downloads=True,
             output_directories=("gopath",),
             description=f"Download Go module {request.name}@{request.version}.",
