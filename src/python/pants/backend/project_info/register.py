@@ -13,7 +13,7 @@ from pants.backend.project_info import (
     list_targets,
     paths,
     peek,
-    source_file_validator,
+    regex_lint,
 )
 
 
@@ -28,5 +28,5 @@ def rules():
         *list_targets.rules(),
         *paths.rules(),
         *peek.rules(),
-        *source_file_validator.rules(),
+        *regex_lint.rules(),
     ]

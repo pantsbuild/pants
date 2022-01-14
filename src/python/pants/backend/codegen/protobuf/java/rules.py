@@ -4,7 +4,7 @@
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
-from pants.backend.python.target_types import PythonSourceField
+from pants.backend.java.target_types import JavaSourceField
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -34,7 +34,7 @@ from pants.util.logging import LogLevel
 
 class GenerateJavaFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
-    output = PythonSourceField
+    output = JavaSourceField
 
 
 @rule(desc="Generate Java from Protobuf", level=LogLevel.DEBUG)

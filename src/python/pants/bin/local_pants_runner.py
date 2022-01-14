@@ -29,7 +29,7 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.global_options import DynamicRemoteOptions, maybe_warn_python_macros_deprecation
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -75,6 +75,7 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, env)
             bootstrap_options = options.bootstrap_option_values()
             assert bootstrap_options is not None
+            maybe_warn_python_macros_deprecation(bootstrap_options)
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options
             )

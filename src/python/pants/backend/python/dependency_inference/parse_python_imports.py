@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 import pkgutil
 from dataclasses import dataclass
 
@@ -9,15 +10,15 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-class ParsedPythonImports(DeduplicatedCollection[str]):
-    """All the discovered imports from a Python source file.
+class ParsedPythonImports(FrozenDict[str, int]):
+    """All the discovered imports from a Python source file mapped to the first line they appear.
 
     May include string imports if the request specified to include them.
     """
@@ -67,7 +68,8 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
     )
     # See above for where we explicitly encoded as utf8. Even though utf8 is the
     # default for decode(), we make that explicit here for emphasis.
-    return ParsedPythonImports(process_result.stdout.decode("utf8").strip().splitlines())
+    process_output = process_result.stdout.decode("utf8")
+    return ParsedPythonImports(json.loads(process_output) if process_output else {})
 
 
 def rules():

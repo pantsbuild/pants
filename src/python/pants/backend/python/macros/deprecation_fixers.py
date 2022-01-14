@@ -14,6 +14,7 @@ from pants.core.goals.update_build_files import (
     DeprecationFixerRequest,
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
+    UpdateBuildFilesSubsystem,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -26,6 +27,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list
@@ -47,8 +49,12 @@ class MacroRenames:
     generated: FrozenDict[Address, tuple[Address, str]]
 
 
+class MacroRenamesRequest:
+    pass
+
+
 @rule(desc="Determine how to rename Python macros to target generators", level=LogLevel.DEBUG)
-async def determine_macro_changes(all_targets: AllTargets) -> MacroRenames:
+async def determine_macro_changes(all_targets: AllTargets, _: MacroRenamesRequest) -> MacroRenames:
     # Strategy: Find `python_requirement` targets who depend on a `_python_requirements_file`
     # target to figure out which macros we have. Note that context-aware object factories (CAOFs)
     # are not actual targets and are "erased", so this is the way to find the macros.
@@ -144,10 +150,23 @@ class UpdatePythonMacrosRequest(DeprecationFixerRequest):
 
 
 @rule(desc="Change Python macros to target generators", level=LogLevel.DEBUG)
-def maybe_update_macros_references(
+async def maybe_update_macros_references(
     request: UpdatePythonMacrosRequest,
-    renames: MacroRenames,
+    global_options: GlobalOptions,
+    update_build_files_subsystem: UpdateBuildFilesSubsystem,
 ) -> RewrittenBuildFile:
+    if not update_build_files_subsystem.fix_python_macros:
+        return RewrittenBuildFile(request.path, request.lines, ())
+
+    if not global_options.options.use_deprecated_python_macros:
+        raise ValueError(
+            "`--update-build-files-fix-python-macros` specified when "
+            "`[GLOBAL].use_deprecated_python_macros` is already set to false, which means that "
+            "there is nothing left to fix."
+        )
+
+    renames = await Get(MacroRenames, MacroRenamesRequest())
+
     changed_generator_aliases = set()
 
     def maybe_update(input_lines: tuple[str, ...]) -> list[str]:

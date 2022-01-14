@@ -17,7 +17,8 @@ from pants.backend.python.dependency_inference.rules import (
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
 )
-from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
+from pants.backend.python.macros import python_requirements
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
     PythonRequirementsFileTarget,
     PythonRequirementTarget,
@@ -260,14 +261,15 @@ def test_infer_python_strict(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             PythonRequirementsFileTarget,
+            PythonRequirementsTargetGenerator,
         ],
-        context_aware_object_factories={"python_requirements": PythonRequirementsCAOF},
     )
 
     rule_runner.write_files(
@@ -298,7 +300,7 @@ def test_infer_python_strict(caplog) -> None:
     run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "warning")
     assert len(caplog.records) == 1
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese" in caplog.text
+    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
 
     # Now test with "error"
     caplog.clear()
@@ -308,7 +310,7 @@ def test_infer_python_strict(caplog) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
     assert len(caplog.records) == 2  # one for the error being raised and one for our message
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese" in caplog.text
+    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
 
     caplog.clear()
 
@@ -337,7 +339,7 @@ def test_infer_python_strict(caplog) -> None:
             "src/python/requirements.txt": "venezuelan_beaver_cheese==1.0.0",
             "src/python/BUILD": dedent(
                 """\
-                    python_requirements()
+                    python_requirements(name='reqs')
                     python_sources()
                 """
             ),

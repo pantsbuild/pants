@@ -54,9 +54,7 @@ class ValidateSubsystem(GoalSubsystem):
             default=DetailLevel.nonmatching,
             help="How much detail to emit to the console.",
             removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Use `[sourcefile-validation].detail_level` instead, which behaves the same."
-            ),
+            removal_hint="Use `[regex-lint].detail_level` instead, which behaves the same.",
         )
 
 
@@ -94,9 +92,12 @@ class ValidationConfig:
         )
 
 
-class SourceFileValidation(Subsystem):
-    options_scope = "sourcefile-validation"
-    help = "Configuration for source file validation."
+class RegexLintSubsystem(Subsystem):
+    options_scope = "regex-lint"
+    help = "Lint your code using regex patterns, e.g. to check for copyright headers."
+
+    deprecated_options_scope = "sourcefile-validation"
+    deprecated_options_scope_removal_version = "2.11.0.dev0"
 
     @classmethod
     def register_options(cls, register):
@@ -309,9 +310,9 @@ async def validate(
     console: Console,
     specs_snapshot: SpecsSnapshot,
     validate_subsystem: ValidateSubsystem,
-    source_file_validation: SourceFileValidation,
+    regex_lint_subsystem: RegexLintSubsystem,
 ) -> Validate:
-    multi_matcher = source_file_validation.get_multi_matcher()
+    multi_matcher = regex_lint_subsystem.get_multi_matcher()
     if multi_matcher is None:
         logger.error(
             "You must set the option `[sourcefile-validation].config` for the "
@@ -325,7 +326,7 @@ async def validate(
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)
     )
 
-    detail_level = source_file_validation.detail_level(validate_subsystem)
+    detail_level = regex_lint_subsystem.detail_level(validate_subsystem)
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:
