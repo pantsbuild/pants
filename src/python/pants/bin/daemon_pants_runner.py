@@ -113,6 +113,12 @@ class DaemonPantsRunner:
             # Capture the client's start time, which we propagate here in order to get an accurate
             # view of total time.
             env_start_time = env.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+            if not env_start_time:
+                # NB: We warn rather than erroring here because it eases use of non-Pants nailgun
+                # clients for testing.
+                logger.warning(
+                    "No start time was reported by the client! Metrics may be inaccurate."
+                )
             start_time = float(env_start_time) if env_start_time else time.time()
 
             options_bootstrapper = OptionsBootstrapper.create(
