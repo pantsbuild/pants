@@ -99,6 +99,7 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
         return Some(value.clone());
       }
 
+      #[allow(clippy::question_mark)]
       if item_receiver.changed().await.is_err() {
         return None;
       }
