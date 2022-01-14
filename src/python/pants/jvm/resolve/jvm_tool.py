@@ -32,6 +32,7 @@ from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
@@ -306,18 +307,6 @@ async def load_jvm_lockfile(
         ),
     )
 
-    requirements = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
-    )
-
-    if resolved_lockfile.metadata and resolved_lockfile.metadata.is_valid_for(requirements):
-        raise ValueError(
-            f"The lockfile JVM tool `{request.resolve_name} was generated with different "
-            "requirements, and needs to be regenerated using "
-            f"`{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name}`"
-        )
-
     return resolved_lockfile
 
 
@@ -340,6 +329,44 @@ async def generate_jvm_lockfile(
         Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])
     )
     return JvmToolLockfile(lockfile_digest, request.resolve_name, request.lockfile_dest)
+
+
+@frozen_after_init
+@dataclass
+class ValidatedJvmToolLockfileRequest:
+
+    options_scope: str
+    artifact_inputs: FrozenOrderedSet[str]
+
+    def __init__(self, tool: JvmToolBase):
+        self.options_scope = tool.options_scope
+        self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
+        self.lockfile = tool.resolved_lockfile()
+
+    def __hash__(self):
+        return hash((self.options_scope, self.artifact_inputs, self.lockfile))
+
+
+@rule(desc="Validate JVM lockfile")
+async def validate_jvm_lockfile(
+    request: ValidatedJvmToolLockfileRequest,
+) -> CoursierResolvedLockfile:
+
+    lockfile = request.lockfile
+    requirements = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(
+            request.artifact_inputs, f"[{request.options_scope}].artifacts"
+        ),
+    )
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(requirements):
+        raise ValueError(
+            f"Lockfile for {request.options_scope} was generated with different "
+            "requirements than are currently set. Investigate."
+        )
+
+    return lockfile
 
 
 def determine_resolves_to_generate(
