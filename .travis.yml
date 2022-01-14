@@ -265,7 +265,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py36
     language: python
     name: Self-checks and lint (Python 3.6)
@@ -324,7 +323,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=lint.py37
     language: python
@@ -418,7 +416,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=unit_tests.py36
     language: python
     name: Unit tests (Python 3.6)
@@ -477,7 +474,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=unit_tests.py37
     language: python
@@ -534,7 +530,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_0.py36
     language: python
     name: Integration tests - V1 - shard 0 (Python 3.6)
@@ -590,7 +585,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_1.py36
     language: python
     name: Integration tests - V1 - shard 1 (Python 3.6)
@@ -646,7 +640,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_2.py36
     language: python
     name: Integration tests - V1 - shard 2 (Python 3.6)
@@ -702,7 +695,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_3.py36
     language: python
     name: Integration tests - V1 - shard 3 (Python 3.6)
@@ -758,7 +750,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_4.py36
     language: python
     name: Integration tests - V1 - shard 4 (Python 3.6)
@@ -814,7 +805,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_5.py36
     language: python
     name: Integration tests - V1 - shard 5 (Python 3.6)
@@ -870,7 +860,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_0.py37
     language: python
@@ -927,7 +916,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_1.py37
     language: python
@@ -984,7 +972,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_2.py37
     language: python
@@ -1041,7 +1028,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_3.py37
     language: python
@@ -1098,7 +1084,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_4.py37
     language: python
@@ -1155,7 +1140,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_5.py37
     language: python
@@ -1212,7 +1196,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_0.py36
     language: python
     name: Integration tests - V2 - shard 0 (Python 3.6)
@@ -1268,7 +1251,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_1.py36
     language: python
     name: Integration tests - V2 - shard 1 (Python 3.6)
@@ -1324,7 +1306,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_2.py36
     language: python
     name: Integration tests - V2 - shard 2 (Python 3.6)
@@ -1380,7 +1361,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_3.py36
     language: python
     name: Integration tests - V2 - shard 3 (Python 3.6)
@@ -1436,7 +1416,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_4.py36
     language: python
     name: Integration tests - V2 - shard 4 (Python 3.6)
@@ -1492,7 +1471,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_5.py36
     language: python
     name: Integration tests - V2 - shard 5 (Python 3.6)
@@ -1548,7 +1526,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.shard_6.py36
     language: python
     name: Integration tests - V2 - shard 6 (Python 3.6)
@@ -1604,7 +1581,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_0.py37
     language: python
@@ -1661,7 +1637,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_1.py37
     language: python
@@ -1718,7 +1693,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_2.py37
     language: python
@@ -1775,7 +1749,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_3.py37
     language: python
@@ -1832,7 +1805,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_4.py37
     language: python
@@ -1889,7 +1861,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_5.py37
     language: python
@@ -1946,7 +1917,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v2.shard_6.py37
     language: python
@@ -2071,7 +2041,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
     language: python
@@ -2336,7 +2305,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=jvm_tests.py36
     if: commit_message !~ /\[ci skip-jvm-tests\]/
     language: python
@@ -2396,7 +2364,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=jvm_tests.py37
     if: commit_message !~ /\[ci skip-jvm-tests\]/
@@ -2463,7 +2430,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PANTS_PEX_RELEASE=stable
     - CACHE_NAME=deploy.stable
@@ -2520,7 +2486,6 @@ jobs:
     dist: xenial
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
     - CACHE_NAME=deploy.unstable

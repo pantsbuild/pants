@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Conan(PythonToolBase):
     options_scope = "conan"
-    default_version = "conan==1.19.2"
+    default_version = "conan==1.44.0"
     # NB: Only versions of pylint below `2.0.0` support use in python 2.
     default_extra_requirements = ["pylint==1.9.3", "astroid<2.0,>=1.6"]
     default_entry_point = "conans.conan"
