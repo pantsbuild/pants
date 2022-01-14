@@ -6,12 +6,14 @@ import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -43,7 +45,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class TerraformHcl2ParserLockfileSentinel(PythonToolLockfileSentinel):
+class TerraformHcl2ParserLockfileSentinel(ToolLockfileSentinel):
     options_scope = TerraformHcl2Parser.options_scope
 
 
@@ -150,6 +152,7 @@ async def infer_terraform_module_dependencies(
 def rules():
     return [
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
-        UnionRule(PythonToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
     ]

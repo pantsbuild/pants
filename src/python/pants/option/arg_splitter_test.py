@@ -10,14 +10,8 @@ from typing import Any
 
 import pytest
 
-from pants.option.arg_splitter import (
-    AllHelp,
-    ArgSplitter,
-    NoGoalHelp,
-    ThingHelp,
-    UnknownGoalHelp,
-    VersionHelp,
-)
+from pants.goal.builtins import builtin_goals
+from pants.option.arg_splitter import NO_GOAL_NAME, UNKNOWN_GOAL_NAME, ArgSplitter
 from pants.option.scope import ScopeInfo
 
 
@@ -28,6 +22,8 @@ def known_scope_infos() -> list[ScopeInfo]:
         ScopeInfo("test", is_goal=True),
         ScopeInfo("jvm", is_goal=False),
         ScopeInfo("reporting", is_goal=False),
+        # TODO: move help related tests closer to `pants.goal.help` to avoid this cludge.
+        *(goal.get_scope_info() for goal in builtin_goals()),
     ]
 
 
@@ -55,17 +51,19 @@ def assert_valid_split(
     assert expected_scope_to_flags == split_args.scope_to_flags
     assert expected_specs == split_args.specs
     assert expected_passthru == split_args.passthru
-    assert expected_is_help == (splitter.help_request is not None)
-    assert expected_help_advanced == (
-        isinstance(splitter.help_request, ThingHelp) and splitter.help_request.advanced
+
+    assert expected_is_help == (
+        split_args.builtin_goal
+        in ("help", "help-advanced", "help-all", UNKNOWN_GOAL_NAME, NO_GOAL_NAME)
     )
-    assert expected_help_all == isinstance(splitter.help_request, AllHelp)
+    assert expected_help_advanced == ("help-advanced" == split_args.builtin_goal)
+    assert expected_help_all == ("help-all" == split_args.builtin_goal)
 
 
 def assert_unknown_goal(splitter: ArgSplitter, args_str: str, unknown_goals: list[str]) -> None:
-    splitter.split_args(shlex.split(args_str))
-    assert isinstance(splitter.help_request, UnknownGoalHelp)
-    assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
+    split_args = splitter.split_args(shlex.split(args_str))
+    assert UNKNOWN_GOAL_NAME == split_args.builtin_goal
+    assert set(unknown_goals) == set(split_args.unknown_goals)
 
 
 def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[ScopeInfo]) -> None:
@@ -276,14 +274,21 @@ def test_subsystem_flags(splitter: ArgSplitter) -> None:
 
 
 def help_test(command_line: str, **expected):
-    return (command_line, {**expected, "expected_passthru": None, "expected_is_help": True})
+    return (
+        command_line,
+        {
+            **expected,
+            "expected_passthru": None,
+            "expected_is_help": True,
+        },
+    )
 
 
-def help_no_arguments_test(command_line: str, **expected):
+def help_no_arguments_test(command_line: str, *scopes: str, **expected):
     return help_test(
         command_line,
         expected_goals=[],
-        expected_scope_to_flags={"": []},
+        expected_scope_to_flags={scope: [] for scope in ("", *scopes)},
         expected_specs=[],
         **expected,
     )
@@ -293,15 +298,34 @@ def help_no_arguments_test(command_line: str, **expected):
     "command_line, expected",
     [
         help_no_arguments_test("./pants"),
-        help_no_arguments_test("./pants help"),
-        help_no_arguments_test("./pants -h"),
-        help_no_arguments_test("./pants --help"),
-        help_no_arguments_test("./pants help-advanced", expected_help_advanced=True),
-        help_no_arguments_test("./pants help --help-advanced", expected_help_advanced=True),
-        help_no_arguments_test("./pants --help-advanced", expected_help_advanced=True),
-        help_no_arguments_test("./pants --help --help-advanced", expected_help_advanced=True),
-        help_no_arguments_test("./pants --help-advanced --help", expected_help_advanced=True),
-        help_no_arguments_test("./pants help-all", expected_help_all=True),
+        help_no_arguments_test("./pants help", "help"),
+        help_no_arguments_test("./pants -h", "help"),
+        help_no_arguments_test("./pants --help", "help"),
+        help_no_arguments_test(
+            "./pants help-advanced", "help-advanced", expected_help_advanced=True
+        ),
+        help_no_arguments_test(
+            "./pants --help-advanced", "help-advanced", expected_help_advanced=True
+        ),
+        help_no_arguments_test("./pants help-all", "help-all", expected_help_all=True),
+        help_test(
+            "./pants --help-advanced --help",
+            expected_goals=["help"],
+            expected_scope_to_flags={"": [], "help": [], "help-advanced": []},
+            expected_specs=[],
+            expected_help_advanced=True,
+        ),
+        help_test(
+            "./pants --help --help-advanced --builtin-option --help-advanced-option",
+            expected_goals=["help-advanced"],
+            expected_scope_to_flags={
+                "": [],
+                "help": ["--builtin-option"],
+                "help-advanced": ["--option"],
+            },
+            expected_specs=[],
+            expected_help_advanced=False,
+        ),
         help_test(
             "./pants -f",
             expected_goals=[],
@@ -311,51 +335,45 @@ def help_no_arguments_test(command_line: str, **expected):
         help_test(
             "./pants help check -x",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": ["-x"]},
-            expected_specs=[],
-        ),
-        help_test(
-            "./pants help check -x",
-            expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": ["-x"]},
+            expected_scope_to_flags={"": [], "help": ["-x"], "check": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check -h",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_scope_to_flags={"": [], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
             "./pants check --help test",
             expected_goals=["check", "test"],
-            expected_scope_to_flags={"": [], "check": [], "test": []},
+            expected_scope_to_flags={"": [], "check": [], "help": [], "test": []},
             expected_specs=[],
         ),
         help_test(
             "./pants test src/foo/bar:baz -h",
             expected_goals=["test"],
-            expected_scope_to_flags={"": [], "test": []},
+            expected_scope_to_flags={"": [], "test": [], "help": []},
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
             "./pants check --help-advanced test",
             expected_goals=["check", "test"],
-            expected_scope_to_flags={"": [], "check": [], "test": []},
+            expected_scope_to_flags={"": [], "check": [], "help-advanced": [], "test": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants help-advanced check",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "check": []},
+            expected_scope_to_flags={"": [], "check": [], "help-advanced": []},
             expected_specs=[],
             expected_help_advanced=True,
         ),
         help_test(
             "./pants check help-all test --help",
-            expected_goals=["check", "test"],
-            expected_scope_to_flags={"": [], "check": [], "test": []},
+            expected_goals=["check", "test", "help"],
+            expected_scope_to_flags={"": [], "check": [], "help": [], "help-all": [], "test": []},
             expected_specs=[],
             expected_help_all=True,
         ),
@@ -367,8 +385,8 @@ def test_help_detection(splitter: ArgSplitter, command_line: str, expected: dict
 
 def test_version_request_detection(splitter: ArgSplitter) -> None:
     def assert_version_request(args_str: str) -> None:
-        splitter.split_args(shlex.split(args_str))
-        assert isinstance(splitter.help_request, VersionHelp)
+        split_args = splitter.split_args(shlex.split(args_str))
+        assert "version" == split_args.builtin_goal
 
     assert_version_request("./pants -v")
     assert_version_request("./pants -V")
@@ -395,8 +413,8 @@ def test_unknown_goal_detection(
 
 @pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext"))
 def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
-    splitter.split_args(shlex.split(f"./pants {extra_args}"))
-    assert isinstance(splitter.help_request, NoGoalHelp)
+    split_args = splitter.split_args(shlex.split(f"./pants {extra_args}"))
+    assert NO_GOAL_NAME == split_args.builtin_goal
 
 
 def test_subsystem_scope_is_unknown_goal(splitter: ArgSplitter) -> None:

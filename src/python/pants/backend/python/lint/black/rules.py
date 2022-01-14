@@ -6,13 +6,12 @@ from typing import Tuple
 
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -37,7 +36,7 @@ class BlackFieldSet(FieldSet):
         return tgt.get(SkipBlackField).value
 
 
-class BlackRequest(PythonFmtRequest, LintRequest):
+class BlackRequest(FmtRequest, LintRequest):
     field_set_type = BlackFieldSet
 
 
@@ -161,7 +160,7 @@ async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, BlackRequest),
+        UnionRule(FmtRequest, BlackRequest),
         UnionRule(LintRequest, BlackRequest),
         *pex.rules(),
     ]

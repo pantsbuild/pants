@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -18,6 +20,8 @@ from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
+
+logger = logging.getLogger(__name__)
 
 
 class DetailLevel(Enum):
@@ -49,11 +53,11 @@ class ValidateSubsystem(GoalSubsystem):
             type=DetailLevel,
             default=DetailLevel.nonmatching,
             help="How much detail to emit to the console.",
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Use `[sourcefile-validation].detail_level` instead, which behaves the same."
+            ),
         )
-
-    @property
-    def detail_level(self) -> DetailLevel:
-        return cast(DetailLevel, self.options.detail_level)
 
 
 class Validate(Goal):
@@ -131,10 +135,33 @@ class SourceFileValidation(Subsystem):
         )
         super().register_options(register)
         register("--config", type=dict, fromfile=True, help=schema_help)
+        register(
+            "--detail-level",
+            type=DetailLevel,
+            default=DetailLevel.nonmatching,
+            help="How much detail to include in the result.",
+        )
 
     @memoized_method
-    def get_multi_matcher(self):
-        return MultiMatcher(ValidationConfig.from_dict(self.options.config))
+    def get_multi_matcher(self) -> MultiMatcher | None:
+        return (
+            MultiMatcher(ValidationConfig.from_dict(self.options.config))
+            if self.options.config
+            else None
+        )
+
+    def detail_level(self, validate_subsystem: ValidateSubsystem) -> DetailLevel:
+        return cast(
+            DetailLevel,
+            resolve_conflicting_options(
+                old_option="detail_level",
+                new_option="detail_level",
+                old_container=validate_subsystem.options,
+                new_container=self.options,
+                old_scope=validate_subsystem.name,
+                new_scope=self.options_scope,
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -285,13 +312,20 @@ async def validate(
     source_file_validation: SourceFileValidation,
 ) -> Validate:
     multi_matcher = source_file_validation.get_multi_matcher()
+    if multi_matcher is None:
+        logger.error(
+            "You must set the option `[sourcefile-validation].config` for the "
+            "`validate` goal to work. Run `./pants help sourcefile-validation`."
+        )
+        return Validate(PANTS_FAILED_EXIT_CODE)
+
     digest_contents = await Get(DigestContents, Digest, specs_snapshot.snapshot.digest)
     regex_match_results = RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)
     )
 
-    detail_level = validate_subsystem.detail_level
+    detail_level = source_file_validation.detail_level(validate_subsystem)
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:

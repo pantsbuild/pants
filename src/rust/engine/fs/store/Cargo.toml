@@ -11,7 +11,7 @@ async-trait = "=0.1.42"
 protos = { path = "../../protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
-double-checked-cell-async = "2.0"
+async-oncecell = "0.2"
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
 futures = "0.3"
@@ -33,12 +33,12 @@ serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
-tokio-rustls = "0.22"
+tokio-rustls = "0.23"
 tokio = { version = "1.4", features = ["fs"] }
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
-uuid = { version = "0.7.1", features = ["v4"] }
+uuid = { version = "0.8.2", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]

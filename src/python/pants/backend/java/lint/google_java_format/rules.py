@@ -3,12 +3,10 @@
 import dataclasses
 from dataclasses import dataclass
 
-from pants.backend.java.lint import java_fmt
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
-from pants.backend.java.lint.java_fmt import JavaFmtRequest
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -35,7 +33,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(JavaFmtRequest, LintRequest):
+class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
 
 
@@ -87,9 +85,9 @@ async def setup_google_java_format(
         toolcp_relpath: tool_classpath.digest,
     }
 
-    maybe_java16_or_higher_options = []
-    if jdk_setup.jre_major_version >= 16:
-        maybe_java16_or_higher_options = [
+    maybe_java11_or_higher_options = []
+    if jdk_setup.jre_major_version >= 11:
+        maybe_java11_or_higher_options = [
             "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
@@ -99,7 +97,7 @@ async def setup_google_java_format(
 
     args = [
         *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
-        *maybe_java16_or_higher_options,
+        *maybe_java11_or_higher_options,
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
         "--dry-run" if setup_request.check_only else "--replace",
@@ -167,7 +165,7 @@ async def generate_google_java_format_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        *java_fmt.rules(),
-        UnionRule(JavaFmtRequest, GoogleJavaFormatRequest),
+        UnionRule(FmtRequest, GoogleJavaFormatRequest),
+        UnionRule(LintRequest, GoogleJavaFormatRequest),
         UnionRule(JvmToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

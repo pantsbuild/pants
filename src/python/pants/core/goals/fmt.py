@@ -6,15 +6,17 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, TypeVar, cast
+from typing import TypeVar, cast
 
+from pants.core.goals.style_request import StyleRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Field, Target, Targets
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
@@ -97,33 +99,18 @@ class FmtResult(EngineAwareReturnType):
 
 
 @union
+class FmtRequest(StyleRequest):
+    pass
+
+
 @dataclass(frozen=True)
-class LanguageFmtTargets:
-    """All the targets that belong together as one language, e.g. all Python targets.
-
-    This allows us to group distinct formatters by language as a performance optimization. Within a
-    language, each formatter must run sequentially to not overwrite the previous formatter; but
-    across languages, it is safe to run in parallel.
-    """
-
-    required_fields: ClassVar[tuple[type[Field], ...]]
-
+class _LanguageFmtRequest:
+    request_types: tuple[type[FmtRequest], ...]
     targets: Targets
 
-    @classmethod
-    def belongs_to_language(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
 
 @dataclass(frozen=True)
-class LanguageFmtResults:
-    """This collection allows us to safely aggregate multiple `FmtResult`s for a language.
-
-    The `output` digest is used to ensure that none of the formatters overwrite each other. The
-    language implementation should run each formatter one at a time and pipe the resulting digest of
-    one formatter into the next. The `input` and `output` digests must contain all files for the
-    target(s), including any which were not re-formatted.
-    """
+class _LanguageFmtResults:
 
     results: tuple[FmtResult, ...]
     input: Digest
@@ -138,7 +125,7 @@ class FmtSubsystem(GoalSubsystem):
     name = "fmt"
     help = "Autoformat source code."
 
-    required_union_implementations = (LanguageFmtTargets,)
+    required_union_implementations = (FmtRequest,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -176,34 +163,33 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
-    language_target_collection_types = union_membership[LanguageFmtTargets]
-    language_target_collections = tuple(
-        language_target_collection_type(
-            Targets(
-                target
-                for target in targets
-                if language_target_collection_type.belongs_to_language(target)
-            )
-        )
-        for language_target_collection_type in language_target_collection_types
-    )
+    # Group targets by the sequence of FmtRequests that apply to them.
+    targets_by_fmt_request_order = defaultdict(list)
+    for target in targets:
+        fmt_requests = []
+        for fmt_request in union_membership[FmtRequest]:
+            if fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
+                fmt_requests.append(fmt_request)
+        if fmt_requests:
+            targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
 
+    # Spawn sequential formatting per unique sequence of FmtRequests.
     if fmt_subsystem.per_file_caching:
         per_language_results = await MultiGet(
             Get(
-                LanguageFmtResults,
-                LanguageFmtTargets,
-                language_target_collection.__class__(Targets([target])),
+                _LanguageFmtResults,
+                _LanguageFmtRequest(fmt_requests, Targets([target])),
             )
-            for language_target_collection in language_target_collections
-            for target in language_target_collection.targets
-            if language_target_collection.targets
+            for fmt_requests, targets in targets_by_fmt_request_order.items()
+            for target in targets
         )
     else:
         per_language_results = await MultiGet(
-            Get(LanguageFmtResults, LanguageFmtTargets, language_target_collection)
-            for language_target_collection in language_target_collections
-            if language_target_collection.targets
+            Get(
+                _LanguageFmtResults,
+                _LanguageFmtRequest(fmt_requests, Targets(targets)),
+            )
+            for fmt_requests, targets in targets_by_fmt_request_order.items()
         )
 
     individual_results = list(
@@ -252,6 +238,37 @@ async def fmt(
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
+
+
+@rule
+async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFmtResults:
+    original_sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(target[SourcesField] for target in language_fmt_request.targets),
+    )
+    prior_formatter_result = original_sources.snapshot
+
+    results = []
+    for fmt_request_type in language_fmt_request.request_types:
+        request = fmt_request_type(
+            (
+                fmt_request_type.field_set_type.create(target)
+                for target in language_fmt_request.targets
+                if fmt_request_type.field_set_type.is_applicable(target)
+            ),
+            prior_formatter_result=prior_formatter_result,
+        )
+        if not request.field_sets:
+            continue
+        result = await Get(FmtResult, FmtRequest, request)
+        results.append(result)
+        if result.did_change:
+            prior_formatter_result = await Get(Snapshot, Digest, result.output)
+    return _LanguageFmtResults(
+        tuple(results),
+        input=original_sources.snapshot.digest,
+        output=prior_formatter_result.digest,
+    )
 
 
 def rules():

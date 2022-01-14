@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import enum
+import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -16,7 +17,9 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
@@ -173,10 +176,21 @@ async def map_first_party_python_targets_to_modules(
 # Third party module mapping
 # -----------------------------------------------------------------------------------------------
 
+_ResolveName = str
 
-class ThirdPartyPythonModuleMapping(FrozenDict[str, Tuple[ModuleProvider, ...]]):
-    def providers_for_module(self, module: str) -> tuple[ModuleProvider, ...]:
-        result = self.get(module, ())
+
+class ThirdPartyPythonModuleMapping(
+    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+):
+    """A mapping of each resolve to the modules they contain and the addresses providing those
+    modules."""
+
+    def _providers_for_resolve(self, module: str, resolve: str) -> tuple[ModuleProvider, ...]:
+        mapping = self.get(resolve)
+        if not mapping:
+            return ()
+
+        result = mapping.get(module, ())
         if result:
             return result
 
@@ -185,25 +199,50 @@ class ThirdPartyPythonModuleMapping(FrozenDict[str, Tuple[ModuleProvider, ...]])
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.providers_for_module(parent_module)
+        return self._providers_for_resolve(parent_module, resolve)
+
+    def providers_for_module(
+        self, module: str, resolves: Iterable[str] | None
+    ) -> tuple[ModuleProvider, ...]:
+        """Find all providers for the module.
+
+        If `resolves` is None, will not consider resolves, i.e. any `python_requirement` can be
+        consumed. Otherwise, providers can only come from `python_requirements` marked compatible
+        with those resolves.
+        """
+        if resolves is None:
+            resolves = list(self.keys())
+        return tuple(
+            itertools.chain.from_iterable(
+                self._providers_for_resolve(module, resolve) for resolve in resolves
+            )
+        )
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses(
     all_python_tgts: AllPythonTargets,
+    python_setup: PythonSetup,
 ) -> ThirdPartyPythonModuleMapping:
-    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
+    resolves_to_modules_to_providers: dict[
+        _ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = {}
 
     for tgt in all_python_tgts.third_party:
+        tgt[PythonRequirementCompatibleResolvesField].validate(python_setup)
+        resolves = tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
-            for module in modules:
-                modules_to_providers[module].append(
-                    ModuleProvider(
-                        tgt.address,
-                        ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+            for resolve in resolves:
+                if resolve not in resolves_to_modules_to_providers:
+                    resolves_to_modules_to_providers[resolve] = defaultdict(list)
+                for module in modules:
+                    resolves_to_modules_to_providers[resolve][module].append(
+                        ModuleProvider(
+                            tgt.address,
+                            ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+                        )
                     )
-                )
 
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:
@@ -240,7 +279,13 @@ async def map_third_party_modules_to_addresses(
                 add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)))
 
     return ThirdPartyPythonModuleMapping(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
+        (
+            resolve,
+            FrozenDict(
+                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+            ),
+        )
+        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
     )
 
 
@@ -276,7 +321,7 @@ async def map_module_to_address(
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
     providers = [
-        *third_party_mapping.providers_for_module(module.module),
+        *third_party_mapping.providers_for_module(module.module, resolves=None),
         *first_party_mapping.providers_for_module(module.module),
     ]
     addresses = tuple(provider.addr for provider in providers)

@@ -12,7 +12,8 @@ from typing import cast
 
 import toml
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest, PythonToolLockfileSentinel
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import PythonLockfileRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -20,6 +21,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -234,7 +236,7 @@ class CoverageSubsystem(PythonToolBase):
         return cast(int, self.options.fail_under)
 
 
-class CoveragePyLockfileSentinel(PythonToolLockfileSentinel):
+class CoveragePyLockfileSentinel(ToolLockfileSentinel):
     options_scope = CoverageSubsystem.options_scope
 
 
@@ -606,6 +608,7 @@ def _get_coverage_report(
 def rules():
     return [
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        UnionRule(PythonToolLockfileSentinel, CoveragePyLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, CoveragePyLockfileSentinel),
     ]

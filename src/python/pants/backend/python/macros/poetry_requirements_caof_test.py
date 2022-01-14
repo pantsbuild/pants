@@ -23,7 +23,7 @@ from pants.backend.python.macros.poetry_requirements_caof import (
     parse_str_version,
 )
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.target_types import PythonRequirementsFile, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import AllTargets
@@ -391,7 +391,7 @@ def test_parse_multi_reqs() -> None:
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[PythonRequirementTarget, PythonRequirementsFile],
+        target_types=[PythonRequirementTarget, PythonRequirementsFileTarget],
         context_aware_object_factories={"poetry_requirements": PoetryRequirementsCAOF},
     )
 
@@ -401,7 +401,7 @@ def assert_poetry_requirements(
     build_file_entry: str,
     pyproject_toml: str,
     *,
-    expected_file_dep: PythonRequirementsFile,
+    expected_file_dep: PythonRequirementsFileTarget,
     expected_targets: Iterable[PythonRequirementTarget],
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
@@ -438,8 +438,8 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             ansicolors = ">=1.18.0"
             """
         ),
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["pyproject.toml"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "pyproject.toml"},
             address=Address("", target_name="pyproject.toml"),
         ),
         expected_targets=[
@@ -489,8 +489,8 @@ def test_source_override(rule_runner: RuleRunner) -> None:
             """
         ),
         pyproject_toml_relpath="subdir/pyproject.toml",
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["subdir/pyproject.toml"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "subdir/pyproject.toml"},
             address=Address("", target_name="subdir_pyproject.toml"),
         ),
         expected_targets=[
@@ -515,8 +515,8 @@ def test_non_pep440_error(rule_runner: RuleRunner, caplog: Any) -> None:
             foo = "~r62b"
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
+            expected_file_dep=PythonRequirementsFileTarget(
+                {"source": "pyproject.toml"},
                 address=Address("", target_name="pyproject.toml"),
             ),
             expected_targets=[],
@@ -532,8 +532,8 @@ def test_no_req_defined_warning(rule_runner: RuleRunner, caplog: Any) -> None:
         [tool.poetry.dependencies]
         [tool.poetry.dev-dependencies]
         """,
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["pyproject.toml"]},
+        expected_file_dep=PythonRequirementsFileTarget(
+            {"source": "pyproject.toml"},
             address=Address("", target_name="pyproject.toml"),
         ),
         expected_targets=[],
@@ -551,8 +551,8 @@ def test_bad_dict_format(rule_runner: RuleRunner) -> None:
             foo = {bad_req = "test"}
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
+            expected_file_dep=PythonRequirementsFileTarget(
+                {"source": "pyproject.toml"},
                 address=Address("", target_name="pyproject.toml"),
             ),
             expected_targets=[],
@@ -570,8 +570,8 @@ def test_bad_req_type(rule_runner: RuleRunner) -> None:
             foo = 4
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
+            expected_file_dep=PythonRequirementsFileTarget(
+                {"source": "pyproject.toml"},
                 address=Address("", target_name="pyproject.toml"),
             ),
             expected_targets=[],
@@ -587,8 +587,8 @@ def test_no_tool_poetry(rule_runner: RuleRunner) -> None:
             """
             foo = 4
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
+            expected_file_dep=PythonRequirementsFileTarget(
+                {"source": "pyproject.toml"},
                 address=Address("", target_name="pyproject.toml"),
             ),
             expected_targets=[],

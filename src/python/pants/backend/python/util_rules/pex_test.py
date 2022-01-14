@@ -23,9 +23,9 @@ from pants.backend.python.subsystems.setup import InvalidLockfileBehavior
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
-    LockfileMetadata,
-    LockfileMetadataV1,
-    LockfileMetadataV2,
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV1,
+    PythonLockfileMetadataV2,
 )
 from pants.backend.python.util_rules.pex import (
     Lockfile,
@@ -840,14 +840,14 @@ def test_validate_metadata(
         invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
     )
 
-    metadata: LockfileMetadata
+    metadata: PythonLockfileMetadata
     if version == 1:
-        metadata = LockfileMetadataV1(
+        metadata = PythonLockfileMetadataV1(
             InterpreterConstraints([expected_constraints]), expected_digest
         )
     elif version == 2:
         expected_requirements = {PipRequirement.parse(i) for i in expected_requirements_}
-        metadata = LockfileMetadataV2(
+        metadata = PythonLockfileMetadataV2(
             InterpreterConstraints([expected_constraints]), expected_requirements
         )
     requirements = _prepare_pex_requirements(

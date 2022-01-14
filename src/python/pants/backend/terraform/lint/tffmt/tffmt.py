@@ -3,11 +3,10 @@
 import logging
 import textwrap
 
-from pants.backend.terraform.lint.fmt import TerraformFmtRequest
 from pants.backend.terraform.style import StyleSetup, StyleSetupRequest
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import external_tool
 from pants.engine.fs import Digest, MergeDigests
@@ -39,7 +38,7 @@ class TfFmtSubsystem(Subsystem):
         )
 
 
-class TffmtRequest(TerraformFmtRequest):
+class TffmtRequest(FmtRequest):
     pass
 
 
@@ -103,5 +102,5 @@ def rules():
         *external_tool.rules(),
         *tool_rules(),
         UnionRule(LintRequest, TffmtRequest),
-        UnionRule(TerraformFmtRequest, TffmtRequest),
+        UnionRule(FmtRequest, TffmtRequest),
     ]

@@ -270,6 +270,9 @@ class HelpInfoExtracter:
         scope_to_help_info = {}
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
+            if scope_info.scope.startswith("_"):
+                # Exclude "private" subsystems.
+                continue
             options.for_scope(scope_info.scope)  # Force parsing.
             subsystem_cls = scope_info.subsystem_cls
             if not scope_info.description:

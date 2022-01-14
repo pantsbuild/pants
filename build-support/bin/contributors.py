@@ -34,6 +34,7 @@ def sorted_contributors(range: str) -> list[str]:
         .stdout.decode()
         .splitlines()
     )
+    contributors -= {"dependabot[bot]"}
     return sorted(contributors)
 
 

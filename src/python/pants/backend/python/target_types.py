@@ -28,6 +28,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import RuntimePackageDependenciesField
@@ -100,27 +101,6 @@ class InterpreterConstraintsField(StringSequenceField):
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         return python_setup.compatibility_or_constraints(self.value)
-
-
-class UnrecognizedResolveNamesError(Exception):
-    def __init__(
-        self,
-        unrecognized_resolve_names: list[str],
-        all_valid_names: Iterable[str],
-        *,
-        description_of_origin: str,
-    ) -> None:
-        # TODO(#12314): maybe implement "Did you mean?"
-        if len(unrecognized_resolve_names) == 1:
-            unrecognized_str = unrecognized_resolve_names[0]
-            name_description = "name"
-        else:
-            unrecognized_str = str(sorted(unrecognized_resolve_names))
-            name_description = "names"
-        super().__init__(
-            f"Unrecognized resolve {name_description} from {description_of_origin}: "
-            f"{unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}"
-        )
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):
@@ -1022,7 +1002,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        PythonCompatibleResolvesField,
+        PythonRequirementCompatibleResolvesField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
@@ -1073,15 +1053,19 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
             )
 
 
-class PythonRequirementsFileSourcesField(MultipleSourcesField):
-    required = True
+class PythonRequirementsFileSourcesField(SingleSourceField):
     uses_source_roots = False
 
 
-class PythonRequirementsFile(Target):
+# This allows us to work around https://github.com/pantsbuild/pants/issues/13118. Because a
+# generated target does not depend on its target generator, `--changed-since --changed-dependees`
+# would not mark the generated targets as changing when the `requirements.txt` changes, even though
+# it may be impacted. Fixing that will be A Thing and requires design work, so instead we can
+# depend on this private target type that owns `requirements.txt` to get `--changed-since` working.
+class PythonRequirementsFileTarget(Target):
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
-    help = "A private helper target type for requirements.txt files."
+    help = "A private helper target type used by `python_requirement` target generators."
 
 
 # -----------------------------------------------------------------------------------------------
