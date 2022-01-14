@@ -170,7 +170,8 @@ async def fmt(
         for fmt_request in union_membership[FmtRequest]:
             if fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
                 fmt_requests.append(fmt_request)
-        targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
+        if fmt_requests:
+            targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
 
     # Spawn sequential formatting per unique sequence of FmtRequests.
     if fmt_subsystem.per_file_caching:
