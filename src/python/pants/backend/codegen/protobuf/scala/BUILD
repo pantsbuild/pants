@@ -4,4 +4,4 @@
 python_sources(dependencies=[":resources"])
 resources(name="resources", sources=["*.scala", "scalapbc.default.lockfile.txt"])
 
-python_tests(name="tests")
+python_tests(name="tests", timeout=120)
