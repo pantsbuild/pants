@@ -32,7 +32,7 @@ class AstVisitor(ast.NodeVisitor):
         self._package_parts = package_parts
         self._contents_lines = contents.decode(errors="ignore").splitlines()
         # N.B. use `setdefault` when adding imports
-        self.imports = {}  # maps modname to first lineno of occurance
+        self.imports = {}  # maps module_name to first lineno of occurance
 
     def maybe_add_string_import(self, node, s):
         if STRING_IMPORT_REGEX.match(s):

@@ -211,8 +211,8 @@ async def infer_python_dependencies_via_imports(
     unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
         unowned_imports_with_lines = [
-            f"{modname} ({request.sources_field.address.filename}:{detected_imports[modname]})"
-            for modname in sorted(unowned_imports)
+            f"{module_name} ({request.sources_field.file_path}:{detected_imports[module_name]})"
+            for module_name in sorted(unowned_imports)
         ]
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
         log = logger.error if raise_error else logger.warning
