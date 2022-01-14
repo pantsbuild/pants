@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 from functools import wraps
-from unittest import skip
 from zipfile import ZipFile
 
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
