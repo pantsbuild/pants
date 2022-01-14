@@ -42,7 +42,7 @@ def assert_imports_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
-    expected: list[str],
+    expected: dict[str, int],
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
@@ -67,7 +67,7 @@ def assert_imports_parsed(
             )
         ],
     )
-    assert list(imports) == sorted(expected)
+    assert dict(imports) == expected
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -76,6 +76,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         from __future__ import print_function
 
         import os
+        import os  # repeated to test the line number
         import os.path
         from typing import TYPE_CHECKING
 
@@ -123,25 +124,25 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(
         rule_runner,
         content,
-        expected=[
-            "__future__.print_function",
-            "also_not_ignored_but_looks_like_it_could_be",
-            "demo",
-            "multiline_import1.not_ignored1",
-            "multiline_import1.not_ignored2",
-            "multiline_import2.not_ignored",
-            "not_ignored_but_looks_like_it_could_be",
-            "os",
-            "os.path",
-            "requests",
-            "project.circular_dep.CircularDep",
-            "project.demo.Demo",
-            "project.demo.OriginalName",
-            "pkg_resources",
-            "subprocess",
-            "subprocess23",
-            "typing.TYPE_CHECKING",
-        ],
+        expected={
+            "__future__.print_function": 1,
+            "os": 3,
+            "os.path": 5,
+            "typing.TYPE_CHECKING": 6,
+            "requests": 8,
+            "demo": 10,
+            "project.demo.Demo": 11,
+            "project.demo.OriginalName": 12,
+            "multiline_import1.not_ignored1": 16,
+            "multiline_import1.not_ignored2": 23,
+            "multiline_import2.not_ignored": 26,
+            "project.circular_dep.CircularDep": 29,
+            "subprocess": 32,
+            "subprocess23": 34,
+            "pkg_resources": 36,
+            "not_ignored_but_looks_like_it_could_be": 39,
+            "also_not_ignored_but_looks_like_it_could_be": 45,
+        },
     )
 
 
@@ -163,14 +164,14 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
         rule_runner,
         content,
         filename=f"project/util/{basename}",
-        expected=[
-            "project.util.sibling",
-            "project.util.sibling.Nibling",
-            "project.util.subdir.child.Child",
-            "project.parent.Parent",
-            "project.parent.Parent1",
-            "project.parent.Guardian",
-        ],
+        expected={
+            "project.util.sibling": 1,
+            "project.util.sibling.Nibling": 2,
+            "project.util.subdir.child.Child": 3,
+            "project.parent.Parent": 4,
+            "project.parent.Parent1": 6,
+            "project.parent.Guardian": 7,
+        },
     )
 
 
@@ -208,31 +209,31 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
         """
     )
 
-    potentially_valid = [
-        "a.b",
-        "a.Foo",
-        "a.b.d",
-        "a.b2.d",
-        "a.b.c.Foo",
-        "a.b.c.d.Foo",
-        "a.b.c.d.FooBar",
-        "a.b.c.d.e.f.g.Baz",
-        "a.b_c.d._bar",
-        "a.b2.c.D",
-        "a.b.c_狗",
-    ]
-    expected = [sym for sym in potentially_valid if sym.count(".") >= min_dots]
+    potentially_valid = {
+        "a.b": 3,
+        "a.Foo": 4,
+        "a.b.d": 5,
+        "a.b2.d": 6,
+        "a.b.c.Foo": 7,
+        "a.b.c.d.Foo": 8,
+        "a.b.c.d.FooBar": 9,
+        "a.b.c.d.e.f.g.Baz": 10,
+        "a.b_c.d._bar": 11,
+        "a.b2.c.D": 12,
+        "a.b.c_狗": 13,
+    }
+    expected = {sym: line for sym, line in potentially_valid.items() if sym.count(".") >= min_dots}
 
     assert_imports_parsed(rule_runner, content, expected=expected, string_imports_min_dots=min_dots)
-    assert_imports_parsed(rule_runner, content, string_imports=False, expected=[])
+    assert_imports_parsed(rule_runner, content, string_imports=False, expected={})
 
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, "x =", expected=[])
+    assert_imports_parsed(rule_runner, "x =", expected={})
 
 
 def test_handle_unicode(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, "x = 'äbç'", expected=[])
+    assert_imports_parsed(rule_runner, "x = 'äbç'", expected={})
 
 
 @skip_unless_python27_present
@@ -259,15 +260,15 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints="==2.7.*",
-        expected=[
-            "demo",
-            "dep.from.bytes",
-            "dep.from.str",
-            "dep.from.str_狗",
-            "project.demo.Demo",
-            "pkg_resources",
-            "treat.as.a.regular.import.not.a.string.import",
-        ],
+        expected={
+            "demo": 4,
+            "project.demo.Demo": 5,
+            "pkg_resources": 7,
+            "treat.as.a.regular.import.not.a.string.import": 8,
+            "dep.from.bytes": 10,
+            "dep.from.str": 11,
+            "dep.from.str_狗": 12,
+        },
     )
 
 
@@ -292,13 +293,13 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.8",
-        expected=[
-            "demo",
-            "dep.from.str",
-            "project.demo.Demo",
-            "pkg_resources",
-            "treat.as.a.regular.import.not.a.string.import",
-        ],
+        expected={
+            "demo": 5,
+            "project.demo.Demo": 6,
+            "pkg_resources": 8,
+            "treat.as.a.regular.import.not.a.string.import": 9,
+            "dep.from.str": 11,
+        },
     )
 
 
@@ -325,11 +326,11 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         constraints=">=3.9",
-        expected=[
-            "demo",
-            "dep.from.str",
-            "project.demo.Demo",
-            "pkg_resources",
-            "treat.as.a.regular.import.not.a.string.import",
-        ],
+        expected={
+            "demo": 7,
+            "project.demo.Demo": 8,
+            "pkg_resources": 10,
+            "treat.as.a.regular.import.not.a.string.import": 11,
+            "dep.from.str": 13,
+        },
     )
