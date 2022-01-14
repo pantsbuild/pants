@@ -395,11 +395,8 @@ def test_get_all_help_info():
         "rule_output_type_to_rule_infos": {
             "Foo": (
                 {
-                    "description": None,  # TODO: Subsystems have `help` we can pick up on.
-                    "help": (
-                        "partial(func, *args, **keywords) - new function with partial application\n"
-                        "of the given arguments and keywords."
-                    ),
+                    "description": None,
+                    "help": "A foo.",
                     "input_gets": ("Get(ScopedOptions, Scope, ..)",),
                     "input_types": (),
                     "name": "construct_scope_foo",
