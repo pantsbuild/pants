@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -323,4 +324,4 @@ async def setup_first_party_pkg_digest(
 
 
 def rules():
-    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules())
+    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules(), *pkg_analyzer.rules())

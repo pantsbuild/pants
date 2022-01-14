@@ -11,6 +11,7 @@ from typing import Any
 
 import ijson
 
+from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.tailor import group_by_dir
@@ -551,4 +552,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *pkg_analyzer.rules(),
+    )

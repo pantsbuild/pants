@@ -16,7 +16,6 @@ from pants.backend.go.util_rules import (
     first_party_pkg,
     go_mod,
     link,
-    pkg_analyzer,
     sdk,
     third_party_pkg,
 )
@@ -54,7 +53,6 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            *pkg_analyzer.rules(),
             generate_targets_from_resources,
             UnionRule(GenerateTargetsRequest, GenerateTargetsFromResources),
             QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
