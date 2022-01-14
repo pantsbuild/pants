@@ -8,15 +8,26 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.go import target_type_rules
+from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.target_types import GoModTarget
-from pants.backend.go.util_rules import sdk, third_party_pkg
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    first_party_pkg,
+    go_mod,
+    import_analysis,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
-    ThirdPartyPkgInfo,
-    ThirdPartyPkgInfoRequest,
+    ThirdPartyPkgAnalysis,
+    ThirdPartyPkgAnalysisRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -28,8 +39,16 @@ def rule_runner() -> RuleRunner:
         rules=[
             *sdk.rules(),
             *third_party_pkg.rules(),
+            *first_party_pkg.rules(),
+            *load_go_binary.rules(),
+            *build_pkg.rules(),
+            *import_analysis.rules(),
+            *link.rules(),
+            *assembly.rules(),
+            *target_type_rules.rules(),
+            *go_mod.rules(),
             QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
-            QueryRule(ThirdPartyPkgInfo, [ThirdPartyPkgInfoRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
         ],
         target_types=[GoModTarget],
     )
@@ -156,7 +175,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
 
     assert_pkg_info(
         import_path="github.com/google/uuid",
-        dir_path="github.com/google/uuid@v1.3.0",
+        dir_path="gopath/pkg/mod/github.com/google/uuid@v1.3.0",
         imports=(
             "bytes",
             "crypto/md5",
@@ -209,7 +228,7 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     )
     assert_pkg_info(
         import_path="golang.org/x/text/unicode/bidi",
-        dir_path="golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
+        dir_path="gopath/pkg/mod/golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c/unicode/bidi",
         imports=("container/list", "fmt", "log", "sort", "unicode/utf8"),
         go_files=("bidi.go", "bracket.go", "core.go", "prop.go", "tables.go", "trieval.go"),
         extra_files=(
@@ -298,8 +317,8 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
         AssertionError, contains="The package `another_project.org/foo` was not downloaded"
     ):
         rule_runner.request(
-            ThirdPartyPkgInfo,
-            [ThirdPartyPkgInfoRequest("another_project.org/foo", digest, "go.mod")],
+            ThirdPartyPkgAnalysis,
+            [ThirdPartyPkgAnalysisRequest("another_project.org/foo", digest, "go.mod")],
         )
 
 
@@ -393,8 +412,8 @@ def test_unsupported_sources(rule_runner: RuleRunner) -> None:
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
+        ThirdPartyPkgAnalysis,
+        [ThirdPartyPkgAnalysisRequest("golang.org/x/mobile/bind/objc", digest, "go.mod")],
     )
     assert pkg_info.error is not None
 
@@ -514,10 +533,10 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
+        ThirdPartyPkgAnalysis,
+        [ThirdPartyPkgAnalysisRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
     )
-    assert pkg_info.dir_path == "github.com/hashicorp/consul/api@v1.3.0"
+    assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
 
 
@@ -542,11 +561,12 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
         ),
     )
     pkg_info = rule_runner.request(
-        ThirdPartyPkgInfo,
-        [ThirdPartyPkgInfoRequest("github.com/ugorji/go/codec", digest, "go.mod")],
+        ThirdPartyPkgAnalysis,
+        [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
     )
-    assert pkg_info.error is not None
-    # This particular error is tricky because `Dir` will not have been set, which we need to
-    # determine the dir_path and the digest.
-    assert pkg_info.dir_path == ""
-    assert pkg_info.digest == EMPTY_DIGEST
+    assert pkg_info.error is None
+    assert (
+        pkg_info.dir_path
+        == "gopath/pkg/mod/github.com/ugorji/go/codec@v0.0.0-20181204163529-d75b2dcb6bc8"
+    )
+    assert "encode.go" in pkg_info.go_files
