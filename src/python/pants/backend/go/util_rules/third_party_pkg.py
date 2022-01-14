@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import posixpath
 from dataclasses import dataclass
 from typing import Any
 
@@ -337,12 +336,22 @@ async def analyze_go_third_party_module(
 async def analyze_go_third_party_package(
     request: AnalyzeThirdPartyPackageRequest,
 ) -> FallibleThirdPartyPkgAnalysis:
-    import_path_tail = posixpath.relpath(request.package_path, start=request.module_sources_path)
-    import_path = (
-        posixpath.join(request.module_import_path, import_path_tail)
-        if import_path_tail != "."
-        else request.module_import_path
-    )
+    if not request.package_path.startswith(request.module_sources_path):
+        raise AssertionError(
+            "The path within GOPATH for a package in a module must always be prefixed by the path "
+            "to the applicable module's root directory. "
+            f"This was not the case however for module {request.module_import_path}.\n\n"
+            "This may be a bug in Pants. Please report this issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
+            f"package_path: {request.package_path}; module_sources_path: {request.module_sources_path}; "
+            f"module_import_path: {request.module_import_path}"
+        )
+    import_path_tail = request.package_path[len(request.module_sources_path) :].strip(os.sep)
+    if import_path_tail != "":
+        parts = import_path_tail.split(os.sep)
+        import_path = "/".join([request.module_import_path, *parts])
+    else:
+        import_path = request.module_import_path
 
     if "Error" in request.pkg_json or "InvalidGoFiles" in request.pkg_json:
         error = request.pkg_json.get("Error", "")
