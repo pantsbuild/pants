@@ -109,7 +109,6 @@ class ModuleDescriptor:
     version: str
     indirect: bool
     minimum_go_version: str | None
-    sum: str | None
 
 
 @dataclass(frozen=True)
@@ -208,7 +207,6 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             version=version,
             indirect=mod_json.get("Indirect", False),
             minimum_go_version=mod_json.get("GoVersion"),
-            sum=None,
         )
 
     # TODO: Augment the modules with go.sum entries?
