@@ -28,6 +28,7 @@ from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -120,7 +121,6 @@ class JvmToolBase(Subsystem):
 
     def resolved_lockfile(self) -> CoursierResolvedLockfile:
         lockfile_content = self.lockfile_content()
-        logger.warning("%s", f"Tool: {self}, reqs: {self.artifact_inputs}")
         return CoursierResolvedLockfile.from_serialized(lockfile_content)
 
 
@@ -306,7 +306,12 @@ async def load_jvm_lockfile(
         ),
     )
 
-    if resolved_lockfile.metadata and resolved_lockfile.metadata.is_valid_for(request.artifact_inputs):
+    requirements = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
+    )
+
+    if resolved_lockfile.metadata and resolved_lockfile.metadata.is_valid_for(requirements):
         raise ValueError(
             f"The lockfile JVM tool `{request.resolve_name} was generated with different "
             "requirements, and needs to be regenerated using "
@@ -326,6 +331,11 @@ async def generate_jvm_lockfile(
     )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
     lockfile_content = resolved_lockfile.to_serialized()
+    metadata = JVMLockfileMetadata.new(requirements)
+    lockfile_content = metadata.add_header_to_lockfile(
+        lockfile_content, regenerate_command="./pants jvm-generate-lockfiles"
+    )
+
     lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])
     )

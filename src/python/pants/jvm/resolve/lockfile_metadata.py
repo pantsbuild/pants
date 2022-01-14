@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Set, cast
+from typing import Any, Iterable, cast
 
 from pants.core.util_rules.lockfile_metadata import (
     LockfileMetadata,
@@ -15,6 +15,7 @@ from pants.core.util_rules.lockfile_metadata import (
     lockfile_metadata_registrar,
 )
 from pants.jvm.resolve.common import ArtifactRequirement
+from pants.util.ordered_set import FrozenOrderedSet
 
 _jvm_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.JVM)
 
@@ -81,13 +82,13 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     those in the stored requirements.
     """
 
-    requirements: set[str]
+    requirements: FrozenOrderedSet[str]
 
     @classmethod
     def from_artifact_requirements(
         cls, requirements: Iterable[ArtifactRequirement]
     ) -> JVMLockfileMetadataV1:
-        return cls({i.to_metadata_str() for i in requirements})
+        return cls(FrozenOrderedSet(i.to_metadata_str() for i in requirements))
 
     @classmethod
     def _from_json_dict(
@@ -100,8 +101,8 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
 
         requirements = metadata(
             "generated_with_requirements",
-            Set[str],
-            set,
+            FrozenOrderedSet[str],
+            FrozenOrderedSet,
         )
 
         return JVMLockfileMetadataV1(requirements)

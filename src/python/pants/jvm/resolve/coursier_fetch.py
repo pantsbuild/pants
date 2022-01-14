@@ -9,7 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 
 import toml
 
@@ -48,15 +48,13 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
-
-if TYPE_CHECKING:
-    from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +237,9 @@ class CoursierResolvedLockfile:
             lockfile_bytes = lockfile
 
         contents = toml.loads(lockfile_str)
-        entries = contents["entries"]
+        entries = tuple(
+            CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
+        )
         metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
 
         return cls(
@@ -709,6 +709,7 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
         Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
         for artifact_requirements in request.artifact_requirements
     )
+
     lockfile_and_requirements_classpath_entries = await MultiGet(
         Get(
             ResolvedClasspathEntries,
