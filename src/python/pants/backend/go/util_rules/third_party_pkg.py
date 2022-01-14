@@ -14,7 +14,6 @@ import ijson
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.tailor import group_by_dir
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -22,6 +21,7 @@ from pants.engine.fs import (
     DigestSubset,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
+    MergeDigests,
     PathGlobs,
     Snapshot,
 )
@@ -111,8 +111,10 @@ class ModuleDescriptor:
     sum: str | None
 
 
-class ModuleDescriptors(DeduplicatedCollection[ModuleDescriptor]):
-    """An ordered list of `ModuleDescriptor`s."""
+@dataclass(frozen=True)
+class ModuleDescriptors:
+    modules: FrozenOrderedSet[ModuleDescriptor]
+    go_mods_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -152,11 +154,28 @@ class FallibleThirdPartyPkgAnalysis:
 
 @rule
 async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> ModuleDescriptors:
+    # List the modules used directly and indirectly by this module.
+    #
+    # This rule can't modify `go.mod` and `go.sum` as it would require mutating the workspace.
+    # Instead, we expect them to be well-formed already.
+    #
+    # Options used:
+    # - `-mod=readonly': It would be convenient to set `-mod=mod` to allow edits, and then compare the
+    #   resulting files to the input so that we could print a diff for the user to know how to update. But
+    #   `-mod=mod` results in more packages being downloaded and added to `go.mod` than is
+    #   actually necessary.
+    # TODO: nice error when `go.mod` and `go.sum` would need to change. Right now, it's a
+    #  message from Go and won't be intuitive for Pants users what to do.
+    # - `-e` is used to not fail if one of the modules is problematic. There may be some packages in the transitive
+    #   closure that cannot be built, but we should  not blow up Pants. For example, a package that sets the
+    #   special value `package documentation` and has no source files would naively error due to
+    #   `build constraints exclude all Go files`, even though we should not error on that package.
     mod_list_result = await Get(
         ProcessResult,
         GoSdkProcess(
             command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
             input_digest=request.digest,
+            output_directories=("gopath",),
             working_dir=request.path if request.path else None,
             allow_downloads=True,
             description="Analyze Go module dependencies.",
@@ -164,7 +183,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     )
 
     if len(mod_list_result.stdout) == 0:
-        return ModuleDescriptors([])
+        return ModuleDescriptors(FrozenOrderedSet(), EMPTY_DIGEST)
 
     descriptors: dict[tuple[str, str], ModuleDescriptor] = {}
 
@@ -194,7 +213,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     # Gazelle does this, mainly to store the sum on the go_repository rule. We could store it (or its
     # absence) to be able to download sums automatically.
 
-    return ModuleDescriptors(descriptors.values())
+    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), mod_list_result.output_digest)
 
 
 def strip_sandbox_prefix(path: str, marker: str) -> str:
@@ -236,9 +255,6 @@ async def analyze_go_third_party_module(
     analyzer: PackageAnalyzerSetup,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
-    # TODO: Download all at once and split? Would not allow caching already downloaded items though.
-    # TODO: Should gopath be an append-only cache or should we reassemble GOPATH cache when trying to run
-    # module operations that could benefit from the cache?
     download_result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -425,7 +441,7 @@ async def analyze_go_third_party_package(
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    modules = await Get(
+    module_analysis = await Get(
         ModuleDescriptors,
         ModuleDescriptorsRequest(
             digest=request.go_mod_digest,
@@ -433,11 +449,15 @@ async def download_and_analyze_third_party_packages(
         ),
     )
 
+    go_mod_digest = await Get(
+        Digest, MergeDigests([request.go_mod_digest, module_analysis.go_mods_digest])
+    )
+
     analyzed_modules = await MultiGet(
         Get(
             AnalyzedThirdPartyModule,
             AnalyzeThirdPartyModuleRequest(
-                go_mod_digest=request.go_mod_digest,
+                go_mod_digest=go_mod_digest,
                 go_mod_path=request.go_mod_path,
                 import_path=mod.name,
                 name=mod.name,
@@ -445,7 +465,7 @@ async def download_and_analyze_third_party_packages(
                 minimum_go_version=mod.minimum_go_version,
             ),
         )
-        for mod in modules
+        for mod in module_analysis.modules
     )
 
     import_path_to_info = {
