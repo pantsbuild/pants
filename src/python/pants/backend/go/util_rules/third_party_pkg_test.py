@@ -540,3 +540,36 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
+
+
+def test_ambiguous_package(rule_runner: RuleRunner) -> None:
+    digest = set_up_go_mod(
+        rule_runner,
+        dedent(
+            """\
+            module example.com/third-party-module
+            go 1.16
+            require github.com/ugorji/go v1.1.4
+            require github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8
+            """
+        ),
+        dedent(
+            """\
+            github.com/ugorji/go v1.1.4 h1:j4s+tAvLfL3bZyefP2SEWmhBzmuIlH/eqNuPdFPgngw=
+            github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
+            github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 h1:3SVOIvH7Ae1KRYyQWRjXWJEA9sS/c/pjvH++55Gr648=
+            github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
+            """
+        ),
+    )
+    pkg_info = rule_runner.request(
+        ThirdPartyPkgAnalysis,
+        [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
+    )
+    print(f"pkg_info = {pkg_info}")
+    assert pkg_info.error is None
+    assert (
+        pkg_info.dir_path
+        == "gopath/pkg/mod/github.com/ugorji/go/codec@v0.0.0-20181204163529-d75b2dcb6bc8"
+    )
+    assert "encode.go" in pkg_info.go_files
