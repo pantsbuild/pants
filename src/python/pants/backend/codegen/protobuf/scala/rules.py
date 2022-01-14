@@ -45,11 +45,16 @@ from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
 from pants.jvm.resolve.jvm_tool import (
     GatherJvmCoordinatesRequest,
     JvmToolLockfileRequest,
     JvmToolLockfileSentinel,
+    ValidatedJvmToolLockfileRequest,
 )
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -113,6 +118,8 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -124,7 +131,7 @@ async def generate_scala_from_protobuf(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(scalapb.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
         Get(Digest, CreateDigest([Directory(output_dir)])),
@@ -280,6 +287,8 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
             MaterializedClasspath,
@@ -312,7 +321,7 @@ async def setup_scalapb_shim_classfiles(
             MaterializedClasspath,
             MaterializedClasspathRequest(
                 prefix="__shimcp",
-                lockfiles=(scalapb.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
         Get(

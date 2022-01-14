@@ -21,8 +21,16 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import (
+    JvmToolLockfileRequest,
+    JvmToolLockfileSentinel,
+    ValidatedJvmToolLockfileRequest,
+)
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
@@ -61,11 +69,14 @@ async def setup_scalatest_for_target(
     scalatest: Scalatest,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalatest))
+
     classpath, scalatest_classpath = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(
             MaterializedClasspath,
-            MaterializedClasspathRequest(lockfiles=(scalatest.resolved_lockfile(),)),
+            MaterializedClasspathRequest(lockfiles=(lockfile,)),
         ),
     )
 
