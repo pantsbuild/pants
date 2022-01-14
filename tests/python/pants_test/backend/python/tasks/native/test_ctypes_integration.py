@@ -48,9 +48,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     _binary_interop_target_dir = "testprojects/src/python/python_distribution/ctypes_interop"
     _binary_target_with_interop = f"{_binary_interop_target_dir}:bin"
     _wrapped_math_build_file = os.path.join(_binary_interop_target_dir, "wrapped-math", "BUILD")
-    _binary_target_with_third_party = (
-        "testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party"
-    )
     _binary_target_with_compiler_option_sets = (
         "testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin"
     )
@@ -172,31 +169,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             )
             self.assert_success(pants_run_interop)
             self.assertEqual("x=3, f(x)=299\n", pants_run_interop.stdout_data)
-
-    @skip(
-        "See https://github.com/pantsbuild/pants/issues/8316 and https://github.com/pantsbuild/pants/issues/7762"
-    )
-    @_toolchain_variants
-    def test_ctypes_third_party_integration(self, toolchain_variant):
-        pants_binary = self.run_pants(
-            ["binary", self._binary_target_with_third_party],
-            config={"native-build-step": {"toolchain_variant": toolchain_variant.value}},
-        )
-        self.assert_success(pants_binary)
-
-        # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
-        # be available on the runtime library path.
-        attempt_pants_run = match(
-            Platform.current,
-            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True},
-        )
-        if attempt_pants_run:
-            pants_run = self.run_pants(
-                ["-q", "run", self._binary_target_with_third_party],
-                config={"native-build-step": {"toolchain_variant": toolchain_variant.value}},
-            )
-            self.assert_success(pants_run)
-            self.assertIn("Test worked!\n", pants_run.stdout_data)
 
     def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
         """Test that `./pants run` respects platforms when the closure contains native sources.

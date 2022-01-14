@@ -79,7 +79,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             # Already tested in 'PantsRequirementIntegrationTest' and 'SetupPyIntegrationTest'.
             "testprojects/pants-plugins/*",
             "testprojects/src/python/python_distribution/ctypes:ctypes_test",
-            "testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test",
             "testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin",
             # Requires non-standard settings, and already tested by
             # `ProtobufIntegrationTest.test_import_from_buildroot`
