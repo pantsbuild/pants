@@ -102,19 +102,19 @@ async def coursier_generate_lockfile(
         # Note that it's legal to have a resolve with no artifacts.
         ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ())),
     )
-    resolved_lockfile_json = resolved_lockfile.to_json()
+    resolved_lockfile_serialized = resolved_lockfile.to_serialized()
     lockfile_path = jvm.resolves[request.resolve]
 
     # If the lockfile hasn't changed, don't overwrite it.
     existing_lockfile_digest_contents = await Get(DigestContents, PathGlobs([lockfile_path]))
     if (
         existing_lockfile_digest_contents
-        and resolved_lockfile_json == existing_lockfile_digest_contents[0].content
+        and resolved_lockfile_serialized == existing_lockfile_digest_contents[0].content
     ):
         return CoursierGenerateLockfileResult(EMPTY_DIGEST)
 
     new_lockfile = await Get(
-        Digest, CreateDigest((FileContent(lockfile_path, resolved_lockfile_json),))
+        Digest, CreateDigest((FileContent(lockfile_path, resolved_lockfile_serialized),))
     )
     return CoursierGenerateLockfileResult(new_lockfile)
 

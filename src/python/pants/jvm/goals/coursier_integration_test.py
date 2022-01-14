@@ -77,7 +77,7 @@ def test_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
     assert (
         Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_json()
+        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
     )
 
 
@@ -86,7 +86,7 @@ def test_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": HAMCREST_BUILD_FILE,
-            "3rdparty/jvm/default.lock": HAMCREST_EXPECTED_LOCKFILE.to_json().decode("utf-8"),
+            "3rdparty/jvm/default.lock": HAMCREST_EXPECTED_LOCKFILE.to_serialized().decode("utf-8"),
         }
     )
     result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
@@ -94,7 +94,7 @@ def test_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     assert result.stderr == ""
     assert (
         Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_json()
+        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
     )
 
 
@@ -106,7 +106,7 @@ def test_updates_lockfile(rule_runner: RuleRunner) -> None:
     assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
     assert (
         Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_json()
+        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
     )
 
 
@@ -165,7 +165,10 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             ),
         )
     )
-    assert Path(rule_runner.build_root, "a.lockfile").read_bytes() == expected_lockfile_a.to_json()
+    assert (
+        Path(rule_runner.build_root, "a.lockfile").read_bytes()
+        == expected_lockfile_a.to_serialized()
+    )
 
     expected_lockfile_b = CoursierResolvedLockfile(
         entries=(
@@ -184,4 +187,7 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             HAMCREST_EXPECTED_LOCKFILE.entries[0],
         )
     )
-    assert Path(rule_runner.build_root, "b.lockfile").read_bytes() == expected_lockfile_b.to_json()
+    assert (
+        Path(rule_runner.build_root, "b.lockfile").read_bytes()
+        == expected_lockfile_b.to_serialized()
+    )
