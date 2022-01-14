@@ -564,7 +564,6 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
         ThirdPartyPkgAnalysis,
         [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
     )
-    print(f"pkg_info = {pkg_info}")
     assert pkg_info.error is None
     assert (
         pkg_info.dir_path
