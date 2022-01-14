@@ -260,7 +260,7 @@ async def analyze_go_third_party_module(
         GoSdkProcess(
             ("mod", "download", "-json", f"{request.name}@{request.version}"),
             input_digest=request.go_mod_digest,  # for go.sum
-            working_dir=request.go_mod_path if request.go_mod_path else None,
+            working_dir=os.path.dirname(request.go_mod_path) if request.go_mod_path else None,
             # Allow downloads of the module sources.
             allow_downloads=True,
             output_directories=("gopath",),
