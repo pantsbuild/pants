@@ -13,15 +13,17 @@ from pants.backend.scala.target_types import (
     ScalacPluginTarget,
 )
 from pants.build_graph.address import AddressInput
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.jvm.goals import lockfile
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
@@ -63,8 +65,8 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
     )
 
 
-class GlobalScalacPluginsToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = "scalac-plugins"
+class GlobalScalacPluginsToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = "scalac-plugins"
 
 
 @rule
@@ -72,8 +74,8 @@ def generate_global_scalac_plugins_lockfile_request(
     _: GlobalScalacPluginsToolLockfileSentinel,
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
     scalac_plugins: Scalac,
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest(
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest(
         artifact_inputs=FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
         resolve_name="scalac-plugins",
         lockfile_dest=scalac_plugins.plugins_global_lockfile,
@@ -96,7 +98,6 @@ class GlobalScalacPlugins:
 async def global_scalac_plugins(
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
 ) -> GlobalScalacPlugins:
-
     lockfile = await Get(CoursierResolvedLockfile, GlobalScalacPluginsToolLockfileSentinel())
     classpath = await Get(
         MaterializedClasspath,
@@ -112,5 +113,6 @@ def rules():
     return (
         *collect_rules(),
         *jvm_tool_rules(),
-        UnionRule(JvmToolLockfileSentinel, GlobalScalacPluginsToolLockfileSentinel),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, GlobalScalacPluginsToolLockfileSentinel),
     )

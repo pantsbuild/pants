@@ -4,14 +4,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-xml_2.13",
             "version": "1.3.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -19,7 +21,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-xml_2.13_1.3.0.jar",
@@ -35,7 +38,8 @@
             "group": "org.scala-lang",
             "artifact": "scala-library",
             "version": "2.13.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -52,14 +56,16 @@
             "group": "org.scala-lang",
             "artifact": "scala-reflect",
             "version": "2.13.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -67,7 +73,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang_scala-reflect_2.13.6.jar",
@@ -83,20 +90,23 @@
             "group": "org.scalactic",
             "artifact": "scalactic_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -104,13 +114,15 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalactic_scalactic_2.13_3.2.10.jar",
@@ -126,7 +138,8 @@
             "group": "org.scalatest",
             "artifact": "scalatest-compatible",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -143,38 +156,44 @@
             "group": "org.scalatest",
             "artifact": "scalatest-core_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -182,31 +201,36 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-core_2.13_3.2.10.jar",
@@ -222,26 +246,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-diagrams_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -249,37 +277,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-diagrams_2.13_3.2.10.jar",
@@ -295,26 +329,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-featurespec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -322,37 +360,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-featurespec_2.13_3.2.10.jar",
@@ -368,26 +412,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-flatspec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -395,37 +443,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-flatspec_2.13_3.2.10.jar",
@@ -441,26 +495,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-freespec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -468,37 +526,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-freespec_2.13_3.2.10.jar",
@@ -514,26 +578,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-funspec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -541,37 +609,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-funspec_2.13_3.2.10.jar",
@@ -587,26 +661,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-funsuite_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -614,37 +692,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-funsuite_2.13_3.2.10.jar",
@@ -660,26 +744,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-matchers-core_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -687,37 +775,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-matchers-core_2.13_3.2.10.jar",
@@ -733,26 +827,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-mustmatchers_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -760,43 +858,50 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-mustmatchers_2.13_3.2.10.jar",
@@ -812,26 +917,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-propspec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -839,37 +948,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-propspec_2.13_3.2.10.jar",
@@ -885,26 +1000,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-refspec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -912,37 +1031,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-refspec_2.13_3.2.10.jar",
@@ -958,26 +1083,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-shouldmatchers_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -985,43 +1114,50 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-shouldmatchers_2.13_3.2.10.jar",
@@ -1037,26 +1173,30 @@
             "group": "org.scalatest",
             "artifact": "scalatest-wordspec_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1064,37 +1204,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest-wordspec_2.13_3.2.10.jar",
@@ -1110,98 +1256,114 @@
             "group": "org.scalatest",
             "artifact": "scalatest_2.13",
             "version": "3.2.10",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-diagrams_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-flatspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-funspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-refspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-wordspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-propspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-shouldmatchers_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-mustmatchers_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-freespec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-funsuite_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-featurespec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1209,109 +1371,127 @@
                 "group": "org.scalatest",
                 "artifact": "scalatest-diagrams_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-flatspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-funspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-refspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-wordspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-propspec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-compatible",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-shouldmatchers_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-mustmatchers_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-freespec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-funsuite_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalactic",
                 "artifact": "scalactic_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-matchers-core_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalatest",
                 "artifact": "scalatest-featurespec_2.13",
                 "version": "3.2.10",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalatest_scalatest_2.13_3.2.10.jar",
