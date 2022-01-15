@@ -135,7 +135,6 @@ def run_fmt(rule_runner: RuleRunner, *, target_specs: List[str], per_file_cachin
     return result.stderr
 
 
-@logging
 @pytest.mark.parametrize("per_file_caching", [True, False])
 def test_summary(per_file_caching: bool) -> None:
     """Tests that the final summary is correct.

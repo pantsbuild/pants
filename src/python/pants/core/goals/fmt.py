@@ -18,6 +18,7 @@ from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -135,6 +136,11 @@ class FmtSubsystem(GoalSubsystem):
             advanced=True,
             type=bool,
             default=False,
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Formatters are now broken into multiple batches by default using the "
+                "`--batch-size` argument."
+            ),
             help=(
                 "Rather than formatting all files in a single batch, format each file as a "
                 "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
@@ -145,10 +151,34 @@ class FmtSubsystem(GoalSubsystem):
                 "faster than `--no-per-file-caching` for your use case."
             ),
         )
+        register(
+            "--batch-size",
+            advanced=True,
+            type=int,
+            default=128,
+            help=(
+                "The target minimum number of files that will be included in each formatter batch.\n"
+                "\n"
+                "Formatter processes are batched for a few reasons:\n"
+                "\n"
+                "1. to avoid OS argument length limits (in processes which don't support argument "
+                "files)\n"
+                "2. to support more stable cache keys than would be possible if all files were "
+                "operated on in a single batch.\n"
+                "3. to allow for parallelism in formatter processes which don't have internal "
+                "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
+                "behavior when multiple processes are competing for cores and so internal "
+                "parallelism cannot be used perfectly.\n"
+            ),
+        )
 
     @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
+
+    @property
+    def batch_size(self) -> int:
+        return cast(int, self.options.batch_size)
 
 
 class Fmt(Goal):
@@ -187,9 +217,12 @@ async def fmt(
         per_language_results = await MultiGet(
             Get(
                 _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets(targets)),
+                _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
             )
             for fmt_requests, targets in targets_by_fmt_request_order.items()
+            for target_batch in partition_sequentially(
+                targets, key=lambda t: t.address.spec, size_min=fmt_subsystem.batch_size
+            )
         )
 
     individual_results = list(
