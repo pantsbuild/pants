@@ -42,7 +42,7 @@ def assert_imports_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
-    expected: dict[str, int],
+    expected: dict[str, tuple[int, bool]],
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
@@ -67,7 +67,9 @@ def assert_imports_parsed(
             )
         ],
     )
-    assert dict(imports) == expected
+    assert {
+        module_name: (info.lineno, info.string) for module_name, info in imports.items()
+    } == expected
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -125,23 +127,23 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         expected={
-            "__future__.print_function": 1,
-            "os": 3,
-            "os.path": 5,
-            "typing.TYPE_CHECKING": 6,
-            "requests": 8,
-            "demo": 10,
-            "project.demo.Demo": 11,
-            "project.demo.OriginalName": 12,
-            "multiline_import1.not_ignored1": 16,
-            "multiline_import1.not_ignored2": 23,
-            "multiline_import2.not_ignored": 26,
-            "project.circular_dep.CircularDep": 29,
-            "subprocess": 32,
-            "subprocess23": 34,
-            "pkg_resources": 36,
-            "not_ignored_but_looks_like_it_could_be": 39,
-            "also_not_ignored_but_looks_like_it_could_be": 45,
+            "__future__.print_function": (1, False),
+            "os": (3, False),
+            "os.path": (5, False),
+            "typing.TYPE_CHECKING": (6, False),
+            "requests": (8, False),
+            "demo": (10, False),
+            "project.demo.Demo": (11, False),
+            "project.demo.OriginalName": (12, False),
+            "multiline_import1.not_ignored1": (16, False),
+            "multiline_import1.not_ignored2": (23, False),
+            "multiline_import2.not_ignored": (26, False),
+            "project.circular_dep.CircularDep": (29, False),
+            "subprocess": (32, False),
+            "subprocess23": (34, False),
+            "pkg_resources": (36, False),
+            "not_ignored_but_looks_like_it_could_be": (39, False),
+            "also_not_ignored_but_looks_like_it_could_be": (45, False),
         },
     )
 
@@ -165,12 +167,12 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
         content,
         filename=f"project/util/{basename}",
         expected={
-            "project.util.sibling": 1,
-            "project.util.sibling.Nibling": 2,
-            "project.util.subdir.child.Child": 3,
-            "project.parent.Parent": 4,
-            "project.parent.Parent1": 6,
-            "project.parent.Guardian": 7,
+            "project.util.sibling": (1, False),
+            "project.util.sibling.Nibling": (2, False),
+            "project.util.subdir.child.Child": (3, False),
+            "project.parent.Parent": (4, False),
+            "project.parent.Parent1": (6, False),
+            "project.parent.Guardian": (7, False),
         },
     )
 
@@ -210,22 +212,28 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     )
 
     potentially_valid = {
-        "a.b": 3,
-        "a.Foo": 4,
-        "a.b.d": 5,
-        "a.b2.d": 6,
-        "a.b.c.Foo": 7,
-        "a.b.c.d.Foo": 8,
-        "a.b.c.d.FooBar": 9,
-        "a.b.c.d.e.f.g.Baz": 10,
-        "a.b_c.d._bar": 11,
-        "a.b2.c.D": 12,
-        "a.b.c_狗": 13,
+        "a.b": (3, True),
+        "a.Foo": (4, True),
+        "a.b.d": (5, True),
+        "a.b2.d": (6, True),
+        "a.b.c.Foo": (7, True),
+        "a.b.c.d.Foo": (8, True),
+        "a.b.c.d.FooBar": (9, True),
+        "a.b.c.d.e.f.g.Baz": (10, True),
+        "a.b_c.d._bar": (11, True),
+        "a.b2.c.D": (12, True),
+        "a.b.c_狗": (13, True),
     }
     expected = {sym: line for sym, line in potentially_valid.items() if sym.count(".") >= min_dots}
 
     assert_imports_parsed(rule_runner, content, expected=expected, string_imports_min_dots=min_dots)
     assert_imports_parsed(rule_runner, content, string_imports=False, expected={})
+
+
+def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
+    assert_imports_parsed(
+        rule_runner, "import one.two.three; 'one.two.three'", expected={"one.two.three": (1, False)}
+    )
 
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
@@ -261,13 +269,13 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         content,
         constraints="==2.7.*",
         expected={
-            "demo": 4,
-            "project.demo.Demo": 5,
-            "pkg_resources": 7,
-            "treat.as.a.regular.import.not.a.string.import": 8,
-            "dep.from.bytes": 10,
-            "dep.from.str": 11,
-            "dep.from.str_狗": 12,
+            "demo": (4, False),
+            "project.demo.Demo": (5, False),
+            "pkg_resources": (7, False),
+            "treat.as.a.regular.import.not.a.string.import": (8, False),
+            "dep.from.bytes": (10, True),
+            "dep.from.str": (11, True),
+            "dep.from.str_狗": (12, True),
         },
     )
 
@@ -294,11 +302,11 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         content,
         constraints=">=3.8",
         expected={
-            "demo": 5,
-            "project.demo.Demo": 6,
-            "pkg_resources": 8,
-            "treat.as.a.regular.import.not.a.string.import": 9,
-            "dep.from.str": 11,
+            "demo": (5, False),
+            "project.demo.Demo": (6, False),
+            "pkg_resources": (8, False),
+            "treat.as.a.regular.import.not.a.string.import": (9, False),
+            "dep.from.str": (11, True),
         },
     )
 
@@ -327,10 +335,10 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         content,
         constraints=">=3.9",
         expected={
-            "demo": 7,
-            "project.demo.Demo": 8,
-            "pkg_resources": 10,
-            "treat.as.a.regular.import.not.a.string.import": 11,
-            "dep.from.str": 13,
+            "demo": (7, False),
+            "project.demo.Demo": (8, False),
+            "pkg_resources": (10, False),
+            "treat.as.a.regular.import.not.a.string.import": (11, False),
+            "dep.from.str": (13, True),
         },
     )

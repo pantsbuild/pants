@@ -172,7 +172,7 @@ async def infer_python_dependencies_via_imports(
         return InferredDependencies([])
 
     wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
-    explicitly_provided_deps, detected_imports = await MultiGet(
+    explicitly_provided_deps, parsed_imports = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
         Get(
             ParsedPythonImports,
@@ -186,14 +186,13 @@ async def infer_python_dependencies_via_imports(
     )
 
     owners_per_import = await MultiGet(
-        Get(PythonModuleOwners, PythonModule(imported_module))
-        for imported_module in detected_imports.keys()
+        Get(PythonModuleOwners, PythonModule(imported_module)) for imported_module in parsed_imports
     )
 
     merged_result: set[Address] = set()
     unowned_imports: set[str] = set()
     address = wrapped_tgt.target.address
-    for owners, imp in zip(owners_per_import, detected_imports):
+    for owners, imp in zip(owners_per_import, parsed_imports):
         merged_result.update(owners.unambiguous)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
@@ -205,13 +204,17 @@ async def infer_python_dependencies_via_imports(
         if maybe_disambiguated:
             merged_result.add(maybe_disambiguated)
 
-        if not owners.unambiguous and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES:
+        if (
+            not owners.unambiguous
+            and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
+            and not parsed_imports[imp].string
+        ):
             unowned_imports.add(imp)
 
     unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
         unowned_imports_with_lines = [
-            f"{module_name} ({request.sources_field.file_path}:{detected_imports[module_name]})"
+            f"{module_name} ({request.sources_field.file_path}:{parsed_imports[module_name].lineno})"
             for module_name in sorted(unowned_imports)
         ]
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError

@@ -31,12 +31,15 @@ class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
         self._package_parts = package_parts
         self._contents_lines = contents.decode(errors="ignore").splitlines()
+
+        # Each of these maps module_name to first lineno of occurance
         # N.B. use `setdefault` when adding imports
-        self.imports = {}  # maps module_name to first lineno of occurance
+        self.definite_imports = {}
+        self.string_imports = {}
 
     def maybe_add_string_import(self, node, s):
-        if STRING_IMPORT_REGEX.match(s):
-            self.imports.setdefault(s, node.lineno)
+        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
+            self.string_imports.setdefault(s, node.lineno)
 
     @staticmethod
     def _is_pragma_ignored(line):
@@ -67,7 +70,9 @@ class AstVisitor(ast.NodeVisitor):
                 token = next(token_iter)
 
             if not self._is_pragma_ignored(token[4]):
-                self.imports.setdefault(import_prefix + alias.name, token[3][0] + node.lineno - 1)
+                self.definite_imports.setdefault(
+                    import_prefix + alias.name, token[3][0] + node.lineno - 1
+                )
             if alias.asname and token[1] != alias.asname:
                 consume_until(alias.asname)
 
@@ -100,40 +105,23 @@ class AstVisitor(ast.NodeVisitor):
             if name is not None:
                 lineno = node.args[0].lineno
                 if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
-                    self.imports.setdefault(name, lineno)
+                    self.definite_imports.setdefault(name, lineno)
                 return
 
         self.generic_visit(node)
 
+    # For Python 2.7, and Python3 < 3.8
+    def visit_Str(self, node):
+        try:
+            val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
+            self.maybe_add_string_import(node, val)
+        except UnicodeError:
+            pass
 
-if os.environ["STRING_IMPORTS"] == "y":
-    # String handling changes a bit depending on Python version. We dynamically add the appropriate
-    # logic.
-    if sys.version_info[0:2] == (2, 7):
-
-        def visit_Str(self, node):
-            try:
-                val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
-                self.maybe_add_string_import(node, val)
-            except UnicodeError:
-                pass
-
-        setattr(AstVisitor, "visit_Str", visit_Str)
-
-    elif sys.version_info[0:2] < (3, 8):
-
-        def visit_Str(self, node):
-            self.maybe_add_string_import(node, node.s)
-
-        setattr(AstVisitor, "visit_Str", visit_Str)
-
-    else:
-
-        def visit_Constant(self, node):
-            if isinstance(node.value, str):
-                self.maybe_add_string_import(node, node.value)
-
-        setattr(AstVisitor, "visit_Constant", visit_Constant)
+    # For Python 3.8+
+    def visit_Constant(self, node):
+        if isinstance(node.value, str):
+            self.maybe_add_string_import(node, node.value)
 
 
 def main(filename):
@@ -151,8 +139,20 @@ def main(filename):
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
     # See below for where we explicitly decode.
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
-    output = json.dumps(visitor.imports)
-    buffer.write(output.encode("utf8"))
+
+    # N.B. Start with string and `update` with definitive so definite "wins"
+    result = {
+        module_name: {"lineno": lineno, "string": True}
+        for module_name, lineno in visitor.string_imports.items()
+    }
+    result.update(
+        {
+            module_name: {"lineno": lineno, "string": False}
+            for module_name, lineno in visitor.definite_imports.items()
+        }
+    )
+
+    buffer.write(json.dumps(result).encode("utf8"))
 
 
 if __name__ == "__main__":
