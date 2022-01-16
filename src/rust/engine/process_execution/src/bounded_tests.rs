@@ -1,21 +1,26 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::bounded::AsyncSemaphore;
+use crate::bounded::{balance, AsyncSemaphore, Task};
+
+fn mk_semaphore(permits: usize) -> AsyncSemaphore {
+  let executor = task_executor::Executor::new();
+  AsyncSemaphore::new(&executor, permits)
+}
 
 #[tokio::test]
 async fn acquire_and_release() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
 
   sema.with_acquired(|_id| future::ready(())).await;
 }
 
 #[tokio::test]
 async fn correct_semaphore_slot_ids() {
-  let sema = AsyncSemaphore::new(2);
+  let sema = mk_semaphore(2);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
   let (tx3, rx3) = oneshot::channel();
@@ -67,7 +72,7 @@ async fn correct_semaphore_slot_ids() {
 
 #[tokio::test]
 async fn correct_semaphore_slot_ids_2() {
-  let sema = AsyncSemaphore::new(4);
+  let sema = mk_semaphore(4);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
   let (tx3, rx3) = oneshot::channel();
@@ -145,7 +150,7 @@ async fn correct_semaphore_slot_ids_2() {
 
 #[tokio::test]
 async fn at_most_n_acquisitions() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
 
@@ -208,7 +213,7 @@ async fn drop_while_waiting() {
   // If the SECOND future was not removed from the waiters queue we would not get a signal
   // that thread3 acquired the lock because the 2nd task would be blocking the queue trying to
   // poll a non existent future.
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
   let handle3 = sema.clone();
@@ -270,7 +275,7 @@ async fn drop_while_waiting() {
 
 #[tokio::test]
 async fn dropped_future_is_removed_from_queue() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
 
@@ -326,4 +331,44 @@ async fn dropped_future_is_removed_from_queue() {
     panic!("thread1 didn't exit.");
   }
   assert_eq!(1, sema.available_permits());
+}
+
+/// Given Tasks as triples of desired, actual, and expected concurrency (all of which are
+/// assumed to be preemptible), assert that the expected concurrency is applied.
+fn test_balance(
+  concurrency_limit: usize,
+  expected_preempted: usize,
+  task_defs: Vec<(usize, usize, usize)>,
+) {
+  let ten_minutes_from_now = Instant::now() + Duration::from_secs(10 * 60);
+  let tasks = task_defs
+    .iter()
+    .enumerate()
+    .map(|(id, (desired, actual, _))| Task::new(id, *desired, *actual, ten_minutes_from_now))
+    .collect::<Vec<_>>();
+
+  assert_eq!(
+    expected_preempted,
+    balance(concurrency_limit, Instant::now(), tasks.iter().collect())
+  );
+  for (task, (_, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
+    assert_eq!(expected, task.concurrency());
+  }
+}
+
+#[tokio::test]
+async fn balance_noop() {
+  test_balance(2, 0, vec![(1, 1, 1), (1, 1, 1)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted() {
+  // Preempt the first Task and give it one slot, without adjusting the second task.
+  test_balance(2, 1, vec![(2, 2, 1), (1, 1, 1)]);
+}
+
+#[tokio::test]
+async fn balance_undercommitted() {
+  // Should preempt both Tasks to give them more concurrency.
+  test_balance(4, 2, vec![(2, 1, 2), (2, 1, 2)]);
 }

@@ -198,6 +198,7 @@ impl Core {
       };
 
     Ok(Box::new(bounded::CommandRunner::new(
+      executor,
       maybe_nailgunnable_local_command_runner,
       exec_strategy_opts.local_parallelism,
     )))
@@ -241,6 +242,7 @@ impl Core {
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
         Box::new(bounded::CommandRunner::new(
+          executor,
           Box::new(remote::CommandRunner::new(
             // We unwrap because global_options.py will have already validated these are defined.
             remoting_opts.execution_address.as_ref().unwrap(),
