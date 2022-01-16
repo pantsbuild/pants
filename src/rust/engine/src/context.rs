@@ -24,8 +24,8 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, BoundedCommandRunner, CommandRunner, ImmutableInputs, NamedCaches, Platform,
-  ProcessMetadata, RemoteCacheWarningsBehavior,
+  self, bounded, local, nailgun, remote, remote_cache, CommandRunner, ImmutableInputs, NamedCaches,
+  Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -59,7 +59,7 @@ pub struct Core {
   pub intrinsics: Intrinsics,
   pub executor: Executor,
   store: Store,
-  pub command_runner: Box<dyn process_execution::CommandRunner>,
+  pub command_runner: Box<dyn CommandRunner>,
   pub http_client: reqwest::Client,
   pub local_cache: PersistentCache,
   pub vfs: PosixFS,
@@ -170,7 +170,7 @@ impl Core {
     exec_strategy_opts: &ExecutionStrategyOptions,
   ) -> Result<Box<dyn CommandRunner>, String> {
     let immutable_inputs = ImmutableInputs::new(store.clone(), local_execution_root_dir)?;
-    let local_command_runner = process_execution::local::CommandRunner::new(
+    let local_command_runner = local::CommandRunner::new(
       store.clone(),
       executor.clone(),
       local_execution_root_dir.to_path_buf(),
@@ -179,9 +179,9 @@ impl Core {
       exec_strategy_opts.local_cleanup,
     );
 
-    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
+    let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
-        Box::new(process_execution::nailgun::CommandRunner::new(
+        Box::new(nailgun::CommandRunner::new(
           local_command_runner,
           local_execution_root_dir.to_path_buf(),
           store.clone(),
@@ -197,7 +197,7 @@ impl Core {
         Box::new(local_command_runner)
       };
 
-    Ok(Box::new(BoundedCommandRunner::new(
+    Ok(Box::new(bounded::CommandRunner::new(
       maybe_nailgunnable_local_command_runner,
       exec_strategy_opts.local_parallelism,
     )))
@@ -240,8 +240,8 @@ impl Core {
     // `global_options.py` already validates that both are not set at the same time.
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
-        Box::new(BoundedCommandRunner::new(
-          Box::new(process_execution::remote::CommandRunner::new(
+        Box::new(bounded::CommandRunner::new(
+          Box::new(remote::CommandRunner::new(
             // We unwrap because global_options.py will have already validated these are defined.
             remoting_opts.execution_address.as_ref().unwrap(),
             remoting_opts.store_address.as_ref().unwrap(),
@@ -262,7 +262,7 @@ impl Core {
           exec_strategy_opts.remote_parallelism,
         ))
       } else if remote_caching_used {
-        Box::new(process_execution::remote_cache::CommandRunner::new(
+        Box::new(remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
           executor.clone(),

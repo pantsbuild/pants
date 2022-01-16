@@ -30,21 +30,22 @@ extern crate derivative;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use fs::RelativePath;
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
-use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use store::{SnapshotOps, SnapshotOpsError, Store};
-use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
+
+pub mod bounded;
+#[cfg(test)]
+mod bounded_tests;
 
 pub mod cache;
 #[cfg(test)]
@@ -667,68 +668,6 @@ pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
   let (_, _, execute_request) =
     crate::remote::make_execute_request(process, metadata.clone()).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
-}
-
-///
-/// A CommandRunner wrapper that limits the number of concurrent requests.
-///
-#[derive(Clone)]
-pub struct BoundedCommandRunner {
-  inner: Arc<(Box<dyn CommandRunner>, AsyncSemaphore)>,
-}
-
-impl BoundedCommandRunner {
-  pub fn new(inner: Box<dyn CommandRunner>, bound: usize) -> BoundedCommandRunner {
-    BoundedCommandRunner {
-      inner: Arc::new((inner, AsyncSemaphore::new(bound))),
-    }
-  }
-}
-
-#[async_trait]
-impl CommandRunner for BoundedCommandRunner {
-  async fn run(
-    &self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-    mut process: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let semaphore_acquisition = self.inner.1.acquire();
-    let permit = in_workunit!(
-      context.workunit_store.clone(),
-      "acquire_command_runner_slot".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
-      |workunit| async move {
-        let _blocking_token = workunit.blocking();
-        semaphore_acquisition.await
-      }
-    )
-    .await;
-
-    log::debug!(
-      "Running {} under semaphore with concurrency id: {}",
-      process.description,
-      permit.concurrency_slot()
-    );
-
-    if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-      process.env.insert(
-        execution_slot_env_var.clone(),
-        format!("{}", permit.concurrency_slot()),
-      );
-    }
-
-    self.inner.0.run(context, workunit, process).await
-  }
-}
-
-impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
-  fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
-    Arc::new(*command_runner)
-  }
 }
 
 #[cfg(test)]

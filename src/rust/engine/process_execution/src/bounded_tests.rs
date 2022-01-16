@@ -4,7 +4,7 @@ use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::AsyncSemaphore;
+use crate::bounded::AsyncSemaphore;
 
 #[tokio::test]
 async fn acquire_and_release() {
