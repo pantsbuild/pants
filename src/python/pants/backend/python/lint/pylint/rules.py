@@ -38,6 +38,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
+from pants.vcs.changed import DependeesOption
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,7 @@ class PylintPartition:
 
 class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
+    requires_dependees = DependeesOption.TRANSITIVE
 
 
 def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:

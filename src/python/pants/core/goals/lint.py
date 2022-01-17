@@ -6,8 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Iterable, cast
 
+from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
@@ -22,6 +24,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
+from pants.vcs.changed import DependeesFlagOption
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +128,21 @@ class LintResults(EngineAwareReturnType):
         return False
 
 
+class DependeesOption(Enum):
+    NONE = "none"
+    DIRECT = "direct"
+    TRANSITIVE = "transitive"
+
+
 @union
 class LintRequest(StyleRequest):
     """A union for StyleRequests that should be lintable.
 
     Subclass and install a member of this type to provide a linter.
     """
+
+    # @TODO: Document
+    requires_dependees: DependeesOption = DependeesOption.NONE
 
 
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
@@ -181,16 +193,35 @@ async def lint(
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
+    dependees_flag: DependeesFlagOption,
 ) -> Lint:
-    request_types = cast("Iterable[type[StyleRequest]]", union_membership[LintRequest])
-    requests = tuple(
-        request_type(
-            request_type.field_set_type.create(target)
-            for target in targets
-            if request_type.field_set_type.is_applicable(target)
+    request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
+    requests = []
+
+    for request_type in request_types:
+        requires_dependees = request_type.requires_dependees
+        request_targets = list(targets)
+        if (
+            dependees_flag == DependeesFlagOption.IMPLICIT
+            and requires_dependees != DependeesOption.NONE
+        ):
+            additional_targets = await Get(
+                Dependees,
+                DependeesRequest(
+                    (target.address for target in targets),
+                    transitive=requires_dependees == DependeesOption.TRANSITIVE,
+                    include_roots=False,
+                ),
+            )
+            request_targets.extend(additional_targets)
+
+        requests.append(
+            request_type(
+                request_type.field_set_type.create(target)
+                for target in request_targets
+                if request_type.field_set_type.is_applicable(target)
+            )
         )
-        for request_type in request_types
-    )
 
     if lint_subsystem.per_file_caching:
         all_per_file_results = await MultiGet(

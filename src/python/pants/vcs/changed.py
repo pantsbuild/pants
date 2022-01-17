@@ -20,16 +20,17 @@ from pants.util.docutil import doc_url
 from pants.vcs.git import Git
 
 
-class DependeesOption(Enum):
+class DependeesFlagOption(Enum):
     NONE = "none"
     DIRECT = "direct"
     TRANSITIVE = "transitive"
+    IMPLICIT = "implicit"
 
 
 @dataclass(frozen=True)
 class ChangedRequest:
     sources: tuple[str, ...]
-    dependees: DependeesOption
+    dependees: DependeesFlagOption
 
 
 class ChangedAddresses(Collection[Address]):
@@ -39,13 +40,13 @@ class ChangedAddresses(Collection[Address]):
 @rule
 async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
     owners = await Get(Owners, OwnersRequest(request.sources))
-    if request.dependees == DependeesOption.NONE:
+    if request.dependees in (DependeesFlagOption.NONE, DependeesFlagOption.IMPLICIT):
         return ChangedAddresses(owners)
     dependees_with_roots = await Get(
         Dependees,
         DependeesRequest(
             owners,
-            transitive=request.dependees == DependeesOption.TRANSITIVE,
+            transitive=request.dependees == DependeesFlagOption.TRANSITIVE,
             include_roots=True,
         ),
     )
@@ -62,7 +63,7 @@ class ChangedOptions:
 
     since: str | None
     diffspec: str | None
-    dependees: DependeesOption
+    dependees: DependeesFlagOption
 
     @classmethod
     def from_options(cls, options: OptionValueContainer) -> ChangedOptions:
@@ -109,10 +110,15 @@ class Changed(Subsystem):
         )
         register(
             "--dependees",
-            type=DependeesOption,
-            default=DependeesOption.NONE,
+            type=DependeesFlagOption,
+            default=DependeesFlagOption.NONE,
             help="Include direct or transitive dependees of changed targets.",
         )
+
+
+@rule
+async def get_dependees_flag_options(changed: Changed) -> DependeesFlagOption:
+    return changed.options.dependees
 
 
 def rules():
