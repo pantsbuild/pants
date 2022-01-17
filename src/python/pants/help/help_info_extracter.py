@@ -8,11 +8,13 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
+from itertools import groupby
 from typing import Any, Callable, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
+from pants.engine.rules import TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
@@ -229,12 +231,25 @@ class TargetTypeHelpInfo:
 
 
 @dataclass(frozen=True)
+class RuleInfo:
+    name: str
+    description: str | None
+    help: str | None
+    provider: str
+    input_types: tuple[str, ...]
+    input_gets: tuple[str, ...]
+    output_type: str
+    output_desc: str | None
+
+
+@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
     scope_to_help_info: dict[str, OptionScopeHelpInfo]
     name_to_goal_info: dict[str, GoalHelpInfo]
     name_to_target_type_info: dict[str, TargetTypeHelpInfo]
+    rule_output_type_to_rule_infos: dict[str, tuple[RuleInfo, ...]]
 
 
 ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
@@ -323,6 +338,7 @@ class HelpInfoExtracter:
             scope_to_help_info=scope_to_help_info,
             name_to_goal_info=name_to_goal_info,
             name_to_target_type_info=name_to_target_type_info,
+            rule_output_type_to_rule_infos=cls.get_rule_infos(build_configuration),
         )
 
     @staticmethod
@@ -396,6 +412,42 @@ class HelpInfoExtracter:
         if not providers:
             return ""
         return providers[0]
+
+    @staticmethod
+    def maybe_cleandoc(doc: str | None) -> str | None:
+        return doc and inspect.cleandoc(doc)
+
+    @staticmethod
+    def rule_info_output_type(rule_info: RuleInfo) -> str:
+        return rule_info.output_type
+
+    @classmethod
+    def get_rule_infos(
+        cls, build_configuration: BuildConfiguration | None
+    ) -> dict[str, tuple[RuleInfo, ...]]:
+        if build_configuration is None:
+            return {}
+
+        rule_infos = [
+            RuleInfo(
+                name=rule.canonical_name,
+                description=rule.desc,
+                help=cls.maybe_cleandoc(rule.func.__doc__),
+                provider=cls.get_first_provider(providers),
+                input_types=tuple(selector.__name__ for selector in rule.input_selectors),
+                input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+                output_type=rule.output_type.__name__,
+                output_desc=cls.maybe_cleandoc(rule.output_type.__doc__),
+            )
+            for rule, providers in build_configuration.rule_to_providers.items()
+            if isinstance(rule, TaskRule)
+        ]
+        return {
+            rule_output_type: tuple(infos)
+            for rule_output_type, infos in groupby(
+                sorted(rule_infos, key=cls.rule_info_output_type), key=cls.rule_info_output_type
+            )
+        }
 
     def __init__(self, scope: str):
         self._scope = scope

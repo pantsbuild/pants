@@ -24,7 +24,7 @@ from pants.option.arg_splitter import (
 )
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.docutil import terminal_width
-from pants.util.strutil import first_paragraph, hard_wrap
+from pants.util.strutil import first_paragraph, hard_wrap, pluralize
 
 
 class HelpPrinter(MaybeColor):
@@ -110,10 +110,14 @@ class HelpPrinter(MaybeColor):
                     self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
                 elif thing == "tools":
                     self._print_all_tools()
+                elif thing == "api-types":
+                    self._print_all_api_types()
                 elif thing in self._all_help_info.scope_to_help_info:
                     self._print_options_help(thing, help_request.advanced)
                 elif thing in self._all_help_info.name_to_target_type_info:
                     self._print_target_help(thing)
+                elif thing in self._all_help_info.rule_output_type_to_rule_infos:
+                    self._print_api_type_help(thing, help_request.advanced)
                 else:
                     print(self.maybe_red(f"Unknown entity: {thing}"))
         else:
@@ -197,6 +201,22 @@ class HelpPrinter(MaybeColor):
         ToolHelpInfo.print_all(ToolHelpInfo.iter(self._all_help_info), self)
         tool_help_cmd = f"{self._bin_name} help $tool"
         print(f"Use `{self.maybe_green(tool_help_cmd)}` to get help for a specific tool.\n")
+
+    def _print_all_api_types(self) -> None:
+        self._print_title("Plugin API Types")
+        api_type_descriptions: Dict[str, str] = {}
+        for api_type, rule_infos in self._all_help_info.rule_output_type_to_rule_infos.items():
+            if api_type.startswith("_"):
+                continue
+            api_type_descriptions[api_type] = rule_infos[0].output_desc or ""
+        longest_api_type_name = max(len(name) for name in api_type_descriptions.keys())
+        chars_before_description = longest_api_type_name + 2
+        for api_type, description in api_type_descriptions.items():
+            name = self.maybe_cyan(api_type.ljust(chars_before_description))
+            description = self._format_summary_description(description, chars_before_description)
+            print(f"{name}{description}\n")
+        api_help_cmd = f"{self._bin_name} help $api_type"
+        print(f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type.\n")
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
@@ -290,6 +310,42 @@ class HelpPrinter(MaybeColor):
                     hard_wrap(field.description, indent=len(indent), width=self._width)
                 )
                 print("\n" + formatted_desc)
+        print()
+
+    def _print_api_type_help(self, output_type: str, show_advanced: bool) -> None:
+        self._print_title(f"`{output_type}` API type")
+        rule_infos = self._all_help_info.rule_output_type_to_rule_infos[output_type]
+        if rule_infos[0].output_desc:
+            print("\n".join(hard_wrap(rule_infos[0].output_desc, width=self._width)))
+            print()
+        print(f"Returned by {pluralize(len(rule_infos), 'rule')}:")
+        for rule_info in rule_infos:
+            print()
+            print(self.maybe_magenta(rule_info.name))
+            indent = "    "
+            print(self.maybe_cyan(f"{indent}activated by"), rule_info.provider)
+            if rule_info.input_types:
+                print(
+                    self.maybe_cyan(f"{indent}{pluralize(len(rule_info.input_types), 'input')}:"),
+                    ", ".join(rule_info.input_types),
+                )
+            else:
+                print(self.maybe_cyan(f"{indent}no inputs"))
+            if show_advanced and rule_info.input_gets:
+                print(
+                    f"\n{indent}".join(
+                        hard_wrap(
+                            self.maybe_cyan(f"{pluralize(len(rule_info.input_gets), 'get')}: ")
+                            + ", ".join(rule_info.input_gets),
+                            indent=4,
+                            width=self._width - 4,
+                        )
+                    )
+                )
+            if rule_info.description:
+                print(f"{indent}{rule_info.description}")
+            if rule_info.help:
+                print("\n" + "\n".join(hard_wrap(rule_info.help, indent=4, width=self._width)))
         print()
 
     def _get_help_json(self) -> str:

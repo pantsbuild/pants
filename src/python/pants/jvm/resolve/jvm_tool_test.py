@@ -23,6 +23,7 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 
 class MockJvmTool(JvmToolBase):
     options_scope = "mock-tool"
+    help = "Hamcrest is a mocking tool for the JVM."
 
     default_version = "1.3"
     default_artifacts = ("org.hamcrest:hamcrest-core:{version}",)
