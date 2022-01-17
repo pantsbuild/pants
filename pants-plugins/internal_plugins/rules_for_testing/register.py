@@ -11,6 +11,7 @@ class ListAndDieForTestingSubsystem(GoalSubsystem):
     """A fast and deadly variant of `./pants list`."""
 
     name = "list-and-die-for-testing"
+    help = "A fast and deadly variant of `./pants list`."
 
 
 class ListAndDieForTesting(Goal):
