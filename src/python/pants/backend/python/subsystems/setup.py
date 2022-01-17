@@ -203,6 +203,8 @@ class PythonSetup(Subsystem):
             type=int,
             default=CPU_COUNT // 2,
             default_help_repr="#cores/2",
+            removal_version="2.11.0.dev0",
+            removal_hint="Now set automatically based on the amount of concurrency available.",
             advanced=True,
             help=(
                 "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
