@@ -4,7 +4,8 @@
             "group": "com.google.code.findbugs",
             "artifact": "jsr305",
             "version": "3.0.2",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -21,7 +22,8 @@
             "group": "com.google.errorprone",
             "artifact": "error_prone_annotations",
             "version": "2.5.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -38,14 +40,16 @@
             "group": "com.google.googlejavaformat",
             "artifact": "google-java-format",
             "version": "1.13.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.google.guava",
                 "artifact": "guava",
                 "version": "30.1.1-jre",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -53,43 +57,50 @@
                 "group": "com.google.guava",
                 "artifact": "listenablefuture",
                 "version": "9999.0-empty-to-avoid-conflict-with-guava",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.j2objc",
                 "artifact": "j2objc-annotations",
                 "version": "1.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.code.findbugs",
                 "artifact": "jsr305",
                 "version": "3.0.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.guava",
                 "artifact": "guava",
                 "version": "30.1.1-jre",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.guava",
                 "artifact": "failureaccess",
                 "version": "1.0.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.errorprone",
                 "artifact": "error_prone_annotations",
                 "version": "2.5.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.checkerframework",
                 "artifact": "checker-qual",
                 "version": "3.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.google.googlejavaformat_google-java-format_1.13.0.jar",
@@ -105,7 +116,8 @@
             "group": "com.google.guava",
             "artifact": "failureaccess",
             "version": "1.0.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -122,44 +134,51 @@
             "group": "com.google.guava",
             "artifact": "guava",
             "version": "30.1.1-jre",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.google.guava",
                 "artifact": "listenablefuture",
                 "version": "9999.0-empty-to-avoid-conflict-with-guava",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.j2objc",
                 "artifact": "j2objc-annotations",
                 "version": "1.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.code.findbugs",
                 "artifact": "jsr305",
                 "version": "3.0.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.guava",
                 "artifact": "failureaccess",
                 "version": "1.0.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.errorprone",
                 "artifact": "error_prone_annotations",
                 "version": "2.5.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.checkerframework",
                 "artifact": "checker-qual",
                 "version": "3.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -167,37 +186,43 @@
                 "group": "com.google.guava",
                 "artifact": "listenablefuture",
                 "version": "9999.0-empty-to-avoid-conflict-with-guava",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.j2objc",
                 "artifact": "j2objc-annotations",
                 "version": "1.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.code.findbugs",
                 "artifact": "jsr305",
                 "version": "3.0.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.guava",
                 "artifact": "failureaccess",
                 "version": "1.0.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.errorprone",
                 "artifact": "error_prone_annotations",
                 "version": "2.5.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.checkerframework",
                 "artifact": "checker-qual",
                 "version": "3.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.google.guava_guava_30.1.1-jre.jar",
@@ -213,7 +238,8 @@
             "group": "com.google.guava",
             "artifact": "listenablefuture",
             "version": "9999.0-empty-to-avoid-conflict-with-guava",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -230,7 +256,8 @@
             "group": "com.google.j2objc",
             "artifact": "j2objc-annotations",
             "version": "1.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -247,7 +274,8 @@
             "group": "org.checkerframework",
             "artifact": "checker-qual",
             "version": "3.8.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],

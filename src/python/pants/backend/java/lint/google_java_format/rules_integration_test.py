@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
-from pants.backend.java.lint import java_fmt
 from pants.backend.java.lint.google_java_format import rules as gjf_fmt_rules
 from pants.backend.java.lint.google_java_format import skip_field
 from pants.backend.java.lint.google_java_format.rules import (
@@ -43,7 +42,6 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *java_util_rules(),
             *target_types_rules(),
-            *java_fmt.rules(),
             *gjf_fmt_rules.rules(),
             *skip_field.rules(),
             QueryRule(LintResults, (GoogleJavaFormatRequest,)),

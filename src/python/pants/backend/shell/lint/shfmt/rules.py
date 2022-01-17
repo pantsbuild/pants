@@ -3,11 +3,10 @@
 
 from dataclasses import dataclass
 
-from pants.backend.shell.lint.shell_fmt import ShellFmtRequest
 from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -33,7 +32,7 @@ class ShfmtFieldSet(FieldSet):
         return tgt.get(SkipShfmtField).value
 
 
-class ShfmtRequest(ShellFmtRequest, LintRequest):
+class ShfmtRequest(FmtRequest, LintRequest):
     field_set_type = ShfmtFieldSet
 
 
@@ -118,6 +117,6 @@ async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(ShellFmtRequest, ShfmtRequest),
+        UnionRule(FmtRequest, ShfmtRequest),
         UnionRule(LintRequest, ShfmtRequest),
     ]

@@ -9,12 +9,18 @@ from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
     GenerateThriftSourcesRequest,
 )
-from pants.backend.codegen.thrift.target_types import ThriftSourceField
+from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.python.target_types import PythonSourceField
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
+)
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -60,10 +66,23 @@ async def generate_python_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
+class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
+    inject_for = ThriftDependenciesField
+
+
+@rule
+async def inject_apache_thrift_java_dependencies(
+    _: InjectApacheThriftPythonDependencies, thrift_python: ThriftPythonSubsystem
+) -> InjectedDependencies:
+    addresses = await Get(Addresses, UnparsedAddressInputs, thrift_python.runtime_dependencies)
+    return InjectedDependencies(addresses)
+
+
 def rules():
     return (
         *collect_rules(),
         *additional_fields.rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromThriftRequest),
+        UnionRule(InjectDependenciesRequest, InjectApacheThriftPythonDependencies),
     )

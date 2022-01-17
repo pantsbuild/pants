@@ -1,12 +1,17 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.lint.flake8.subsystem import Flake8, Flake8FieldSet
+from pants.backend.python.lint.flake8.subsystem import (
+    Flake8,
+    Flake8FieldSet,
+    Flake8FirstPartyPlugins,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
@@ -40,13 +45,17 @@ def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
 
 
 @rule(level=LogLevel.DEBUG)
-async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> LintResult:
+async def flake8_lint_partition(
+    partition: Flake8Partition, flake8: Flake8, first_party_plugins: Flake8FirstPartyPlugins
+) -> LintResult:
     flake8_pex_get = Get(
         VenvPex,
         PexRequest(
             output_filename="flake8.pex",
             internal_only=True,
-            requirements=flake8.pex_requirements(),
+            requirements=flake8.pex_requirements(
+                extra_requirements=first_party_plugins.requirement_strings,
+            ),
             interpreter_constraints=partition.interpreter_constraints,
             main=flake8.main,
         ),
@@ -64,7 +73,12 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
     input_digest = await Get(
         Digest,
         MergeDigests(
-            (source_files.snapshot.digest, config_files.snapshot.digest, report_directory)
+            (
+                source_files.snapshot.digest,
+                first_party_plugins.sources_digest,
+                config_files.snapshot.digest,
+                report_directory,
+            )
         ),
     )
 
@@ -75,6 +89,7 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
             argv=generate_argv(source_files, flake8),
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
+            extra_env={"PEX_EXTRA_SYS_PATH": first_party_plugins.PREFIX},
             description=f"Run Flake8 on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -89,7 +104,10 @@ async def flake8_lint_partition(partition: Flake8Partition, flake8: Flake8) -> L
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def flake8_lint(
-    request: Flake8Request, flake8: Flake8, python_setup: PythonSetup
+    request: Flake8Request,
+    flake8: Flake8,
+    python_setup: PythonSetup,
+    first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResults:
     if flake8.skip:
         return LintResults([], linter_name="Flake8")
@@ -98,15 +116,23 @@ async def flake8_lint(
     # (http://flake8.pycqa.org/en/latest/user/invocation.html). We batch targets by their
     # constraints to ensure, for example, that all Python 2 targets run together and all Python 3
     # targets run together.
-    constraints_to_field_sets = InterpreterConstraints.group_field_sets_by_constraints(
-        request.field_sets, python_setup
-    )
+    results = defaultdict(set)
+    for fs in request.field_sets:
+        constraints = InterpreterConstraints.create_from_compatibility_fields(
+            [fs.interpreter_constraints, *first_party_plugins.interpreter_constraints_fields],
+            python_setup,
+        )
+        results[constraints].add(fs)
+
     partitioned_results = await MultiGet(
-        Get(LintResult, Flake8Partition(partition_field_sets, partition_compatibility))
-        for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
+        Get(
+            LintResult,
+            Flake8Partition(tuple(sorted(field_sets, key=lambda fs: fs.address)), constraints),
+        )
+        for constraints, field_sets in sorted(results.items())
     )
     return LintResults(partitioned_results, linter_name="Flake8")
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintRequest, Flake8Request), *pex.rules()]
+    return [*collect_rules(), UnionRule(LintRequest, Flake8Request), *pex_from_targets.rules()]

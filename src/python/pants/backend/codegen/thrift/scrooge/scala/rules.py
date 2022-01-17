@@ -6,7 +6,7 @@ from pants.backend.codegen.thrift.scrooge.rules import (
 )
 from pants.backend.codegen.thrift.scrooge.scala.subsystem import ScroogeScalaSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.scala.target_types import ScalaSourceField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 
 class GenerateScalaFromThriftRequest(GenerateSourcesRequest):
     input = ThriftSourceField
-    output = JavaSourceField
+    output = ScalaSourceField
 
 
 class InjectScroogeScalaDependencies(InjectDependenciesRequest):

@@ -20,6 +20,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[PythonRequirementTarget, PythonRequirementsFileTarget],
         context_aware_object_factories={"pipenv_requirements": PipenvRequirementsCAOF},
+        use_deprecated_python_macros=True,
     )
 
 

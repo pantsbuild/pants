@@ -5,7 +5,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.project_info.source_file_validator import (
+from pants.backend.project_info.regex_lint import (
     Matcher,
     MultiMatcher,
     RegexMatchResult,

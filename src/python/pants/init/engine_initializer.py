@@ -193,6 +193,7 @@ class EngineInitializer:
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
+            use_deprecated_python_macros=bootstrap_options.use_deprecated_python_macros,
         )
 
     @staticmethod
@@ -206,6 +207,7 @@ class EngineInitializer:
         local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
+        use_deprecated_python_macros: bool,
         ca_certs_path: str | None = None,
         build_root: str | None = None,
         include_trace_on_error: bool = True,
@@ -226,6 +228,7 @@ class EngineInitializer:
                 build_root=build_root_path,
                 target_type_aliases=registered_target_types.aliases,
                 object_aliases=build_configuration.registered_aliases,
+                use_deprecated_python_macros=use_deprecated_python_macros,
             )
 
         @rule

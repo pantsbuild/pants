@@ -8,7 +8,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.lint import fmt
 from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
@@ -36,7 +35,6 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[GoModTarget, GoPackageTarget],
         rules=[
-            *fmt.rules(),
             *gofmt_rules(),
             *source_files.rules(),
             *target_type_rules.rules(),

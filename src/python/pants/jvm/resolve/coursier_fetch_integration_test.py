@@ -14,14 +14,13 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Targets
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.coursier_fetch import (
+from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
     Coordinate,
     Coordinates,
-    CoursierLockfileEntry,
-    CoursierResolvedLockfile,
 )
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test

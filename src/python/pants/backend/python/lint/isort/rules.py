@@ -6,11 +6,10 @@ from typing import Tuple
 
 from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,7 +33,7 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(PythonFmtRequest, LintRequest):
+class IsortRequest(FmtRequest, LintRequest):
     field_set_type = IsortFieldSet
 
 
@@ -161,7 +160,7 @@ async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, IsortRequest),
+        UnionRule(FmtRequest, IsortRequest),
         UnionRule(LintRequest, IsortRequest),
         *pex.rules(),
     ]

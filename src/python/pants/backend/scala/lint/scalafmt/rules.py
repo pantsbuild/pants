@@ -7,12 +7,12 @@ import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.scala.lint.scala_lang_fmt import ScalaLangFmtRequest
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -29,9 +29,10 @@ from pants.engine.process import BashBinary, FallibleProcessResult, Process, Pro
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
+from pants.jvm.goals import lockfile
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -50,12 +51,12 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(ScalaLangFmtRequest, LintRequest):
+class ScalafmtRequest(FmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
 
 
-class ScalafmtToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = ScalafmtSubsystem.options_scope
+class ScalafmtToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = ScalafmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -319,14 +320,15 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 async def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel,
     tool: ScalafmtSubsystem,
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(tool)
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest.from_tool(tool)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(ScalaLangFmtRequest, ScalafmtRequest),
+        *lockfile.rules(),
+        UnionRule(FmtRequest, ScalafmtRequest),
         UnionRule(LintRequest, ScalafmtRequest),
-        UnionRule(JvmToolLockfileSentinel, ScalafmtToolLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

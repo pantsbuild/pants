@@ -6,10 +6,9 @@
 See https://github.com/myint/autoflake for details.
 """
 
-from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.autoflake import rules as autoflake_rules
 from pants.backend.python.lint.autoflake import skip_field, subsystem
 
 
 def rules():
-    return (*autoflake_rules.rules(), *python_fmt.rules(), *skip_field.rules(), *subsystem.rules())
+    return (*autoflake_rules.rules(), *skip_field.rules(), *subsystem.rules())

@@ -12,6 +12,7 @@ from pants.backend.python.macros import deprecation_fixers
 from pants.backend.python.macros.deprecation_fixers import (
     GeneratorRename,
     MacroRenames,
+    MacroRenamesRequest,
     UpdatePythonMacrosRequest,
 )
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
@@ -27,10 +28,10 @@ from pants.util.frozendict import FrozenDict
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=(
             *deprecation_fixers.rules(),
-            QueryRule(MacroRenames, []),
+            QueryRule(MacroRenames, [MacroRenamesRequest]),
             QueryRule(RewrittenBuildFile, [UpdatePythonMacrosRequest]),
         ),
         target_types=[GenericTarget, PythonRequirementsFileTarget, PythonRequirementTarget],
@@ -39,7 +40,10 @@ def rule_runner() -> RuleRunner:
             "poetry_requirements": PoetryRequirementsCAOF,
             "pipenv_requirements": PipenvRequirementsCAOF,
         },
+        use_deprecated_python_macros=True,
     )
+    rule_runner.set_options(["--update-build-files-fix-python-macros"])
+    return rule_runner
 
 
 def test_determine_macro_changes(rule_runner: RuleRunner, caplog) -> None:
@@ -71,7 +75,7 @@ def test_determine_macro_changes(rule_runner: RuleRunner, caplog) -> None:
             "pipenv/BUILD": "pipenv_requirements()",
         }
     )
-    renames = rule_runner.request(MacroRenames, [])
+    renames = rule_runner.request(MacroRenames, [MacroRenamesRequest()])
     assert renames.generators == (
         GeneratorRename("BUILD", "python_requirements", "reqs"),
         GeneratorRename("pipenv/BUILD", "pipenv_requirements", None),

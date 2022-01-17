@@ -1,28 +1,27 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABCMeta, abstractmethod
+from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import ClassVar, List, Optional, Type
+from typing import List, Type
 
 import pytest
 
-from pants.core.goals.fmt import (
-    Fmt,
-    FmtResult,
-    FmtSubsystem,
-    LanguageFmtResults,
-    LanguageFmtTargets,
-    fmt,
-)
-from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
-from pants.engine.target import MultipleSourcesField, Target, Targets
-from pants.engine.unions import UnionMembership
-from pants.testutil.option_util import create_goal_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
+from pants.core.goals.fmt import rules as fmt_rules
+from pants.core.util_rules import source_files
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import FieldSet, MultipleSourcesField, Target
+from pants.engine.unions import UnionRule
+from pants.testutil.rule_runner import RuleRunner, logging
 from pants.util.logging import LogLevel
+
+FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
+SMALLTALK_FILE = FileContent("formatted.st", b"y := self size + super size.')\n")
 
 
 class FortranSources(MultipleSourcesField):
@@ -34,6 +33,33 @@ class FortranTarget(Target):
     core_fields = (FortranSources,)
 
 
+@dataclass(frozen=True)
+class FortranFieldSet(FieldSet):
+    required_fields = (FortranSources,)
+
+    sources: FortranSources
+
+
+class FortranFmtRequest(FmtRequest):
+    field_set_type = FortranFieldSet
+
+
+@rule
+async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
+    output = (
+        await Get(Digest, CreateDigest([FORTRAN_FILE]))
+        if any(fs.address.target_name == "needs_formatting" for fs in request.field_sets)
+        else EMPTY_DIGEST
+    )
+    return FmtResult(
+        input=EMPTY_DIGEST,
+        output=output,
+        stdout="",
+        stderr="",
+        formatter_name="FortranConditionallyDidChange",
+    )
+
+
 class SmalltalkSources(MultipleSourcesField):
     pass
 
@@ -43,92 +69,51 @@ class SmalltalkTarget(Target):
     core_fields = (SmalltalkSources,)
 
 
-class InvalidSources(MultipleSourcesField):
-    pass
-
-
-class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
-    formatter_name: ClassVar[str]
-
-    @abstractmethod
-    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        pass
-
-
-class FortranTargets(MockLanguageTargets):
-    required_fields = (FortranSources,)
-
-    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        output = (
-            result_digest
-            if any(tgt.address.target_name == "needs_formatting" for tgt in self.targets)
-            else EMPTY_DIGEST
-        )
-        return LanguageFmtResults(
-            (
-                FmtResult(
-                    input=EMPTY_DIGEST,
-                    output=output,
-                    stdout="",
-                    stderr="",
-                    formatter_name="FortranConditionallyDidChange",
-                ),
-            ),
-            input=EMPTY_DIGEST,
-            output=result_digest,
-        )
-
-
-class SmalltalkTargets(MockLanguageTargets):
+@dataclass(frozen=True)
+class SmalltalkFieldSet(FieldSet):
     required_fields = (SmalltalkSources,)
 
-    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        return LanguageFmtResults(
-            (
-                FmtResult(
-                    input=result_digest,
-                    output=result_digest,
-                    stdout="",
-                    stderr="",
-                    formatter_name="SmalltalkDidNotChange",
-                ),
-                FmtResult.skip(formatter_name="SmalltalkSkipped"),
-            ),
-            input=EMPTY_DIGEST,
-            output=result_digest,
-        )
+    sources: SmalltalkSources
 
 
-class InvalidTargets(MockLanguageTargets):
-    required_fields = (InvalidSources,)
-
-    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        # Note: we return a result that would result in a change so that we can validate that this
-        # result is not actually returned.
-        return LanguageFmtResults(
-            (
-                FmtResult(
-                    input=EMPTY_DIGEST,
-                    output=result_digest,
-                    stdout="",
-                    stderr="",
-                    formatter_name="InvalidFormatter",
-                ),
-            ),
-            input=EMPTY_DIGEST,
-            output=result_digest,
-        )
+class SmalltalkNoopRequest(FmtRequest):
+    field_set_type = SmalltalkFieldSet
 
 
-FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
-SMALLTALK_FILE = FileContent("formatted.st", b"y := self size + super size.')\n")
+@rule
+async def smalltalk_noop(_: SmalltalkNoopRequest) -> FmtResult:
+    result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
+    return FmtResult(
+        input=result_digest,
+        output=result_digest,
+        stdout="",
+        stderr="",
+        formatter_name="SmalltalkDidNotChange",
+    )
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
-    # While we use `run_rule_with_mocks`, rather than `RuleRunner.request()`, we still need an
-    # instance of a Scheduler.
-    return RuleRunner()
+class SmalltalkSkipRequest(FmtRequest):
+    field_set_type = SmalltalkFieldSet
+
+
+@rule
+def smalltalk_skip(_: SmalltalkSkipRequest) -> FmtResult:
+    return FmtResult.skip(formatter_name="SmalltalkSkipped")
+
+
+def fmt_rule_runner(
+    target_types: List[Type[Target]],
+    fmt_request_types: List[Type[FmtRequest]],
+) -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *collect_rules(),
+            *source_files.rules(),
+            *fmt_rules(),
+            *(UnionRule(FmtRequest, frt) for frt in fmt_request_types),
+        ],
+        target_types=target_types,
+    )
 
 
 def fortran_digest(rule_runner: RuleRunner) -> Digest:
@@ -141,84 +126,18 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
     ).digest
 
 
-def make_target(
-    address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
-) -> Target:
-    return target_cls({}, address or Address("", target_name="tests"))
+def run_fmt(rule_runner: RuleRunner, *, target_specs: List[str], per_file_caching: bool) -> str:
+    result = rule_runner.run_goal_rule(
+        Fmt, args=[f"--fmt-per-file-caching={per_file_caching!r}", *target_specs]
+    )
+    assert result.exit_code == 0
+    assert not result.stdout
+    return result.stderr
 
 
-def run_fmt_rule(
-    rule_runner: RuleRunner,
-    *,
-    language_target_collection_types: List[Type[LanguageFmtTargets]],
-    targets: List[Target],
-    result_digest: Digest,
-    per_file_caching: bool,
-) -> str:
-    with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
-        result: Fmt = run_rule_with_mocks(
-            fmt,
-            rule_args=[
-                console,
-                Targets(targets),
-                create_goal_subsystem(
-                    FmtSubsystem, per_file_caching=per_file_caching, per_target_caching=False
-                ),
-                Workspace(rule_runner.scheduler, _enforce_effects=False),
-                union_membership,
-            ],
-            mock_gets=[
-                MockGet(
-                    output_type=LanguageFmtResults,
-                    input_type=LanguageFmtTargets,
-                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
-                        result_digest
-                    ),
-                ),
-                MockGet(
-                    output_type=Digest,
-                    input_type=MergeDigests,
-                    mock=lambda _: result_digest,
-                ),
-            ],
-            union_membership=union_membership,
-        )
-        assert result.exit_code == 0
-        assert not stdio_reader.get_stdout()
-        return stdio_reader.get_stderr()
-
-
-def assert_workspace_modified(
-    rule_runner: RuleRunner, *, fortran_formatted: bool, smalltalk_formatted: bool
-) -> None:
-    fortran_file = Path(rule_runner.build_root, FORTRAN_FILE.path)
-    smalltalk_file = Path(rule_runner.build_root, SMALLTALK_FILE.path)
-    if fortran_formatted:
-        assert fortran_file.is_file()
-        assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
-    if smalltalk_formatted:
-        assert smalltalk_file.is_file()
-        assert smalltalk_file.read_text() == SMALLTALK_FILE.content.decode()
-
-
-def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
-    def assert_noops(*, per_file_caching: bool) -> None:
-        stderr = run_fmt_rule(
-            rule_runner,
-            language_target_collection_types=[InvalidTargets],
-            targets=[make_target()],
-            result_digest=fortran_digest(rule_runner),
-            per_file_caching=per_file_caching,
-        )
-        assert stderr.strip() == ""
-        assert_workspace_modified(rule_runner, fortran_formatted=False, smalltalk_formatted=False)
-
-    assert_noops(per_file_caching=False)
-    assert_noops(per_file_caching=True)
-
-
-def test_summary(rule_runner: RuleRunner) -> None:
+@logging
+@pytest.mark.parametrize("per_file_caching", [True, False])
+def test_summary(per_file_caching: bool) -> None:
     """Tests that the final summary is correct.
 
     This checks that we:
@@ -226,37 +145,45 @@ def test_summary(rule_runner: RuleRunner) -> None:
         `--per-file-caching`).
     * Correctly distinguish between skipped, changed, and did not change.
     """
-    fortran_addresses = [
-        Address("", target_name="f1"),
-        Address("", target_name="needs_formatting"),
-    ]
-    smalltalk_addresses = [Address("", target_name="s1"), Address("", target_name="s2")]
 
-    fortran_targets = [make_target(addr, target_cls=FortranTarget) for addr in fortran_addresses]
-    smalltalk_targets = [
-        make_target(addr, target_cls=SmalltalkTarget) for addr in smalltalk_addresses
-    ]
+    rule_runner = fmt_rule_runner(
+        target_types=[FortranTarget, SmalltalkTarget],
+        fmt_request_types=[FortranFmtRequest, SmalltalkNoopRequest, SmalltalkSkipRequest],
+    )
 
-    def assert_expected(*, per_file_caching: bool) -> None:
-        stderr = run_fmt_rule(
-            rule_runner,
-            language_target_collection_types=[FortranTargets, SmalltalkTargets],
-            targets=[*fortran_targets, *smalltalk_targets],
-            result_digest=merged_digest(rule_runner),
-            per_file_caching=per_file_caching,
-        )
-        assert_workspace_modified(rule_runner, fortran_formatted=True, smalltalk_formatted=True)
-        assert stderr == dedent(
-            """\
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                fortran(name='f1')
+                fortran(name='needs_formatting')
+                smalltalk(name='s1')
+                smalltalk(name='s2')
+                """,
+            ),
+        },
+    )
 
-            + FortranConditionallyDidChange made changes.
-            ✓ SmalltalkDidNotChange made no changes.
-            - SmalltalkSkipped skipped.
-            """
-        )
+    stderr = run_fmt(
+        rule_runner,
+        target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"],
+        per_file_caching=per_file_caching,
+    )
 
-    assert_expected(per_file_caching=False)
-    assert_expected(per_file_caching=True)
+    assert stderr == dedent(
+        """\
+
+        + FortranConditionallyDidChange made changes.
+        ✓ SmalltalkDidNotChange made no changes.
+        - SmalltalkSkipped skipped.
+        """
+    )
+
+    fortran_file = Path(rule_runner.build_root, FORTRAN_FILE.path)
+    smalltalk_file = Path(rule_runner.build_root, SMALLTALK_FILE.path)
+    assert fortran_file.is_file()
+    assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
+    assert not smalltalk_file.is_file()
 
 
 def test_streaming_output_skip() -> None:

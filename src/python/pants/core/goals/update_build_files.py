@@ -139,6 +139,16 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
                 "because they do not change semantics."
             ),
         )
+        register(
+            "--fix-python-macros",
+            type=bool,
+            default=False,
+            help=(
+                "Update references to targets generated from `python_requirements` and "
+                "`poetry_requirements` from the old deprecated macro mechanism to the new target "
+                f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
+            ),
+        )
 
     @property
     def check(self) -> bool:
@@ -151,6 +161,10 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     @property
     def fix_safe_deprecations(self) -> bool:
         return cast(bool, self.options.fix_safe_deprecations)
+
+    @property
+    def fix_python_macros(self) -> bool:
+        return cast(bool, self.options.fix_python_macros)
 
 
 class UpdateBuildFilesGoal(Goal):

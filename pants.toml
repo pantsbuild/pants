@@ -69,6 +69,7 @@ remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
+use_deprecated_python_macros = false
 
 [anonymous-telemetry]
 enabled = true
@@ -163,7 +164,7 @@ extra_env_vars = [
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
 
-[sourcefile-validation]
+[regex-lint]
 config = "@build-support/regexes/config.yaml"
 
 [generate-lockfiles]

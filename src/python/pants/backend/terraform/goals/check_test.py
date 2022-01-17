@@ -10,7 +10,6 @@ import pytest
 from pants.backend.terraform import style, tool
 from pants.backend.terraform.goals import check
 from pants.backend.terraform.goals.check import TerraformCheckRequest
-from pants.backend.terraform.lint import fmt
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import external_tool, source_files
@@ -27,7 +26,6 @@ def rule_runner() -> RuleRunner:
         target_types=[TerraformModuleTarget],
         rules=[
             *external_tool.rules(),
-            *fmt.rules(),
             *check.rules(),
             *tool.rules(),
             *style.rules(),

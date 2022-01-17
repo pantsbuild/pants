@@ -4,13 +4,12 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,7 +33,7 @@ class YapfFieldSet(FieldSet):
         return tgt.get(SkipYapfField).value
 
 
-class YapfRequest(PythonFmtRequest, LintRequest):
+class YapfRequest(FmtRequest, LintRequest):
     field_set_type = YapfFieldSet
 
 
@@ -143,7 +142,7 @@ async def yapf_lint(request: YapfRequest, yapf: Yapf) -> LintResults:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, YapfRequest),
+        UnionRule(FmtRequest, YapfRequest),
         UnionRule(LintRequest, YapfRequest),
         *pex.rules(),
     ]

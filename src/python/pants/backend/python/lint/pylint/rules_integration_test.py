@@ -42,7 +42,8 @@ def rule_runner() -> RuleRunner:
 
 
 # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
-PYLINT_FAILURE_RETURN_CODE = 16
+PYLINT_ERROR_FAILURE_RETURN_CODE = 2
+PYLINT_CONVENTION_FAILURE_RETURN_CODE = 16
 
 PACKAGE = "src/python/project"
 GOOD_FILE = "'''docstring'''\nUPPERCASE_CONSTANT = ''\n"
@@ -100,7 +101,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
-    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result[0].exit_code == PYLINT_CONVENTION_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.py:2:0: C0103" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
@@ -112,7 +113,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
         rule_runner, [tgt], extra_args=["--pylint-args='--output=reports/output.txt'"]
     )
     assert len(result) == 1
-    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result[0].exit_code == PYLINT_CONVENTION_FAILURE_RETURN_CODE
     assert result[0].stdout.strip() == ""
     report_files = rule_runner.request(DigestContents, [result[0].report])
     assert len(report_files) == 1
@@ -133,7 +134,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     result = run_pylint(rule_runner, tgts)
     assert len(result) == 1
-    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result[0].exit_code == PYLINT_CONVENTION_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/good.py" not in result[0].stdout
     assert f"{PACKAGE}/bad.py:2:0: C0103" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
@@ -216,7 +217,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
-def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
+def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -225,23 +226,30 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
                 python_requirement(name='direct_req', requirements=['ansicolors'])
                 """
             ),
-            f"{PACKAGE}/transitive_dep.py": "",
+            f"{PACKAGE}/transitive_dep.py": dedent(
+                """\
+                A = NotImplemented
+                """
+            ),
             f"{PACKAGE}/direct_dep.py": dedent(
                 """\
                 # No docstring - Pylint doesn't lint dependencies.
 
-                from project.transitive_dep import doesnt_matter_if_variable_exists
+                from project.transitive_dep import A
 
-                THIS_VARIABLE_EXISTS = ''
+                B = A
                 """
             ),
             f"{PACKAGE}/f.py": dedent(
                 """\
-                '''Pylint will check that variables exist and are used.'''
+                '''Pylint should be upset about raising NotImplemented.'''
                 from colors import green
-                from project.direct_dep import THIS_VARIABLE_EXISTS
+                from project.direct_dep import B
 
-                print(green(THIS_VARIABLE_EXISTS))
+                def i_just_raise():
+                    '''A docstring.'''
+                    print(green("hello"))
+                    raise B  # pylint should error here
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
@@ -258,7 +266,11 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
+    result = run_pylint(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == PYLINT_ERROR_FAILURE_RETURN_CODE
+    assert f"{PACKAGE}/f.py:8:4: E0702" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
@@ -296,7 +308,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.pyi"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
-    assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result[0].exit_code == PYLINT_CONVENTION_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.pyi:2:0: C0103" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
@@ -417,7 +429,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint_with_plugin(tgt)
-    assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
+    assert result.exit_code == PYLINT_CONVENTION_FAILURE_RETURN_CODE
     assert f"{PACKAGE}/f.py:2:0: C9871" in result.stdout
     assert result.report == EMPTY_DIGEST
 

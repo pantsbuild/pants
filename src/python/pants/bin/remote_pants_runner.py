@@ -101,23 +101,24 @@ class RemotePantsRunner:
         :param env: The environment (e.g. os.environ) for this run.
         :param options_bootstrapper: The bootstrap options.
         """
-        self._start_time = time.time()
         self._args = args
         self._env = env
         self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
 
-    def run(self) -> ExitCode:
+    def run(self, start_time: float) -> ExitCode:
         """Starts up a pantsd instance if one is not already running, then connects to it via
         nailgun."""
 
         pantsd_handle = self._client.maybe_launch()
         logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
 
-        return self._connect_and_execute(pantsd_handle)
+        return self._connect_and_execute(pantsd_handle, start_time)
 
-    def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
+    def _connect_and_execute(
+        self, pantsd_handle: PantsDaemonClient.Handle, start_time: float
+    ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
         executor = GlobalOptions.create_py_executor(global_options)
 
@@ -126,7 +127,7 @@ class RemotePantsRunner:
         modified_env = {
             **self._env,
             **ng_env,
-            "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
+            "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(start_time),
             "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
                 global_options.pantsd_timeout_when_multiple_invocations
             ),

@@ -8,7 +8,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.lint import fmt
 from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
 from pants.backend.go.lint.vet.rules import rules as go_vet_rules
@@ -38,7 +37,6 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         target_types=[GoModTarget, GoPackageTarget],
         rules=[
-            *fmt.rules(),
             *skip_field.rules(),
             *go_vet_rules(),
             *source_files.rules(),

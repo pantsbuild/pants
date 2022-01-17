@@ -4,14 +4,16 @@
             "group": "com.chuusai",
             "artifact": "shapeless_2.13",
             "version": "2.3.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -19,7 +21,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.chuusai_shapeless_2.13_2.3.3.jar",
@@ -35,26 +38,30 @@
             "group": "com.github.alexarchambault",
             "artifact": "argonaut-shapeless_6.2_2.13",
             "version": "1.2.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.chuusai",
                 "artifact": "shapeless_2.13",
                 "version": "2.3.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.argonaut",
                 "artifact": "argonaut_2.13",
                 "version": "6.2.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -62,25 +69,29 @@
                 "group": "com.chuusai",
                 "artifact": "shapeless_2.13",
                 "version": "2.3.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.argonaut",
                 "artifact": "argonaut_2.13",
                 "version": "6.2.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.github.alexarchambault_argonaut-shapeless_6.2_2.13_1.2.0.jar",
@@ -96,7 +107,8 @@
             "group": "com.google.protobuf",
             "artifact": "protobuf-java",
             "version": "3.15.8",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -113,32 +125,37 @@
             "group": "com.thesamet.scalapb",
             "artifact": "compilerplugin_2.13",
             "version": "0.11.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.google.protobuf",
                 "artifact": "protobuf-java",
                 "version": "3.15.8",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-gen_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -146,37 +163,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-gen_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.protobuf",
                 "artifact": "protobuf-java",
                 "version": "3.15.8",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.thesamet.scalapb_compilerplugin_2.13_0.11.6.jar",
@@ -192,20 +215,23 @@
             "group": "com.thesamet.scalapb",
             "artifact": "protoc-bridge_2.13",
             "version": "0.9.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -213,13 +239,15 @@
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.thesamet.scalapb_protoc-bridge_2.13_0.9.3.jar",
@@ -235,26 +263,30 @@
             "group": "com.thesamet.scalapb",
             "artifact": "protoc-cache-coursier_2.13",
             "version": "0.9.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -262,85 +294,99 @@
                 "group": "io.github.alexarchambault",
                 "artifact": "concurrent-reference-hash-map",
                 "version": "1.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.argonaut",
                 "artifact": "argonaut_2.13",
                 "version": "6.2.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.alexarchambault",
                 "artifact": "argonaut-shapeless_6.2_2.13",
                 "version": "1.2.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.chuusai",
                 "artifact": "shapeless_2.13",
                 "version": "2.3.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault.windows-ansi",
                 "artifact": "windows-ansi",
                 "version": "0.0.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-cache_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-core_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.thesamet.scalapb_protoc-cache-coursier_2.13_0.9.3.jar",
@@ -356,20 +402,23 @@
             "group": "com.thesamet.scalapb",
             "artifact": "protoc-gen_2.13",
             "version": "0.9.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -377,19 +426,22 @@
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.thesamet.scalapb_protoc-gen_2.13_0.9.3.jar",
@@ -405,38 +457,44 @@
             "group": "com.thesamet.scalapb",
             "artifact": "scalapbc_2.13",
             "version": "0.11.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "compilerplugin_2.13",
                 "version": "0.11.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-cache-coursier_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -444,121 +502,141 @@
                 "group": "com.thesamet.scalapb",
                 "artifact": "compilerplugin_2.13",
                 "version": "0.11.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault",
                 "artifact": "concurrent-reference-hash-map",
                 "version": "1.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-cache-coursier_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.argonaut",
                 "artifact": "argonaut_2.13",
                 "version": "6.2.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.alexarchambault",
                 "artifact": "argonaut-shapeless_6.2_2.13",
                 "version": "1.2.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-gen_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.chuusai",
                 "artifact": "shapeless_2.13",
                 "version": "2.3.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "dev.dirs",
                 "artifact": "directories",
                 "version": "26",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault.windows-ansi",
                 "artifact": "windows-ansi",
                 "version": "0.0.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-cache_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.google.protobuf",
                 "artifact": "protobuf-java",
                 "version": "3.15.8",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-core_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.thesamet.scalapb",
                 "artifact": "protoc-bridge_2.13",
                 "version": "0.9.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.thesamet.scalapb_scalapbc_2.13_0.11.6.jar",
@@ -574,7 +652,8 @@
             "group": "dev.dirs",
             "artifact": "directories",
             "version": "26",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -591,14 +670,16 @@
             "group": "io.argonaut",
             "artifact": "argonaut_2.13",
             "version": "6.2.5",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -606,13 +687,15 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.argonaut_argonaut_2.13_6.2.5.jar",
@@ -628,26 +711,30 @@
             "group": "io.get-coursier",
             "artifact": "coursier-cache_2.13",
             "version": "2.0.16",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault.windows-ansi",
                 "artifact": "windows-ansi",
                 "version": "0.0.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -655,31 +742,36 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault.windows-ansi",
                 "artifact": "windows-ansi",
                 "version": "0.0.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.get-coursier_coursier-cache_2.13_2.0.16.jar",
@@ -695,32 +787,37 @@
             "group": "io.get-coursier",
             "artifact": "coursier-core_2.13",
             "version": "2.0.16",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault",
                 "artifact": "concurrent-reference-hash-map",
                 "version": "1.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -728,31 +825,36 @@
                 "group": "io.github.alexarchambault",
                 "artifact": "concurrent-reference-hash-map",
                 "version": "1.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.get-coursier_coursier-core_2.13_2.0.16.jar",
@@ -768,20 +870,23 @@
             "group": "io.get-coursier",
             "artifact": "coursier-util_2.13",
             "version": "2.0.16",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -789,13 +894,15 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.get-coursier_coursier-util_2.13_2.0.16.jar",
@@ -811,32 +918,37 @@
             "group": "io.get-coursier",
             "artifact": "coursier_2.13",
             "version": "2.0.16",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.github.alexarchambault",
                 "artifact": "argonaut-shapeless_6.2_2.13",
                 "version": "1.2.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-cache_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-core_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -844,79 +956,92 @@
                 "group": "io.github.alexarchambault",
                 "artifact": "concurrent-reference-hash-map",
                 "version": "1.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.argonaut",
                 "artifact": "argonaut_2.13",
                 "version": "6.2.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-util_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.alexarchambault",
                 "artifact": "argonaut-shapeless_6.2_2.13",
                 "version": "1.2.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.chuusai",
                 "artifact": "shapeless_2.13",
                 "version": "2.3.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.github.alexarchambault.windows-ansi",
                 "artifact": "windows-ansi",
                 "version": "0.0.3",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-cache_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "coursier-core_2.13",
                 "version": "2.0.16",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.get-coursier_coursier_2.13_2.0.16.jar",
@@ -932,14 +1057,16 @@
             "group": "io.github.alexarchambault.windows-ansi",
             "artifact": "windows-ansi",
             "version": "0.0.3",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -947,7 +1074,8 @@
                 "group": "org.fusesource.jansi",
                 "artifact": "jansi",
                 "version": "1.18",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "io.github.alexarchambault.windows-ansi_windows-ansi_0.0.3.jar",
@@ -963,7 +1091,8 @@
             "group": "io.github.alexarchambault",
             "artifact": "concurrent-reference-hash-map",
             "version": "1.0.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -980,7 +1109,8 @@
             "group": "org.fusesource.jansi",
             "artifact": "jansi",
             "version": "1.18",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -997,14 +1127,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-collection-compat_2.13",
             "version": "2.5.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1012,7 +1144,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-collection-compat_2.13_2.5.0.jar",
@@ -1028,14 +1161,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-xml_2.13",
             "version": "1.3.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1043,7 +1178,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-xml_2.13_1.3.0.jar",
@@ -1059,7 +1195,8 @@
             "group": "org.scala-lang",
             "artifact": "scala-library",
             "version": "2.13.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -1076,14 +1213,16 @@
             "group": "org.scala-lang",
             "artifact": "scala-reflect",
             "version": "2.13.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1091,7 +1230,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang_scala-reflect_2.13.1.jar",

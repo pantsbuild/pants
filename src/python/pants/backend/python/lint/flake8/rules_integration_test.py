@@ -14,8 +14,9 @@ from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.backend.python.util_rules import python_sources
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
@@ -32,7 +33,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *flake8_rules(),
             *flake8_subsystem_rules(),
-            *source_files.rules(),
+            *python_sources.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(LintResults, [Flake8Request]),

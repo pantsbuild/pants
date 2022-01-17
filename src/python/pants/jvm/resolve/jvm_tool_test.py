@@ -5,29 +5,20 @@ from __future__ import annotations
 
 import textwrap
 
-import pytest
-
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, UnrecognizedResolveNamesError
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import SubsystemRule, rule
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.jvm_tool import (
-    GatherJvmCoordinatesRequest,
-    JvmToolBase,
-    JvmToolLockfileRequest,
-    JvmToolLockfileSentinel,
-    determine_resolves_to_generate,
-    filter_tool_lockfile_requests,
-)
+from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class MockJvmTool(JvmToolBase):
@@ -39,15 +30,15 @@ class MockJvmTool(JvmToolBase):
     default_lockfile_url = ""
 
 
-class MockJvmToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = MockJvmTool.options_scope
+class MockJvmToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = MockJvmTool.options_scope
 
 
 @rule
 async def generate_test_tool_lockfile_request(
     _: MockJvmToolLockfileSentinel, tool: MockJvmTool
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(tool)
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest.from_tool(tool)
 
 
 def test_jvm_tool_base_extracts_correct_coordinates() -> None:
@@ -62,7 +53,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             *jvm_tool.rules(),
             generate_test_tool_lockfile_request,
             SubsystemRule(MockJvmTool),
-            QueryRule(JvmToolLockfileRequest, (MockJvmToolLockfileSentinel,)),
+            QueryRule(JvmLockfileRequest, (MockJvmToolLockfileSentinel,)),
             QueryRule(ArtifactRequirements, (GatherJvmCoordinatesRequest,)),
             QueryRule(DigestContents, (Digest,)),
         ],
@@ -90,7 +81,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             )
         }
     )
-    lockfile_request = rule_runner.request(JvmToolLockfileRequest, [MockJvmToolLockfileSentinel()])
+    lockfile_request = rule_runner.request(JvmLockfileRequest, [MockJvmToolLockfileSentinel()])
     assert sorted(lockfile_request.artifact_inputs) == [
         "//:junit_junit",
         "org.hamcrest:hamcrest-core:1.3",
@@ -104,69 +95,3 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
         Coordinate(group="junit", artifact="junit", version="4.13.2"),
         Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),
     ]
-
-
-def test_determine_tool_sentinels_to_generate() -> None:
-    class Tool1(JvmToolLockfileSentinel):
-        resolve_name = "tool1"
-
-    class Tool2(JvmToolLockfileSentinel):
-        resolve_name = "tool2"
-
-    class Tool3(JvmToolLockfileSentinel):
-        resolve_name = "tool3"
-
-    def assert_chosen(
-        requested: list[str],
-        expected_tools: list[type[JvmToolLockfileSentinel]],
-    ) -> None:
-        tools = determine_resolves_to_generate([Tool1, Tool2, Tool3], requested)
-        assert tools == expected_tools
-
-    assert_chosen([Tool2.resolve_name], expected_tools=[Tool2])
-    assert_chosen(
-        [Tool1.resolve_name, Tool3.resolve_name],
-        expected_tools=[Tool1, Tool3],
-    )
-
-    # If none are specifically requested, return all.
-    assert_chosen([], expected_tools=[Tool1, Tool2, Tool3])
-
-    with pytest.raises(UnrecognizedResolveNamesError):
-        assert_chosen(["fake"], expected_tools=[])
-
-
-def test_filter_tool_lockfile_requests() -> None:
-    def create_request(name: str, lockfile_dest: str | None = None) -> JvmToolLockfileRequest:
-        return JvmToolLockfileRequest(
-            FrozenOrderedSet(),
-            resolve_name=name,
-            lockfile_dest=lockfile_dest or f"{name}.txt",
-        )
-
-    tool1 = create_request("tool1")
-    tool2 = create_request("tool2")
-    default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
-
-    def assert_filtered(
-        extra_request: JvmToolLockfileRequest | None,
-        *,
-        resolve_specified: bool,
-    ) -> None:
-        requests = [tool1, tool2]
-        if extra_request:
-            requests.append(extra_request)
-        assert filter_tool_lockfile_requests(requests, resolve_specified=resolve_specified) == [
-            tool1,
-            tool2,
-        ]
-
-    assert_filtered(None, resolve_specified=False)
-    assert_filtered(None, resolve_specified=True)
-
-    assert_filtered(default_tool, resolve_specified=False)
-    with pytest.raises(ValueError) as exc:
-        assert_filtered(default_tool, resolve_specified=True)
-    assert f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`" in str(
-        exc.value
-    )
