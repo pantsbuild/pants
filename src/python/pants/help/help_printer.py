@@ -206,6 +206,8 @@ class HelpPrinter(MaybeColor):
         self._print_title("Plugin API Types")
         api_type_descriptions: Dict[str, str] = {}
         for api_type, rule_infos in self._all_help_info.rule_output_type_to_rule_infos.items():
+            if api_type.startswith("_"):
+                continue
             api_type_descriptions[api_type] = rule_infos[0].output_desc or ""
         longest_api_type_name = max(len(name) for name in api_type_descriptions.keys())
         chars_before_description = longest_api_type_name + 2
