@@ -7,6 +7,7 @@ from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJava
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -15,9 +16,10 @@ from pants.engine.process import BashBinary, FallibleProcessResult, Process, Pro
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
+from pants.jvm.goals import lockfile
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import JvmToolLockfileRequest, JvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -37,8 +39,8 @@ class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
 
 
-class GoogleJavaFormatToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = GoogleJavaFormatSubsystem.options_scope
+class GoogleJavaFormatToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = GoogleJavaFormatSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -158,14 +160,15 @@ async def google_java_format_lint(
 async def generate_google_java_format_lockfile_request(
     _: GoogleJavaFormatToolLockfileSentinel,
     tool: GoogleJavaFormatSubsystem,
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(tool)
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest.from_tool(tool)
 
 
 def rules():
     return [
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
         UnionRule(LintRequest, GoogleJavaFormatRequest),
-        UnionRule(JvmToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

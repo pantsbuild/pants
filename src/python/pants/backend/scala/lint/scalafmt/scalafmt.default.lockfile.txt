@@ -4,38 +4,44 @@
             "group": "com.geirsson",
             "artifact": "metaconfig-core_2.13",
             "version": "0.9.15",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -43,43 +49,50 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.geirsson_metaconfig-core_2.13_0.9.15.jar",
@@ -95,26 +108,30 @@
             "group": "com.geirsson",
             "artifact": "metaconfig-typesafe-config_2.13",
             "version": "0.9.15",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -122,55 +139,64 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.geirsson_metaconfig-typesafe-config_2.13_0.9.15.jar",
@@ -186,14 +212,16 @@
             "group": "com.github.scopt",
             "artifact": "scopt_2.13",
             "version": "4.0.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -201,7 +229,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.github.scopt_scopt_2.13_4.0.1.jar",
@@ -217,7 +246,8 @@
             "group": "com.googlecode.java-diff-utils",
             "artifact": "diffutils",
             "version": "1.3.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -234,14 +264,16 @@
             "group": "com.lihaoyi",
             "artifact": "fansi_2.13",
             "version": "0.2.14",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -249,7 +281,8 @@
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.lihaoyi_fansi_2.13_0.2.14.jar",
@@ -265,7 +298,8 @@
             "group": "com.lihaoyi",
             "artifact": "geny_2.13",
             "version": "0.6.5",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -282,20 +316,23 @@
             "group": "com.lihaoyi",
             "artifact": "pprint_2.13",
             "version": "0.6.6",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -303,13 +340,15 @@
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "com.lihaoyi_pprint_2.13_0.6.6.jar",
@@ -325,7 +364,8 @@
             "group": "com.lihaoyi",
             "artifact": "sourcecode_2.13",
             "version": "0.2.7",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -342,7 +382,8 @@
             "group": "com.martiansoftware",
             "artifact": "nailgun-server",
             "version": "0.9.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -359,7 +400,8 @@
             "group": "com.typesafe",
             "artifact": "config",
             "version": "1.4.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -376,7 +418,8 @@
             "group": "io.get-coursier",
             "artifact": "interface",
             "version": "0.0.17",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -393,7 +436,8 @@
             "group": "net.java.dev.jna",
             "artifact": "jna",
             "version": "5.8.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -410,7 +454,8 @@
             "group": "org.jline",
             "artifact": "jline",
             "version": "3.20.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -427,14 +472,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-collection-compat_2.13",
             "version": "2.5.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -442,7 +489,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-collection-compat_2.13_2.5.0.jar",
@@ -458,14 +506,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-parallel-collections_2.13",
             "version": "1.0.4",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -473,7 +523,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-parallel-collections_2.13_1.0.4.jar",
@@ -489,14 +540,16 @@
             "group": "org.scala-lang.modules",
             "artifact": "scala-xml_2.13",
             "version": "1.3.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -504,7 +557,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang.modules_scala-xml_2.13_1.3.0.jar",
@@ -520,32 +574,37 @@
             "group": "org.scala-lang",
             "artifact": "scala-compiler",
             "version": "2.13.7",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -553,25 +612,29 @@
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang_scala-compiler_2.13.7.jar",
@@ -587,7 +650,8 @@
             "group": "org.scala-lang",
             "artifact": "scala-library",
             "version": "2.13.7",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -604,14 +668,16 @@
             "group": "org.scala-lang",
             "artifact": "scala-reflect",
             "version": "2.13.7",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -619,7 +685,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang_scala-reflect_2.13.7.jar",
@@ -635,14 +702,16 @@
             "group": "org.scala-lang",
             "artifact": "scalap",
             "version": "2.13.7",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-compiler",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -650,31 +719,36 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-compiler",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scala-lang_scalap_2.13.7.jar",
@@ -690,20 +764,23 @@
             "group": "org.scalameta",
             "artifact": "common_2.13",
             "version": "4.4.30",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -711,13 +788,15 @@
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_common_2.13_4.4.30.jar",
@@ -733,20 +812,23 @@
             "group": "org.scalameta",
             "artifact": "fastparse-v2_2.13",
             "version": "2.3.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -754,13 +836,15 @@
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_fastparse-v2_2.13_2.3.1.jar",
@@ -776,20 +860,23 @@
             "group": "org.scalameta",
             "artifact": "parsers_2.13",
             "version": "4.4.30",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "trees_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -797,37 +884,43 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "trees_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_parsers_2.13_4.4.30.jar",
@@ -843,56 +936,65 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-cli_2.13",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scalameta",
                 "artifact": "svm-subs",
                 "version": "101.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-dynamic_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.martiansoftware",
                 "artifact": "nailgun-server",
                 "version": "0.9.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-core_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.scopt",
                 "artifact": "scopt_2.13",
                 "version": "4.0.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.googlecode.java-diff-utils",
                 "artifact": "diffutils",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -900,193 +1002,225 @@
                 "group": "org.scalameta",
                 "artifact": "svm-subs",
                 "version": "101.0.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-dynamic_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-parallel-collections_2.13",
                 "version": "1.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.martiansoftware",
                 "artifact": "nailgun-server",
                 "version": "0.9.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-core_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-typesafe-config_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-config_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-xml_2.13",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "parsers_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-compiler",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "interface",
                 "version": "0.0.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "trees_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.github.scopt",
                 "artifact": "scopt_2.13",
                 "version": "4.0.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.googlecode.java-diff-utils",
                 "artifact": "diffutils",
                 "version": "1.3.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalameta_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scalap",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-sysops_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-interfaces",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalafmt-cli_2.13_3.2.1.jar",
@@ -1102,26 +1236,30 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-config_2.13",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-typesafe-config_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1129,61 +1267,71 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-typesafe-config_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalafmt-config_2.13_3.2.1.jar",
@@ -1199,38 +1347,44 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-core_2.13",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-config_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalameta_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-sysops_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1238,139 +1392,162 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-parallel-collections_2.13",
                 "version": "1.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-core_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.geirsson",
                 "artifact": "metaconfig-typesafe-config_2.13",
                 "version": "0.9.15",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-config_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "parsers_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-compiler",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "trees_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "fansi_2.13",
                 "version": "0.2.14",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.typelevel",
                 "artifact": "paiges-core_2.13",
                 "version": "0.4.2",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-collection-compat_2.13",
                 "version": "2.5.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "pprint_2.13",
                 "version": "0.6.6",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalameta_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scalap",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-sysops_2.13",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalafmt-core_2.13_3.2.1.jar",
@@ -1386,32 +1563,37 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-dynamic_2.13",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "interface",
                 "version": "0.0.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-interfaces",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1419,25 +1601,29 @@
                 "group": "com.typesafe",
                 "artifact": "config",
                 "version": "1.4.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "io.get-coursier",
                 "artifact": "interface",
                 "version": "0.0.17",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "scalafmt-interfaces",
                 "version": "3.2.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalafmt-dynamic_2.13_3.2.1.jar",
@@ -1453,7 +1639,8 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-interfaces",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [],
         "dependencies": [],
@@ -1470,20 +1657,23 @@
             "group": "org.scalameta",
             "artifact": "scalafmt-sysops_2.13",
             "version": "3.2.1",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-parallel-collections_2.13",
                 "version": "1.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1491,13 +1681,15 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang.modules",
                 "artifact": "scala-parallel-collections_2.13",
                 "version": "1.0.4",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalafmt-sysops_2.13_3.2.1.jar",
@@ -1513,26 +1705,30 @@
             "group": "org.scalameta",
             "artifact": "scalameta_2.13",
             "version": "4.4.30",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scalap",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "parsers_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1540,73 +1736,85 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "parsers_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-compiler",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "net.java.dev.jna",
                 "artifact": "jna",
                 "version": "5.8.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "trees_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.jline",
                 "artifact": "jline",
                 "version": "3.20.0",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scalap",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-reflect",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_scalameta_2.13_4.4.30.jar",
@@ -1622,14 +1830,16 @@
             "group": "org.scalameta",
             "artifact": "svm-subs",
             "version": "101.0.0",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1637,7 +1847,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_svm-subs_101.0.0.jar",
@@ -1653,26 +1864,30 @@
             "group": "org.scalameta",
             "artifact": "trees_2.13",
             "version": "4.4.30",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1680,31 +1895,36 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "common_2.13",
                 "version": "4.4.30",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "sourcecode_2.13",
                 "version": "0.2.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "org.scalameta",
                 "artifact": "fastparse-v2_2.13",
                 "version": "2.3.1",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             },
             {
                 "group": "com.lihaoyi",
                 "artifact": "geny_2.13",
                 "version": "0.6.5",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.scalameta_trees_2.13_4.4.30.jar",
@@ -1720,14 +1940,16 @@
             "group": "org.typelevel",
             "artifact": "paiges-core_2.13",
             "version": "0.4.2",
-            "packaging": "jar"
+            "packaging": "jar",
+            "classifier": null
         },
         "directDependencies": [
             {
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "dependencies": [
@@ -1735,7 +1957,8 @@
                 "group": "org.scala-lang",
                 "artifact": "scala-library",
                 "version": "2.13.7",
-                "packaging": "jar"
+                "packaging": "jar",
+                "classifier": null
             }
         ],
         "file_name": "org.typelevel_paiges-core_2.13_0.4.2.jar",

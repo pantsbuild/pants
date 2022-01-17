@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -17,6 +18,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
+from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.build_graph.address import Address
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules import source_files
@@ -157,12 +159,9 @@ async def compute_first_party_package_import_path(
 @rule
 async def analyze_first_party_package(
     request: FirstPartyPkgAnalysisRequest,
+    analyzer: PackageAnalyzerSetup,
 ) -> FallibleFirstPartyPkgAnalysis:
-    analyzer, wrapped_target, import_path_info, owning_go_mod = await MultiGet(
-        Get(
-            LoadedGoBinary,
-            LoadedGoBinaryRequest("analyze_package", ("main.go", "read.go"), "./package_analyzer"),
-        ),
+    wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(WrappedTarget, Address, request.address),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(OwningGoMod, OwningGoModRequest(request.address)),
@@ -178,7 +177,7 @@ async def analyze_first_party_package(
     result = await Get(
         FallibleProcessResult,
         Process(
-            ("./package_analyzer", request.address.spec_path or "."),
+            (analyzer.path, request.address.spec_path or "."),
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
@@ -325,4 +324,4 @@ async def setup_first_party_pkg_digest(
 
 
 def rules():
-    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules())
+    return (*collect_rules(), *source_files.rules(), *load_go_binary.rules(), *pkg_analyzer.rules())

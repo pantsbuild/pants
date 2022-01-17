@@ -300,7 +300,7 @@ def test_infer_python_strict(caplog) -> None:
     run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "warning")
     assert len(caplog.records) == 1
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese" in caplog.text
+    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
 
     # Now test with "error"
     caplog.clear()
@@ -310,7 +310,7 @@ def test_infer_python_strict(caplog) -> None:
     assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
     assert len(caplog.records) == 2  # one for the error being raised and one for our message
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese" in caplog.text
+    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
 
     caplog.clear()
 
