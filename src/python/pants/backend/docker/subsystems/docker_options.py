@@ -76,16 +76,15 @@ class DockerOptions(Subsystem):
         register(
             "--default-context-root",
             type=str,
-            default=".",
+            default="",
             help=(
                 "Provide a default Docker build context root path for `docker_image` targets that "
                 "does not specify their own `context_root`.\n\n"
                 "The build root is relative to the project root by default, but may be prefixed "
-                "with `BUILD:` to be relative to the directory of the BUILD file of the "
-                "`docker_image`.\n\n"
-                "Examples:\n\n"
+                "with `./` to be relative to the directory of the BUILD file of the `docker_image`."
+                "\n\nExamples:\n\n"
                 "    --default-context-root=src/docker\n"
-                "    --default-context-root=BUILD:per/image/root\n"
+                "    --default-context-root=./per/image/root\n"
             ),
         )
 
@@ -175,7 +174,7 @@ class DockerOptions(Subsystem):
 
     @property
     def default_context_root(self) -> str:
-        return cast(str, self.options.default_context_root)
+        return cast(str, self.options.default_context_root).strip("/")
 
     @property
     def default_repository(self) -> str:

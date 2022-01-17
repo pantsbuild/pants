@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os.path
 from textwrap import dedent
-from typing import Callable, ContextManager
+from typing import Callable
 
 import pytest
 
@@ -47,10 +47,10 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget
+from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.pytest_util import assert_logged, no_exception
+from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -119,7 +119,7 @@ def assert_build(
         opts = options or {}
         opts.setdefault("registries", {})
         opts.setdefault("default_repository", "{name}")
-        opts.setdefault("default_context_root", ".")
+        opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
         opts.setdefault("env_vars", [])
@@ -712,7 +712,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             ],
         ),
         (
-            "BUILD:.",
+            ".",
             ("config.txt",),
             ("docker/test/conf/config.txt",),
             [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
@@ -721,7 +721,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             ],
         ),
         (
-            "BUILD:.",
+            "./",
             ("conf/config.txt",),
             (
                 "docker/test/conf/config.txt",
@@ -732,8 +732,9 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "There are unreachable files in these directories, excluded from the build context "
                 "due to `context_root` being 'docker/test':\n\n"
                 "  * src.project\n\n"
-                "Suggested `context_root` setting is '.' in order to include all files in the "
-                "build context, or relocate them to be part of the current `context_root`."
+                "Suggested `context_root` setting is '' in order to include all files in the "
+                "build context, otherwise relocate the files to be part of the current "
+                "`context_root` 'docker/test'."
             ],
         ),
     ],
@@ -837,103 +838,30 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected_context_root, context_root, options",
+    "default_context_root, context_root, expected_context_root",
     [
-        (".", None, None),
-        ("src/docker", "src/docker", None),
-        ("src/docker", "BUILD:", None),
-        ("src/docker", "BUILD:.", None),
-        ("src", "BUILD:..", None),
-        ("src/docker/build/context", "BUILD:build/context", None),
-        ("src/docker", "src/docker", {"default_context_root": "default/path"}),
-        ("src/docker", None, {"default_context_root": "src/docker"}),
-        ("src/build/context", None, {"default_context_root": "BUILD:../build/context"}),
+        ("", None, "."),
+        ("/", None, "."),
+        ("src", None, "src"),
+        ("/src", None, "src"),
+        (".", None, "src/docker"),
+        ("./build/context/", None, "src/docker/build/context"),
+        ("ignored", "", "."),
+        ("ignored", "src/context/", "src/context"),
+        ("ignored", "/", "."),
+        ("ignored", "/src", "src"),
+        ("ignored", ".", "src/docker"),
+        ("ignored", "./build/context", "src/docker/build/context"),
     ],
 )
-def test_context_root(
-    rule_runner: RuleRunner,
-    context_root: str | None,
-    options: dict | None,
-    expected_context_root: str,
+def test_get_context_root(
+    context_root: str | None, default_context_root: str, expected_context_root: str
 ) -> None:
-    rule_runner.write_files(
-        {
-            "src/docker/BUILD": f"docker_image(name='image', context_root={context_root!r})",
-            "src/docker/Dockerfile": "FROM python:3.8",
-        }
+    docker_options = create_subsystem(
+        DockerOptions,
+        default_context_root=default_context_root,
     )
-
-    def check_docker_proc(process: Process):
-        assert process.argv == (
-            "/dummy/docker",
-            "build",
-            "--tag",
-            "image:latest",
-            "--file",
-            "src/docker/Dockerfile",
-            expected_context_root,
-        )
-
-    assert_build(
-        rule_runner,
-        Address("src/docker", target_name="image"),
-        options=options,
-        process_assertions=check_docker_proc,
-    )
-
-
-@pytest.mark.parametrize(
-    "context_root, options, raises",
-    [
-        (None, None, no_exception()),
-        (
-            "/abs/path",
-            None,
-            pytest.raises(
-                InvalidFieldException,
-                match=(
-                    r"The 'context_root' field in target src/docker:image must be a relative path, "
-                    r"but was '/abs/path'\."
-                ),
-            ),
-        ),
-        (
-            "BUILD:/abs/path",
-            None,
-            pytest.raises(
-                InvalidFieldException,
-                match=(
-                    r"The 'context_root' field in target src/docker:image must be a relative path, "
-                    r"but was '/abs/path'\."
-                ),
-            ),
-        ),
-        (
-            None,
-            {"default_context_root": "/abs/path"},
-            pytest.raises(
-                InvalidFieldException,
-                match=(
-                    r"The \[docker\]\.default_context_root configuration option must be a relative path, "
-                    r"but was '/abs/path'\."
-                ),
-            ),
-        ),
-    ],
-)
-def test_invalid_context_root(
-    rule_runner: RuleRunner, context_root: str | None, options: dict | None, raises: ContextManager
-) -> None:
-    rule_runner.write_files(
-        {
-            "src/docker/BUILD": f"docker_image(name='image', context_root={context_root!r})",
-            "src/docker/Dockerfile": "FROM python:3.8",
-        }
-    )
-
-    with raises:
-        assert_build(
-            rule_runner,
-            Address("src/docker", target_name="image"),
-            options=options,
-        )
+    address = Address("src/docker", target_name="image")
+    tgt = DockerImageTarget({"context_root": context_root}, address)
+    fs = DockerFieldSet.create(tgt)
+    assert fs.get_context_root(docker_options.default_context_root) == expected_context_root

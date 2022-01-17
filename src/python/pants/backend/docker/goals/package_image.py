@@ -38,7 +38,7 @@ from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidFieldException, Target, WrappedTarget
+from pants.engine.target import Target, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.util.strutil import bullet_list
@@ -147,17 +147,21 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
     def get_context_root(self, default_context_root: str) -> str:
-        context_root = self.context_root.value or default_context_root
-        if context_root.startswith("BUILD:"):
-            context_root = path.join(self.address.spec_path, context_root[6:])
-        if path.isabs(context_root):
-            if self.context_root.value:
-                source = f"{self.context_root.alias!r} field in target {self.address}"
-            else:
-                source = "[docker].default_context_root configuration option"
-            raise InvalidFieldException(
-                f"The {source} must be a relative path, but was {context_root!r}."
-            )
+        """Examines `default_context_root` and `self.context_root.value` and translates that to a
+        context root for the Docker build operation.
+
+        That is, in the configuration/field value, the context root is relative to project root when
+        in the form `path/..` (implies semantics as `//path/..` for target addresses) or the BUILD
+        file when `./path/..`.
+
+        The returned path is always relative to the project root.
+        """
+        if self.context_root.value is not None:
+            context_root = self.context_root.value
+        else:
+            context_root = default_context_root
+        if context_root == "." or context_root.startswith("./"):
+            context_root = path.join(self.address.spec_path, context_root)
         return path.normpath(context_root)
 
 
@@ -344,12 +348,13 @@ def format_docker_build_context_help_message(
     if paths_outside_context_root:
         unreachable = sorted({path.dirname(pth) for pth in paths_outside_context_root})
         context_paths = tuple(dst for src, dst in context.copy_source_vs_context_source if dst)
-        new_context_root = path.commonpath(context_paths) or "."
+        new_context_root = path.commonpath(context_paths)
         msg += (
             "There are unreachable files in these directories, excluded from the build context "
             f"due to `context_root` being {context_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
             f"Suggested `context_root` setting is {new_context_root!r} in order to include all files "
-            "in the build context, or relocate them to be part of the current `context_root`."
+            "in the build context, otherwise relocate the files to be part of the current "
+            f"`context_root` {context_root!r}."
         )
 
     return msg

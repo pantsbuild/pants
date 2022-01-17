@@ -7,13 +7,14 @@ import os
 import re
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import Callable, ClassVar, Iterator, cast
+from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
+from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -50,10 +51,18 @@ class DockerImageContextRootField(StringField):
     alias = "context_root"
     help = (
         "Specify which directory to use as the Docker build context root, relative to the project "
-        "build root by default. With a `BUILD:` prefix it is relative to the directory of the "
-        "BUILD file. This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
-        "default build root is specified in the `[docker].default_context_root` configuration option."
+        "build root by default. With a `./` prefix it is relative to the directory of the BUILD "
+        "file. This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
+        "default build root is specified in the `[docker].default_context_root` configuration "
+        "option."
     )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if isinstance(value_or_default, str):
+            return value_or_default.strip("/")
+        return value_or_default
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
