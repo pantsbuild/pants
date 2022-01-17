@@ -1,18 +1,26 @@
-use std::cmp::{min, Ordering, Reverse};
+use std::borrow::Cow;
+use std::cmp::{max, min, Ordering, Reverse};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::{atomic, Arc};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use lazy_static::lazy_static;
 use log::Level;
 use parking_lot::Mutex;
+use regex::Regex;
 use task_executor::Executor;
 use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
 use workunit_store::{in_workunit, RunningWorkunit, WorkunitMetadata};
 
 use crate::{Context, FallibleProcessResultWithPlatform, Process};
+
+lazy_static! {
+  // TODO: Runtime formatting is unstable in Rust, so we imitate it.
+  static ref CONCURRENCY_TEMPLATE_RE: Regex = Regex::new(r"\{pants_concurrency\}").unwrap();
+}
 
 ///
 /// A CommandRunner wrapper which limits the number of concurrent requests and which provides
@@ -32,7 +40,12 @@ impl CommandRunner {
   ) -> CommandRunner {
     CommandRunner {
       inner: inner.into(),
-      sema: AsyncSemaphore::new(executor, bound),
+      sema: AsyncSemaphore::new(
+        executor,
+        bound,
+        // TODO: Make configurable.
+        Duration::from_millis(200),
+      ),
     }
   }
 }
@@ -43,9 +56,9 @@ impl crate::CommandRunner for CommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    mut process: Process,
+    process: Process,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let semaphore_acquisition = self.sema.acquire();
+    let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
     let permit = in_workunit!(
       context.workunit_store.clone(),
       "acquire_command_runner_slot".to_owned(),
@@ -61,6 +74,7 @@ impl crate::CommandRunner for CommandRunner {
     .await;
 
     loop {
+      let mut process = process.clone();
       let concurrency_available = permit.concurrency();
       log::debug!(
         "Running {} under semaphore with concurrency id: {}, and concurrency: {}",
@@ -69,11 +83,32 @@ impl crate::CommandRunner for CommandRunner {
         concurrency_available,
       );
 
+      // TODO: Both of these templating cases should be implemented at the lowest possible level:
+      // they might currently be applied above a cache.
       if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
         process.env.insert(
           execution_slot_env_var.clone(),
           format!("{}", permit.concurrency_slot()),
         );
+      }
+      if process.concurrency_available > 0 {
+        let concurrency = format!("{}", permit.concurrency());
+        let mut matched = false;
+        process.argv = std::mem::take(&mut process.argv)
+          .into_iter()
+          .map(
+            |arg| match CONCURRENCY_TEMPLATE_RE.replace_all(&arg, &concurrency) {
+              Cow::Owned(altered) => {
+                matched = true;
+                altered
+              }
+              Cow::Borrowed(_original) => arg,
+            },
+          )
+          .collect();
+        if !matched {
+          return Err(format!("Process {} set `concurrency_available={}`, but did not include the `{}` template variable in its arguments.", process.description, process.concurrency_available, *CONCURRENCY_TEMPLATE_RE));
+        }
       }
 
       let running_process = self.inner.run(context.clone(), workunit, process.clone());
@@ -105,23 +140,27 @@ pub(crate) struct AsyncSemaphore {
 }
 
 struct State {
+  total_permits: usize,
   available_ids: VecDeque<usize>,
   tasks: Vec<Arc<Task>>,
 }
 
 impl AsyncSemaphore {
-  pub fn new(executor: &Executor, permits: usize) -> AsyncSemaphore {
+  pub fn new(
+    executor: &Executor,
+    permits: usize,
+    preemptible_duration: Duration,
+  ) -> AsyncSemaphore {
     let mut available_ids = VecDeque::new();
     for id in 1..=permits {
       available_ids.push_back(id);
     }
 
     let state = Arc::new(Mutex::new(State {
+      total_permits: permits,
       available_ids,
       tasks: Vec::new(),
     }));
-    // TODO: Make configurable.
-    let preemptible_duration = Duration::from_millis(200);
 
     // Spawn a task which will periodically balance Tasks.
     let _balancer_task = {
@@ -133,7 +172,7 @@ impl AsyncSemaphore {
             // Balance tasks.
             let state = state.lock();
             balance(
-              permits,
+              state.total_permits,
               Instant::now(),
               state.tasks.iter().map(|t| t.as_ref()).collect(),
             );
@@ -161,6 +200,8 @@ impl AsyncSemaphore {
   ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
+  /// NB: This method does not support preemption, or controlling concurrency.
+  ///
   // TODO: https://github.com/rust-lang/rust/issues/46379
   #[allow(dead_code)]
   pub(crate) async fn with_acquired<F, B, O>(self, f: F) -> O
@@ -168,13 +209,18 @@ impl AsyncSemaphore {
     F: FnOnce(usize) -> B,
     B: Future<Output = O>,
   {
-    let permit = self.acquire().await;
+    let permit = self.acquire(1).await;
     let res = f(permit.task.id).await;
     drop(permit);
     res
   }
 
-  pub async fn acquire(&self) -> Permit<'_> {
+  ///
+  /// Acquire a slot on the semaphore when it becomes available. Additionally, attempt to acquire
+  /// the given amount of concurrency. The amount actually acquired will be reported on the
+  /// returned Permit.
+  ///
+  pub async fn acquire(&self, concurrency_desired: usize) -> Permit<'_> {
     let permit = self.sema.acquire().await.expect("semaphore closed");
     let task = {
       let mut state = self.state.lock();
@@ -182,11 +228,19 @@ impl AsyncSemaphore {
         .available_ids
         .pop_front()
         .expect("More permits were distributed than ids exist.");
-      // TODO: Configure and calculate concurrency.
+
+      // A Task is initially given its fair share of the available concurrency (i.e., for two
+      // tasks, each gets half), even if that means we overcommit. Balancing will adjust
+      // concurrency later, to the extent that it can given preemption timeouts.
+      let concurrency_desired = max(concurrency_desired, 1);
+      let concurrency_actual = min(
+        concurrency_desired,
+        state.total_permits / (state.tasks.len() + 1),
+      );
       let task = Arc::new(Task::new(
         id,
-        1,
-        1,
+        concurrency_desired,
+        concurrency_actual,
         Instant::now() + self.preemptible_duration,
       ));
       state.tasks.push(task.clone());

@@ -7,8 +7,15 @@ use tokio::time::{sleep, timeout};
 use crate::bounded::{balance, AsyncSemaphore, Task};
 
 fn mk_semaphore(permits: usize) -> AsyncSemaphore {
+  mk_semaphore_with_preemptible_duration(permits, Duration::from_millis(200))
+}
+
+fn mk_semaphore_with_preemptible_duration(
+  permits: usize,
+  preemptible_duration: Duration,
+) -> AsyncSemaphore {
   let executor = task_executor::Executor::new();
-  AsyncSemaphore::new(&executor, permits)
+  AsyncSemaphore::new(&executor, permits, preemptible_duration)
 }
 
 #[tokio::test]
@@ -240,7 +247,7 @@ async fn drop_while_waiting() {
 
   // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
   tokio::spawn(async move {
-    let permit_future = handle2.acquire().boxed();
+    let permit_future = handle2.acquire(1).boxed();
     let delay_future = sleep(Duration::from_millis(100)).boxed();
     let raced_result = future::select(delay_future, permit_future).await;
     // We expect to have timed out, because the other Future will not resolve until asked.
@@ -331,6 +338,33 @@ async fn dropped_future_is_removed_from_queue() {
     panic!("thread1 didn't exit.");
   }
   assert_eq!(1, sema.available_permits());
+}
+
+#[tokio::test]
+async fn preemption() {
+  let ten_secs = Duration::from_secs(10);
+  let sema = mk_semaphore_with_preemptible_duration(2, ten_secs);
+
+  // Acquire a permit which will take all concurrency, and confirm that it doesn't get preempted.
+  let permit1 = sema.acquire(2).await;
+  assert_eq!(2, permit1.concurrency());
+  if let Ok(_) = timeout(ten_secs / 100, permit1.notified_concurrency_changed()).await {
+    panic!("permit1 should not have been preempted.");
+  }
+
+  // Acquire another permit, and confirm that it doesn't get preempted.
+  let permit2 = sema.acquire(2).await;
+  if let Ok(_) = timeout(ten_secs / 100, permit2.notified_concurrency_changed()).await {
+    panic!("permit2 should not have been preempted.");
+  }
+
+  // But that permit1 does get preempted.
+  if let Err(_) = timeout(ten_secs, permit1.notified_concurrency_changed()).await {
+    panic!("permit1 should have been preempted.");
+  }
+
+  assert_eq!(1, permit1.concurrency());
+  assert_eq!(1, permit2.concurrency());
 }
 
 /// Given Tasks as triples of desired, actual, and expected concurrency (all of which are

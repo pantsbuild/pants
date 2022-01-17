@@ -368,8 +368,17 @@ pub struct Process {
 
   pub timeout: Option<std::time::Duration>,
 
-  /// If not None, then if a BoundedCommandRunner executes this Process
+  /// If not None, then a bounded::CommandRunner executing this Process will set an environment
+  /// variable with this name containing a unique execution slot number.
   pub execution_slot_variable: Option<String>,
+
+  /// If non-zero, the amount of parallelism that this process is capable of given its inputs. This
+  /// value does not directly set the number of cores allocated to the process: that is computed
+  /// based on availability, and provided as a template value in the arguments of the process.
+  ///
+  /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the
+  /// process.
+  pub concurrency_available: usize,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
@@ -434,6 +443,7 @@ impl Process {
       jdk_home: None,
       platform_constraint: None,
       execution_slot_variable: None,
+      concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
     }
   }
