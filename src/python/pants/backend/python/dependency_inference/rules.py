@@ -207,7 +207,7 @@ async def infer_python_dependencies_via_imports(
         if (
             not owners.unambiguous
             and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
-            and not parsed_imports[imp].string
+            and not parsed_imports[imp].weak
         ):
             unowned_imports.add(imp)
 

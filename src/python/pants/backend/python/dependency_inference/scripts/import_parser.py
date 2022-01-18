@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `MIN_DOTS=1 STRING_IMPORTS=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `MIN_DOTS=1 weak_imports=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -34,12 +34,14 @@ class AstVisitor(ast.NodeVisitor):
 
         # Each of these maps module_name to first lineno of occurance
         # N.B. use `setdefault` when adding imports
-        self.definite_imports = {}
-        self.string_imports = {}
+        # (See `ParsedPythonImportInfo` in ../parse_python_imports.py for the delineation of
+        #   weak/strong)
+        self.strong_imports = {}
+        self.weak_imports = {}
 
     def maybe_add_string_import(self, node, s):
         if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
-            self.string_imports.setdefault(s, node.lineno)
+            self.weak_imports.setdefault(s, node.lineno)
 
     @staticmethod
     def _is_pragma_ignored(line):
@@ -70,7 +72,7 @@ class AstVisitor(ast.NodeVisitor):
                 token = next(token_iter)
 
             if not self._is_pragma_ignored(token[4]):
-                self.definite_imports.setdefault(
+                self.strong_imports.setdefault(
                     import_prefix + alias.name, token[3][0] + node.lineno - 1
                 )
             if alias.asname and token[1] != alias.asname:
@@ -105,7 +107,7 @@ class AstVisitor(ast.NodeVisitor):
             if name is not None:
                 lineno = node.args[0].lineno
                 if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
-                    self.definite_imports.setdefault(name, lineno)
+                    self.strong_imports.setdefault(name, lineno)
                 return
 
         self.generic_visit(node)
@@ -140,15 +142,15 @@ def main(filename):
     # See below for where we explicitly decode.
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
 
-    # N.B. Start with string and `update` with definitive so definite "wins"
+    # N.B. Start with weak and `update` with definitive so definite "wins"
     result = {
-        module_name: {"lineno": lineno, "string": True}
-        for module_name, lineno in visitor.string_imports.items()
+        module_name: {"lineno": lineno, "weak": True}
+        for module_name, lineno in visitor.weak_imports.items()
     }
     result.update(
         {
-            module_name: {"lineno": lineno, "string": False}
-            for module_name, lineno in visitor.definite_imports.items()
+            module_name: {"lineno": lineno, "weak": False}
+            for module_name, lineno in visitor.strong_imports.items()
         }
     )
 

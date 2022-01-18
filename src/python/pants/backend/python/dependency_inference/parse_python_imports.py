@@ -20,12 +20,14 @@ from pants.util.logging import LogLevel
 @dataclass(frozen=True)
 class ParsedPythonImportInfo:
     lineno: int
-    string: bool
+    # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
+    # file and the parsed import.
+    # Examples of "weak" imports include string imports (if enabled).
+    weak: bool
 
 
 class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
-    """All the discovered imports from a Python source file mapped to the first line they appear and
-    whether they are a string import."""
+    """All the discovered imports from a Python source file mapped to the relevant info."""
 
 
 @dataclass(frozen=True)
