@@ -737,6 +737,35 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "`context_root` 'docker/test'."
             ],
         ),
+        (
+            "./config",
+            (),
+            (
+                "docker/test/config/..unusal-name",
+                "docker/test/config/.rc",
+                "docker/test/config/.a",
+                "docker/test/config/.conf.d/b",
+            ),
+            [
+                (
+                    logging.WARNING,
+                    (
+                        "Docker build failed for `docker_image` docker/test:test. The "
+                        "docker/test/Dockerfile have `COPY` instructions where the source files "
+                        "may not have been found in the Docker build context.\n"
+                        "\n"
+                        "There are additional files in the Docker build context that were not "
+                        "referenced by any `COPY` instruction (this is not an error):\n"
+                        "\n"
+                        "  * ..unusal-name\n"
+                        "  * .a\n"
+                        "  * .conf.d/b\n"
+                        "  * .rc\n"
+                    ),
+                )
+            ],
+            [],
+        ),
     ],
 )
 def test_docker_build_fail_logs(

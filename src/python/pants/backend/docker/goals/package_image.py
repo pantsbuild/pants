@@ -298,7 +298,7 @@ def format_docker_build_context_help_message(
         if not context_path:
             return paths
         dst = path.relpath(context_path, context_root)
-        if dst.startswith("."):
+        if dst.startswith("../"):
             paths_outside_context_root.append(context_path)
             return ("", "")
         if instruction_path == dst:
