@@ -36,7 +36,7 @@ class GofmtFieldSet(FieldSet):
         return tgt.get(SkipGofmtField).value
 
 
-class GofmtRequest(FmtRequest):
+class GofmtRequest(FmtRequest, LintRequest):
     field_set_type = GofmtFieldSet
 
 

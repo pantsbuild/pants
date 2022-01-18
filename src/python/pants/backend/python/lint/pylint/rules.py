@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, DependeesOption, LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -71,6 +71,7 @@ class PylintPartition:
 
 class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
+    requires_dependees = DependeesOption.TRANSITIVE
 
 
 def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
