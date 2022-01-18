@@ -99,6 +99,8 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
         return Some(value.clone());
       }
 
+      // TODO: Remove the `allow` once https://github.com/rust-lang/rust-clippy/issues/8281
+      // is fixed upstream.
       #[allow(clippy::question_mark)]
       if item_receiver.changed().await.is_err() {
         return None;
