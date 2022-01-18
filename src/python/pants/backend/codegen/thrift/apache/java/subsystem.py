@@ -11,7 +11,7 @@ from pants.option.subsystem import Subsystem
 
 
 class ApacheThriftJavaSubsystem(Subsystem):
-    options_scope = "apache-thrift-java"
+    options_scope = "java-thrift"
     help = "Options specific to generating Java from Thrift using the Apache Thrift generator"
 
     @classmethod
