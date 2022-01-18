@@ -51,10 +51,12 @@ async def generate_jvm_lockfile(
         GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
     )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
-    
+
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
     metadata = JVMLockfileMetadata.new(requirements)
-    resolved_lockfile_contents = metadata.add_header_to_lockfile(resolved_lockfile_contents, regenerate_command="./pants generate-lockfiles")
+    resolved_lockfile_contents = metadata.add_header_to_lockfile(
+        resolved_lockfile_contents, regenerate_command="./pants generate-lockfiles"
+    )
 
     lockfile_digest = await Get(
         Digest,
