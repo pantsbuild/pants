@@ -16,8 +16,9 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import FieldSet, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -153,6 +154,11 @@ class LintSubsystem(GoalSubsystem):
             advanced=True,
             type=bool,
             default=False,
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Linters are now broken into multiple batches by default using the "
+                "`--batch-size` argument."
+            ),
             help=(
                 "Rather than linting all files in a single batch, lint each file as a "
                 "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
@@ -163,10 +169,34 @@ class LintSubsystem(GoalSubsystem):
                 "faster than `--no-per-file-caching` for your use case."
             ),
         )
+        register(
+            "--batch-size",
+            advanced=True,
+            type=int,
+            default=128,
+            help=(
+                "The target minimum number of files that will be included in each linter batch.\n"
+                "\n"
+                "Linter processes are batched for a few reasons:\n"
+                "\n"
+                "1. to avoid OS argument length limits (in processes which don't support argument "
+                "files)\n"
+                "2. to support more stable cache keys than would be possible if all files were "
+                "operated on in a single batch.\n"
+                "3. to allow for parallelism in linter processes which don't have internal "
+                "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
+                "behavior when multiple processes are competing for cores and so internal "
+                "parallelism cannot be used perfectly.\n"
+            ),
+        )
 
     @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
+
+    @property
+    def batch_size(self) -> int:
+        return cast(int, self.options.batch_size)
 
 
 class Lint(Goal):
@@ -182,7 +212,7 @@ async def lint(
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    request_types = cast("Iterable[type[StyleRequest]]", union_membership[LintRequest])
+    request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
@@ -193,36 +223,48 @@ async def lint(
     )
 
     if lint_subsystem.per_file_caching:
-        all_per_file_results = await MultiGet(
+        all_batch_results = await MultiGet(
             Get(LintResults, LintRequest, request.__class__([field_set]))
             for request in requests
-            for field_set in request.field_sets
             if request.field_sets
-        )
-
-        def key_fn(results: LintResults):
-            return results.linter_name
-
-        # NB: We must pre-sort the data for itertools.groupby() to work properly.
-        sorted_all_per_files_results = sorted(all_per_file_results, key=key_fn)
-        # We consolidate all results for each linter into a single `LintResults`.
-        all_results = tuple(
-            LintResults(
-                itertools.chain.from_iterable(
-                    per_file_results.results for per_file_results in all_linter_results
-                ),
-                linter_name=linter_name,
-            )
-            for linter_name, all_linter_results in itertools.groupby(
-                sorted_all_per_files_results, key=key_fn
-            )
+            for field_set in request.field_sets
         )
     else:
-        all_results = await MultiGet(
-            Get(LintResults, LintRequest, request) for request in requests if request.field_sets
+
+        def address_str(fs: FieldSet) -> str:
+            return fs.address.spec
+
+        all_batch_results = await MultiGet(
+            Get(LintResults, LintRequest, request.__class__(field_sets))
+            for request in requests
+            if request.field_sets
+            for field_sets in partition_sequentially(
+                request.field_sets, key=address_str, size_min=lint_subsystem.batch_size
+            )
         )
 
-    all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
+    def key_fn(results: LintResults):
+        return results.linter_name
+
+    # NB: We must pre-sort the data for itertools.groupby() to work properly.
+    sorted_all_batch_results = sorted(all_batch_results, key=key_fn)
+    # We consolidate all results for each linter into a single `LintResults`.
+    all_results = tuple(
+        sorted(
+            (
+                LintResults(
+                    itertools.chain.from_iterable(
+                        per_file_results.results for per_file_results in all_linter_results
+                    ),
+                    linter_name=linter_name,
+                )
+                for linter_name, all_linter_results in itertools.groupby(
+                    sorted_all_batch_results, key=key_fn
+                )
+            ),
+            key=lambda results: results.linter_name,
+        )
+    )
 
     def get_tool_name(res: LintResults) -> str:
         return res.linter_name

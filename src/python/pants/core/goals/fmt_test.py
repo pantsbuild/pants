@@ -17,7 +17,7 @@ from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import RuleRunner, logging
+from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
 
 FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
