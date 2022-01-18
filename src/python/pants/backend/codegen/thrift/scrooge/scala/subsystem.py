@@ -9,7 +9,7 @@ from pants.option.subsystem import Subsystem
 
 
 class ScroogeScalaSubsystem(Subsystem):
-    options_scope = "scrooge-scala"
+    options_scope = "scala-scrooge"
     help = "Scala-specific options for the Scrooge Thrift IDL compiler (https://twitter.github.io/scrooge/)."
 
     @classmethod
