@@ -27,6 +27,7 @@ from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -72,9 +73,9 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest = rule_runner.request(Scalatest, [])
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": scalatest.resolved_lockfile()
-            .to_serialized()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(
+                scalatest.resolved_lockfile()
+            ).serialize(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
