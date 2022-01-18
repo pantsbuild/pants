@@ -51,7 +51,8 @@ async def generate_jvm_lockfile(
     )
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
     lockfile_digest = await Get(
-        Digest, CreateDigest([FileContent(request.lockfile_dest, resolved_lockfile.to_json())])
+        Digest,
+        CreateDigest([FileContent(request.lockfile_dest, resolved_lockfile.to_serialized())]),
     )
     return Lockfile(lockfile_digest, request.resolve_name, request.lockfile_dest)
 

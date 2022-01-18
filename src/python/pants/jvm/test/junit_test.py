@@ -121,7 +121,7 @@ JUNIT4_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -168,7 +168,7 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -223,7 +223,7 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -287,7 +287,7 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -426,7 +426,7 @@ JUNIT5_RESOLVED_LOCKFILE = CoursierResolvedLockfile(
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -476,7 +476,7 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(
@@ -532,7 +532,7 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_json().decode(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.to_serialized().decode(),
             "BUILD": dedent(
                 """\
                 jvm_artifact(

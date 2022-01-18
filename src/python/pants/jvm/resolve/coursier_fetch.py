@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
 
+import toml
+
+from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
@@ -208,20 +211,62 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dict(cls, lockfile) -> CoursierResolvedLockfile:
+    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
 
-        return cls(entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in lockfile))
-
-    def to_json(self) -> bytes:
-        """Export this CoursierResolvedLockfile to human-readable JSON.
-
-        This JSON is intended to be checked in to the user's repo as a hermetic snapshot of a
-        Coursier resolved JVM classpath.
-        """
-        return json.dumps([entry.to_json_dict() for entry in self.entries], indent=4).encode(
-            "utf-8"
+        return cls(
+            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
         )
+
+    @classmethod
+    def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
+        """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
+
+        The toml file should consist of an `[entries]` block, followed by several entries.
+        """
+
+        lockfile_str: str
+        if isinstance(lockfile, str):
+            lockfile_str = lockfile
+        else:
+            lockfile_str = lockfile.decode("utf-8")
+
+        contents = toml.loads(lockfile_str)
+        entries = tuple(
+            CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
+        )
+
+        return cls(
+            entries=entries,
+        )
+
+    @classmethod
+    def from_serialized(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
+        """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
+        attached metadata, or old-style JSON.)."""
+
+        try:
+            return cls.from_toml(lockfile)
+        except toml.TomlDecodeError:
+            deprecated.warn_or_error(
+                "2.11.0.dev0",
+                "JSON-encoded JVM lockfile",
+                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
+            )
+            return cls.from_json_dicts(json.loads(lockfile))
+
+    def to_serialized(self) -> bytes:
+        """Export this CoursierResolvedLockfile to a human-readable serialized form.
+
+        This serialized form is intended to be checked in to the user's repo as a hermetic snapshot
+        of a Coursier resolved JVM classpath.
+        """
+
+        lockfile = {
+            "entries": [entry.to_json_dict() for entry in self.entries],
+        }
+
+        return toml.dumps(lockfile).encode("utf-8")
 
 
 def classpath_dest_filename(coord: str, src_filename: str) -> str:
@@ -603,7 +648,7 @@ async def get_coursier_lockfile_for_resolve(
 ) -> CoursierResolvedLockfile:
     lockfile_digest_contents = await Get(DigestContents, Digest, coursier_resolve.digest)
     lockfile_contents = lockfile_digest_contents[0].content
-    return CoursierResolvedLockfile.from_json_dict(json.loads(lockfile_contents))
+    return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
 
 @dataclass(frozen=True)
@@ -659,6 +704,7 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
         Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
         for artifact_requirements in request.artifact_requirements
     )
+
     lockfile_and_requirements_classpath_entries = await MultiGet(
         Get(
             ResolvedClasspathEntries,
