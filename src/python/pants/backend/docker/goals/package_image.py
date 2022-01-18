@@ -150,11 +150,11 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         """Examines `default_context_root` and `self.context_root.value` and translates that to a
         context root for the Docker build operation.
 
-        That is, in the configuration/field value, the context root is relative to project root when
+        That is, in the configuration/field value, the context root is relative to build root when
         in the form `path/..` (implies semantics as `//path/..` for target addresses) or the BUILD
         file when `./path/..`.
 
-        The returned path is always relative to the project root.
+        The returned path is always relative to the build root.
         """
         if self.context_root.value is not None:
             context_root = self.context_root.value

@@ -50,9 +50,9 @@ class DockerImageBuildArgsField(StringSequenceField):
 class DockerImageContextRootField(StringField):
     alias = "context_root"
     help = (
-        "Specify which directory to use as the Docker build context root, relative to the project "
-        "build root by default. With a `./` prefix it is relative to the directory of the BUILD "
-        "file. This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
+        "Specify which directory to use as the Docker build context root, relative to the build "
+        "root by default. With a `./` prefix it is relative to the directory of the BUILD file. "
+        "This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
         "default build root is specified in the `[docker].default_context_root` configuration "
         "option."
     )
@@ -78,7 +78,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
-        "project source tree."
+        "source tree."
     )
 
 
@@ -87,8 +87,8 @@ class DockerImageInstructionsField(StringSequenceField):
     required = False
     help = (
         "The `Dockerfile` content, typically one instruction per list item.\n\n"
-        "Use the `source` field instead if you prefer having the Dockerfile in your project "
-        "source tree.\n\n"
+        "Use the `source` field instead if you prefer having the Dockerfile in your source tree."
+        "\n\n"
         + dedent(
             """\
             Example:
@@ -225,10 +225,10 @@ class DockerImageBuildSecretsOptionField(
     alias = "secrets"
     help = (
         "Secret files to expose to the build (only if BuildKit enabled).\n\n"
-        "Secrets may use absolute paths, or paths relative to your project build root, or the "
-        "BUILD file if prefixed with `./`. The id should be valid as used by the Docker build "
-        "`--secret` option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) "
-        "for more information.\n\n"
+        "Secrets may use absolute paths, or paths relative to your build root, or the BUILD file "
+        "if prefixed with `./`. The id should be valid as used by the Docker build `--secret` "
+        "option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
+        "information.\n\n"
         + dedent(
             """\
             Example:
