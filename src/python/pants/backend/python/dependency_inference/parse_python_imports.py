@@ -17,11 +17,17 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-class ParsedPythonImports(FrozenDict[str, int]):
-    """All the discovered imports from a Python source file mapped to the first line they appear.
+@dataclass(frozen=True)
+class ParsedPythonImportInfo:
+    lineno: int
+    # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
+    # file and the parsed import.
+    # Examples of "weak" imports include string imports (if enabled).
+    weak: bool
 
-    May include string imports if the request specified to include them.
-    """
+
+class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
+    """All the discovered imports from a Python source file mapped to the relevant info."""
 
 
 @dataclass(frozen=True)
@@ -68,8 +74,10 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
     )
     # See above for where we explicitly encoded as utf8. Even though utf8 is the
     # default for decode(), we make that explicit here for emphasis.
-    process_output = process_result.stdout.decode("utf8")
-    return ParsedPythonImports(json.loads(process_output) if process_output else {})
+    process_output = process_result.stdout.decode("utf8") or "{}"
+    return ParsedPythonImports(
+        (imp, ParsedPythonImportInfo(**info)) for imp, info in json.loads(process_output).items()
+    )
 
 
 def rules():
