@@ -215,8 +215,8 @@ async def lint(
                 ),
             )
             unexp_targets = await Get(UnexpandedTargets, Addresses(dependees))
-            targets = await Get(Targets, UnexpandedTargets, unexp_targets)
-            request_targets.extend(targets)
+            additional_targets = await Get(Targets, UnexpandedTargets, unexp_targets)
+            request_targets.extend(additional_targets)
 
         requests.append(
             request_type(
