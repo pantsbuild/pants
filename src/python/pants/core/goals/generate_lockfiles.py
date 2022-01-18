@@ -157,8 +157,9 @@ class AmbiguousResolveNamesError(Exception):
         if tool_providers:
             if not user_providers:
                 raise AssertionError(
-                    f"Two tools have the same options_scope: {ambiguous_name}. This "
-                    "should not be possible. Please open a bug at "
+                    f"{len(tool_providers)} tools have the same options_scope: {ambiguous_name}. "
+                    "If you're writing a plugin, rename your `ToolLockfileSentinel`s so that "
+                    "there is no ambiguity. Otherwise, please open a bug at "
                     "https://github.com/pantsbuild/pants/issues/new."
                 )
             if len(user_providers) == 1:
