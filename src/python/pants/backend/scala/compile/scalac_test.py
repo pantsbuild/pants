@@ -25,6 +25,7 @@ from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -58,6 +59,9 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
+
+
+EMPTY_LOCKFILE = TCoursierResolvedLockfile(CoursierResolvedLockfile(())).serialize()
 
 
 SCALA_LIB_SOURCE = dedent(
@@ -98,7 +102,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
@@ -148,7 +152,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -193,7 +197,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
         }
     )
     request = CompileScalaSourceRequest(
@@ -212,7 +216,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
-    resolved_joda_lockfile = CoursierResolvedLockfile(
+    resolved_joda_lockfile = TCoursierResolvedLockfile.new(
         entries=(
             CoursierLockfileEntry(
                 coord=Coordinate(group="joda-time", artifact="joda-time", version="2.10.10"),
@@ -242,7 +246,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.to_serialized().decode(),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -290,9 +294,7 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(())
-            .to_serialized()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -339,7 +341,7 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -392,7 +394,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(
+            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile.new(
                 entries=(
                     CoursierLockfileEntry(
                         coord=Coordinate(
@@ -407,9 +409,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                         ),
                     ),
                 )
-            )
-            .to_serialized()
-            .decode("utf-8"),
+            ).serialize(),
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -485,7 +485,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(
+            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile.new(
                 entries=(
                     CoursierLockfileEntry(
                         coord=Coordinate(
@@ -785,9 +785,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                         pants_address=None,
                     ),
                 )
-            )
-            .to_serialized()
-            .decode("utf-8"),
+            ).serialize(),
             "lib/A.scala": dedent(
                 """\
                 trait Functor[F[_]] {
