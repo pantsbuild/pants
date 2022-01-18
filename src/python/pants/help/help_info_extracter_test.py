@@ -7,6 +7,7 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
@@ -272,12 +273,17 @@ def test_get_all_help_info():
     Foo.register_options_on_scope(options)
     Bar.register_options_on_scope(options)
 
+    @rule
+    def rule_info_test(foo: Foo) -> Target:
+        """This rule is for testing info extraction only."""
+
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     bc_builder = BuildConfiguration.Builder()
     bc_builder.register_subsystems("help_info_extracter_test", (Foo, Bar))
     bc_builder.register_target_types("help_info_extracter_test", (BazLibrary,))
+    bc_builder.register_rules("help_info_extracter_test", collect_rules(locals()))
 
     all_help_info = HelpInfoExtracter.get_all_help_info(
         options,
@@ -385,6 +391,38 @@ def test_get_all_help_info():
                 "advanced": tuple(),
                 "deprecated": tuple(),
             },
+        },
+        "rule_output_type_to_rule_infos": {
+            "Foo": (
+                {
+                    "description": None,
+                    "help": "A foo.",
+                    "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                    "input_types": (),
+                    "name": "construct_scope_foo",
+                    "output_desc": None,
+                    "output_type": "Foo",
+                    "provider": "help_info_extracter_test",
+                },
+            ),
+            "Target": (
+                {
+                    "description": None,
+                    "help": "This rule is for testing info extraction only.",
+                    "input_gets": (),
+                    "input_types": ("Foo",),
+                    "name": "pants.help.help_info_extracter_test.rule_info_test",
+                    "output_desc": (
+                        "A Target represents an addressable set of metadata.\n\n    Set the "
+                        "`help` class property with a description, which will be used in "
+                        "`./pants help`. For the\n    best rendering, use soft wrapping (e.g. "
+                        "implicit string concatenation) within paragraphs, but\n    hard wrapping "
+                        "(`\n`) to separate distinct paragraphs and/or lists.\n    "
+                    ),
+                    "output_type": "Target",
+                    "provider": "help_info_extracter_test",
+                },
+            ),
         },
         "name_to_goal_info": {
             "bar": {
