@@ -7,6 +7,7 @@ from pants.backend.codegen.thrift.scrooge.additional_fields import ScroogeFinagl
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.build_graph.address import Address
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -14,17 +15,15 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.jvm.goals import lockfile
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import (
-    JvmToolLockfileRequest,
-    JvmToolLockfileSentinel,
-    ValidatedJvmToolLockfileRequest,
-)
+from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -41,8 +40,8 @@ class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 
 
-class ScroogeToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = ScroogeSubsystem.options_scope
+class ScroogeToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = ScroogeSubsystem.options_scope
 
 
 @rule
@@ -145,13 +144,14 @@ async def generate_scrooge_thrift_sources(
 async def generate_scrooge_lockfile_request(
     _: ScroogeToolLockfileSentinel,
     scrooge: ScroogeSubsystem,
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(scrooge)
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest.from_tool(scrooge)
 
 
 def rules():
     return [
         *collect_rules(),
         *additional_fields.rules(),
-        UnionRule(JvmToolLockfileSentinel, ScroogeToolLockfileSentinel),
+        *lockfile.rules(),
+        UnionRule(ToolLockfileSentinel, ScroogeToolLockfileSentinel),
     ]

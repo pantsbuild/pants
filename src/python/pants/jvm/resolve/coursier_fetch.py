@@ -256,7 +256,9 @@ class CoursierResolvedLockfile:
             return cls.from_toml(lockfile)
         except toml.TomlDecodeError:
             deprecated.warn_or_error(
-                "2.11.0dev", "JSON-encoded JVM lockfile", "run `./pants generate-lockfiles"
+                "2.11.0.dev0",
+                "JSON-encoded JVM lockfile",
+                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
             )
             return cls.from_json_dicts(json.loads(lockfile))
 

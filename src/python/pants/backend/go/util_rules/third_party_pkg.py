@@ -3,28 +3,34 @@
 
 from __future__ import annotations
 
+import json
 import logging
-import os.path
+import os
 from dataclasses import dataclass
+from typing import Any
 
 import ijson
 
+from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.core.goals.tailor import group_by_dir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    AddPrefix,
     Digest,
     DigestSubset,
+    GlobExpansionConjunction,
     GlobMatchErrorBehavior,
+    MergeDigests,
     PathGlobs,
-    RemovePrefix,
+    Snapshot,
 )
-from pants.engine.process import ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import strip_prefix, strip_v2_chroot_path
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +40,7 @@ class GoThirdPartyPkgError(Exception):
 
 
 @dataclass(frozen=True)
-class ThirdPartyPkgInfo:
+class ThirdPartyPkgAnalysis:
     """All the info and files needed to build a third-party package.
 
     The digest only contains the files for the package, with all prefixes stripped.
@@ -57,7 +63,7 @@ class ThirdPartyPkgInfo:
 
 
 @dataclass(frozen=True)
-class ThirdPartyPkgInfoRequest(EngineAwareParameter):
+class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     """Request the info and digest needed to build a third-party package.
 
     The package's module must be included in the input `go.mod`/`go.sum`.
@@ -72,7 +78,7 @@ class ThirdPartyPkgInfoRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgInfo]):
+class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
     """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
 
     The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
@@ -81,7 +87,7 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgInfo]):
     """
 
     digest: Digest
-    import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgInfo]
+    import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgAnalysis]
 
 
 @dataclass(frozen=True)
@@ -90,118 +96,390 @@ class AllThirdPartyPackagesRequest:
     go_mod_path: str
 
 
+@dataclass(frozen=True)
+class ModuleDescriptorsRequest:
+    digest: Digest
+    path: str
+
+
+@dataclass(frozen=True)
+class ModuleDescriptor:
+    import_path: str
+    name: str
+    version: str
+    indirect: bool
+    minimum_go_version: str | None
+
+
+@dataclass(frozen=True)
+class ModuleDescriptors:
+    modules: FrozenOrderedSet[ModuleDescriptor]
+    go_mods_digest: Digest
+
+
+@dataclass(frozen=True)
+class AnalyzeThirdPartyModuleRequest:
+    go_mod_digest: Digest
+    go_mod_path: str
+    import_path: str
+    name: str
+    version: str
+    minimum_go_version: str | None
+
+
+@dataclass(frozen=True)
+class AnalyzedThirdPartyModule:
+    packages: FrozenOrderedSet[ThirdPartyPkgAnalysis]
+
+
+@dataclass(frozen=True)
+class AnalyzeThirdPartyPackageRequest:
+    pkg_json: FrozenDict[str, Any]
+    module_sources_digest: Digest
+    module_sources_path: str
+    module_import_path: str
+    package_path: str
+    minimum_go_version: str | None
+
+
+@dataclass(frozen=True)
+class FallibleThirdPartyPkgAnalysis:
+    """Metadata for a third-party Go package, but fallible if our analysis failed."""
+
+    analysis: ThirdPartyPkgAnalysis | None
+    import_path: str
+    exit_code: int = 0
+    stderr: str | None = None
+
+
+@rule
+async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> ModuleDescriptors:
+    # List the modules used directly and indirectly by this module.
+    #
+    # This rule can't modify `go.mod` and `go.sum` as it would require mutating the workspace.
+    # Instead, we expect them to be well-formed already.
+    #
+    # Options used:
+    # - `-mod=readonly': It would be convenient to set `-mod=mod` to allow edits, and then compare the
+    #   resulting files to the input so that we could print a diff for the user to know how to update. But
+    #   `-mod=mod` results in more packages being downloaded and added to `go.mod` than is
+    #   actually necessary.
+    # TODO: nice error when `go.mod` and `go.sum` would need to change. Right now, it's a
+    #  message from Go and won't be intuitive for Pants users what to do.
+    # - `-e` is used to not fail if one of the modules is problematic. There may be some packages in the transitive
+    #   closure that cannot be built, but we should  not blow up Pants. For example, a package that sets the
+    #   special value `package documentation` and has no source files would naively error due to
+    #   `build constraints exclude all Go files`, even though we should not error on that package.
+    mod_list_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
+            input_digest=request.digest,
+            output_directories=("gopath",),
+            working_dir=request.path if request.path else None,
+            # Allow downloads of the module metadata (i.e., go.mod files).
+            allow_downloads=True,
+            description="Analyze Go module dependencies.",
+        ),
+    )
+
+    if len(mod_list_result.stdout) == 0:
+        return ModuleDescriptors(FrozenOrderedSet(), EMPTY_DIGEST)
+
+    descriptors: dict[tuple[str, str], ModuleDescriptor] = {}
+
+    for mod_json in ijson.items(mod_list_result.stdout, "", multiple_values=True):
+        # Skip the first-party module being analyzed.
+        if "Main" in mod_json and mod_json["Main"]:
+            continue
+
+        if "Replace" in mod_json:
+            # TODO: Reject local file path replacements? Gazelle does.
+            name = mod_json["Replace"]["Path"]
+            version = mod_json["Replace"]["Version"]
+        else:
+            name = mod_json["Path"]
+            version = mod_json["Version"]
+
+        descriptors[(name, version)] = ModuleDescriptor(
+            import_path=mod_json["Path"],
+            name=name,
+            version=version,
+            indirect=mod_json.get("Indirect", False),
+            minimum_go_version=mod_json.get("GoVersion"),
+        )
+
+    # TODO: Augment the modules with go.sum entries?
+    # Gazelle does this, mainly to store the sum on the go_repository rule. We could store it (or its
+    # absence) to be able to download sums automatically.
+
+    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), mod_list_result.output_digest)
+
+
+def strip_sandbox_prefix(path: str, marker: str) -> str:
+    """Strip a path prefix from a path using a marker string to find the start of the portion to not
+    strip. This is used to strip absolute paths used in the execution sandbox by `go`.
+
+    Note: The marker string is required because we cannot assume how the prefix will be formed since it
+    will differ depending on which execution environment is used (e.g, local or remote).
+    """
+    marker_pos = path.find(marker)
+    if marker_pos != -1:
+        return path[marker_pos:]
+    else:
+        return path
+
+
+def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
+    result = {}
+    for k, v in d.items():
+        if not isinstance(k, str):
+            raise AssertionError("Got non-`str` key for _freeze_json_dict.")
+
+        f: Any = None
+        if isinstance(v, list):
+            f = tuple(v)
+        elif isinstance(v, dict):
+            f = _freeze_json_dict(v)
+        elif isinstance(v, str) or isinstance(v, int):
+            f = v
+        else:
+            raise AssertionError(f"Unsupported value type for _freeze_json_dict: {type(v)}")
+        result[k] = f
+    return FrozenDict(result)
+
+
+@rule
+async def analyze_go_third_party_module(
+    request: AnalyzeThirdPartyModuleRequest,
+    analyzer: PackageAnalyzerSetup,
+) -> AnalyzedThirdPartyModule:
+    # Download the module.
+    download_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            ("mod", "download", "-json", f"{request.name}@{request.version}"),
+            input_digest=request.go_mod_digest,  # for go.sum
+            working_dir=os.path.dirname(request.go_mod_path) if request.go_mod_path else None,
+            # Allow downloads of the module sources.
+            allow_downloads=True,
+            output_directories=("gopath",),
+            description=f"Download Go module {request.name}@{request.version}.",
+        ),
+    )
+
+    if len(download_result.stdout) == 0:
+        raise AssertionError(
+            f"Expected output from `go mod download` for {request.name}@{request.version}."
+        )
+
+    module_metadata = json.loads(download_result.stdout)
+    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
+    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
+
+    # Subset the output directory to just the module sources and go.mod (which may be generated).
+    module_sources_snapshot = await Get(
+        Snapshot,
+        DigestSubset(
+            download_result.output_digest,
+            PathGlobs(
+                [f"{module_sources_relpath}/**", go_mod_relpath],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin=f"the download of Go module {request.name}@{request.version}",
+            ),
+        ),
+    )
+
+    # Determine directories with potential Go packages in them.
+    candidate_package_dirs = []
+    files_by_dir = group_by_dir(
+        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
+    )
+    for maybe_pkg_dir, files in files_by_dir.items():
+        # Skip directories where "testdata" would end up in the import path.
+        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
+        if "testdata" in maybe_pkg_dir.split("/"):
+            continue
+
+        # Consider directories with at least one `.go` file as package candidates.
+        if any(f for f in files if f.endswith(".go")):
+            candidate_package_dirs.append(maybe_pkg_dir)
+    candidate_package_dirs.sort()
+
+    # Analyze all of the packages in this module.
+    analyzer_relpath = "__analyzer"
+    analysis_result = await Get(
+        ProcessResult,
+        Process(
+            [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
+            input_digest=module_sources_snapshot.digest,
+            immutable_input_digests={
+                analyzer_relpath: analyzer.digest,
+            },
+            description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    if len(analysis_result.stdout) == 0:
+        return AnalyzedThirdPartyModule(FrozenOrderedSet())
+
+    package_analysis_gets = []
+    for pkg_path, pkg_json in zip(
+        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
+    ):
+        package_analysis_gets.append(
+            Get(
+                FallibleThirdPartyPkgAnalysis,
+                AnalyzeThirdPartyPackageRequest(
+                    pkg_json=_freeze_json_dict(pkg_json),
+                    module_sources_digest=module_sources_snapshot.digest,
+                    module_sources_path=module_sources_relpath,
+                    module_import_path=request.name,
+                    package_path=pkg_path,
+                    minimum_go_version=request.minimum_go_version,
+                ),
+            )
+        )
+    analyzed_packages_fallible = await MultiGet(package_analysis_gets)
+    analyzed_packages = [
+        pkg.analysis for pkg in analyzed_packages_fallible if pkg.analysis and pkg.exit_code == 0
+    ]
+    return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
+
+
+@rule
+async def analyze_go_third_party_package(
+    request: AnalyzeThirdPartyPackageRequest,
+) -> FallibleThirdPartyPkgAnalysis:
+    if not request.package_path.startswith(request.module_sources_path):
+        raise AssertionError(
+            "The path within GOPATH for a package in a module must always be prefixed by the path "
+            "to the applicable module's root directory. "
+            f"This was not the case however for module {request.module_import_path}.\n\n"
+            "This may be a bug in Pants. Please report this issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
+            f"package_path: {request.package_path}; module_sources_path: {request.module_sources_path}; "
+            f"module_import_path: {request.module_import_path}"
+        )
+    import_path_tail = request.package_path[len(request.module_sources_path) :].strip(os.sep)
+    if import_path_tail != "":
+        parts = import_path_tail.split(os.sep)
+        import_path = "/".join([request.module_import_path, *parts])
+    else:
+        import_path = request.module_import_path
+
+    if "Error" in request.pkg_json or "InvalidGoFiles" in request.pkg_json:
+        error = request.pkg_json.get("Error", "")
+        if error:
+            error += "\n"
+        if "InvalidGoFiles" in request.pkg_json:
+            error += "\n".join(
+                f"{filename}: {error}"
+                for filename, error in request.pkg_json.get("InvalidGoFiles", {}).items()
+            )
+            error += "\n"
+        return FallibleThirdPartyPkgAnalysis(
+            analysis=None, import_path=import_path, exit_code=1, stderr=error
+        )
+
+    maybe_error: GoThirdPartyPkgError | None = None
+
+    for key in (
+        "CgoFiles",
+        "CompiledGoFiles",
+        "CFiles",
+        "CXXFiles",
+        "MFiles",
+        "HFiles",
+        "FFiles",
+        "SwigFiles",
+        "SwigCXXFiles",
+        "SysoFiles",
+    ):
+        if key in request.pkg_json:
+            maybe_error = GoThirdPartyPkgError(
+                f"The third-party package {import_path} includes `{key}`, which Pants does "
+                "not yet support. Please open a feature request at "
+                "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+                "prioritize adding support. Please include this error message and the version of "
+                "the third-party module."
+            )
+
+    package_digest = await Get(
+        Digest,
+        DigestSubset(
+            request.module_sources_digest,
+            PathGlobs(
+                [os.path.join(request.package_path, "*")],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"the analysis of Go package {import_path}",
+            ),
+        ),
+    )
+
+    analysis = ThirdPartyPkgAnalysis(
+        digest=package_digest,
+        import_path=import_path,
+        dir_path=request.package_path,
+        imports=tuple(request.pkg_json.get("Imports", ())),
+        go_files=tuple(request.pkg_json.get("GoFiles", ())),
+        s_files=tuple(request.pkg_json.get("SFiles", ())),
+        minimum_go_version=request.minimum_go_version,
+        error=maybe_error,
+    )
+
+    return FallibleThirdPartyPkgAnalysis(
+        analysis=analysis,
+        import_path=import_path,
+        exit_code=0,
+        stderr=None,
+    )
+
+
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    # NB: We download all modules to GOPATH={chroot}/gopath. Running `go list ...` from {chroot}
-    # would naively try analyzing the contents of the GOPATH like they were first-party packages.
-    # This results in errors like this:
-    #
-    #   package <import_path>/gopath/pkg/mod/golang.org/x/text@v0.3.0/unicode: can only use
-    #   path@version syntax with 'go get' and 'go install' in module-aware mode
-    #
-    # Instead, we make sure we run `go list` from a subdirectory of the chroot. It can still
-    # access the contents of `GOPATH`, but won't incorrectly treat its contents as
-    # first-party packages.
-    go_mod_dir = os.path.dirname(request.go_mod_path)
-    if not go_mod_dir:
-        go_mod_dir = "go_mod_prefix"
-        go_mod_digest = await Get(Digest, AddPrefix(request.go_mod_digest, go_mod_dir))
-    else:
-        go_mod_digest = request.go_mod_digest
-
-    list_argv = (
-        "list",
-        # This rule can't modify `go.mod` and `go.sum` as it would require mutating the workspace.
-        # Instead, we expect them to be well-formed already.
-        #
-        # It would be convenient to set `-mod=mod` to allow edits, and then compare the resulting
-        # files to the input so that we could print a diff for the user to know how to update. But
-        # `-mod=mod` results in more packages being downloaded and added to `go.mod` than is
-        # actually necessary.
-        # TODO: nice error when `go.mod` and `go.sum` would need to change. Right now, it's a
-        #  message from Go and won't be intuitive for Pants users what to do.
-        "-mod=readonly",
-        # There may be some packages in the transitive closure that cannot be built, but we should
-        # not blow up Pants.
-        #
-        # For example, a package that sets the special value `package documentation` and has no
-        # source files would naively error due to `build constraints exclude all Go files`, even
-        # though we should not error on that package.
-        "-e",
-        "-json",
-        # This matches all packages. `all` only matches first-party packages and complains that
-        # there are no `.go` files.
-        "...",
-    )
-    list_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=list_argv,
-            description=f"Run `go list` to download {request.go_mod_path}",
-            input_digest=go_mod_digest,
-            output_directories=("gopath/pkg/mod",),
-            working_dir=go_mod_dir,
-            allow_downloads=True,
+    module_analysis = await Get(
+        ModuleDescriptors,
+        ModuleDescriptorsRequest(
+            digest=request.go_mod_digest,
+            path=os.path.dirname(request.go_mod_path),
         ),
     )
-    stripped_result_digest = await Get(
-        Digest, RemovePrefix(list_result.output_digest, "gopath/pkg/mod")
+
+    go_mod_digest = await Get(
+        Digest, MergeDigests([request.go_mod_digest, module_analysis.go_mods_digest])
     )
 
-    all_digest_subset_gets = []
-    all_pkg_info_kwargs = []
-    all_failed_pkg_info = []
-    for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):
-        if "Standard" in pkg_json:
-            continue
-        import_path = pkg_json["ImportPath"]
-
-        maybe_error, maybe_failed_pkg_info = maybe_raise_or_create_error_or_create_failed_pkg_info(
-            pkg_json, import_path
+    analyzed_modules = await MultiGet(
+        Get(
+            AnalyzedThirdPartyModule,
+            AnalyzeThirdPartyModuleRequest(
+                go_mod_digest=go_mod_digest,
+                go_mod_path=request.go_mod_path,
+                import_path=mod.name,
+                name=mod.name,
+                version=mod.version,
+                minimum_go_version=mod.minimum_go_version,
+            ),
         )
-        if maybe_failed_pkg_info:
-            all_failed_pkg_info.append(maybe_failed_pkg_info)
-            continue
+        for mod in module_analysis.modules
+    )
 
-        dir_path = strip_prefix(strip_v2_chroot_path(pkg_json["Dir"]), "gopath/pkg/mod/")
-        all_pkg_info_kwargs.append(
-            dict(
-                import_path=import_path,
-                dir_path=dir_path,
-                imports=tuple(pkg_json.get("Imports", ())),
-                go_files=tuple(pkg_json.get("GoFiles", ())),
-                s_files=tuple(pkg_json.get("SFiles", ())),
-                minimum_go_version=pkg_json.get("Module", {}).get("GoVersion"),
-                error=maybe_error,
-            )
-        )
-        all_digest_subset_gets.append(
-            Get(
-                Digest,
-                DigestSubset(
-                    stripped_result_digest,
-                    PathGlobs(
-                        [os.path.join(dir_path, "*")],
-                        glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                        description_of_origin=f"downloading {import_path}",
-                    ),
-                ),
-            )
-        )
-
-    all_digest_subsets = await MultiGet(all_digest_subset_gets)
     import_path_to_info = {
-        pkg_info_kwargs["import_path"]: ThirdPartyPkgInfo(digest=digest_subset, **pkg_info_kwargs)
-        for pkg_info_kwargs, digest_subset in zip(all_pkg_info_kwargs, all_digest_subsets)
+        pkg.import_path: pkg
+        for analyzed_module in analyzed_modules
+        for pkg in analyzed_module.packages
     }
-    import_path_to_info.update((pkg_info.import_path, pkg_info) for pkg_info in all_failed_pkg_info)
-    return AllThirdPartyPackages(list_result.output_digest, FrozenDict(import_path_to_info))
+
+    return AllThirdPartyPackages(EMPTY_DIGEST, FrozenDict(import_path_to_info))
 
 
 @rule
-async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyPkgInfo:
+async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
@@ -218,7 +496,7 @@ async def extract_package_info(request: ThirdPartyPkgInfoRequest) -> ThirdPartyP
 
 def maybe_raise_or_create_error_or_create_failed_pkg_info(
     go_list_json: dict, import_path: str
-) -> tuple[GoThirdPartyPkgError | None, ThirdPartyPkgInfo | None]:
+) -> tuple[GoThirdPartyPkgError | None, ThirdPartyPkgAnalysis | None]:
     """Error for unrecoverable errors, otherwise lazily create an error or `ThirdPartyPkgInfo` for
     recoverable errors.
 
@@ -247,7 +525,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             f"that we can figure out how to support this:"
             f"\n\n{go_list_json}"
         )
-        return None, ThirdPartyPkgInfo(
+        return None, ThirdPartyPkgAnalysis(
             import_path=import_path,
             dir_path="",
             digest=EMPTY_DIGEST,
@@ -270,31 +548,11 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             None,
         )
 
-    for key in (
-        "CgoFiles",
-        "CompiledGoFiles",
-        "CFiles",
-        "CXXFiles",
-        "MFiles",
-        "HFiles",
-        "FFiles",
-        "SwigFiles",
-        "SwigCXXFiles",
-        "SysoFiles",
-    ):
-        if key in go_list_json:
-            return (
-                GoThirdPartyPkgError(
-                    f"The third-party package {import_path} includes `{key}`, which Pants does "
-                    "not yet support. Please open a feature request at "
-                    "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-                    "prioritize adding support. Please include this error message and the version of "
-                    "the third-party module."
-                ),
-                None,
-            )
     return None, None
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *pkg_analyzer.rules(),
+    )

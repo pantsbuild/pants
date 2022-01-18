@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
+from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -20,17 +21,15 @@ from pants.engine.process import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
+from pants.jvm.goals import lockfile
+from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import (
-    JvmToolLockfileRequest,
-    JvmToolLockfileSentinel,
-    ValidatedJvmToolLockfileRequest,
-)
+from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
@@ -44,8 +43,8 @@ class ScalatestTestFieldSet(TestFieldSet):
     sources: ScalatestTestSourceField
 
 
-class ScalatestToolLockfileSentinel(JvmToolLockfileSentinel):
-    resolve_name = Scalatest.options_scope
+class ScalatestToolLockfileSentinel(ToolLockfileSentinel):
+    options_scope = Scalatest.options_scope
 
 
 @dataclass(frozen=True)
@@ -172,13 +171,14 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 @rule
 async def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(scalatest)
+) -> JvmLockfileRequest:
+    return JvmLockfileRequest.from_tool(scalatest)
 
 
 def rules():
     return [
         *collect_rules(),
+        *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
-        UnionRule(JvmToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        UnionRule(ToolLockfileSentinel, ScalatestToolLockfileSentinel),
     ]

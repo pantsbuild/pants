@@ -3,42 +3,21 @@
 from __future__ import annotations
 
 import importlib.resources
-import logging
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Sequence, cast
+from typing import ClassVar, cast
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    FileContent,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-    Workspace,
-)
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
-from pants.engine.unions import UnionMembership, union
-from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
-from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-
-DEFAULT_TOOL_LOCKFILE = "<default>"
-
-
-logger = logging.getLogger(__name__)
 
 
 class JvmToolBase(Subsystem):
@@ -125,110 +104,10 @@ class JvmToolBase(Subsystem):
         return CoursierResolvedLockfile.from_serialized(lockfile_content)
 
 
-@union
-class JvmToolLockfileSentinel:
-    resolve_name: ClassVar[str]
-
-
-@dataclass(frozen=True)
-class JvmToolLockfileRequest:
-    artifact_inputs: FrozenOrderedSet[str]
-    resolve_name: str
-    lockfile_dest: str
-
-    @classmethod
-    def from_tool(cls, tool: JvmToolBase) -> JvmToolLockfileRequest:
-        lockfile_dest = tool.lockfile
-        if lockfile_dest == DEFAULT_TOOL_LOCKFILE:
-            raise ValueError(
-                f"Internal error: Request to write tool lockfile but `[{tool.options_scope}.lockfile]` "
-                f'is set to the default ("{DEFAULT_TOOL_LOCKFILE}").'
-            )
-        return cls(
-            artifact_inputs=FrozenOrderedSet(tool.artifact_inputs),
-            resolve_name=tool.options_scope,
-            lockfile_dest=tool.lockfile,
-        )
-
-
-@dataclass(frozen=True)
-class JvmToolLockfile:
-    digest: Digest
-    resolve_name: str
-    path: str
-
-
 @dataclass(frozen=True)
 class GatherJvmCoordinatesRequest:
     artifact_inputs: FrozenOrderedSet[str]
     option_name: str
-
-
-class GenerateJvmLockfilesSubsystem(GoalSubsystem):
-    name = "jvm-generate-lockfiles"
-    help = "Generate lockfiles for JVM tools third-party dependencies."
-    required_union_implementations = (JvmToolLockfileSentinel,)
-
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--resolve",
-            type=list,
-            member_type=str,
-            advanced=False,
-            help=(
-                "Only generate lockfiles for the specified resolve(s).\n\n"
-                "Resolves are the logical names for tool lockfiles which are "
-                "the options scope for that tool such as `junit`.\n\n"
-                "For example, you can run `./pants jvm-generate-lockfiles --resolve=junit "
-                "to only generate lockfiles for the `junit` tool.\n\n"
-                "If you specify an invalid resolve name, like 'fake', Pants will output all "
-                "possible values.\n\n"
-                "If not specified, Pants will generate lockfiles for all resolves."
-            ),
-        )
-
-    @property
-    def resolve_names(self) -> tuple[str, ...]:
-        return tuple(self.options.resolve)
-
-
-class GenerateJvmLockfilesGoal(Goal):
-    subsystem_cls = GenerateJvmLockfilesSubsystem
-
-
-@goal_rule
-async def generate_lockfiles_goal(
-    workspace: Workspace,
-    union_membership: UnionMembership,
-    generate_lockfiles_subsystem: GenerateJvmLockfilesSubsystem,
-) -> GenerateJvmLockfilesGoal:
-    specified_tool_sentinels = determine_resolves_to_generate(
-        union_membership[JvmToolLockfileSentinel],
-        generate_lockfiles_subsystem.resolve_names,
-    )
-
-    specified_tool_requests = await MultiGet(
-        Get(JvmToolLockfileRequest, JvmToolLockfileSentinel, sentinel())
-        for sentinel in specified_tool_sentinels
-    )
-
-    applicable_tool_requests = filter_tool_lockfile_requests(
-        specified_tool_requests,
-        resolve_specified=bool(generate_lockfiles_subsystem.resolve_names),
-    )
-
-    results = await MultiGet(
-        Get(JvmToolLockfile, JvmToolLockfileRequest, req) for req in applicable_tool_requests
-    )
-
-    merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
-    workspace.write_digest(merged_digest)
-    for result in results:
-        logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
-
-    return GenerateJvmLockfilesGoal(exit_code=0)
 
 
 @rule
@@ -283,54 +162,6 @@ async def gather_coordinates_for_jvm_lockfile(
     return ArtifactRequirements(requirements)
 
 
-@rule
-async def load_jvm_lockfile(
-    request: JvmToolLockfileRequest,
-) -> CoursierResolvedLockfile:
-    """Loads an existing lockfile."""
-
-    if not request.artifact_inputs:
-        return CoursierResolvedLockfile(entries=())
-
-    lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
-    if not lockfile_snapshot.files:
-        raise ValueError(
-            f"JVM tool `{request.resolve_name}` does not have a lockfile generated. "
-            f"Run `{GenerateJvmLockfilesSubsystem.name} --resolve={request.resolve_name}` to "
-            "generate it."
-        )
-
-    resolved_lockfile = await Get(
-        CoursierResolvedLockfile,
-        CoursierResolveKey(
-            name=request.resolve_name, path=request.lockfile_dest, digest=lockfile_snapshot.digest
-        ),
-    )
-
-    return resolved_lockfile
-
-
-@rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
-async def generate_jvm_lockfile(
-    request: JvmToolLockfileRequest,
-) -> JvmToolLockfile:
-    requirements = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(request.artifact_inputs, f"[{request.resolve_name}].artifacts"),
-    )
-    resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, requirements)
-    lockfile_content = resolved_lockfile.to_serialized()
-    metadata = JVMLockfileMetadata.new(requirements)
-    lockfile_content = metadata.add_header_to_lockfile(
-        lockfile_content, regenerate_command="./pants jvm-generate-lockfiles"
-    )
-
-    lockfile_digest = await Get(
-        Digest, CreateDigest([FileContent(request.lockfile_dest, lockfile_content)])
-    )
-    return JvmToolLockfile(lockfile_digest, request.resolve_name, request.lockfile_dest)
-
-
 @frozen_after_init
 @dataclass
 class ValidatedJvmToolLockfileRequest:
@@ -369,65 +200,5 @@ async def validate_jvm_lockfile(
     return lockfile
 
 
-def determine_resolves_to_generate(
-    all_tool_sentinels: Iterable[type[JvmToolLockfileSentinel]],
-    requested_resolve_names: Sequence[str],
-) -> list[type[JvmToolLockfileSentinel]]:
-    """Apply the `--resolve` option to determine which resolves are specified.
-
-    Return the tool_lockfile_sentinels to operate on.
-    """
-    resolve_names_to_sentinels = {
-        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
-    }
-
-    if not requested_resolve_names:
-        return list(all_tool_sentinels)
-
-    specified_sentinels = []
-    unrecognized_resolve_names = []
-    for resolve_name in requested_resolve_names:
-        sentinel = resolve_names_to_sentinels.get(resolve_name)
-        if sentinel:
-            specified_sentinels.append(sentinel)
-        else:
-            unrecognized_resolve_names.append(resolve_name)
-
-    if unrecognized_resolve_names:
-        raise UnrecognizedResolveNamesError(
-            unrecognized_resolve_names,
-            set(resolve_names_to_sentinels.keys()),
-            description_of_origin="the option `--jvm-generate-lockfiles-resolve`",
-        )
-
-    return specified_sentinels
-
-
-def filter_tool_lockfile_requests(
-    specified_requests: Sequence[JvmToolLockfileRequest], *, resolve_specified: bool
-) -> list[JvmToolLockfileRequest]:
-    result = []
-    for req in specified_requests:
-        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
-            result.append(req)
-            continue
-        if resolve_specified:
-            resolve = req.resolve_name
-            raise ValueError(
-                f"You requested to generate a lockfile for {resolve} because "
-                "you included it in `--jvm-generate-lockfiles-resolve`, but "
-                f"`[{resolve}].lockfile` is set to `{req.lockfile_dest}` "
-                "so a lockfile will not be generated.\n\n"
-                f"If you would like to generate a lockfile for {resolve}, please "
-                f"set `[{resolve}].lockfile` to the path where it should be "
-                "generated and run again."
-            )
-
-    return result
-
-
 def rules():
-    return [
-        *collect_rules(),
-        *coursier_fetch.rules(),
-    ]
+    return collect_rules()
