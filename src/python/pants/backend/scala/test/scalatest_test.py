@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
 
 import pytest
 
@@ -71,18 +72,17 @@ def rule_runner() -> RuleRunner:
 @maybe_skip_jdk_test
 def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest = rule_runner.request(Scalatest, [])
+    scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(
-                scalatest.resolved_lockfile()
-            ).serialize(),
+            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(scalatest.resolved_lockfile()).serialize([ArtifactRequirement(coordinate=scalatest_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'org.scalatest_scalatest',
-                  group = 'org.scalatest',
-                  artifact = 'scalatest_2.13',
-                  version = '3.2.10',
+                  group = '{scalatest_coord.group}',
+                  artifact = '{scalatest_coord.artifact}',
+                  version = '{scalatest_coord.version}',
                 )
 
                 scalatest_tests(

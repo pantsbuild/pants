@@ -21,7 +21,7 @@ from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import CompileResult, FallibleClasspathEntry
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -216,10 +216,11 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
+    joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
     resolved_joda_lockfile = TCoursierResolvedLockfile.new(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(group="joda-time", artifact="joda-time", version="2.10.10"),
+                coord=joda_coord,
                 file_name="joda-time-2.10.10.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -233,12 +234,12 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                     name = "joda-time_joda-time",
-                    group = "joda-time",
-                    artifact = "joda-time",
-                    version = "2.10.10",
+                    group = "{joda_coord.group}",
+                    artifact = "{joda_coord.artifact}",
+                    version = "{joda_coord.version}",
                 )
                 scala_sources(
                     name = 'main',
@@ -246,7 +247,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize([ArtifactRequirement(coordinate=joda_coord)]),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -372,15 +373,16 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
 
 @maybe_skip_jdk_test
 def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
+    acyclic_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                     name = "acyclic_lib",
-                    group = "com.lihaoyi",
-                    artifact = "acyclic_2.13",
-                    version = "0.2.1",
+                    group = "{acyclic_coord.group}",
+                    artifact = "{acyclic_coord.artifact}",
+                    version = "{acyclic_coord.version}",
                     packages=["acyclic.**"],
                 )
 
@@ -397,9 +399,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
             "3rdparty/jvm/default.lock": TCoursierResolvedLockfile.new(
                 entries=(
                     CoursierLockfileEntry(
-                        coord=Coordinate(
-                            group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1"
-                        ),
+                        coord=acyclic_coord,
                         file_name="acyclic_2.13-0.2.1.jar",
                         direct_dependencies=Coordinates([]),
                         dependencies=Coordinates([]),
@@ -409,7 +409,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                         ),
                     ),
                 )
-            ).serialize(),
+            ).serialize([ArtifactRequirement(coordinate=acyclic_coord)]),
             "lib/A.scala": dedent(
                 """
                 package lib

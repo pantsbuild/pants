@@ -23,7 +23,7 @@ from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -120,18 +120,18 @@ JUNIT4_RESOLVED_LOCKFILE = TCoursierResolvedLockfile.new(
 
 @maybe_skip_jdk_test
 def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'junit_junit',
-                  group = 'junit',
-                  artifact = 'junit',
-                  version = '4.13.2',
+                  group = '{junit_coord.group}',
+                  artifact = '{junit_coord.artifact}',
+                  version = '{junit_coord.version}',
                 )
-
                 junit_tests(
                     name='example-test',
                     dependencies= [
@@ -167,16 +167,17 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'junit_junit',
-                  group = 'junit',
-                  artifact = 'junit',
-                  version = '4.13.2',
+                  group = '{junit_coord.group}',
+                  artifact = '{junit_coord.artifact}',
+                  version = '{junit_coord.version}',
                 )
                 junit_tests(
                     name='example-test',
@@ -222,16 +223,17 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'junit_junit',
-                  group = 'junit',
-                  artifact = 'junit',
-                  version = '4.13.2',
+                  group = '{junit_coord.group}',
+                  artifact = '{junit_coord.artifact}',
+                  version = '{junit_coord.version}',
                 )
 
                 java_sources(
@@ -286,16 +288,17 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
+    junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'junit_junit',
-                  group = 'junit',
-                  artifact = 'junit',
-                  version = '4.13.2',
+                  group = '{junit_coord.group}',
+                  artifact = '{junit_coord.artifact}',
+                  version = '{junit_coord.version}',
                 )
 
                 scala_junit_tests(
@@ -425,16 +428,17 @@ JUNIT5_RESOLVED_LOCKFILE = TCoursierResolvedLockfile.new(
 
 @maybe_skip_jdk_test
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
+    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
-                  name='org.junit.jupiter_junit-jupiter-api',
-                  group='org.junit.jupiter',
-                  artifact='junit-jupiter-api',
-                  version='5.7.2',
+                  name = 'org.junit.jupiter_junit-jupiter-api',
+                  group = '{jupiter_coord.group}',
+                  artifact = '{jupiter_coord.artifact}',
+                  version = '{jupiter_coord.version}',
                 )
 
                 junit_tests(
@@ -475,16 +479,17 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
+    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
-                  name='org.junit.jupiter_junit-jupiter-api',
-                  group='org.junit.jupiter',
-                  artifact='junit-jupiter-api',
-                  version='5.7.2',
+                  name = 'org.junit.jupiter_junit-jupiter-api',
+                  group = '{jupiter_coord.group}',
+                  artifact = '{jupiter_coord.artifact}',
+                  version = '{jupiter_coord.version}',
                 )
                 junit_tests(
                     name='example-test',
@@ -531,16 +536,17 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
+    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
-                  name='org.junit.jupiter_junit-jupiter-api',
-                  group='org.junit.jupiter',
-                  artifact='junit-jupiter-api',
-                  version='5.7.2',
+                  name = 'org.junit.jupiter_junit-jupiter-api',
+                  group = '{jupiter_coord.group}',
+                  artifact = '{jupiter_coord.artifact}',
+                  version = '{jupiter_coord.version}',
                 )
 
                 java_sources(

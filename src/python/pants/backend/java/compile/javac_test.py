@@ -25,7 +25,7 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals.coursier import rules as coursier_rules
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -582,10 +582,11 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
-    resolved_joda_lockfile = CoursierResolvedLockfile(
+    joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
+    resolved_joda_lockfile = TCoursierResolvedLockfile.new(
         entries=(
             CoursierLockfileEntry(
-                coord=Coordinate(group="joda-time", artifact="joda-time", version="2.10.10"),
+                coord=joda_coord,
                 file_name="joda-time-2.10.10.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
@@ -616,9 +617,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(
-                resolved_joda_lockfile
-            ).serialize(),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize([ArtifactRequirement(coordinate=joda_coord)]),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
