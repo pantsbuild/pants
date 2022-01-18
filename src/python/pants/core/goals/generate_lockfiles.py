@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.engine.collection import Collection
@@ -131,22 +133,77 @@ class UnrecognizedResolveNamesError(Exception):
         )
 
 
+class _ResolveProviderType(Enum):
+    TOOL = 1
+    USER = 2
+
+
+@dataclass(frozen=True, order=True)
+class _ResolveProvider:
+    option_name: str
+    type_: _ResolveProviderType
+
+
 class AmbiguousResolveNamesError(Exception):
-    def __init__(self, ambiguous_names: list[str]) -> None:
-        if len(ambiguous_names) == 1:
-            first_paragraph = (
-                "A resolve name from the option `[python].experimental_resolves` collides with the "
-                f"name of a tool resolve: {ambiguous_names[0]}"
-            )
+    def __init__(self, ambiguous_name: str, providers: set[_ResolveProvider]) -> None:
+        tool_providers = []
+        user_providers = []
+        for provider in sorted(providers):
+            if provider.type_ == _ResolveProviderType.TOOL:
+                tool_providers.append(provider.option_name)
+            else:
+                user_providers.append(provider.option_name)
+
+        if tool_providers:
+            if not user_providers:
+                raise AssertionError(
+                    f"{len(tool_providers)} tools have the same options_scope: {ambiguous_name}. "
+                    "If you're writing a plugin, rename your `ToolLockfileSentinel`s so that "
+                    "there is no ambiguity. Otherwise, please open a bug at "
+                    "https://github.com/pantsbuild/pants/issues/new."
+                )
+            if len(user_providers) == 1:
+                msg = (
+                    f"A resolve name from the option `{user_providers[0]}` collides with the "
+                    f"name of a tool resolve: {ambiguous_name}\n\n"
+                    f"To fix, please update `{user_providers[0]}` to use a different resolve name."
+                )
+            else:
+                msg = (
+                    f"Multiple options define the resolve name `{ambiguous_name}`, but it is "
+                    f"already claimed by a tool: {user_providers}\n\n"
+                    f"To fix, please update these options so that none of them use "
+                    f"`{ambiguous_name}`."
+                )
         else:
-            first_paragraph = (
-                "Some resolve names from the option `[python].experimental_resolves` collide with "
-                f"the names of tool resolves: {sorted(ambiguous_names)}"
+            assert len(user_providers) > 1
+            msg = (
+                f"The same resolve name `{ambiguous_name}` is used by multiple options, which "
+                f"causes ambiguity: {user_providers}\n\n"
+                f"To fix, please update these options so that `{ambiguous_name}` is not used more "
+                f"than once."
             )
-        super().__init__(
-            f"{first_paragraph}\n\n"
-            "To fix, please update `[python].experimental_resolves` to use different resolve names."
+        super().__init__(msg)
+
+
+def _check_ambiguous_resolve_names(
+    all_known_user_resolve_names: Iterable[KnownUserResolveNames],
+    all_tool_sentinels: Iterable[type[ToolLockfileSentinel]],
+) -> None:
+    resolve_name_to_providers = defaultdict(set)
+    for sentinel in all_tool_sentinels:
+        resolve_name_to_providers[sentinel.options_scope].add(
+            _ResolveProvider(sentinel.options_scope, _ResolveProviderType.TOOL)
         )
+    for known_user_resolve_names in all_known_user_resolve_names:
+        for resolve_name in known_user_resolve_names.names:
+            resolve_name_to_providers[resolve_name].add(
+                _ResolveProvider(known_user_resolve_names.option_name, _ResolveProviderType.USER)
+            )
+
+    for resolve_name, providers in resolve_name_to_providers.items():
+        if len(providers) > 1:
+            raise AmbiguousResolveNamesError(resolve_name, providers)
 
 
 def determine_resolves_to_generate(
@@ -158,6 +215,8 @@ def determine_resolves_to_generate(
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
     """
+    _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
+
     resolve_names_to_sentinels = {
         sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
     }
