@@ -456,13 +456,22 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     # TODO: Loading this per JvmArtifact.
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
+    requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+        raise ValueError(
+            f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
+            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            "lockfile based on the new requirements."
+        )
+
     # All of the transitive dependencies are exported.
     # TODO: Expose an option to control whether this exports only the root, direct dependencies,
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
         request.resolve,
-        ArtifactRequirement.from_jvm_artifact_target(request.component.representative).coordinate,
+        requirement.coordinate,
     )
 
     classpath_entries = await MultiGet(

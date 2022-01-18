@@ -124,7 +124,7 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidJVMLockfileReason] = set()
 
-        if self.requirements != FrozenOrderedSet(i.to_metadata_str() for i in requirements or []):
+        if not self.requirements.issuperset(i.to_metadata_str() for i in requirements or []):
             failure_reasons.add(InvalidJVMLockfileReason.REQUIREMENTS_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)
