@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from functools import partial
-from os import path
 from textwrap import dedent
 from typing import Iterator
 
@@ -86,9 +86,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     ) -> str:
         repository_context = DockerInterpolationContext.from_dict(
             {
-                "directory": path.basename(self.address.spec_path),
+                "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
-                "parent_directory": path.basename(path.dirname(self.address.spec_path)),
+                "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 **interpolation_context,
             }
         )
@@ -161,8 +161,8 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         else:
             context_root = default_context_root
         if context_root == "." or context_root.startswith("./"):
-            context_root = path.join(self.address.spec_path, context_root)
-        return path.normpath(context_root)
+            context_root = os.path.join(self.address.spec_path, context_root)
+        return os.path.normpath(context_root)
 
 
 def get_build_options(
@@ -297,7 +297,7 @@ def format_docker_build_context_help_message(
         instruction_path, context_path = paths
         if not context_path:
             return paths
-        dst = path.relpath(context_path, context_root)
+        dst = os.path.relpath(context_path, context_root)
         if dst.startswith("../"):
             paths_outside_context_root.append(context_path)
             return ("", "")
@@ -346,9 +346,9 @@ def format_docker_build_context_help_message(
         )
 
     if paths_outside_context_root:
-        unreachable = sorted({path.dirname(pth) for pth in paths_outside_context_root})
+        unreachable = sorted({os.path.dirname(pth) for pth in paths_outside_context_root})
         context_paths = tuple(dst for src, dst in context.copy_source_vs_context_source if dst)
-        new_context_root = path.commonpath(context_paths)
+        new_context_root = os.path.commonpath(context_paths)
         msg += (
             "There are unreachable files in these directories, excluded from the build context "
             f"due to `context_root` being {context_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
