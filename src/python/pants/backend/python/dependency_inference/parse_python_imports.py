@@ -74,7 +74,7 @@ async def parse_python_imports(request: ParsePythonImportsRequest) -> ParsedPyth
     # default for decode(), we make that explicit here for emphasis.
     process_output = process_result.stdout.decode("utf8") or "{}"
     return ParsedPythonImports(
-        {imp: ParsedPythonImportInfo(**info) for imp, info in json.loads(process_output).items()}
+        (imp, ParsedPythonImportInfo(**info)) for imp, info in json.loads(process_output).items()
     )
 
 
