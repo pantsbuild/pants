@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
 
 import pytest
 
@@ -26,6 +25,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
@@ -75,7 +75,9 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(scalatest.resolved_lockfile()).serialize([ArtifactRequirement(coordinate=scalatest_coord)]),
+            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile(
+                scalatest.resolved_lockfile()
+            ).serialize([ArtifactRequirement(coordinate=scalatest_coord)]),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(

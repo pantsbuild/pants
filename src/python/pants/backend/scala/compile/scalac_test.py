@@ -247,7 +247,9 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize([ArtifactRequirement(coordinate=joda_coord)]),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(
+                [ArtifactRequirement(coordinate=joda_coord)]
+            ),
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example

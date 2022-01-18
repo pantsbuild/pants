@@ -123,7 +123,9 @@ def test_vintage_simple_success(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=junit_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -170,7 +172,9 @@ def test_vintage_simple_failure(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=junit_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -226,7 +230,9 @@ def test_vintage_success_with_dep(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=junit_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -291,7 +297,9 @@ def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
     junit_coord = Coordinate(group="junit", artifact="junit", version="4.13.2")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=junit_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=junit_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -428,10 +436,14 @@ JUNIT5_RESOLVED_LOCKFILE = TCoursierResolvedLockfile.new(
 
 @maybe_skip_jdk_test
 def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
-    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
+    jupiter_coord = Coordinate(
+        group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2"
+    )
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=jupiter_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -479,10 +491,14 @@ def test_jupiter_simple_success(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
-    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
+    jupiter_coord = Coordinate(
+        group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2"
+    )
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=jupiter_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
@@ -536,10 +552,14 @@ def test_jupiter_simple_failure(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
-    jupiter_coord = Coordinate(group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2")
+    jupiter_coord = Coordinate(
+        group="org.junit.jupiter", artifact="junit-jupiter-api", version="5.7.2"
+    )
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize([ArtifactRequirement(coordinate=jupiter_coord)]),
+            "3rdparty/jvm/default.lock": JUNIT5_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=jupiter_coord)]
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(

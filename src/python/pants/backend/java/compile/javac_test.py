@@ -26,7 +26,7 @@ from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals.coursier import rules as coursier_rules
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
@@ -617,7 +617,9 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize([ArtifactRequirement(coordinate=joda_coord)]),
+            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(
+                [ArtifactRequirement(coordinate=joda_coord)]
+            ),
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
