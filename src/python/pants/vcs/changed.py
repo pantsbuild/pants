@@ -116,10 +116,5 @@ class Changed(Subsystem):
         )
 
 
-@rule
-async def get_dependees_flag_options(changed: Changed) -> DependeesFlagOption:
-    return changed.options.dependees
-
-
 def rules():
     return [*collect_rules(), *dependees.rules()]

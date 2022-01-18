@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, DependeesOption, LintRequest, LintResult, LintResults
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -38,7 +38,6 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
-from pants.vcs.changed import DependeesOption
 
 
 @dataclass(frozen=True)

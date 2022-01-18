@@ -12,19 +12,20 @@ from typing import Any, Iterable, cast
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.core.goals.style_request import StyleRequest, write_reports
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import Targets, UnexpandedTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
-from pants.vcs.changed import DependeesFlagOption
+from pants.vcs.changed import Changed, DependeesFlagOption
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,7 @@ async def lint(
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
-    dependees_flag: DependeesFlagOption,
+    changed: Changed,
 ) -> Lint:
     request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
     requests = []
@@ -202,10 +203,10 @@ async def lint(
         requires_dependees = request_type.requires_dependees
         request_targets = list(targets)
         if (
-            dependees_flag == DependeesFlagOption.IMPLICIT
+            changed.options.dependees == DependeesFlagOption.IMPLICIT
             and requires_dependees != DependeesOption.NONE
         ):
-            additional_targets = await Get(
+            dependees = await Get(
                 Dependees,
                 DependeesRequest(
                     (target.address for target in targets),
@@ -213,7 +214,9 @@ async def lint(
                     include_roots=False,
                 ),
             )
-            request_targets.extend(additional_targets)
+            unexp_targets = await Get(UnexpandedTargets, Addresses(dependees))
+            targets = await Get(Targets, UnexpandedTargets, unexp_targets)
+            request_targets.extend(targets)
 
         requests.append(
             request_type(
