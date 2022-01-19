@@ -230,7 +230,10 @@ async def lint(
             for request in requests
             if request.field_sets
             for field_set_batch in partition_sequentially(
-                request.field_sets, key=address_str, size_min=lint_subsystem.batch_size
+                request.field_sets,
+                key=address_str,
+                size_target=lint_subsystem.batch_size,
+                size_max=4 * lint_subsystem.batch_size,
             )
         )
 

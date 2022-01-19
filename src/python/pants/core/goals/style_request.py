@@ -26,7 +26,7 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 def style_batch_size_help(uppercase: str, lowercase: str) -> str:
     return (
-        f"The target minimum number of files that will be included in each {lowercase} batch.\n"
+        f"The target number of files to be included in each {lowercase} batch.\n"
         "\n"
         f"{uppercase} processes are batched for a few reasons:\n"
         "\n"
@@ -38,6 +38,9 @@ def style_batch_size_help(uppercase: str, lowercase: str) -> str:
         "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
         "behavior when multiple processes are competing for cores and so internal "
         "parallelism cannot be used perfectly.\n"
+        "\n"
+        "In order to improve cache hit rates (see 2.), batches are created at stable boundaries, "
+        'and so this value is only a "target" batch size (rather than an exact value).'
     )
 
 

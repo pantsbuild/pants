@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
+import logging
 from dataclasses import dataclass
 
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
@@ -19,9 +20,16 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -62,6 +70,9 @@ async def setup_google_java_format(
     jdk_setup: JdkSetup,
     bash: BashBinary,
 ) -> Setup:
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
+
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
@@ -70,7 +81,7 @@ async def setup_google_java_format(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(tool.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
     )

@@ -80,31 +80,32 @@ def partition_sequentially(
     items: Iterable[_T],
     *,
     key: Callable[[_T], str],
-    size_min: int,
+    size_target: int,
     size_max: int | None = None,
 ) -> Iterator[list[_T]]:
-    """Stably partitions the given items into batches of at least size_min.
+    """Stably partitions the given items into batches of around `size_target` items.
 
     The "stability" property refers to avoiding adjusting all batches when a single item is added,
     which could happen if the items were trivially windowed using `itertools.islice` and an
     item was added near the front of the list.
 
-    Batches will be capped to `size_max`, which defaults `size_min*2`.
+    Batches will optionally be capped to `size_max`, but note that this can weaken the stability
+    properties of the bucketing, by forcing bucket boundaries to be created where they otherwise
+    might not.
     """
 
-    # To stably partition the arguments into ranges of at least `size_min`, we sort them, and
-    # create a new batch sequentially once we have the minimum number of entries, _and_ we encounter
-    # an item hash prefixed with a threshold of zeros.
+    # To stably partition the arguments into ranges of approximately `size_target`, we sort them,
+    # and create a new batch sequentially once we encounter an item hash prefixed with a threshold
+    # of zeros.
     #
     # The hashes act like a (deterministic) series of rolls of an evenly distributed die. The
     # probability of a hash prefixed with Z zero bits is 1/2^Z, and so to break after N items on
     # average, we look for `Z == log2(N)` zero bits.
     #
-    # Breaking on these deterministic boundaries means that adding any single item will affect
-    # either one bucket (if the item does not create a boundary) or two (if it does create a
-    # boundary).
-    zero_prefix_threshold = math.log(max(4, size_min) // 4, 2)
-    size_max = size_min * 2 if size_max is None else size_max
+    # Breaking on these deterministic boundaries reduces the chance that adding or removing items
+    # causes multiple buckets to be recalculated. But when a `size_max` value is set, it's possible
+    # for adding items to cause multiple sequential buckets to be affected.
+    zero_prefix_threshold = math.log(max(1, size_target), 2)
 
     batch: list[_T] = []
 
@@ -121,10 +122,8 @@ def partition_sequentially(
 
     for item_key, item in keyed_items:
         batch.append(item)
-        if (
-            len(batch) >= size_min
-            and native_engine.hash_prefix_zero_bits(item_key) >= zero_prefix_threshold
-        ) or (len(batch) >= size_max):
+        prefix_zero_bits = native_engine.hash_prefix_zero_bits(item_key)
+        if prefix_zero_bits >= zero_prefix_threshold or (size_max and len(batch) >= size_max):
             yield emit_batch()
     if batch:
         yield emit_batch()
