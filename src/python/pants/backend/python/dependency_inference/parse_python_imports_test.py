@@ -122,6 +122,13 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         __import__(
             "also_not_ignored_but_looks_like_it_could_be"
         )  # pants: ignore
+
+        try:
+            import maybe_exists1
+        except ImportError:
+            import should_exist1
+
+
         """
     )
     assert_imports_parsed(
@@ -140,11 +147,13 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
             "multiline_import2.not_ignored": ImpInfo(lineno=26, weak=False),
             "project.circular_dep.CircularDep": ImpInfo(lineno=29, weak=False),
-            "subprocess": ImpInfo(lineno=32, weak=False),
+            "subprocess": ImpInfo(lineno=32, weak=True),
             "subprocess23": ImpInfo(lineno=34, weak=False),
             "pkg_resources": ImpInfo(lineno=36, weak=False),
             "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=39, weak=False),
             "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=45, weak=False),
+            "maybe_exists1": ImpInfo(lineno=49, weak=True),
+            "should_exist1": ImpInfo(lineno=51, weak=False),
         },
     )
 
