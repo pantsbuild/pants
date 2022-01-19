@@ -195,7 +195,7 @@ async def validate_jvm_lockfile(
         raise ValueError(
             f"The lockfile for {request.options_scope} was generated with different "
             "requirements than are currently set. Check whether any `JAVA` options "
-            "(including environment) variables have changed your requirements "
+            "(including environment variables) have changed your requirements "
             "or run `./pants generate-lockfiles` to regenerate the lockfiles."
         )
 
