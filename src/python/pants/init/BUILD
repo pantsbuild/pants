@@ -50,4 +50,4 @@ target(
     ],
 )
 
-python_tests(name="tests", timeout=200)
+python_tests(name="tests", timeout=240)
