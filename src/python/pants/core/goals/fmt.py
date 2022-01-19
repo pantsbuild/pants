@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TypeVar, cast
 
-from pants.core.goals.style_request import StyleRequest
+from pants.core.goals.style_request import StyleRequest, style_batch_size_help
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -139,7 +139,11 @@ class FmtSubsystem(GoalSubsystem):
             removal_version="2.11.0.dev0",
             removal_hint=(
                 "Formatters are now broken into multiple batches by default using the "
-                "`--batch-size` argument."
+                "`--batch-size` argument.\n"
+                "\n"
+                "To keep (roughly) this option's behavior, set [fmt].batch_size = 1. However, "
+                "you'll likely get better performance by using a larger batch size because of "
+                "reduced overhead launching processes."
             ),
             help=(
                 "Rather than formatting all files in a single batch, format each file as a "
@@ -156,20 +160,7 @@ class FmtSubsystem(GoalSubsystem):
             advanced=True,
             type=int,
             default=128,
-            help=(
-                "The target minimum number of files that will be included in each formatter batch.\n"
-                "\n"
-                "Formatter processes are batched for a few reasons:\n"
-                "\n"
-                "1. to avoid OS argument length limits (in processes which don't support argument "
-                "files)\n"
-                "2. to support more stable cache keys than would be possible if all files were "
-                "operated on in a single batch.\n"
-                "3. to allow for parallelism in formatter processes which don't have internal "
-                "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
-                "behavior when multiple processes are competing for cores and so internal "
-                "parallelism cannot be used perfectly.\n"
-            ),
+            help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
         )
 
     @property

@@ -6,7 +6,7 @@ from __future__ import annotations
 import collections
 import collections.abc
 import math
-from typing import Any, Callable, Iterable, Iterator, MutableMapping, Sequence, TypeVar
+from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
 
 from pants.engine.internals import native_engine
 
@@ -77,7 +77,7 @@ def ensure_str_list(val: str | Iterable[str], *, allow_single_str: bool = False)
 
 
 def partition_sequentially(
-    items: Sequence[_T],
+    items: Iterable[_T],
     *,
     key: Callable[[_T], str],
     size_min: int,
@@ -95,7 +95,15 @@ def partition_sequentially(
     # To stably partition the arguments into ranges of at least `size_min`, we sort them, and
     # create a new batch sequentially once we have the minimum number of entries, _and_ we encounter
     # an item hash prefixed with a threshold of zeros.
-    zero_prefix_threshold = math.log(size_min // 8, 2)
+    #
+    # The hashes act like a (deterministic) series of rolls of an evenly distributed die. The
+    # probability of a hash prefixed with Z zero bits is 1/2^Z, and so to break after N items on
+    # average, we look for `Z == log2(N)` zero bits.
+    #
+    # Breaking on these deterministic boundaries means that adding any single item will affect
+    # either one bucket (if the item does not create a boundary) or two (if it does create a
+    # boundary).
+    zero_prefix_threshold = math.log(max(4, size_min) // 4, 2)
     size_max = size_min * 2 if size_max is None else size_max
 
     batch: list[_T] = []

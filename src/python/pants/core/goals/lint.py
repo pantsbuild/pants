@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
-from pants.core.goals.style_request import StyleRequest, write_reports
+from pants.core.goals.style_request import StyleRequest, style_batch_size_help, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -157,7 +157,11 @@ class LintSubsystem(GoalSubsystem):
             removal_version="2.11.0.dev0",
             removal_hint=(
                 "Linters are now broken into multiple batches by default using the "
-                "`--batch-size` argument."
+                "`--batch-size` argument.\n"
+                "\n"
+                "To keep (roughly) this option's behavior, set [lint].batch_size = 1. However, "
+                "you'll likely get better performance by using a larger batch size because of "
+                "reduced overhead launching processes."
             ),
             help=(
                 "Rather than linting all files in a single batch, lint each file as a "
@@ -174,20 +178,7 @@ class LintSubsystem(GoalSubsystem):
             advanced=True,
             type=int,
             default=128,
-            help=(
-                "The target minimum number of files that will be included in each linter batch.\n"
-                "\n"
-                "Linter processes are batched for a few reasons:\n"
-                "\n"
-                "1. to avoid OS argument length limits (in processes which don't support argument "
-                "files)\n"
-                "2. to support more stable cache keys than would be possible if all files were "
-                "operated on in a single batch.\n"
-                "3. to allow for parallelism in linter processes which don't have internal "
-                "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
-                "behavior when multiple processes are competing for cores and so internal "
-                "parallelism cannot be used perfectly.\n"
-            ),
+            help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
         )
 
     @property
@@ -235,10 +226,10 @@ async def lint(
             return fs.address.spec
 
         all_batch_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__(field_sets))
+            Get(LintResults, LintRequest, request.__class__(field_set_batch))
             for request in requests
             if request.field_sets
-            for field_sets in partition_sequentially(
+            for field_set_batch in partition_sequentially(
                 request.field_sets, key=address_str, size_min=lint_subsystem.batch_size
             )
         )
@@ -262,7 +253,7 @@ async def lint(
                     sorted_all_batch_results, key=key_fn
                 )
             ),
-            key=lambda results: results.linter_name,
+            key=key_fn,
         )
     )
 
