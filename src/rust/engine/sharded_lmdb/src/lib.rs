@@ -36,11 +36,10 @@ use std::time::{self, Duration};
 use bytes::{BufMut, Bytes};
 use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
-  self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
-  RwTransaction, Transaction, WriteFlags,
+  self, Database, DatabaseFlags, Environment, EnvironmentFlags, RwTransaction, Transaction,
+  WriteFlags,
 };
 use log::trace;
-use tempfile::TempDir;
 
 ///
 /// The lease time is relatively short, because we in general would like things to be
@@ -108,11 +107,11 @@ impl AsRef<[u8]> for VersionedFingerprint {
 pub struct ShardedLmdb {
   // First Database is content, second is leases.
   lmdbs: HashMap<u8, (PathBuf, Arc<Environment>, Database, Database)>,
-  root_path: PathBuf,
-  max_size_per_shard: usize,
+  _root_path: PathBuf,
+  _max_size_per_shard: usize,
   executor: task_executor::Executor,
   lease_time: Duration,
-  shard_count: u8,
+  _shard_count: u8,
   shard_fingerprint_mask: u8,
 }
 
@@ -191,11 +190,11 @@ impl ShardedLmdb {
 
     Ok(ShardedLmdb {
       lmdbs,
-      root_path,
-      max_size_per_shard,
+      _root_path: root_path,
+      _max_size_per_shard: max_size_per_shard,
       executor,
       lease_time,
-      shard_count,
+      _shard_count: shard_count,
       shard_fingerprint_mask,
     })
   }
@@ -563,39 +562,6 @@ impl ShardedLmdb {
         }
       })
       .await
-  }
-
-  #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
-  pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in
-      ShardedLmdb::envs(&self.root_path, self.max_size_per_shard, self.shard_count)?
-    {
-      let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
-      env
-        .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
-        .map_err(|e| {
-          format!(
-            "Error copying store from {:?} to {:?}: {}",
-            old_dir,
-            new_dir.path(),
-            e
-          )
-        })?;
-      std::fs::remove_dir_all(&old_dir)
-        .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
-      std::fs::rename(&new_dir.path(), &old_dir).map_err(|e| {
-        format!(
-          "Error replacing {:?} with {:?}: {}",
-          old_dir,
-          new_dir.path(),
-          e
-        )
-      })?;
-
-      // Prevent the tempdir from being deleted on drop.
-      std::mem::drop(new_dir);
-    }
-    Ok(())
   }
 }
 
