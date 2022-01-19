@@ -221,10 +221,6 @@ def determine_resolves_to_generate(
         sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
     }
 
-    # TODO: check for ambiguity: between tools and user resolves, and across distinct
-    #  `KnownUserResolveNames`s. Update AmbiguousResolveNamesError to say where the resolve
-    #  name is defined, whereas right now we hardcode it to be the `[python]` option.
-
     if not requested_resolve_names:
         return [
             known_resolve_names.requested_resolve_names_cls(known_resolve_names.names)
@@ -289,8 +285,7 @@ def filter_tool_lockfile_requests(
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    # TODO: Add back `KnownUserResolveNames` once JVM implements it.
-    required_union_implementations = (ToolLockfileSentinel,)
+    required_union_implementations = (ToolLockfileSentinel, KnownUserResolveNamesRequest)
 
     @classmethod
     def register_options(cls, register) -> None:
