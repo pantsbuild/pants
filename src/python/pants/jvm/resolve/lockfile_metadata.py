@@ -122,6 +122,12 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
         self,
         requirements: Iterable[ArtifactRequirement] | None,
     ) -> LockfileMetadataValidation:
+        """Returns a truthy object if the request requirements match the metadata requirements.
+
+        For this version, "match" is defined as the request requirements being a non-strict subset
+        of the metadata requirements.
+        """
+
         failure_reasons: set[InvalidJVMLockfileReason] = set()
 
         if not self.requirements.issuperset(i.to_metadata_str() for i in requirements or []):
