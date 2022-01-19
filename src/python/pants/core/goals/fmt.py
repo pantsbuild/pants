@@ -212,7 +212,10 @@ async def fmt(
             )
             for fmt_requests, targets in targets_by_fmt_request_order.items()
             for target_batch in partition_sequentially(
-                targets, key=lambda t: t.address.spec, size_min=fmt_subsystem.batch_size
+                targets,
+                key=lambda t: t.address.spec,
+                size_target=fmt_subsystem.batch_size,
+                size_max=4 * fmt_subsystem.batch_size,
             )
         )
 
