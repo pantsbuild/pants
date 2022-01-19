@@ -27,7 +27,7 @@ from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestFieldSet
 from pants.jvm.test.junit import rules as junit_rules
@@ -88,7 +88,7 @@ def rule_runner() -> RuleRunner:
 # )
 # The `repr` of the resulting lockfile object can be directly copied
 # into code to get the following:
-JUNIT4_RESOLVED_LOCKFILE = TCoursierResolvedLockfile.new(
+JUNIT4_RESOLVED_LOCKFILE = TestCoursierWrapper.new(
     entries=(
         CoursierLockfileEntry(
             coord=Coordinate(group="junit", artifact="junit", version="4.13.2"),
@@ -356,7 +356,7 @@ def test_vintage_scala_simple_success(rule_runner: RuleRunner) -> None:
 # )
 # The `repr` of the resulting lockfile object can be directly copied
 # into code to get the following:
-JUNIT5_RESOLVED_LOCKFILE = TCoursierResolvedLockfile.new(
+JUNIT5_RESOLVED_LOCKFILE = TestCoursierWrapper.new(
     entries=(
         CoursierLockfileEntry(
             coord=Coordinate(group="org.apiguardian", artifact="apiguardian-api", version="1.1.0"),

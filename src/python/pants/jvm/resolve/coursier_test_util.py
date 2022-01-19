@@ -10,7 +10,7 @@ from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 
 
 @dataclass
-class TCoursierResolvedLockfile:
+class TestCoursierWrapper:
     """Utility class to make it easier to create a serialized Coursier lockfile with a correct
     metadata header in tests."""
 

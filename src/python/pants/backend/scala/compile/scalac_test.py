@@ -25,7 +25,7 @@ from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.coursier_test_util import TCoursierResolvedLockfile
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -61,7 +61,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-EMPTY_LOCKFILE = TCoursierResolvedLockfile(CoursierResolvedLockfile(())).serialize()
+EMPTY_LOCKFILE = TestCoursierWrapper(CoursierResolvedLockfile(())).serialize()
 
 
 SCALA_LIB_SOURCE = dedent(
@@ -217,7 +217,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
-    resolved_joda_lockfile = TCoursierResolvedLockfile.new(
+    resolved_joda_lockfile = TestCoursierWrapper.new(
         entries=(
             CoursierLockfileEntry(
                 coord=joda_coord,
@@ -398,7 +398,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile.new(
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
                 entries=(
                     CoursierLockfileEntry(
                         coord=acyclic_coord,
@@ -487,7 +487,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TCoursierResolvedLockfile.new(
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
                 entries=(
                     CoursierLockfileEntry(
                         coord=Coordinate(
