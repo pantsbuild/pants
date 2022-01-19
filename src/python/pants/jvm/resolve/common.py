@@ -27,7 +27,7 @@ class InvalidCoordinateString(Exception):
         super().__init__(f"Received invalid artifact coordinates: {coords}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Coordinate:
     """A single Maven-style coordinate for a JVM dependency.
 

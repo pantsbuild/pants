@@ -22,7 +22,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.subsystems import JvmSubsystem
@@ -164,7 +164,7 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 async def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(scalatest)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(scalatest))
 
 
 def rules():
