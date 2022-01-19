@@ -163,19 +163,17 @@ async def gather_coordinates_for_jvm_lockfile(
 
 
 @frozen_after_init
-@dataclass
+@dataclass(unsafe_hash=True)
 class ValidatedJvmToolLockfileRequest:
 
     options_scope: str
     artifact_inputs: FrozenOrderedSet[str]
+    lockfile: CoursierResolvedLockfile
 
     def __init__(self, tool: JvmToolBase):
         self.options_scope = tool.options_scope
         self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
         self.lockfile = tool.resolved_lockfile()
-
-    def __hash__(self):
-        return hash((self.options_scope, self.artifact_inputs, self.lockfile))
 
 
 @rule(desc="Validate JVM lockfile")
