@@ -11,6 +11,7 @@ use std::collections::hash_map::HashMap;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fs::File;
+use std::hash::Hasher;
 use std::io;
 use std::panic;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_latch::AsyncLatch;
+use fnv::FnvHasher;
 use futures::future;
 use futures::future::FutureExt;
 use futures::Future;
@@ -137,6 +139,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(scheduler_shutdown, m)?)?;
 
   m.add_function(wrap_pyfunction!(strongly_connected_components, m)?)?;
+  m.add_function(wrap_pyfunction!(hash_prefix_zero_bits, m)?)?;
 
   Ok(())
 }
@@ -566,6 +569,17 @@ fn strongly_connected_components(
       })
       .collect(),
   )
+}
+
+/// Return the number of zero bits prefixed on an (undefined, but well balanced) hash of the given
+/// string.
+///
+/// This is mostly in rust because of the convenience of the `leading_zeros` builtin method.
+#[pyfunction]
+fn hash_prefix_zero_bits(item: &str) -> u32 {
+  let mut hasher = FnvHasher::default();
+  hasher.write(item.as_bytes());
+  hasher.finish().leading_zeros()
 }
 
 ///

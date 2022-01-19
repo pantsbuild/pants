@@ -291,6 +291,7 @@ def lease_files_in_graph(scheduler: PyScheduler, session: PySession) -> None: ..
 def strongly_connected_components(
     adjacency_lists: Sequence[Tuple[Any, Sequence[Any]]]
 ) -> Sequence[Sequence[Any]]: ...
+def hash_prefix_zero_bits(item: str) -> int: ...
 
 class PyExecutionRequest:
     def __init__(

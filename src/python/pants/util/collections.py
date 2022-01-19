@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import collections
 import collections.abc
-from typing import Any, Iterable, MutableMapping, TypeVar
+import math
+from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
+
+from pants.engine.internals import native_engine
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -71,3 +74,57 @@ def ensure_str_list(val: str | Iterable[str], *, allow_single_str: bool = False)
     If `allow_single_str` is True, a single `str` will be wrapped into a `List[str]`.
     """
     return ensure_list(val, expected_type=str, allow_single_scalar=allow_single_str)
+
+
+def partition_sequentially(
+    items: Iterable[_T],
+    *,
+    key: Callable[[_T], str],
+    size_min: int,
+    size_max: int | None = None,
+) -> Iterator[list[_T]]:
+    """Stably partitions the given items into batches of at least size_min.
+
+    The "stability" property refers to avoiding adjusting all batches when a single item is added,
+    which could happen if the items were trivially windowed using `itertools.islice` and an
+    item was added near the front of the list.
+
+    Batches will be capped to `size_max`, which defaults `size_min*2`.
+    """
+
+    # To stably partition the arguments into ranges of at least `size_min`, we sort them, and
+    # create a new batch sequentially once we have the minimum number of entries, _and_ we encounter
+    # an item hash prefixed with a threshold of zeros.
+    #
+    # The hashes act like a (deterministic) series of rolls of an evenly distributed die. The
+    # probability of a hash prefixed with Z zero bits is 1/2^Z, and so to break after N items on
+    # average, we look for `Z == log2(N)` zero bits.
+    #
+    # Breaking on these deterministic boundaries means that adding any single item will affect
+    # either one bucket (if the item does not create a boundary) or two (if it does create a
+    # boundary).
+    zero_prefix_threshold = math.log(max(4, size_min) // 4, 2)
+    size_max = size_min * 2 if size_max is None else size_max
+
+    batch: list[_T] = []
+
+    def emit_batch() -> list[_T]:
+        assert batch
+        result = list(batch)
+        batch.clear()
+        return result
+
+    keyed_items = []
+    for item in items:
+        keyed_items.append((key(item), item))
+    keyed_items.sort()
+
+    for item_key, item in keyed_items:
+        batch.append(item)
+        if (
+            len(batch) >= size_min
+            and native_engine.hash_prefix_zero_bits(item_key) >= zero_prefix_threshold
+        ) or (len(batch) >= size_max):
+            yield emit_batch()
+    if batch:
+        yield emit_batch()

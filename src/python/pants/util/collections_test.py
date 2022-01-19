@@ -12,6 +12,7 @@ from pants.util.collections import (
     assert_single_element,
     ensure_list,
     ensure_str_list,
+    partition_sequentially,
     recursively_update,
 )
 
@@ -85,3 +86,23 @@ def test_ensure_str_list() -> None:
         ensure_str_list(0)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         ensure_str_list([0, 1])  # type: ignore[list-item]
+
+
+@pytest.mark.parametrize("size_min", [0, 1, 16, 32, 64, 128])
+def test_partition_sequentially(size_min: int) -> None:
+    # Adding an item at any position in the input sequence should affect either 1 or 2 (if the added
+    # item becomes a boundary) buckets in the output.
+
+    def partitioned_buckets(items: list[str]) -> set[tuple[str, ...]]:
+        return set(tuple(p) for p in partition_sequentially(items, key=str, size_min=size_min))
+
+    # We start with base items containing every other element from a sorted sequence.
+    all_items = sorted((f"item{i}" for i in range(0, 64)))
+    base_items = [item for i, item in enumerate(all_items) if i % 2 == 0]
+    base_partitions = partitioned_buckets(base_items)
+
+    # Then test that adding any of the remaining items elements (which will be interspersed in the
+    # base items) only affects 1 or 2 buckets in the output.
+    for to_add in [item for i, item in enumerate(all_items) if i % 2 == 1]:
+        updated_partitions = partitioned_buckets([to_add, *base_items])
+        assert 1 <= len(base_partitions ^ updated_partitions) <= 2
