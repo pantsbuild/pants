@@ -45,7 +45,7 @@ from pants.jvm.compile import (
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
 )
-from pants.jvm.goals.coursier import rules as coursier_rules
+from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -66,7 +66,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *coursier_fetch_rules(),
-            *coursier_rules(),
+            *lockfile.rules(),
             *classpath.rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),

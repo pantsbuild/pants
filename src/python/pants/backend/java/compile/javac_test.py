@@ -24,7 +24,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
-from pants.jvm.goals.coursier import rules as coursier_rules
+from pants.jvm.goals import lockfile
 from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             *javac_check_rules(),
             *util_rules(),
             *target_types_rules(),
-            *coursier_rules(),
+            *lockfile.rules(),
             *jdk_rules.rules(),
             *java_dep_inf_rules(),
             *source_files.rules(),
