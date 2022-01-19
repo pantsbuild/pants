@@ -9,13 +9,14 @@ from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import SubsystemRule, rule
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.engine.rules import Get, SubsystemRule, rule
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
+from pants.jvm.goals.lockfile import rules as lockfile_rules
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
+from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -39,7 +40,7 @@ class MockJvmToolLockfileSentinel(ToolLockfileSentinel):
 async def generate_test_tool_lockfile_request(
     _: MockJvmToolLockfileSentinel, tool: MockJvmTool
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(tool))
 
 
 def test_jvm_tool_base_extracts_correct_coordinates() -> None:
@@ -52,10 +53,10 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             *source_files.rules(),
             *util_rules(),
             *jvm_tool.rules(),
+            *lockfile_rules(),
             generate_test_tool_lockfile_request,
             SubsystemRule(MockJvmTool),
             QueryRule(JvmLockfileRequest, (MockJvmToolLockfileSentinel,)),
-            QueryRule(ArtifactRequirements, (GatherJvmCoordinatesRequest,)),
             QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[JvmArtifactTarget],
@@ -83,16 +84,8 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
         }
     )
     lockfile_request = rule_runner.request(JvmLockfileRequest, [MockJvmToolLockfileSentinel()])
-    assert sorted(lockfile_request.artifact_inputs) == [
-        "//:junit_junit",
-        "org.hamcrest:hamcrest-core:1.3",
-    ]
-
-    requirements = rule_runner.request(
-        ArtifactRequirements, [GatherJvmCoordinatesRequest(lockfile_request.artifact_inputs, "")]
-    )
-    coordinates = [i.coordinate for i in requirements]
-    assert sorted(coordinates, key=lambda c: (c.group, c.artifact, c.version)) == [
+    coordinates = sorted(i.coordinate for i in lockfile_request.artifacts)
+    assert coordinates == [
         Coordinate(group="junit", artifact="junit", version="4.13.2"),
         Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),
     ]

@@ -19,11 +19,13 @@ from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
+from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
@@ -55,7 +57,7 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
 
     if invalid_targets:
         raise ValueError(
-            f"The `[{Scalac.options_scope}].global` option accepts only "
+            f"The `[{Scalac.options_scope}].plugins_global` option accepts only "
             f"`{ScalacPluginTarget.alias}` targets, but got:\n\n"
             f"{bullet_list(type(t).alias for t in invalid_targets)}"
         )
@@ -70,13 +72,20 @@ class GlobalScalacPluginsToolLockfileSentinel(ToolLockfileSentinel):
 
 
 @rule
-def generate_global_scalac_plugins_lockfile_request(
+async def generate_global_scalac_plugins_lockfile_request(
     _: GlobalScalacPluginsToolLockfileSentinel,
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
     scalac_plugins: Scalac,
 ) -> JvmLockfileRequest:
+    artifacts = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(
+            FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
+            f"[{scalac_plugins.options_scope}].plugins_global",
+        ),
+    )
     return JvmLockfileRequest(
-        artifact_inputs=FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
+        artifacts=artifacts,
         resolve_name="scalac-plugins",
         lockfile_dest=scalac_plugins.plugins_global_lockfile,
     )
