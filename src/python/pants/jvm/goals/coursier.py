@@ -23,6 +23,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllTargets
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierError, CoursierResolvedLockfile
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.frozendict import FrozenDict
@@ -97,24 +98,31 @@ async def coursier_generate_lockfile(
     jvm: JvmSubsystem,
     resolves_to_artifacts: JvmResolvesToArtifacts,
 ) -> CoursierGenerateLockfileResult:
+    requirements = ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ()))
     resolved_lockfile = await Get(
         CoursierResolvedLockfile,
         # Note that it's legal to have a resolve with no artifacts.
-        ArtifactRequirements(resolves_to_artifacts.get(request.resolve, ())),
+        ArtifactRequirements,
+        requirements,
     )
-    resolved_lockfile_serialized = resolved_lockfile.to_serialized()
+    resolved_serialized_lockfile = resolved_lockfile.to_serialized()
+    metadata = JVMLockfileMetadata.new(requirements)
+    resolved_serialized_lockfile = metadata.add_header_to_lockfile(
+        resolved_serialized_lockfile, regenerate_command="./pants generate-lockfiles"
+    )
+
     lockfile_path = jvm.resolves[request.resolve]
 
     # If the lockfile hasn't changed, don't overwrite it.
     existing_lockfile_digest_contents = await Get(DigestContents, PathGlobs([lockfile_path]))
     if (
         existing_lockfile_digest_contents
-        and resolved_lockfile_serialized == existing_lockfile_digest_contents[0].content
+        and resolved_serialized_lockfile == existing_lockfile_digest_contents[0].content
     ):
         return CoursierGenerateLockfileResult(EMPTY_DIGEST)
 
     new_lockfile = await Get(
-        Digest, CreateDigest((FileContent(lockfile_path, resolved_lockfile_serialized),))
+        Digest, CreateDigest((FileContent(lockfile_path, resolved_serialized_lockfile),))
     )
     return CoursierGenerateLockfileResult(new_lockfile)
 

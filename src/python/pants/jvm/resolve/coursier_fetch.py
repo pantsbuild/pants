@@ -48,6 +48,7 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.util_rules import ExtractFileDigest
@@ -177,6 +178,7 @@ class CoursierResolvedLockfile:
     """
 
     entries: tuple[CoursierLockfileEntry, ...]
+    metadata: JVMLockfileMetadata | None = None
 
     @classmethod
     def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
@@ -226,18 +228,23 @@ class CoursierResolvedLockfile:
         """
 
         lockfile_str: str
+        lockfile_bytes: bytes
         if isinstance(lockfile, str):
             lockfile_str = lockfile
+            lockfile_bytes = lockfile.encode("utf-8")
         else:
             lockfile_str = lockfile.decode("utf-8")
+            lockfile_bytes = lockfile
 
         contents = toml.loads(lockfile_str)
         entries = tuple(
             CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
         )
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
 
         return cls(
             entries=entries,
+            metadata=metadata,
         )
 
     @classmethod
@@ -449,13 +456,22 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     # TODO: Loading this per JvmArtifact.
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
+    requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+        raise ValueError(
+            f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
+            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            "lockfile based on the new requirements."
+        )
+
     # All of the transitive dependencies are exported.
     # TODO: Expose an option to control whether this exports only the root, direct dependencies,
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
         request.resolve,
-        ArtifactRequirement.from_jvm_artifact_target(request.component.representative).coordinate,
+        requirement.coordinate,
     )
 
     classpath_entries = await MultiGet(

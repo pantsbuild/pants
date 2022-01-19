@@ -19,6 +19,7 @@ from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -71,6 +72,13 @@ async def generate_jvm_lockfile(
     request: JvmLockfileRequest,
 ) -> Lockfile:
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, request.artifacts)
+
+    resolved_lockfile_contents = resolved_lockfile.to_serialized()
+    metadata = JVMLockfileMetadata.new(request.artifacts)
+    resolved_lockfile_contents = metadata.add_header_to_lockfile(
+        resolved_lockfile_contents, regenerate_command="./pants generate-lockfiles"
+    )
+
     lockfile_digest = await Get(
         Digest,
         CreateDigest([FileContent(request.lockfile_dest, resolved_lockfile.to_serialized())]),

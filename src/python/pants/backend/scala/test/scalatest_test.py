@@ -25,8 +25,10 @@ from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -70,18 +72,19 @@ def rule_runner() -> RuleRunner:
 @maybe_skip_jdk_test
 def test_simple_success(rule_runner: RuleRunner) -> None:
     scalatest = rule_runner.request(Scalatest, [])
+    scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": scalatest.resolved_lockfile()
-            .to_serialized()
-            .decode("utf-8"),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper(
+                scalatest.resolved_lockfile()
+            ).serialize([ArtifactRequirement(coordinate=scalatest_coord)]),
             "BUILD": dedent(
-                """\
+                f"""\
                 jvm_artifact(
                   name = 'org.scalatest_scalatest',
-                  group = 'org.scalatest',
-                  artifact = 'scalatest_2.13',
-                  version = '3.2.10',
+                  group = '{scalatest_coord.group}',
+                  artifact = '{scalatest_coord.artifact}',
+                  version = '{scalatest_coord.version}',
                 )
 
                 scalatest_tests(

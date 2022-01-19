@@ -16,6 +16,7 @@ from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, 
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -159,6 +160,44 @@ async def gather_coordinates_for_jvm_lockfile(
         )
 
     return ArtifactRequirements(requirements)
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ValidatedJvmToolLockfileRequest:
+
+    options_scope: str
+    artifact_inputs: FrozenOrderedSet[str]
+    lockfile: CoursierResolvedLockfile
+
+    def __init__(self, tool: JvmToolBase):
+        self.options_scope = tool.options_scope
+        self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
+        self.lockfile = tool.resolved_lockfile()
+
+
+@rule(desc="Validate JVM lockfile")
+async def validate_jvm_lockfile(
+    request: ValidatedJvmToolLockfileRequest,
+) -> CoursierResolvedLockfile:
+
+    lockfile = request.lockfile
+    requirements = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(
+            request.artifact_inputs, f"[{request.options_scope}].artifacts"
+        ),
+    )
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(requirements):
+        raise ValueError(
+            f"The lockfile for {request.options_scope} was generated with different "
+            "requirements than are currently set. Check whether any `JAVA` options "
+            "(including environment variables) have changed your requirements "
+            "or run `./pants generate-lockfiles` to regenerate the lockfiles."
+        )
+
+    return lockfile
 
 
 def rules():

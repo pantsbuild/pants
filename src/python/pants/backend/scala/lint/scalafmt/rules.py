@@ -32,7 +32,12 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -197,6 +202,9 @@ async def setup_scalafmt(
     bash: BashBinary,
 ) -> Setup:
     toolcp_relpath = "__toolcp"
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
+
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
@@ -205,7 +213,7 @@ async def setup_scalafmt(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(tool.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
     )

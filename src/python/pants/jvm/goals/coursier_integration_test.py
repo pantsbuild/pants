@@ -13,22 +13,28 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import FileDigest
 from pants.jvm.goals.coursier import CoursierResolve
 from pants.jvm.goals.coursier import rules as coursier_goal_rules
-from pants.jvm.resolve.common import Coordinate, Coordinates
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import RuleRunner
 
+NAME = "hamcrest"
+GROUP = "org.hamcrest"
+ARTIFACT = "hamcrest-core"
+VERSION = "1.3"
+
 HAMCREST_BUILD_FILE = dedent(
-    """\
+    f"""\
     jvm_artifact(
-        name='hamcrest',
-        group='org.hamcrest',
-        artifact='hamcrest-core',
-        version="1.3",
+        name='{NAME}',
+        group='{GROUP}',
+        artifact='{ARTIFACT}',
+        version="{VERSION}",
     )
     """
 )
@@ -36,9 +42,9 @@ HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
     entries=(
         CoursierLockfileEntry(
             coord=Coordinate(
-                group="org.hamcrest",
-                artifact="hamcrest-core",
-                version="1.3",
+                group=GROUP,
+                artifact=ARTIFACT,
+                version=VERSION,
             ),
             file_name="org.hamcrest_hamcrest-core_1.3.jar",
             direct_dependencies=Coordinates([]),
@@ -50,6 +56,13 @@ HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
         ),
     )
 )
+HAMCREST_LOCKFILE_METADATA = JVMLockfileMetadata.new(
+    [ArtifactRequirement(Coordinate(group=GROUP, artifact=ARTIFACT, version=VERSION))]
+)
+
+
+def compare_lockfiles(file_content: bytes, structured: CoursierResolvedLockfile) -> None:
+    assert CoursierResolvedLockfile.from_serialized(file_content).entries == structured.entries
 
 
 @pytest.fixture
@@ -75,9 +88,9 @@ def test_creates_missing_lockfile(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
-    assert (
-        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
+    compare_lockfiles(
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes(),
+        HAMCREST_EXPECTED_LOCKFILE,
     )
 
 
@@ -86,15 +99,18 @@ def test_noop_does_not_touch_lockfile(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": HAMCREST_BUILD_FILE,
-            "3rdparty/jvm/default.lock": HAMCREST_EXPECTED_LOCKFILE.to_serialized().decode("utf-8"),
+            "3rdparty/jvm/default.lock": HAMCREST_LOCKFILE_METADATA.add_header_to_lockfile(
+                HAMCREST_EXPECTED_LOCKFILE.to_serialized(),
+                regenerate_command="./pants generate-lockfiles",
+            ).decode("utf-8"),
         }
     )
     result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == ""
-    assert (
-        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
+    compare_lockfiles(
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes(),
+        HAMCREST_EXPECTED_LOCKFILE,
     )
 
 
@@ -104,9 +120,9 @@ def test_updates_lockfile(rule_runner: RuleRunner) -> None:
     result = rule_runner.run_goal_rule(CoursierResolve, args=[], env_inherit={"PATH"})
     assert result.exit_code == 0
     assert result.stderr == "Updated lockfile at: 3rdparty/jvm/default.lock\n"
-    assert (
-        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes()
-        == HAMCREST_EXPECTED_LOCKFILE.to_serialized()
+    compare_lockfiles(
+        Path(rule_runner.build_root, "3rdparty/jvm/default.lock").read_bytes(),
+        HAMCREST_EXPECTED_LOCKFILE,
     )
 
 
@@ -165,10 +181,8 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             ),
         )
     )
-    assert (
-        Path(rule_runner.build_root, "a.lockfile").read_bytes()
-        == expected_lockfile_a.to_serialized()
-    )
+
+    compare_lockfiles(Path(rule_runner.build_root, "a.lockfile").read_bytes(), expected_lockfile_a)
 
     expected_lockfile_b = CoursierResolvedLockfile(
         entries=(
@@ -187,7 +201,5 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             HAMCREST_EXPECTED_LOCKFILE.entries[0],
         )
     )
-    assert (
-        Path(rule_runner.build_root, "b.lockfile").read_bytes()
-        == expected_lockfile_b.to_serialized()
-    )
+
+    compare_lockfiles(Path(rule_runner.build_root, "b.lockfile").read_bytes(), expected_lockfile_b)
