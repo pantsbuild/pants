@@ -119,7 +119,7 @@ class KnownJVMUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 
 @rule
-def determine_python_user_resolves(
+def determine_jvm_user_resolves(
     _: KnownJVMUserResolveNamesRequest, jvm_subsystem: JvmSubsystem
 ) -> KnownUserResolveNames:
     return KnownUserResolveNames(
