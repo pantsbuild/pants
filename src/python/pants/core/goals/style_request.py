@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
 
 
+def style_batch_size_help(uppercase: str, lowercase: str) -> str:
+    return (
+        f"The target minimum number of files that will be included in each {lowercase} batch.\n"
+        "\n"
+        f"{uppercase} processes are batched for a few reasons:\n"
+        "\n"
+        "1. to avoid OS argument length limits (in processes which don't support argument "
+        "files)\n"
+        "2. to support more stable cache keys than would be possible if all files were "
+        "operated on in a single batch.\n"
+        f"3. to allow for parallelism in {lowercase} processes which don't have internal "
+        "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
+        "behavior when multiple processes are competing for cores and so internal "
+        "parallelism cannot be used perfectly.\n"
+    )
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):

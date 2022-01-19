@@ -6,7 +6,7 @@ from pants.util.docutil import git_url
 
 
 class AvroSubsystem(JvmToolBase):
-    options_scope = "avro-java"
+    options_scope = "java-avro"
     help = "Avro IDL compiler (https://avro.apache.org/)."
 
     default_version = "1.11.0"

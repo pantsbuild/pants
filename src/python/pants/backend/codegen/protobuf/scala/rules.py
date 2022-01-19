@@ -45,7 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
@@ -376,10 +376,9 @@ async def setup_scalapb_shim_classfiles(
 
 @rule
 async def generate_scalapbc_lockfile_request(
-    _: ScalapbcToolLockfileSentinel,
-    tool: ScalaPBSubsystem,
+    _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(tool))
 
 
 def rules():

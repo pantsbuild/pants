@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TypeVar, cast
 
-from pants.core.goals.style_request import StyleRequest
+from pants.core.goals.style_request import StyleRequest, style_batch_size_help
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -18,6 +18,7 @@ from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -135,6 +136,15 @@ class FmtSubsystem(GoalSubsystem):
             advanced=True,
             type=bool,
             default=False,
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Formatters are now broken into multiple batches by default using the "
+                "`--batch-size` argument.\n"
+                "\n"
+                "To keep (roughly) this option's behavior, set [fmt].batch_size = 1. However, "
+                "you'll likely get better performance by using a larger batch size because of "
+                "reduced overhead launching processes."
+            ),
             help=(
                 "Rather than formatting all files in a single batch, format each file as a "
                 "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
@@ -145,10 +155,21 @@ class FmtSubsystem(GoalSubsystem):
                 "faster than `--no-per-file-caching` for your use case."
             ),
         )
+        register(
+            "--batch-size",
+            advanced=True,
+            type=int,
+            default=128,
+            help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
+        )
 
     @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
+
+    @property
+    def batch_size(self) -> int:
+        return cast(int, self.options.batch_size)
 
 
 class Fmt(Goal):
@@ -187,9 +208,12 @@ async def fmt(
         per_language_results = await MultiGet(
             Get(
                 _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets(targets)),
+                _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
             )
             for fmt_requests, targets in targets_by_fmt_request_order.items()
+            for target_batch in partition_sequentially(
+                targets, key=lambda t: t.address.spec, size_min=fmt_subsystem.batch_size
+            )
         )
 
     individual_results = list(

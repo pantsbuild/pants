@@ -18,7 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -169,10 +169,9 @@ async def google_java_format_lint(
 
 @rule
 async def generate_google_java_format_lockfile_request(
-    _: GoogleJavaFormatToolLockfileSentinel,
-    tool: GoogleJavaFormatSubsystem,
+    _: GoogleJavaFormatToolLockfileSentinel, tool: GoogleJavaFormatSubsystem
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(tool))
 
 
 def rules():

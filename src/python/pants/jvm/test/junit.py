@@ -21,7 +21,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -169,7 +169,7 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 async def generate_junit_lockfile_request(
     _: JunitToolLockfileSentinel, junit: JUnit
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(junit)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(junit))
 
 
 def rules():

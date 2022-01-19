@@ -16,7 +16,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -142,10 +142,9 @@ async def generate_scrooge_thrift_sources(
 
 @rule
 async def generate_scrooge_lockfile_request(
-    _: ScroogeToolLockfileSentinel,
-    scrooge: ScroogeSubsystem,
+    _: ScroogeToolLockfileSentinel, scrooge: ScroogeSubsystem
 ) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(scrooge)
+    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(scrooge))
 
 
 def rules():
