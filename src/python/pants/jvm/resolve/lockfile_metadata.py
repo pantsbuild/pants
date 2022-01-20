@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, cast
@@ -17,8 +16,6 @@ from pants.core.util_rules.lockfile_metadata import (
 )
 from pants.jvm.resolve.common import ArtifactRequirement
 from pants.util.ordered_set import FrozenOrderedSet
-
-logger = logging.getLogger(__name__)
 
 _jvm_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.JVM)
 
@@ -56,15 +53,6 @@ class JVMLockfileMetadata(LockfileMetadata):
                 LockfileScope.JVM, lockfile, lockfile_path, resolve_name
             ),
         )
-
-    def _header_dict(self) -> dict[Any, Any]:
-        """Produce a dictionary to be serialized into the lockfile header.
-
-        Subclasses should call `super` and update the resulting dictionary.
-        """
-
-        d = super()._header_dict()
-        return d
 
     def is_valid_for(
         self,
@@ -111,12 +99,12 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
         return JVMLockfileMetadataV1(requirements)
 
     def _header_dict(self) -> dict[Any, Any]:
-        out = super()._header_dict()
-
-        out["generated_with_requirements"] = (
-            sorted(self.requirements) if self.requirements is not None else None
-        )
-        return out
+        return {
+            **super()._header_dict(),
+            "generated_with_requirements": (
+                sorted(self.requirements) if self.requirements is not None else None
+            ),
+        }
 
     def is_valid_for(
         self,
