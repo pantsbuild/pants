@@ -22,29 +22,11 @@ from pants.jvm.resolve.common import (
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-
-HAMCREST_EXPECTED_LOCKFILE = CoursierResolvedLockfile(
-    entries=(
-        CoursierLockfileEntry(
-            coord=Coordinate(
-                group="org.hamcrest",
-                artifact="hamcrest-core",
-                version="1.3",
-            ),
-            file_name="org.hamcrest_hamcrest-core_1.3.jar",
-            direct_dependencies=Coordinates([]),
-            dependencies=Coordinates([]),
-            file_digest=FileDigest(
-                fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
-                serialized_bytes_length=45024,
-            ),
-        ),
-    )
-)
 
 
 @pytest.fixture
@@ -77,10 +59,27 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
     )
     digest_contents = rule_runner.request(DigestContents, [result.digest])
     assert len(digest_contents) == 1
-    assert (
-        CoursierResolvedLockfile.from_serialized(digest_contents[0].content)
-        == HAMCREST_EXPECTED_LOCKFILE
+
+    expected = CoursierResolvedLockfile(
+        entries=(
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.hamcrest",
+                    artifact="hamcrest-core",
+                    version="1.3",
+                ),
+                file_name="org.hamcrest_hamcrest-core_1.3.jar",
+                direct_dependencies=Coordinates([]),
+                dependencies=Coordinates([]),
+                file_digest=FileDigest(
+                    fingerprint="66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
+                    serialized_bytes_length=45024,
+                ),
+            ),
+        ),
+        metadata=JVMLockfileMetadata.new(artifacts),
     )
+    assert CoursierResolvedLockfile.from_serialized(digest_contents[0].content) == expected
 
 
 @maybe_skip_jdk_test
