@@ -25,8 +25,8 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules

@@ -13,7 +13,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.user_resolves import MaterializedClasspath, MaterializedClasspathRequest
 from pants.util.logging import LogLevel
 
 

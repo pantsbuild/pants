@@ -48,8 +48,8 @@ from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, CoursierResolvedLockfile
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.user_resolves import MaterializedClasspath, MaterializedClasspathRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet

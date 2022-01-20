@@ -13,8 +13,8 @@ from pants.core.util_rules import config_files, source_files, stripped_source_fi
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.user_resolves import rules as user_resolve_rules
 from pants.jvm.util_rules import rules as util_rules
 
 
@@ -30,7 +30,7 @@ def rules():
         # Re-export rules necessary to avoid rule graph errors.
         *config_files.rules(),
         *classpath.rules(),
-        *coursier_fetch_rules(),
+        *user_resolve_rules(),
         *coursier_setup_rules(),
         *external_tool_rules(),
         *source_files.rules(),

@@ -18,8 +18,8 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet

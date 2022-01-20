@@ -31,9 +31,9 @@ from pants.jvm.resolve.common import (
     Coordinates,
     CoursierLockfileEntry,
 )
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,

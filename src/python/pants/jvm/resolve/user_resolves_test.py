@@ -13,8 +13,8 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
 from pants.jvm.resolve.common import Coordinate, CoursierResolveKey
-from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
+from pants.jvm.resolve.user_resolves import NoCompatibleResolve
+from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules

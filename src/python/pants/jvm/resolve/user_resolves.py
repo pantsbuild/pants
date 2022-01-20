@@ -33,7 +33,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
-from pants.jvm.resolve import coursier_setup
+from pants.jvm.goals import lockfile
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -371,6 +371,6 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
 def rules():
     return [
         *collect_rules(),
-        *coursier_setup.rules(),
+        *lockfile.rules(),
         UnionRule(ClasspathEntryRequest, CoursierFetchRequest),
     ]

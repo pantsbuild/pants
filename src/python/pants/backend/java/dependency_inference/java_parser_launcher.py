@@ -13,7 +13,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.user_resolves import MaterializedClasspath, MaterializedClasspathRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)

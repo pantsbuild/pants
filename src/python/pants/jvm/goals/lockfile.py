@@ -36,7 +36,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve import coursier_fetch, jvm_tool
+from pants.jvm.resolve import coursier_setup, jvm_tool
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -363,7 +363,7 @@ async def setup_user_lockfile_requests(
 def rules():
     return (
         *collect_rules(),
-        *coursier_fetch.rules(),
+        *coursier_setup.rules(),
         *jvm_tool.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),

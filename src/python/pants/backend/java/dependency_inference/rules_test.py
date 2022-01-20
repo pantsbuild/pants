@@ -29,8 +29,8 @@ from pants.engine.target import (
     Targets,
 )
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
