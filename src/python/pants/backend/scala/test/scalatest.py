@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -22,7 +22,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -43,7 +43,7 @@ class ScalatestTestFieldSet(TestFieldSet):
     sources: ScalatestTestSourceField
 
 
-class ScalatestToolLockfileSentinel(ToolLockfileSentinel):
+class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = Scalatest.options_scope
 
 
@@ -171,8 +171,8 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 @rule
 async def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
-) -> JvmLockfileRequest:
-    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(scalatest))
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(scalatest))
 
 
 def rules():
@@ -180,5 +180,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
-        UnionRule(ToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
     ]

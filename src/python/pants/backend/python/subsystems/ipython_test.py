@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.ipython import IPythonLockfileSentinel
 from pants.backend.python.subsystems.ipython import rules as subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
@@ -16,7 +16,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 def test_setup_lockfile_interpreter_constraints() -> None:
     rule_runner = RuleRunner(
-        rules=[*subsystem_rules(), QueryRule(PythonLockfileRequest, [IPythonLockfileSentinel])],
+        rules=[*subsystem_rules(), QueryRule(GeneratePythonLockfile, [IPythonLockfileSentinel])],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget],
     )
 
@@ -28,7 +28,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
         rule_runner.write_files({"project/BUILD": build_file})
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [IPythonLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [IPythonLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     assert_ics("python_sources()", [global_constraint])

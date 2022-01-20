@@ -12,7 +12,7 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -30,7 +30,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -60,7 +60,7 @@ class ScalafmtRequest(FmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
 
 
-class ScalafmtToolLockfileSentinel(ToolLockfileSentinel):
+class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = ScalafmtSubsystem.options_scope
 
 
@@ -327,8 +327,8 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 @rule
 async def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
-) -> JvmLockfileRequest:
-    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(tool))
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
 
 
 def rules():
@@ -337,5 +337,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(FmtRequest, ScalafmtRequest),
         UnionRule(LintRequest, ScalafmtRequest),
-        UnionRule(ToolLockfileSentinel, ScalafmtToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]
