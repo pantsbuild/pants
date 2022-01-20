@@ -29,9 +29,9 @@ flake8-pantsbuild==2.0.0; python_version >= "3.6" \
 flake8==3.9.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0") \
     --hash=sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907 \
     --hash=sha256:07528381786f2a6237b061f6e96610a4167b226cb926e2aa2b6b1d78057c576b
-importlib-metadata==4.10.0; python_full_version >= "3.6.1" and python_version < "3.8" and python_version >= "3.7" and (python_version >= "3.7" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.7") \
-    --hash=sha256:b7cf7d3fef75f1e4c80a96ca660efbd51473d7e8f39b5ab9210febc7809012a4 \
-    --hash=sha256:92a8b58ce734b2a4494878e0ecf7d79ccd7a128b5fc6014c401e0b61f006f0f6
+importlib-metadata==4.10.1; python_full_version >= "3.6.1" and python_version < "3.8" and python_version >= "3.7" and (python_version >= "3.7" and python_full_version < "3.0.0" and python_version < "3.8" or python_full_version >= "3.5.0" and python_version < "3.8" and python_version >= "3.7") \
+    --hash=sha256:899e2a40a8c4a1aec681feef45733de8a6c58f3f6a0dbed2eb6574b4387a77b6 \
+    --hash=sha256:951f0d8a5b7260e9db5e41d429285b5f451e928479f19d80818878527d36e95e
 mccabe==0.6.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6" \
     --hash=sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42 \
     --hash=sha256:dd8d182285a0fe56bace7f45b5e7d1a6ebcbf524e8f3bd87eb0f125271b8831f
