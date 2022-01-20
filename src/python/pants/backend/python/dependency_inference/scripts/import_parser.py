@@ -16,7 +16,6 @@ import re
 import sys
 import tokenize
 from io import open
-from typing import Iterable, Sequence
 
 MIN_DOTS = os.environ["MIN_DOTS"]
 
