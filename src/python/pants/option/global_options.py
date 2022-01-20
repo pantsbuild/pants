@@ -333,6 +333,7 @@ class ExecutionOptions:
     remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
+    remote_cache_read_timeout_millis: int
 
     remote_execution_address: str | None
     remote_execution_extra_platform_properties: list[str]
@@ -373,6 +374,7 @@ class ExecutionOptions:
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
+            remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
@@ -452,6 +454,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_eager_fetch=True,
     remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
     remote_cache_rpc_concurrency=128,
+    remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_extra_platform_properties=[],
@@ -1212,6 +1215,15 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
             help="The number of concurrent requests allowed to the remote cache service.",
+        )
+        register(
+            "--remote-cache-read-timeout-millis",
+            type=int,
+            advanced=True,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read_timeout_millis,
+            help=(
+                "Timeout value for remote cache lookups in milliseconds."
+            ),
         )
 
         register(

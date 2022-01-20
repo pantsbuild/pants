@@ -106,6 +106,7 @@ pub struct CommandRunner {
   retry_interval_duration: Duration,
   capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
+  cache_read_timeout: Duration,
 }
 
 enum StreamOutcome {
@@ -127,6 +128,7 @@ impl CommandRunner {
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
     cache_concurrency_limit: usize,
+    cache_read_timeout: Duration,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
@@ -179,6 +181,7 @@ impl CommandRunner {
       retry_interval_duration,
       capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
+      cache_read_timeout,
     };
 
     Ok(command_runner)
@@ -772,6 +775,7 @@ impl crate::CommandRunner for CommandRunner {
       self.action_cache_client.clone(),
       self.store.clone(),
       false,
+      Some(self.cache_read_timeout),
     )
     .await?;
     debug!(
@@ -1341,6 +1345,7 @@ pub async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   eager_fetch: bool,
+  timeout_duration: Option<Duration>,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
     context.workunit_store.clone(),
@@ -1367,7 +1372,18 @@ pub async fn check_action_cache(
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
-          async move { client.get_action_result(request).await }
+          async move {
+            let lookup_fut = client.get_action_result(request);
+            match timeout_duration {
+              Some(d) => {
+                let timeout_fut = tokio::time::timeout(d, lookup_fut);
+                timeout_fut
+                  .await
+                  .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
+              }
+              None => lookup_fut.await,
+            }
+          }
         },
         status_is_retryable,
       )
