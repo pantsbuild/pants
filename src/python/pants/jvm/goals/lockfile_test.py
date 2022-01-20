@@ -18,8 +18,9 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
 )
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata

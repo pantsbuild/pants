@@ -19,8 +19,9 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
 )
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test

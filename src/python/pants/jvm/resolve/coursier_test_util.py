@@ -4,8 +4,11 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.jvm.resolve.common import ArtifactRequirement
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
+)
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 
 

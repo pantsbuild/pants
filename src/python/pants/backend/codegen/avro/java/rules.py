@@ -37,11 +37,8 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.jvm.resolve.common import CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel

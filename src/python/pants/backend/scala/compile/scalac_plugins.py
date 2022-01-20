@@ -19,12 +19,8 @@ from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
-from pants.jvm.resolve.common import ArtifactRequirements
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
+from pants.jvm.resolve.common import ArtifactRequirements, CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
 from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.ordered_set import FrozenOrderedSet

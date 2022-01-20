@@ -21,8 +21,12 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve import coursier_fetch, jvm_tool
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, CoursierResolveKey
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    ArtifactRequirements,
+    CoursierResolvedLockfile,
+    CoursierResolveKey,
+)
 from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem

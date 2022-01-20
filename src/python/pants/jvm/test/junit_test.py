@@ -23,8 +23,12 @@ from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    Coordinate,
+    Coordinates,
+    CoursierLockfileEntry,
+)
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper

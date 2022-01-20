@@ -9,8 +9,13 @@ from unittest import mock
 import pytest
 
 from pants.engine.fs import EMPTY_DIGEST
-from pants.jvm.resolve.common import Coordinate, Coordinates, CoursierResolveKey
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
+from pants.jvm.resolve.common import (
+    Coordinate,
+    Coordinates,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
+    CoursierResolveKey,
+)
 
 coord1 = Coordinate("test", "art1", "1.0.0")
 coord2 = Coordinate("test", "art2", "1.0.0")

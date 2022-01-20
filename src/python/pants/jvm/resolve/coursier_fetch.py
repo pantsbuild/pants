@@ -9,11 +9,8 @@ import logging
 import os
 from dataclasses import dataclass
 from itertools import chain
-from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import FrozenSet, Iterable, Iterator, List, Tuple
 
-import toml
-
-from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
@@ -45,12 +42,14 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    CoursierError,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
     CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
@@ -61,10 +60,6 @@ logger = logging.getLogger(__name__)
 
 class CoursierFetchRequest(ClasspathEntryRequest):
     field_sets = (JvmArtifactFieldSet,)
-
-
-class CoursierError(Exception):
-    """An exception relating to invoking Coursier or processing its output."""
 
 
 class NoCompatibleResolve(Exception):
@@ -82,198 +77,6 @@ class NoCompatibleResolve(Exception):
             f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
             "fields) in common."
         )
-
-
-@dataclass(frozen=True)
-class CoursierLockfileEntry:
-    """A single artifact entry from a Coursier-resolved lockfile.
-
-    These fields are nearly identical to the JSON objects from the
-    "dependencies" entries in Coursier's --json-output-file format.
-    But unlike Coursier's JSON report, a CoursierLockfileEntry
-    includes the content-address of the artifact fetched by Coursier
-    and ingested by Pants.
-
-    For example, a Coursier JSON report dependency entry might look like this:
-
-    ```
-    {
-      "coord": "com.chuusai:shapeless_2.13:2.3.3",
-      "file": "/home/USER/.cache/coursier/v1/https/repo1.maven.org/maven2/com/chuusai/shapeless_2.13/2.3.3/shapeless_2.13-2.3.3.jar",
-      "directDependencies": [
-        "org.scala-lang:scala-library:2.13.0"
-      ],
-      "dependencies": [
-        "org.scala-lang:scala-library:2.13.0"
-      ]
-    }
-    ```
-
-    The equivalent CoursierLockfileEntry would look like this:
-
-    ```
-    CoursierLockfileEntry(
-        coord="com.chuusai:shapeless_2.13:2.3.3", # identical
-        file_name="shapeless_2.13-2.3.3.jar" # PurePath(entry["file"].name)
-        direct_dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
-        dependencies=(Coordinate.from_coord_str("org.scala-lang:scala-library:2.13.0"),),
-        file_digest=FileDigest(fingerprint=<sha256 of the jar>, ...),
-    )
-    ```
-
-    The fields `remote_url` and `pants_address` are set by Pants if the `coord` field matches a
-    `jvm_artifact` that had either the `url` or `jar` fields set.
-    """
-
-    coord: Coordinate
-    file_name: str
-    direct_dependencies: Coordinates
-    dependencies: Coordinates
-    file_digest: FileDigest
-    remote_url: str | None = None
-    pants_address: str | None = None
-
-    @classmethod
-    def from_json_dict(cls, entry) -> CoursierLockfileEntry:
-        """Construct a CoursierLockfileEntry from its JSON dictionary representation."""
-
-        return cls(
-            coord=Coordinate.from_json_dict(entry["coord"]),
-            file_name=entry["file_name"],
-            direct_dependencies=Coordinates(
-                Coordinate.from_json_dict(d) for d in entry["directDependencies"]
-            ),
-            dependencies=Coordinates(Coordinate.from_json_dict(d) for d in entry["dependencies"]),
-            file_digest=FileDigest(
-                fingerprint=entry["file_digest"]["fingerprint"],
-                serialized_bytes_length=entry["file_digest"]["serialized_bytes_length"],
-            ),
-            remote_url=entry.get("remote_url"),
-            pants_address=entry.get("pants_address"),
-        )
-
-    def to_json_dict(self) -> dict[str, Any]:
-        """Export this CoursierLockfileEntry to a JSON object."""
-
-        return dict(
-            coord=self.coord.to_json_dict(),
-            directDependencies=[coord.to_json_dict() for coord in self.direct_dependencies],
-            dependencies=[coord.to_json_dict() for coord in self.dependencies],
-            file_name=self.file_name,
-            file_digest=dict(
-                fingerprint=self.file_digest.fingerprint,
-                serialized_bytes_length=self.file_digest.serialized_bytes_length,
-            ),
-            remote_url=self.remote_url,
-            pants_address=self.pants_address,
-        )
-
-
-@dataclass(frozen=True)
-class CoursierResolvedLockfile:
-    """An in-memory representation of Pants' Coursier lockfile format.
-
-    All coordinates in the resolved lockfile will be compatible, so we do not need to do version
-    testing when looking up coordinates.
-    """
-
-    entries: tuple[CoursierLockfileEntry, ...]
-    metadata: JVMLockfileMetadata | None = None
-
-    @classmethod
-    def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
-        # TODO: After fixing https://github.com/pantsbuild/pants/issues/13496, coordinate matches
-        # should become exact, and this error message will capture all cases of stale lockfiles.
-        return CoursierError(
-            f"{coord} was not present in resolve `{key.name}` at `{key.path}`.\n"
-            f"If you have recently added new `{JvmArtifactTarget.alias}` targets, you might "
-            f"need to update your lockfile by running `coursier-resolve --names={key.name}`."
-        )
-
-    def direct_dependencies(
-        self, key: CoursierResolveKey, coord: Coordinate
-    ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
-        """Return the entry for the given Coordinate, and for its direct dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
-        if entry is None:
-            raise self._coordinate_not_found(key, coord)
-
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.direct_dependencies))
-
-    def dependencies(
-        self, key: CoursierResolveKey, coord: Coordinate
-    ) -> tuple[CoursierLockfileEntry, tuple[CoursierLockfileEntry, ...]]:
-        """Return the entry for the given Coordinate, and for its transitive dependencies."""
-        entries = {(i.coord.group, i.coord.artifact): i for i in self.entries}
-        entry = entries.get((coord.group, coord.artifact))
-        if entry is None:
-            raise self._coordinate_not_found(key, coord)
-
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
-
-    @classmethod
-    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
-
-        return cls(
-            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
-        )
-
-    @classmethod
-    def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
-        """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
-
-        The toml file should consist of an `[entries]` block, followed by several entries.
-        """
-
-        lockfile_str: str
-        lockfile_bytes: bytes
-        if isinstance(lockfile, str):
-            lockfile_str = lockfile
-            lockfile_bytes = lockfile.encode("utf-8")
-        else:
-            lockfile_str = lockfile.decode("utf-8")
-            lockfile_bytes = lockfile
-
-        contents = toml.loads(lockfile_str)
-        entries = tuple(
-            CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
-        )
-        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
-
-        return cls(
-            entries=entries,
-            metadata=metadata,
-        )
-
-    @classmethod
-    def from_serialized(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
-        attached metadata, or old-style JSON.)."""
-
-        try:
-            return cls.from_toml(lockfile)
-        except toml.TomlDecodeError:
-            deprecated.warn_or_error(
-                "2.11.0.dev0",
-                "JSON-encoded JVM lockfile",
-                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
-            )
-            return cls.from_json_dicts(json.loads(lockfile))
-
-    def to_serialized(self) -> bytes:
-        """Export this CoursierResolvedLockfile to a human-readable serialized form.
-
-        This serialized form is intended to be checked in to the user's repo as a hermetic snapshot
-        of a Coursier resolved JVM classpath.
-        """
-
-        lockfile = {
-            "entries": [entry.to_json_dict() for entry in self.entries],
-        }
-
-        return toml.dumps(lockfile).encode("utf-8")
 
 
 def classpath_dest_filename(coord: str, src_filename: str) -> str:
@@ -360,7 +163,7 @@ async def coursier_resolve_lockfile(
         return CoursierResolvedLockfile(entries=())
 
     coursier_resolve_info = await Get(
-        CoursierResolveInfo, ArtifactRequirements, artifact_requirements
+        _CoursierResolveInfo, ArtifactRequirements, artifact_requirements
     )
 
     coursier_report_file_name = "coursier_report.json"

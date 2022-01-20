@@ -25,8 +25,12 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    Coordinate,
+    Coordinates,
+    CoursierLockfileEntry,
+)
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper

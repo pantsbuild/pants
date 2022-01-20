@@ -15,8 +15,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.common import Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.common import Coordinate, Coordinates, CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
