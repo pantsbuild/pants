@@ -33,7 +33,6 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
-from pants.jvm.goals.lockfile import _classpath_dest_filename, _CoursierResolveInfo
 from pants.jvm.resolve import coursier_setup
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
@@ -42,7 +41,9 @@ from pants.jvm.resolve.common import (
     CoursierError,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    CoursierResolveInfo,
     CoursierResolveKey,
+    classpath_dest_filename,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
@@ -151,7 +152,7 @@ async def coursier_fetch_one_coord(
         req = ArtifactRequirement(request.coord, url=request.remote_url)
 
     coursier_resolve_info = await Get(
-        _CoursierResolveInfo,
+        CoursierResolveInfo,
         ArtifactRequirements([req]),
     )
 
@@ -198,7 +199,7 @@ async def coursier_fetch_one_coord(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
-    classpath_dest_name = _classpath_dest_filename(dep["coord"], dep["file"])
+    classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
     classpath_dest = f"classpath/{classpath_dest_name}"
 
     resolved_file_digest = await Get(

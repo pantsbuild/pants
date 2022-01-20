@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, FrozenSet, Iterable
 from urllib.parse import quote_plus as url_quote_plus
 
 import toml
@@ -394,6 +395,22 @@ class CoursierResolvedLockfile:
         }
 
         return toml.dumps(lockfile).encode("utf-8")
+
+
+def classpath_dest_filename(coord: str, src_filename: str) -> str:
+    """Calculates the destination filename on the classpath for the given source filename and coord.
+
+    TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
+    """
+    dest_name = coord.replace(":", "_")
+    _, ext = os.path.splitext(src_filename)
+    return f"{dest_name}{ext}"
+
+
+@dataclass(frozen=True)
+class CoursierResolveInfo:
+    coord_arg_strings: FrozenSet[str]
+    digest: Digest
 
 
 @dataclass(frozen=True)

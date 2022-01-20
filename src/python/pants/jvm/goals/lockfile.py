@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import FrozenSet, List, Tuple
+from typing import List, Tuple
 
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -33,9 +32,8 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve import coursier_fetch, jvm_tool
@@ -46,7 +44,9 @@ from pants.jvm.resolve.common import (
     Coordinates,
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
+    CoursierResolveInfo,
     CoursierResolveKey,
+    classpath_dest_filename,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
@@ -69,26 +69,10 @@ class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
 
 
-def _classpath_dest_filename(coord: str, src_filename: str) -> str:
-    """Calculates the destination filename on the classpath for the given source filename and coord.
-
-    TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
-    """
-    dest_name = coord.replace(":", "_")
-    _, ext = os.path.splitext(src_filename)
-    return f"{dest_name}{ext}"
-
-
-@dataclass(frozen=True)
-class _CoursierResolveInfo:
-    coord_arg_strings: FrozenSet[str]
-    digest: Digest
-
-
 @rule
 async def prepare_coursier_resolve_info(
     artifact_requirements: ArtifactRequirements,
-) -> _CoursierResolveInfo:
+) -> CoursierResolveInfo:
     # Transform requirements that correspond to local JAR files into coordinates with `file:/`
     # URLs, and put the files in the place specified by the URLs.
     no_jars: List[ArtifactRequirement] = []
@@ -113,7 +97,7 @@ async def prepare_coursier_resolve_info(
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
-    return _CoursierResolveInfo(
+    return CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
         digest=jar_files.snapshot.digest,
     )
@@ -153,7 +137,7 @@ async def coursier_resolve_lockfile(
         return CoursierResolvedLockfile(entries=())
 
     coursier_resolve_info = await Get(
-        _CoursierResolveInfo, ArtifactRequirements, artifact_requirements
+        CoursierResolveInfo, ArtifactRequirements, artifact_requirements
     )
 
     coursier_report_file_name = "coursier_report.json"
@@ -196,7 +180,7 @@ async def coursier_resolve_lockfile(
     report = json.loads(report_contents[0].content)
 
     artifact_file_names = tuple(
-        _classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
+        classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
     )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
     artifact_digests = await MultiGet(
