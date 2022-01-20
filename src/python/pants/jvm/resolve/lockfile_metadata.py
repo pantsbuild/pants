@@ -54,6 +54,14 @@ class JVMLockfileMetadata(LockfileMetadata):
             ),
         )
 
+    def _header_dict(self) -> dict[Any, Any]:
+        """Produce a dictionary to be serialized into the lockfile header.
+
+        Subclasses should call `super` and update the resulting dictionary.
+        """
+        d = super()._header_dict()
+        return d
+
     def is_valid_for(
         self,
         requirements: Iterable[ArtifactRequirement] | None,
