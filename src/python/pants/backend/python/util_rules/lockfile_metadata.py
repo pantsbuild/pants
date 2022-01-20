@@ -68,7 +68,7 @@ class PythonLockfileMetadata(LockfileMetadata):
             **super()._header_dict(),
             "valid_for_interpreter_constraints": [
                 str(ic) for ic in self.valid_for_interpreter_constraints
-            ]
+            ],
         }
 
     def is_valid_for(
@@ -109,7 +109,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
     def _header_dict(self) -> dict[Any, Any]:
         return {
             **super()._header_dict(),
-            "requirements_invalidation_digest": self.requirements_invalidation_digest
+            "requirements_invalidation_digest": self.requirements_invalidation_digest,
         }
 
     def is_valid_for(
@@ -173,7 +173,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
             # Sorting followed by stringifying does not produce a meaningful result.
             "generated_with_requirements": (
                 sorted(str(i) for i in self.requirements) if self.requirements is not None else None
-            )
+            ),
         }
 
     def is_valid_for(
