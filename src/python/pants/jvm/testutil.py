@@ -19,7 +19,7 @@ from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, Targets
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.common import CoursierResolveKey
 from pants.testutil.rule_runner import RuleRunner
 
 

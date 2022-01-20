@@ -12,7 +12,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionMembership
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
-from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.common import CoursierResolveKey
 
 logger = logging.getLogger(__name__)
 

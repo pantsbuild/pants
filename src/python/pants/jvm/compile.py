@@ -17,7 +17,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget, FieldSet
 from pants.engine.unions import UnionMembership, union
-from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.common import CoursierResolveKey
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet

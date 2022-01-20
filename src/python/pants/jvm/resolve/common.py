@@ -9,6 +9,7 @@ from typing import Iterable
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.fs import Digest
 from pants.engine.target import Target
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -191,3 +192,10 @@ class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
     @classmethod
     def from_coordinates(cls, coordinates: Iterable[Coordinate]) -> ArtifactRequirements:
         return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
+
+
+@dataclass(frozen=True)
+class CoursierResolveKey:
+    name: str
+    path: str
+    digest: Digest

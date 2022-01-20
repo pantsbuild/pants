@@ -45,9 +45,9 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    CoursierResolveKey,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
-from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
