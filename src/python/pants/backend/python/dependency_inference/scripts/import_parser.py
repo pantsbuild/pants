@@ -127,7 +127,6 @@ class AstVisitor(ast.NodeVisitor):
         for stmt in node.finalbody:
             self.visit(stmt)
 
-
     def visit_Call(self, node):
         # Handle __import__("string_literal").  This is commonly used in __init__.py files,
         # to explicitly mark namespace packages.  Note that we don't handle more complex

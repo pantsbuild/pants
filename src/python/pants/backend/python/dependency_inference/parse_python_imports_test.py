@@ -126,6 +126,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         },
     )
 
+
 def test_dunder_import_call(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
@@ -151,6 +152,7 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
             "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
         },
     )
+
 
 def test_try_except(rule_runner: RuleRunner) -> None:
     content = dedent(
@@ -217,6 +219,7 @@ def test_try_except(rule_runner: RuleRunner) -> None:
             "strong8": ImpInfo(lineno=37, weak=False),
         },
     )
+
 
 @pytest.mark.parametrize("basename", ["foo.py", "__init__.py"])
 def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
@@ -307,6 +310,7 @@ def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
         expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
     )
 
+
 def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(
         rule_runner,
@@ -319,6 +323,7 @@ def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
         ),
         expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
     )
+
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(rule_runner, "x =", expected={})
