@@ -79,7 +79,7 @@ class NoCompatibleResolve(Exception):
         )
 
 
-def classpath_dest_filename(coord: str, src_filename: str) -> str:
+def _classpath_dest_filename(coord: str, src_filename: str) -> str:
     """Calculates the destination filename on the classpath for the given source filename and coord.
 
     TODO: This is duplicated in `COURSIER_POST_PROCESSING_SCRIPT`.
@@ -90,7 +90,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 
 
 @dataclass(frozen=True)
-class CoursierResolveInfo:
+class _CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
     digest: Digest
 
@@ -98,7 +98,7 @@ class CoursierResolveInfo:
 @rule
 async def prepare_coursier_resolve_info(
     artifact_requirements: ArtifactRequirements,
-) -> CoursierResolveInfo:
+) -> _CoursierResolveInfo:
     # Transform requirements that correspond to local JAR files into coordinates with `file:/`
     # URLs, and put the files in the place specified by the URLs.
     no_jars: List[ArtifactRequirement] = []
@@ -123,7 +123,7 @@ async def prepare_coursier_resolve_info(
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
-    return CoursierResolveInfo(
+    return _CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
         digest=jar_files.snapshot.digest,
     )
@@ -206,7 +206,7 @@ async def coursier_resolve_lockfile(
     report = json.loads(report_contents[0].content)
 
     artifact_file_names = tuple(
-        classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
+        _classpath_dest_filename(dep["coord"], dep["file"]) for dep in report["dependencies"]
     )
     artifact_output_paths = tuple(f"classpath/{file_name}" for file_name in artifact_file_names)
     artifact_digests = await MultiGet(
@@ -329,7 +329,7 @@ async def coursier_fetch_one_coord(
         req = ArtifactRequirement(request.coord, url=request.remote_url)
 
     coursier_resolve_info = await Get(
-        CoursierResolveInfo,
+        _CoursierResolveInfo,
         ArtifactRequirements([req]),
     )
 
@@ -376,7 +376,7 @@ async def coursier_fetch_one_coord(
             f'Coursier resolved coord "{resolved_coord.to_coord_str()}" does not match requested coord "{request.coord.to_coord_str()}".'
         )
 
-    classpath_dest_name = classpath_dest_filename(dep["coord"], dep["file"])
+    classpath_dest_name = _classpath_dest_filename(dep["coord"], dep["file"])
     classpath_dest = f"classpath/{classpath_dest_name}"
 
     resolved_file_digest = await Get(
