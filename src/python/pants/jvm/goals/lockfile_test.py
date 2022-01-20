@@ -7,12 +7,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.core.goals.generate_lockfiles import Lockfile, UserLockfileRequests
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest, RequestedJVMserResolveNames
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMserResolveNames
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -39,8 +39,8 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
-            QueryRule(UserLockfileRequests, [RequestedJVMserResolveNames]),
-            QueryRule(Lockfile, [JvmLockfileRequest]),
+            QueryRule(UserGenerateLockfiles, [RequestedJVMserResolveNames]),
+            QueryRule(GenerateLockfileResult, [GenerateJvmLockfile]),
         ],
         target_types=[JvmArtifactTarget],
     )
@@ -54,8 +54,8 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
         [ArtifactRequirement(Coordinate("org.hamcrest", "hamcrest-core", "1.3"))]
     )
     result = rule_runner.request(
-        Lockfile,
-        [JvmLockfileRequest(artifacts=artifacts, resolve_name="test", lockfile_dest="lock.txt")],
+        GenerateLockfileResult,
+        [GenerateJvmLockfile(artifacts=artifacts, resolve_name="test", lockfile_dest="lock.txt")],
     )
     digest_contents = rule_runner.request(DigestContents, [result.digest])
     assert len(digest_contents) == 1
@@ -115,10 +115,10 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(["--jvm-resolves={'a': 'a.lock', 'b': 'b.lock'}"], env_inherit={"PATH"})
 
-    result = rule_runner.request(UserLockfileRequests, [RequestedJVMserResolveNames(["a", "b"])])
+    result = rule_runner.request(UserGenerateLockfiles, [RequestedJVMserResolveNames(["a", "b"])])
     hamcrest_core = ArtifactRequirement(Coordinate("org.hamcrest", "hamcrest-core", "1.3"))
     assert set(result) == {
-        JvmLockfileRequest(
+        GenerateJvmLockfile(
             artifacts=ArtifactRequirements(
                 [
                     hamcrest_core,
@@ -128,7 +128,7 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             resolve_name="a",
             lockfile_dest="a.lock",
         ),
-        JvmLockfileRequest(
+        GenerateJvmLockfile(
             artifacts=ArtifactRequirements(
                 [
                     ArtifactRequirement(Coordinate("org.apiguardian", "apiguardian-api", "1.1.0")),

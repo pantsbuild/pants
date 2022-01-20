@@ -9,25 +9,25 @@ from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
     NO_TOOL_LOCKFILE,
     AmbiguousResolveNamesError,
+    GenerateLockfile,
+    GenerateToolLockfileSentinel,
     KnownUserResolveNames,
-    LockfileRequest,
     RequestedUserResolveNames,
-    ToolLockfileSentinel,
     UnrecognizedResolveNamesError,
-    WrappedLockfileRequest,
+    WrappedGenerateLockfile,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
 
 
 def test_determine_tool_sentinels_to_generate() -> None:
-    class Tool1(ToolLockfileSentinel):
+    class Tool1(GenerateToolLockfileSentinel):
         options_scope = "tool1"
 
-    class Tool2(ToolLockfileSentinel):
+    class Tool2(GenerateToolLockfileSentinel):
         options_scope = "tool2"
 
-    class Tool3(ToolLockfileSentinel):
+    class Tool3(GenerateToolLockfileSentinel):
         options_scope = "tool3"
 
     class Lang1Requested(RequestedUserResolveNames):
@@ -46,7 +46,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
     def assert_chosen(
         requested: set[str],
         expected_user_resolves: list[RequestedUserResolveNames],
-        expected_tools: list[type[ToolLockfileSentinel]],
+        expected_tools: list[type[GenerateToolLockfileSentinel]],
     ) -> None:
         user_resolves, tools = determine_resolves_to_generate(
             [lang1_resolves, lang2_resolves], [Tool1, Tool2, Tool3], requested
@@ -76,7 +76,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         assert_chosen({"fake"}, expected_user_resolves=[], expected_tools=[])
 
     # Error if same resolve name used for tool lockfiles and user lockfiles.
-    class AmbiguousTool(ToolLockfileSentinel):
+    class AmbiguousTool(GenerateToolLockfileSentinel):
         options_scope = "ambiguous"
 
     with pytest.raises(AmbiguousResolveNamesError):
@@ -111,8 +111,8 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
 
 def test_filter_tool_lockfile_requests() -> None:
-    def create_request(name: str, lockfile_dest: str | None = None) -> LockfileRequest:
-        return LockfileRequest(resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt")
+    def create_request(name: str, lockfile_dest: str | None = None) -> GenerateLockfile:
+        return GenerateLockfile(resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt")
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
@@ -120,13 +120,13 @@ def test_filter_tool_lockfile_requests() -> None:
     default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
 
     def assert_filtered(
-        extra_request: LockfileRequest | None,
+        extra_request: GenerateLockfile | None,
         *,
         resolve_specified: bool,
     ) -> None:
-        requests = [WrappedLockfileRequest(tool1), WrappedLockfileRequest(tool2)]
+        requests = [WrappedGenerateLockfile(tool1), WrappedGenerateLockfile(tool2)]
         if extra_request:
-            requests.append(WrappedLockfileRequest(extra_request))
+            requests.append(WrappedGenerateLockfile(extra_request))
         assert filter_tool_lockfile_requests(requests, resolve_specified=resolve_specified) == [
             tool1,
             tool2,

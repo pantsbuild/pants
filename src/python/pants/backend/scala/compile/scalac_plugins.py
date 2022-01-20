@@ -13,12 +13,12 @@ from pants.backend.scala.target_types import (
     ScalacPluginTarget,
 )
 from pants.build_graph.address import AddressInput
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -67,7 +67,7 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
     )
 
 
-class GlobalScalacPluginsToolLockfileSentinel(ToolLockfileSentinel):
+class GlobalScalacPluginsToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = "scalac-plugins"
 
 
@@ -76,7 +76,7 @@ async def generate_global_scalac_plugins_lockfile_request(
     _: GlobalScalacPluginsToolLockfileSentinel,
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
     scalac_plugins: Scalac,
-) -> JvmLockfileRequest:
+) -> GenerateJvmLockfile:
     artifacts = await Get(
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
@@ -84,7 +84,7 @@ async def generate_global_scalac_plugins_lockfile_request(
             f"[{scalac_plugins.options_scope}].plugins_global",
         ),
     )
-    return JvmLockfileRequest(
+    return GenerateJvmLockfile(
         artifacts=artifacts,
         resolve_name="scalac-plugins",
         lockfile_dest=scalac_plugins.plugins_global_lockfile,
@@ -123,5 +123,5 @@ def rules():
         *collect_rules(),
         *jvm_tool_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, GlobalScalacPluginsToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, GlobalScalacPluginsToolLockfileSentinel),
     )
