@@ -302,6 +302,8 @@ def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
         dedent(
             """\
                 import one.two.three
+                try: import one.two.three
+                except ImportError: pass
             """
         ),
         expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
