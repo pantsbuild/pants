@@ -376,8 +376,11 @@ pub struct Process {
   /// value does not directly set the number of cores allocated to the process: that is computed
   /// based on availability, and provided as a template value in the arguments of the process.
   ///
-  /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the
-  /// process.
+  /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+  ///
+  /// Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+  /// period after starting if available resources have changed (because other processes have
+  /// started or finished).
   pub concurrency_available: usize,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]

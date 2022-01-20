@@ -26,6 +26,9 @@ lazy_static! {
 /// A CommandRunner wrapper which limits the number of concurrent requests and which provides
 /// concurrency information to the process being executed.
 ///
+/// If a Process sets a non-zero `concurrency_available` value, it may be preempted (i.e. canceled
+/// and restarted) with a new concurrency value for a short period after starting.
+///
 #[derive(Clone)]
 pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
@@ -107,7 +110,11 @@ impl crate::CommandRunner for CommandRunner {
           )
           .collect();
         if !matched {
-          return Err(format!("Process {} set `concurrency_available={}`, but did not include the `{}` template variable in its arguments.", process.description, process.concurrency_available, *CONCURRENCY_TEMPLATE_RE));
+          return Err(format!(
+            "Process {} set `concurrency_available={}`, but did not include \
+                             the `{}` template variable in its arguments.",
+            process.description, process.concurrency_available, *CONCURRENCY_TEMPLATE_RE
+          ));
         }
       }
 
