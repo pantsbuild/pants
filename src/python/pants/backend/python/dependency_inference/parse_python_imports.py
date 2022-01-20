@@ -22,7 +22,8 @@ class ParsedPythonImportInfo:
     lineno: int
     # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
     # file and the parsed import.
-    # Examples of "weak" imports include string imports (if enabled).
+    # Examples of "weak" imports include string imports (if enabled) or those inside a try block
+    # which has a handler catching ImportError.
     weak: bool
 
 

@@ -196,6 +196,12 @@ def test_try_except(rule_runner: RuleRunner) -> None:
         try: import strong8
         # This would be too complicated to try and handle
         except ImpError: pass
+
+        # At least one test with import on its own line
+        try:
+            import weak8
+        except ImportError:
+            import strong9
         """
     )
     assert_imports_parsed(
@@ -217,6 +223,8 @@ def test_try_except(rule_runner: RuleRunner) -> None:
             "strong6": ImpInfo(lineno=30, weak=False),
             "strong7": ImpInfo(lineno=32, weak=False),
             "strong8": ImpInfo(lineno=37, weak=False),
+            "weak8": ImpInfo(lineno=43, weak=True),
+            "strong9": ImpInfo(lineno=45, weak=False),
         },
     )
 
