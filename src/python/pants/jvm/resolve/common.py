@@ -139,7 +139,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class ArtifactRequirement:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""

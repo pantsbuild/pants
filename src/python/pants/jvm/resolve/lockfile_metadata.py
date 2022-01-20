@@ -35,7 +35,7 @@ class JVMLockfileMetadata(LockfileMetadata):
     @staticmethod
     def new(
         requirements: Iterable[ArtifactRequirement],
-    ) -> LockfileMetadata:
+    ) -> JVMLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
 
