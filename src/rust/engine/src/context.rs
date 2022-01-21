@@ -87,6 +87,7 @@ pub struct RemotingOptions {
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub cache_rpc_concurrency: usize,
+  pub cache_read_timeout: Duration,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -255,6 +256,7 @@ impl Core {
             Duration::from_millis(100),
             remoting_opts.execution_rpc_concurrency,
             remoting_opts.cache_rpc_concurrency,
+            remoting_opts.cache_read_timeout,
             capabilities_cell_opt,
           )?),
           exec_strategy_opts.remote_parallelism,
@@ -274,6 +276,7 @@ impl Core {
           remoting_opts.cache_warnings_behavior,
           remoting_opts.cache_eager_fetch,
           remoting_opts.cache_rpc_concurrency,
+          remoting_opts.cache_read_timeout,
         )?)
       } else {
         local_command_runner
