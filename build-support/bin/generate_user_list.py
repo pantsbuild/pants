@@ -80,6 +80,11 @@ _orgs = (
         "https://files.readme.io/e87f6c5-Orca_Security-small.png",
     ),
     Org(
+        "Pave",
+        "https://www.pave.dev/",
+        "https://files.readme.io/924aa3e-pave-small.png",
+    ),
+    Org(
         "People Data Labs",
         "https://www.peopledatalabs.com/",
         "https://files.readme.io/8c4f5cd-peopledatalabs-small.png",
