@@ -13,13 +13,11 @@ from pants.backend.scala.dependency_inference.scala_parser import (
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
+from pants.jvm.resolve import user_resolves
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -30,9 +28,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *scala_parser.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *jdk_rules.rules(),
             *target_types.rules(),

@@ -23,8 +23,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath, jdk_rules
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
+from pants.jvm.resolve import user_resolves
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -35,8 +34,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *classpath.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *user_resolves.rules(),
             *jdk_rules.rules(),
             *javac_rules(),
             *util_rules(),

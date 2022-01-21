@@ -8,14 +8,12 @@ import textwrap
 import pytest
 
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.process import rules as process_rules
 from pants.jvm.jdk_rules import JdkSetup, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
+from pants.jvm.resolve import user_resolves
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -27,9 +25,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *source_files.rules(),
-            *coursier_setup_rules(),
-            *coursier_fetch_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *util_rules(),
             *jdk_rules(),
             *process_rules(),

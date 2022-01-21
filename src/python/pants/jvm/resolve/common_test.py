@@ -39,7 +39,7 @@ def test_lockfile_filter(
     # 1 direct dependency, more transitive dependencies (coord2)
     # 1 where direct dependencies provide no transitive dependencies (coord 4)
     # 1 where direct dependencies provide repeated dependencies (coord5)
-    direct = {
+    direct: dict[Coordinate, set[Coordinate]] = {
         _coord1: set(),
         _coord2: {_coord3},  # 1, 2, 3, 4, 5
         _coord3: {_coord1, _coord4, _coord5},  # 1, 3, 4, 5

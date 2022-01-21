@@ -17,7 +17,6 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import archive, config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
@@ -25,15 +24,14 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve import user_resolves
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     Coordinate,
     Coordinates,
     CoursierLockfileEntry,
 )
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -51,9 +49,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *archive.rules(),
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *javac_rules(),
             *javac_check_rules(),

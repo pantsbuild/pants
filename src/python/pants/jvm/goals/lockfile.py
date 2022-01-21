@@ -104,7 +104,7 @@ async def prepare_coursier_resolve_info(
 
 
 @rule(level=LogLevel.DEBUG)
-async def coursier_resolve_lockfile(
+async def resolve_lockfile_with_coursier(
     bash: BashBinary,
     coursier: Coursier,
     artifact_requirements: ArtifactRequirements,

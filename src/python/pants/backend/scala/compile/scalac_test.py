@@ -21,6 +21,7 @@ from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import CompileResult, FallibleClasspathEntry
+from pants.jvm.resolve import user_resolves
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     Coordinate,
@@ -28,9 +29,7 @@ from pants.jvm.resolve.common import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
 )
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -46,8 +45,7 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *user_resolves.rules(),
             *jdk_rules.rules(),
             *scalac_check_rules(),
             *scalac_rules(),

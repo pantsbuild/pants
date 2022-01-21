@@ -11,13 +11,13 @@ import pytest
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.core.util_rules import source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Targets
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMserResolveNames
+from pants.jvm.resolve import user_resolves
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -26,9 +26,7 @@ from pants.jvm.resolve.common import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
 )
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -39,10 +37,8 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *coursier_fetch_rules(),
             *lockfile.rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *util_rules(),
             QueryRule(Targets, [AddressSpecs]),

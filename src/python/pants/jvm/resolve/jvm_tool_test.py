@@ -7,16 +7,13 @@ import textwrap
 
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, SubsystemRule, rule
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.goals.lockfile import rules as lockfile_rules
-from pants.jvm.resolve import jvm_tool
+from pants.jvm.resolve import jvm_tool, user_resolves
 from pants.jvm.resolve.common import Coordinate
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -47,9 +44,7 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *util_rules(),
             *jvm_tool.rules(),

@@ -33,7 +33,6 @@ from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.target import CoarsenedTarget, Target, UnexpandedTargets
@@ -45,11 +44,9 @@ from pants.jvm.compile import (
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
 )
-from pants.jvm.goals import lockfile
+from pants.jvm.resolve import user_resolves
 from pants.jvm.resolve.common import CoursierResolveKey
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.user_resolves import CoursierFetchRequest
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -65,11 +62,8 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *lockfile.rules(),
             *classpath.rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *java_dep_inf_rules(),
             *scala_dep_inf_rules(),
             *javac_rules(),

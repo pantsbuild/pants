@@ -22,15 +22,13 @@ from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
+from pants.jvm.resolve import user_resolves
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -41,9 +39,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *classpath.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *scalac_rules(),
             *util_rules(),

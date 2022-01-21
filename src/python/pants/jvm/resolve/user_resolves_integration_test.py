@@ -12,6 +12,7 @@ from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve import user_resolves
 from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
@@ -19,7 +20,6 @@ from pants.jvm.resolve.common import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
 )
-from pants.jvm.resolve.user_resolves import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
+            *user_resolves.rules(),
             *source_files.rules(),
             *util_rules(),
             *lockfile.rules(),
