@@ -12,6 +12,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem, GoRoot
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -29,6 +30,7 @@ class GoSdkProcess:
     working_dir: str | None = None
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+    platform: Platform | None = None
 
     def __init__(
         self,
@@ -41,6 +43,7 @@ class GoSdkProcess:
         output_files: Iterable[str] = (),
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
+        platform: Platform | None = None,
     ) -> None:
         self.command = tuple(command)
         self.description = description
@@ -53,6 +56,7 @@ class GoSdkProcess:
         self.working_dir = working_dir
         self.output_files = tuple(output_files)
         self.output_directories = tuple(output_directories)
+        self.platform = platform
 
 
 @dataclass(frozen=True)
@@ -111,6 +115,7 @@ async def setup_go_sdk_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
+        platform=request.platform,
     )
 
 
