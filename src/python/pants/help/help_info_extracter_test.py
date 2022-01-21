@@ -463,6 +463,20 @@ def test_get_all_help_info():
                 "union_type": None,
                 "used_in_rules": (),
             },
+            "pants.option.scope.Scope": {
+                "consumed_by_rules": (),
+                "dependees": (),
+                "dependencies": (),
+                "documentation": "An options scope.",
+                "is_union": False,
+                "module": "pants.option.scope",
+                "name": "Scope",
+                "provider": "pants.option.scope",
+                "returned_by_rules": (),
+                "union_members": (),
+                "union_type": None,
+                "used_in_rules": ("construct_scope_foo",),
+            },
         },
         "name_to_rule_info": {
             "construct_scope_foo": {

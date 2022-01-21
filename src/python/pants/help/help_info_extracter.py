@@ -596,6 +596,9 @@ class HelpInfoExtracter:
                 provider = cls.get_first_provider(providers)
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
+                for constraint in rule.input_gets:
+                    yield constraint.input_type, _find_provider(constraint.input_type), ()
+
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():
                 provider = cls.get_first_provider(providers)

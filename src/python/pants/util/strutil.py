@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -144,7 +144,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
 
 
-def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
+def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
     """Hard wrap a string while still preserving any prior hard wrapping (new lines).
 
     This works well when the input uses soft wrapping, e.g. via Python's implicit string

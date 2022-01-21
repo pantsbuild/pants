@@ -282,20 +282,40 @@ class HelpPrinter(MaybeColor):
 
     def _print_all_api_types(self) -> None:
         self._print_title("Plugin API Types")
-        api_type_descriptions: Dict[str, str] = {}
-        for name, api_info in self._all_help_info.name_to_api_type_info.items():
+        api_type_descriptions: Dict[str, Tuple[str, str]] = {}
+        indent_api_summary = 0
+        for api_info in self._all_help_info.name_to_api_type_info.values():
+            name = api_info.name
             if name.startswith("_"):
                 continue
             if api_info.is_union:
-                name += " [union]"
-            api_type_descriptions[name] = (api_info.documentation or "").split("\n", 1)[0]
-        longest_api_type_name = max(len(name) for name in api_type_descriptions.keys())
-        chars_before_description = longest_api_type_name + 2
-        for api_type, description in api_type_descriptions.items():
-            name = self.maybe_cyan(api_type.ljust(chars_before_description))
-            description = self._format_summary_description(description, chars_before_description)
+                name += " <union>"
+            summary = (api_info.documentation or "").split("\n", 1)[0]
+            api_type_descriptions[name] = (api_info.module, summary)
+            indent_api_summary = max(indent_api_summary, len(name) + 2, len(api_info.module) + 2)
+
+        for name, (module, summary) in api_type_descriptions.items():
+            name = self.maybe_cyan(name.ljust(indent_api_summary))
+            description_lines = hard_wrap(
+                summary or " ", indent=indent_api_summary, width=self._width
+            )
+            # Juggle the description lines, to inject the api type module on the second line flushed
+            # left just below the type name (potentially sharing the line with the second line of
+            # the description that will be aligned to the right).
+            if len(description_lines) > 1:
+                # Place in front of the description line.
+                description_lines[
+                    1
+                ] = f"{module:{indent_api_summary}}{description_lines[1][indent_api_summary:]}"
+            else:
+                # There is no second description line.
+                description_lines.append(module)
+            # All description lines are indented, but the first line should be indented by the api
+            # type name, so we strip that.
+            description_lines[0] = description_lines[0][indent_api_summary:]
+            description = "\n".join(description_lines)
             print(f"{name}{description}\n")
-        api_help_cmd = f"{self._bin_name} help $api_type|$rule_name"
+        api_help_cmd = f"{self._bin_name} help [api_type/rule_name]"
         print(
             f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
         )
@@ -399,7 +419,7 @@ class HelpPrinter(MaybeColor):
         print()
 
     def _print_api_type_help(self, name: str, show_advanced: bool) -> None:
-        self._print_title(f"`{name}` Plugin API Type")
+        self._print_title(f"`{name}` api type")
         type_info = self._all_help_info.name_to_api_type_info[name]
         print("\n".join(hard_wrap(type_info.documentation or "Undocumented.", width=self._width)))
         print()
@@ -407,12 +427,19 @@ class HelpPrinter(MaybeColor):
             {
                 "activated by": type_info.provider,
                 "union type": type_info.union_type,
-                "use": f"from {type_info.module} import {type_info.name}\n",
                 "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
                 "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
                 "dependees": "\n".join(type_info.dependees) if show_advanced else None,
-                "returned by": "\n".join(type_info.returned_by_rules) if show_advanced else None,
-                "consumed by": "\n".join(type_info.consumed_by_rules) if show_advanced else None,
+                f"returned by {pluralize(len(type_info.returned_by_rules), 'rule')}": "\n".join(
+                    type_info.returned_by_rules
+                )
+                if show_advanced
+                else None,
+                f"consumed by {pluralize(len(type_info.consumed_by_rules), 'rule')}": "\n".join(
+                    type_info.consumed_by_rules
+                )
+                if show_advanced
+                else None,
                 f"used in {pluralize(len(type_info.used_in_rules), 'rule')}": "\n".join(
                     type_info.used_in_rules
                 )
