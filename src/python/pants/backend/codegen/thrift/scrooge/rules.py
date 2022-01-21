@@ -144,7 +144,11 @@ async def generate_scrooge_thrift_sources(
 async def generate_scrooge_lockfile_request(
     _: ScroogeToolLockfileSentinel, scrooge: ScroogeSubsystem
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(scrooge))
+    return await Get(
+        GenerateJvmLockfile,
+        GenerateJvmLockfileFromTool,
+        GenerateJvmLockfileFromTool.create(scrooge),
+    )
 
 
 def rules():

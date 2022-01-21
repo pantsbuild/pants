@@ -242,7 +242,7 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
             artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
-            option_name="--scalapb-plugin-artifacts",
+            option_name="[scalapb].jvm_plugins",
         ),
     )
     classpath = await Get(
@@ -378,7 +378,9 @@ async def setup_scalapb_shim_classfiles(
 async def generate_scalapbc_lockfile_request(
     _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
+    )
 
 
 def rules():

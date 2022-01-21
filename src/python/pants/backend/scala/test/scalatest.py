@@ -172,7 +172,11 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 async def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(scalatest))
+    return await Get(
+        GenerateJvmLockfile,
+        GenerateJvmLockfileFromTool,
+        GenerateJvmLockfileFromTool.create(scalatest),
+    )
 
 
 def rules():

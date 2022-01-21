@@ -40,7 +40,9 @@ class MockJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
 async def generate_test_tool_lockfile_request(
     _: MockJvmToolLockfileSentinel, tool: MockJvmTool
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
+    )
 
 
 def test_jvm_tool_base_extracts_correct_coordinates() -> None:

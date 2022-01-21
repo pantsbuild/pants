@@ -105,6 +105,9 @@ class JvmToolBase(Subsystem):
 
 @dataclass(frozen=True)
 class GatherJvmCoordinatesRequest:
+    """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
+    `jar_artifact` targets into `ArtifactRequirements`."""
+
     artifact_inputs: FrozenOrderedSet[str]
     option_name: str
 

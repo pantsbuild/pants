@@ -328,7 +328,9 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 async def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
+    )
 
 
 def rules():

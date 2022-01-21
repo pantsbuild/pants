@@ -169,7 +169,9 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 async def generate_junit_lockfile_request(
     _: JunitToolLockfileSentinel, junit: JUnit
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(junit))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(junit)
+    )
 
 
 def rules():

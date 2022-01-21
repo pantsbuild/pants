@@ -220,7 +220,9 @@ async def compile_avro_source(
 async def generate_avro_tools_lockfile_request(
     _: AvroToolLockfileSentinel, tool: AvroSubsystem
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
+    )
 
 
 def rules():

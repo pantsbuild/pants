@@ -171,7 +171,9 @@ async def google_java_format_lint(
 async def generate_google_java_format_lockfile_request(
     _: GoogleJavaFormatToolLockfileSentinel, tool: GoogleJavaFormatSubsystem
 ) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+    return await Get(
+        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
+    )
 
 
 def rules():
