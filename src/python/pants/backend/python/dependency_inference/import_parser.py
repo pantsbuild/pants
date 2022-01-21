@@ -73,7 +73,7 @@ class AstVisitor(ast.NodeVisitor):
                 name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
 
             if name is not None:
-                self.imports_add(name)
+                self.imports.add(name)
                 return
 
       self.generic_visit(node)
