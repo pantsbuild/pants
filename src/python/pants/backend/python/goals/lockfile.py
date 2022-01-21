@@ -27,14 +27,14 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import (
+    GenerateLockfile,
+    GenerateLockfileResult,
     GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
-    Lockfile,
-    LockfileRequest,
     RequestedUserResolveNames,
-    UserLockfileRequests,
-    WrappedLockfileRequest,
+    UserGenerateLockfiles,
+    WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonLockfileRequest(LockfileRequest):
+class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
     # Only kept for `[python].experimental_lockfile`, which is not using the new
@@ -64,7 +64,7 @@ class PythonLockfileRequest(LockfileRequest):
         interpreter_constraints: InterpreterConstraints | None = None,
         *,
         extra_requirements: Iterable[str] = (),
-    ) -> PythonLockfileRequest:
+    ) -> GeneratePythonLockfile:
         """Create a request for a dedicated lockfile for the tool.
 
         If the tool determines its interpreter constraints by using the constraints of user code,
@@ -96,8 +96,8 @@ class PythonLockfileRequest(LockfileRequest):
 
 
 @rule
-def wrap_python_lockfile_request(request: PythonLockfileRequest) -> WrappedLockfileRequest:
-    return WrappedLockfileRequest(request)
+def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGenerateLockfile:
+    return WrappedGenerateLockfile(request)
 
 
 class MaybeWarnPythonRepos:
@@ -127,11 +127,11 @@ def maybe_warn_python_repos(python_repos: PythonRepos) -> MaybeWarnPythonRepos:
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: PythonLockfileRequest,
+    req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     _: MaybeWarnPythonRepos,
-) -> Lockfile:
+) -> GenerateLockfileResult:
     pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
     pyproject_toml_digest, launcher_digest = await MultiGet(
         Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
@@ -206,7 +206,7 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return Lockfile(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
@@ -231,9 +231,9 @@ def determine_python_user_resolves(
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
-) -> UserLockfileRequests:
+) -> UserGenerateLockfiles:
     if not python_setup.enable_resolves:
-        return UserLockfileRequests()
+        return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
@@ -248,8 +248,8 @@ async def setup_user_lockfile_requests(
     #  inspect all consumers of that resolve or start to closely couple the resolve with the
     #  interpreter constraints (a "context").
 
-    return UserLockfileRequests(
-        PythonLockfileRequest(
+    return UserGenerateLockfiles(
+        GeneratePythonLockfile(
             requirements=PexRequirements.create_from_requirement_fields(
                 resolve_to_requirements_fields[resolve],
                 constraints_strings=(),
@@ -265,7 +265,7 @@ async def setup_user_lockfile_requests(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(LockfileRequest, PythonLockfileRequest),
+        UnionRule(GenerateLockfile, GeneratePythonLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
     )

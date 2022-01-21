@@ -7,10 +7,10 @@ import os.path
 from typing import Iterable, cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -118,18 +118,18 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel(ToolLockfileSentinel):
+class YapfLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = Yapf.options_scope
 
 
 @rule
-def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(yapf)
+def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(yapf)
 
 
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, YapfLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, YapfLockfileSentinel),
     )

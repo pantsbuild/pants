@@ -13,7 +13,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -45,11 +45,15 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -60,7 +64,7 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class ScalapbcToolLockfileSentinel(ToolLockfileSentinel):
+class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = ScalaPBSubsystem.options_scope
 
 
@@ -112,6 +116,8 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -123,7 +129,7 @@ async def generate_scala_from_protobuf(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(scalapb.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
         Get(Digest, CreateDigest([Directory(output_dir)])),
@@ -279,6 +285,8 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
             MaterializedClasspath,
@@ -311,7 +319,7 @@ async def setup_scalapb_shim_classfiles(
             MaterializedClasspath,
             MaterializedClasspathRequest(
                 prefix="__shimcp",
-                lockfiles=(scalapb.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
         Get(
@@ -368,10 +376,9 @@ async def setup_scalapb_shim_classfiles(
 
 @rule
 async def generate_scalapbc_lockfile_request(
-    _: ScalapbcToolLockfileSentinel,
-    tool: ScalaPBSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+    _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
 
 
 def rules():
@@ -379,5 +386,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
-        UnionRule(ToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
     ]

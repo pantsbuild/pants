@@ -5,12 +5,12 @@ import itertools
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonProvidesField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -44,7 +44,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel(ToolLockfileSentinel):
+class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = Setuptools.options_scope
 
 
@@ -54,9 +54,9 @@ class SetuptoolsLockfileSentinel(ToolLockfileSentinel):
 )
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not setuptools.uses_lockfile:
-        return PythonLockfileRequest.from_tool(setuptools)
+        return GeneratePythonLockfile.from_tool(setuptools)
 
     all_tgts = await Get(AllTargets, AllTargetsRequest())
     transitive_targets_per_python_dist = await MultiGet(
@@ -70,7 +70,7 @@ async def setup_setuptools_lockfile(
         for transitive_targets in transitive_targets_per_python_dist
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         setuptools, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )
 
@@ -79,5 +79,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, SetuptoolsLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, SetuptoolsLockfileSentinel),
     )

@@ -8,7 +8,7 @@ from pants.option.subsystem import Subsystem
 
 
 class ScroogeJavaSubsystem(Subsystem):
-    options_scope = "scrooge-java"
+    options_scope = "java-scrooge"
     help = "Java-specific options for the Scrooge Thrift IDL compiler (https://twitter.github.io/scrooge/)."
 
     @classmethod

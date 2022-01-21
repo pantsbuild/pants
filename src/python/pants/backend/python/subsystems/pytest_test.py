@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.pytest import PyTest, PytestLockfileSentinel
 from pants.backend.python.subsystems.pytest import rules as subsystem_rules
 from pants.backend.python.target_types import (
@@ -27,7 +27,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         rules=[
             *subsystem_rules(),
             *target_types_rules.rules(),
-            QueryRule(PythonLockfileRequest, [PytestLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [PytestLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonTestsGeneratorTarget, GenericTarget],
     )
@@ -41,7 +41,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
         rule_runner.write_files({"project/BUILD": build_file, "project/f_test.py": ""})
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [PytestLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [PytestLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     assert_ics("python_tests()", [global_constraint])

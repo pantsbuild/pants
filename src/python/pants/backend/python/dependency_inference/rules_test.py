@@ -274,7 +274,12 @@ def test_infer_python_strict(caplog) -> None:
 
     rule_runner.write_files(
         {
-            "src/python/cheesey.py": "import venezuelan_beaver_cheese",
+            "src/python/cheesey.py": dedent(
+                """\
+                    import venezuelan_beaver_cheese
+                    "japanese.sage.derby"
+                """
+            ),
             "src/python/BUILD": "python_sources()",
         }
     )
@@ -286,6 +291,7 @@ def test_infer_python_strict(caplog) -> None:
         rule_runner.set_options(
             [
                 f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
+                "--python-infer-string-imports",
                 "--source-root-patterns=src/python",
             ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -301,6 +307,7 @@ def test_infer_python_strict(caplog) -> None:
     assert len(caplog.records) == 1
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
     assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
+    assert "japanese.sage.derby" not in caplog.text
 
     # Now test with "error"
     caplog.clear()
@@ -311,6 +318,7 @@ def test_infer_python_strict(caplog) -> None:
     assert len(caplog.records) == 2  # one for the error being raised and one for our message
     assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
     assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
+    assert "japanese.sage.derby" not in caplog.text
 
     caplog.clear()
 

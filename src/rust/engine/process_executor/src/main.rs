@@ -300,6 +300,7 @@ async fn main() {
             Duration::from_millis(100),
             args.execution_rpc_concurrency,
             args.cache_rpc_concurrency,
+            Duration::from_secs(2),
             None,
           )
           .expect("Failed to make command runner"),

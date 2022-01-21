@@ -1,13 +1,14 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
+import logging
 from dataclasses import dataclass
 
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
@@ -17,11 +18,18 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    MaterializedClasspath,
+    MaterializedClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,7 +47,7 @@ class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
 
 
-class GoogleJavaFormatToolLockfileSentinel(ToolLockfileSentinel):
+class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = GoogleJavaFormatSubsystem.options_scope
 
 
@@ -62,6 +70,9 @@ async def setup_google_java_format(
     jdk_setup: JdkSetup,
     bash: BashBinary,
 ) -> Setup:
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
+
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
@@ -70,7 +81,7 @@ async def setup_google_java_format(
         Get(
             MaterializedClasspath,
             MaterializedClasspathRequest(
-                lockfiles=(tool.resolved_lockfile(),),
+                lockfiles=(lockfile,),
             ),
         ),
     )
@@ -158,10 +169,9 @@ async def google_java_format_lint(
 
 @rule
 async def generate_google_java_format_lockfile_request(
-    _: GoogleJavaFormatToolLockfileSentinel,
-    tool: GoogleJavaFormatSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+    _: GoogleJavaFormatToolLockfileSentinel, tool: GoogleJavaFormatSubsystem
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
 
 
 def rules():
@@ -170,5 +180,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
         UnionRule(LintRequest, GoogleJavaFormatRequest),
-        UnionRule(ToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

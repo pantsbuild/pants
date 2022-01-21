@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Iterable, cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
@@ -234,7 +234,7 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(ToolLockfileSentinel):
+class PylintLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = Pylint.options_scope
 
 
@@ -250,9 +250,9 @@ async def setup_pylint_lockfile(
     first_party_plugins: PylintFirstPartyPlugins,
     pylint: Pylint,
     python_setup: PythonSetup,
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not pylint.uses_lockfile:
-        return PythonLockfileRequest.from_tool(pylint)
+        return GeneratePythonLockfile.from_tool(pylint)
 
     # While Pylint will run in partitions, we need a single lockfile that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
@@ -289,7 +289,7 @@ async def setup_pylint_lockfile(
         )
 
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         pylint,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         extra_requirements=first_party_plugins.requirement_strings,
@@ -300,5 +300,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, PylintLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, PylintLockfileSentinel),
     )

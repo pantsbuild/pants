@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use std::ffi::OsString;
 use std::path::Component;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use fs::RelativePath;
@@ -59,6 +59,7 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+  read_timeout: Duration,
 }
 
 impl CommandRunner {
@@ -76,6 +77,7 @@ impl CommandRunner {
     warnings_behavior: RemoteCacheWarningsBehavior,
     eager_fetch: bool,
     concurrency_limit: usize,
+    read_timeout: Duration,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -109,6 +111,7 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+      read_timeout,
     })
   }
 
@@ -383,6 +386,7 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.eager_fetch,
+        self.read_timeout,
       )
       .await;
       match response {

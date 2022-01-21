@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *target_types_rules.rules(),
             QueryRule(PylintFirstPartyPlugins, []),
-            QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [PylintLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget, PythonRequirementTarget],
     )
@@ -119,7 +119,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [PylintLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [PylintLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
         assert lockfile_request.requirements == FrozenOrderedSet(
             [

@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import collections
 import collections.abc
-from typing import Any, Iterable, MutableMapping, TypeVar
+import math
+from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
+
+from pants.engine.internals import native_engine
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
@@ -71,3 +74,56 @@ def ensure_str_list(val: str | Iterable[str], *, allow_single_str: bool = False)
     If `allow_single_str` is True, a single `str` will be wrapped into a `List[str]`.
     """
     return ensure_list(val, expected_type=str, allow_single_scalar=allow_single_str)
+
+
+def partition_sequentially(
+    items: Iterable[_T],
+    *,
+    key: Callable[[_T], str],
+    size_target: int,
+    size_max: int | None = None,
+) -> Iterator[list[_T]]:
+    """Stably partitions the given items into batches of around `size_target` items.
+
+    The "stability" property refers to avoiding adjusting all batches when a single item is added,
+    which could happen if the items were trivially windowed using `itertools.islice` and an
+    item was added near the front of the list.
+
+    Batches will optionally be capped to `size_max`, but note that this can weaken the stability
+    properties of the bucketing, by forcing bucket boundaries to be created where they otherwise
+    might not.
+    """
+
+    # To stably partition the arguments into ranges of approximately `size_target`, we sort them,
+    # and create a new batch sequentially once we encounter an item hash prefixed with a threshold
+    # of zeros.
+    #
+    # The hashes act like a (deterministic) series of rolls of an evenly distributed die. The
+    # probability of a hash prefixed with Z zero bits is 1/2^Z, and so to break after N items on
+    # average, we look for `Z == log2(N)` zero bits.
+    #
+    # Breaking on these deterministic boundaries reduces the chance that adding or removing items
+    # causes multiple buckets to be recalculated. But when a `size_max` value is set, it's possible
+    # for adding items to cause multiple sequential buckets to be affected.
+    zero_prefix_threshold = math.log(max(1, size_target), 2)
+
+    batch: list[_T] = []
+
+    def emit_batch() -> list[_T]:
+        assert batch
+        result = list(batch)
+        batch.clear()
+        return result
+
+    keyed_items = []
+    for item in items:
+        keyed_items.append((key(item), item))
+    keyed_items.sort()
+
+    for item_key, item in keyed_items:
+        batch.append(item)
+        prefix_zero_bits = native_engine.hash_prefix_zero_bits(item_key)
+        if prefix_zero_bits >= zero_prefix_threshold or (size_max and len(batch) >= size_max):
+            yield emit_batch()
+    if batch:
+        yield emit_batch()
