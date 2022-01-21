@@ -25,17 +25,17 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::cmp;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use std::cmp;
 
 use futures::future::{self, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
-use terminal_size::{Width, Height, terminal_size};
+use terminal_size::{terminal_size, Height, Width};
 
 use task_executor::Executor;
 use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
@@ -121,9 +121,12 @@ impl ConsoleUI {
     let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
     multi_progress.set_move_cursor(false);
-    let terminal_dimensions = terminal_size().unwrap_or((Width(50), Height(self.local_parallelism.try_into().unwrap())));
-    let terminal_width = terminal_dimensions.0.0;
-    let terminal_height = terminal_dimensions.1.0 - 1;
+    let terminal_dimensions = terminal_size().unwrap_or((
+      Width(50),
+      Height(self.local_parallelism.try_into().unwrap()),
+    ));
+    let terminal_width = terminal_dimensions.0 .0;
+    let terminal_height = terminal_dimensions.1 .0 - 1;
 
     let bars = (0..cmp::min(self.local_parallelism, terminal_height.into()))
       .map(|_n| {
