@@ -386,7 +386,7 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.eager_fetch,
-        Some(self.read_timeout),
+        self.read_timeout,
       )
       .await;
       match response {

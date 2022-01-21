@@ -775,7 +775,7 @@ impl crate::CommandRunner for CommandRunner {
       self.action_cache_client.clone(),
       self.store.clone(),
       false,
-      Some(self.cache_read_timeout),
+      self.cache_read_timeout,
     )
     .await?;
     debug!(
@@ -1345,7 +1345,7 @@ pub async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   eager_fetch: bool,
-  timeout_duration: Option<Duration>,
+  timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
     context.workunit_store.clone(),
@@ -1374,15 +1374,10 @@ pub async fn check_action_cache(
           let request = apply_headers(Request::new(request), &context.build_id);
           async move {
             let lookup_fut = client.get_action_result(request);
-            match timeout_duration {
-              Some(d) => {
-                let timeout_fut = tokio::time::timeout(d, lookup_fut);
-                timeout_fut
-                  .await
-                  .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
-              }
-              None => lookup_fut.await,
-            }
+            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
+            timeout_fut
+              .await
+              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
           }
         },
         status_is_retryable,
