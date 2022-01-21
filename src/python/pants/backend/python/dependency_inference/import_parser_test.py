@@ -212,6 +212,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
+        __import__(u"{}".format("interpolation"))
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")

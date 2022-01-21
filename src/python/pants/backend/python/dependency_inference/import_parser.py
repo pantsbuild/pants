@@ -67,14 +67,15 @@ class AstVisitor(ast.NodeVisitor):
           and node.func.id == "__import__"
           and len(node.args) == 1
       ):
-          if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-              arg_s = node.args[0].s
-              val = arg_s.decode("utf-8") if isinstance(arg_s, bytes) else arg_s
-              self.imports.add(arg_s)
-              return
-          elif isinstance(node.args[0], ast.Constant):
-              self.imports.add(str(node.args[0].value))
-              return
+            if sys.version_info[0:2] < (3, 8):
+                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
+            else:
+                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
+
+            if name is not None:
+                self.imports_add(name)
+                return
+
       self.generic_visit(node)
 
 if os.environ["STRING_IMPORTS"] == "y":
