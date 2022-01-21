@@ -668,8 +668,9 @@ async def get_coursier_lockfile_for_resolve(
 
 
 @dataclass(frozen=True)
-class MaterializedClasspathRequest:
-    """A helper to merge various classpath elements.
+class ToolClasspathRequest:
+    """A request to set up the classpath for a JVM tool by fetching artifacts and merging the
+    classpath.
 
     :param prefix: if set, should be a relative directory that will
         be prepended to every classpath element.  This is useful for
@@ -685,11 +686,8 @@ class MaterializedClasspathRequest:
 
 
 @dataclass(frozen=True)
-class MaterializedClasspath:
-    """A fully fetched and merged classpath, ready to hand to a JVM process invocation.
-
-    TODO: Consider renaming to reflect the fact that this is always a 3rdparty classpath.
-    """
+class ToolClasspath:
+    """A fully fetched and merged classpath for running a JVM tool."""
 
     content: Snapshot
 
@@ -713,7 +711,7 @@ class MaterializedClasspath:
 
 
 @rule(level=LogLevel.DEBUG)
-async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
+async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
     artifact_requirements_lockfiles = await MultiGet(
@@ -739,7 +737,7 @@ async def materialize_classpath(request: MaterializedClasspathRequest) -> Materi
     )
     if request.prefix is not None:
         merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
-    return MaterializedClasspath(content=merged_snapshot)
+    return ToolClasspath(content=merged_snapshot)
 
 
 def rules():

@@ -13,7 +13,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
 
 
@@ -28,8 +28,8 @@ async def create_scala_repl_request(
     user_classpath, tool_classpath = await MultiGet(
         Get(Classpath, Addresses(t.address for t in repl.targets)),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
                     ArtifactRequirements.from_coordinates(

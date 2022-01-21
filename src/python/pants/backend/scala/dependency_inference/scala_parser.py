@@ -32,7 +32,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -229,8 +229,8 @@ async def analyze_scala_source_dependencies(
 
     (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,),
             ),
         ),
@@ -309,8 +309,8 @@ async def setup_scala_parser_classfiles(
 
     tool_classpath, parser_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
                     ArtifactRequirements.from_coordinates(
@@ -336,8 +336,8 @@ async def setup_scala_parser_classfiles(
             ),
         ),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__parsercp", artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,)
             ),
         ),

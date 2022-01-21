@@ -28,7 +28,7 @@ from pants.jvm.compile import (
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
@@ -116,8 +116,8 @@ async def compile_scala_source(
     user_classpath = Classpath(direct_dependency_classpath_entries)
     tool_classpath, sources_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 artifact_requirements=(
                     ArtifactRequirements.from_coordinates(
                         [

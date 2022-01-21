@@ -49,8 +49,8 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import (
     GatherJvmCoordinatesRequest,
@@ -83,7 +83,7 @@ class MaterializeJvmPluginRequest:
 @dataclass(frozen=True)
 class MaterializedJvmPlugin:
     name: str
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def setup_arg(self, plugin_relpath: str) -> str:
         classpath_arg = ":".join(self.classpath.classpath_entries(plugin_relpath))
@@ -130,8 +130,8 @@ async def generate_scala_from_protobuf(
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 lockfiles=(lockfile,),
             ),
         ),
@@ -249,7 +249,7 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ),
     )
     classpath = await Get(
-        MaterializedClasspath, MaterializedClasspathRequest(artifact_requirements=(requirements,))
+        ToolClasspath, ToolClasspathRequest(artifact_requirements=(requirements,))
     )
     return MaterializedJvmPlugin(
         name=request.plugin.name,
@@ -292,8 +292,8 @@ async def setup_scalapb_shim_classfiles(
 
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=(
                     ArtifactRequirements.from_coordinates(
@@ -319,8 +319,8 @@ async def setup_scalapb_shim_classfiles(
             ),
         ),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__shimcp",
                 lockfiles=(lockfile,),
             ),

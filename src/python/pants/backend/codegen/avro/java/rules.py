@@ -38,8 +38,8 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -106,8 +106,8 @@ async def compile_avro_source(
 
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 lockfiles=(lockfile,),
             ),
         ),

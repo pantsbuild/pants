@@ -19,8 +19,8 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
@@ -57,8 +57,8 @@ async def generate_scrooge_thrift_sources(
 
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 lockfiles=(lockfile,),
             ),
         ),
