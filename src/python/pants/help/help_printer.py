@@ -5,7 +5,7 @@ import dataclasses
 import difflib
 import json
 import textwrap
-from typing import Dict, cast
+from typing import Dict, Optional, cast
 
 from typing_extensions import Literal
 
@@ -85,6 +85,20 @@ class HelpPrinter(MaybeColor):
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
         print(f"\n{title}\n")
 
+    def _print_table(self, table: Dict[str, Optional[str]], indent: int = 0) -> None:
+        longest_key = max(len(key) for key, value in table.items() if value is not None)
+        for key, value in table.items():
+            if value is None:
+                continue
+            print(
+                self.maybe_cyan(f"{key:{longest_key}}:"),
+                self.maybe_magenta(
+                    f"\n{' ':{longest_key+2}}".join(
+                        hard_wrap(value, width=self._width - longest_key - 2)
+                    )
+                ),
+            )
+
     def _print_all_help(self) -> None:
         print(self._get_help_json())
 
@@ -116,8 +130,10 @@ class HelpPrinter(MaybeColor):
                     self._print_options_help(thing, help_request.advanced)
                 elif thing in self._all_help_info.name_to_target_type_info:
                     self._print_target_help(thing)
-                elif thing in self._all_help_info.rule_output_type_to_rule_infos:
+                elif thing in self._all_help_info.name_to_api_type_info:
                     self._print_api_type_help(thing, help_request.advanced)
+                elif thing in self._all_help_info.name_to_rule_info:
+                    self._print_rule_help(thing, help_request.advanced)
                 else:
                     print(self.maybe_red(f"Unknown entity: {thing}"))
         else:
@@ -205,18 +221,22 @@ class HelpPrinter(MaybeColor):
     def _print_all_api_types(self) -> None:
         self._print_title("Plugin API Types")
         api_type_descriptions: Dict[str, str] = {}
-        for api_type, rule_infos in self._all_help_info.rule_output_type_to_rule_infos.items():
-            if api_type.startswith("_"):
+        for name, api_info in self._all_help_info.name_to_api_type_info.items():
+            if name.startswith("_"):
                 continue
-            api_type_descriptions[api_type] = rule_infos[0].output_desc or ""
+            if api_info.is_union:
+                name += " [union]"
+            api_type_descriptions[name] = (api_info.documentation or "").split("\n", 1)[0]
         longest_api_type_name = max(len(name) for name in api_type_descriptions.keys())
         chars_before_description = longest_api_type_name + 2
         for api_type, description in api_type_descriptions.items():
             name = self.maybe_cyan(api_type.ljust(chars_before_description))
             description = self._format_summary_description(description, chars_before_description)
             print(f"{name}{description}\n")
-        api_help_cmd = f"{self._bin_name} help $api_type"
-        print(f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type.\n")
+        api_help_cmd = f"{self._bin_name} help $api_type|$rule_name"
+        print(
+            f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
+        )
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
@@ -234,9 +254,13 @@ class HelpPrinter(MaybeColor):
         print_cmd("help targets", "List all installed target types.")
         print_cmd("help subsystems", "List all configurable subsystems.")
         print_cmd("help tools", "List all external tools.")
+        print_cmd("help api-types", "List all plugin API types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
-        print_cmd("help [target_type/goal/subsystem]", "Help for a target type, goal or subsystem.")
+        print_cmd(
+            "help [target_type/goal/subsystem/api_type/rule]",
+            "Help for a target type, goal, subsystem, plugin API type or rule.",
+        )
         print_cmd(
             "help-advanced [goal/subsystem]", "Help for a goal or subsystem's advanced options."
         )
@@ -312,44 +336,52 @@ class HelpPrinter(MaybeColor):
                 print("\n" + formatted_desc)
         print()
 
-    def _print_api_type_help(self, output_type: str, show_advanced: bool) -> None:
-        self._print_title(f"`{output_type}` API type")
-        rule_infos = self._all_help_info.rule_output_type_to_rule_infos[output_type]
-        if rule_infos[0].output_desc:
-            print("\n".join(hard_wrap(rule_infos[0].output_desc, width=self._width)))
-            print()
-        print(f"Returned by {pluralize(len(rule_infos), 'rule')}:")
-        for rule_info in rule_infos:
-            print()
-            print(self.maybe_magenta(rule_info.name))
-            indent = "    "
-            print(self.maybe_cyan(f"{indent}activated by"), rule_info.provider)
-            if rule_info.input_types:
-                print(
-                    self.maybe_cyan(f"{indent}{pluralize(len(rule_info.input_types), 'input')}:"),
-                    ", ".join(rule_info.input_types),
+    def _print_api_type_help(self, name: str, show_advanced: bool) -> None:
+        self._print_title(f"`{name}` Plugin API Type")
+        type_info = self._all_help_info.name_to_api_type_info[name]
+        print("\n".join(hard_wrap(type_info.documentation or "Undocumented.", width=self._width)))
+        print()
+        self._print_table(
+            {
+                "activated by": type_info.provider,
+                "union type": type_info.union_type,
+                "use": f"from {type_info.module} import {type_info.name}\n",
+                "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
+                "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
+                "dependees": "\n".join(type_info.dependees) if show_advanced else None,
+                "returned by": "\n".join(type_info.returned_by_rules) if show_advanced else None,
+                "consumed by": "\n".join(type_info.consumed_by_rules) if show_advanced else None,
+                f"used in {pluralize(len(type_info.used_in_rules), 'rule')}": "\n".join(
+                    type_info.used_in_rules
                 )
-            else:
-                print(self.maybe_cyan(f"{indent}no inputs"))
-            if show_advanced and rule_info.input_gets:
-                print(
-                    f"\n{indent}".join(
-                        hard_wrap(
-                            self.maybe_cyan(f"{pluralize(len(rule_info.input_gets), 'get')}: ")
-                            + ", ".join(rule_info.input_gets),
-                            indent=4,
-                            width=self._width - 4,
-                        )
-                    )
-                )
-            if rule_info.description:
-                print(f"{indent}{rule_info.description}")
-            if rule_info.help:
-                print("\n" + "\n".join(hard_wrap(rule_info.help, indent=4, width=self._width)))
+                if show_advanced
+                else None,
+            }
+        )
+        print()
+
+    def _print_rule_help(self, rule_name: str, show_advanced: bool) -> None:
+        rule = self._all_help_info.name_to_rule_info[rule_name]
+        title = f"`{rule_name}` rule"
+        self._print_title(title)
+        if rule.description:
+            print(rule.description + "\n")
+        print("\n".join(hard_wrap(rule.documentation or "Undocumented.", width=self._width)))
+        print()
+        self._print_table(
+            {
+                "activated by": rule.provider,
+                "returns": rule.output_type,
+                f"takes {pluralize(len(rule.input_types), 'input')}": ", ".join(rule.input_types),
+                f"awaits {pluralize(len(rule.input_gets), 'get')}": "\n".join(rule.input_gets)
+                if show_advanced
+                else None,
+            }
+        )
         print()
 
     def _get_help_json(self) -> str:
-        """Return a JSON object containing all the help info we have, for every scope."""
+        """Return a JSON object containing all the help info we have."""
         return json.dumps(
             dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=HelpJSONEncoder
         )

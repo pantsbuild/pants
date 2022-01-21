@@ -84,7 +84,7 @@ class ThingHelpBuiltinGoal(HelpBuiltinGoalBase):
     def create_help_request(self, options: Options) -> HelpRequest:
         return ThingHelp(
             advanced=False,
-            things=tuple(options.goals) + tuple(options.unknown_goals),
+            things=tuple(options.goals) + tuple(options.unknown_goals) + tuple(options.specs),
         )
 
 
@@ -96,7 +96,7 @@ class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
     def create_help_request(self, options: Options) -> HelpRequest:
         return ThingHelp(
             advanced=True,
-            things=tuple(options.goals) + tuple(options.unknown_goals),
+            things=tuple(options.goals) + tuple(options.unknown_goals) + tuple(options.specs),
         )
 
 

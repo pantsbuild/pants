@@ -63,6 +63,15 @@ class DockerImageOptionValueError(ValueError):
 
 @dataclass(frozen=True)
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
+    """Builds a Docker image from a Dockerfile.
+
+    The target fields (e.g. the `docker_image` fields) and the `[docker]` configuration scope
+    provides the required details for building the image.
+
+    See `./pants help docker docker_image` for avilable options, fields and their respective
+    documentations.
+    """
+
     required_fields = (DockerImageSourceField,)
 
     registries: DockerRegistriesField
@@ -194,6 +203,12 @@ async def build_docker_image(
     docker: DockerBinary,
     process_cleanup: ProcessCleanupOption,
 ) -> BuiltPackage:
+    """Build a Docker image.
+
+    Fetches the Docker build context and invokes a `docker build` command to execute the build.
+
+    The artefact of the returned `BuiltPackage` is an instance of `BuiltDockerImage`.
+    """
     context, wrapped_target = await MultiGet(
         Get(
             DockerBuildContext,
