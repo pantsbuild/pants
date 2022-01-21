@@ -205,7 +205,7 @@ class PyTest(PythonToolBase):
 
 
 class PytestLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = PyTest.options_scope
+    resolve_name = PyTest.options_scope
 
 
 @rule(

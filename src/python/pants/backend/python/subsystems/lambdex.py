@@ -31,7 +31,7 @@ class Lambdex(PythonToolBase):
 
 
 class LambdexLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Lambdex.options_scope
+    resolve_name = Lambdex.options_scope
 
 
 @rule

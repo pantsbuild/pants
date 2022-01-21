@@ -41,7 +41,7 @@ class GeneratedScroogeThriftSources:
 
 
 class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = ScroogeSubsystem.options_scope
+    resolve_name = ScroogeSubsystem.options_scope
 
 
 @rule

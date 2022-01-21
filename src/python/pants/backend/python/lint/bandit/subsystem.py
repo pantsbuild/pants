@@ -112,7 +112,7 @@ class Bandit(PythonToolBase):
 
 
 class BanditLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Bandit.options_scope
+    resolve_name = Bandit.options_scope
 
 
 @rule(

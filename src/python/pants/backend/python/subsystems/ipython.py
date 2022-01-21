@@ -49,7 +49,7 @@ class IPython(PythonToolBase):
 
 
 class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = IPython.options_scope
+    resolve_name = IPython.options_scope
 
 
 @rule(

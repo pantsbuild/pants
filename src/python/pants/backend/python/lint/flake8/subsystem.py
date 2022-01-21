@@ -232,7 +232,7 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 
 
 class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Flake8.options_scope
+    resolve_name = Flake8.options_scope
 
 
 @rule(

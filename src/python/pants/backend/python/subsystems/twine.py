@@ -130,7 +130,7 @@ class TwineSubsystem(PythonToolBase):
 
 
 class TwineLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = TwineSubsystem.options_scope
+    resolve_name = TwineSubsystem.options_scope
 
 
 @rule
