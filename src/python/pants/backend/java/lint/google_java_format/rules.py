@@ -17,8 +17,8 @@ from pants.engine.process import BashBinary, FallibleProcessResult, Process, Pro
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
@@ -176,7 +176,7 @@ def generate_google_java_format_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
+        *jvm_tool.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
         UnionRule(LintRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
