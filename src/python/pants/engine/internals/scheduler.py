@@ -182,6 +182,7 @@ class Scheduler:
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
+            cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties

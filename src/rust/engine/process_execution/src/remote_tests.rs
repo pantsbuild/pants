@@ -37,6 +37,7 @@ const STORE_CONCURRENCY_LIMIT: usize = 256;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 const CACHE_CONCURRENCY_LIMIT: usize = 256;
+const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -988,6 +989,7 @@ async fn sends_headers() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1187,6 +1189,7 @@ async fn ensure_inline_stdio_is_stored() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1570,6 +1573,7 @@ async fn execute_missing_file_uploads_if_known() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1644,6 +1648,7 @@ async fn execute_missing_file_errors_if_unknown() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -2315,6 +2320,7 @@ fn create_command_runner(
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .expect("Failed to make command runner");
