@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar, cast
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -151,7 +151,7 @@ class LockfileMetadata:
         )
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
-        metadata_dict = self._header_dict()
+        metadata_dict = self.__render_header_dict()
         metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
         metadata_as_a_comment = "\n".join(f"# {l}" for l in metadata_json).encode("ascii")
         header = b"%b\n%b\n%b" % (BEGIN_LOCKFILE_HEADER, metadata_as_a_comment, END_LOCKFILE_HEADER)
@@ -163,23 +163,36 @@ class LockfileMetadata:
 
         return b"%b\n#\n%b\n\n%b" % (regenerate_command_bytes, header, lockfile)
 
-    def _header_dict(self) -> dict[Any, Any]:
+    def __render_header_dict(self) -> dict[Any, Any]:
         """Produce a dictionary to be serialized into the lockfile header.
 
-        Subclasses should call `super` and update the resulting dictionary.
+        Each class should implement a class method called `header_attrs`, which returns a `dict`
+        containing the metadata attributes that should be stored in the lockfile.
         """
 
-        version: int
+        attrs = {}
+        for cls in reversed(self.__class__.__mro__[:-1]):
+            new_attrs = cast(LockfileMetadata, cls).header_attrs(self)
+            # TODO: figure out behaviour for multiple classes returning the same attr keys
+            # (possible, especially if a version does not override `header_attrs`)
+            attrs.update(new_attrs)
+
+        return attrs
+
+    @classmethod
+    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        return {"version": instance.metadata_version()}
+
+    def metadata_version(self):
+        """Returns the version number for this metadata class, or raises an exception.
+
+        To avoid raising an exception, ensure the subclass is decorated with
+        `lockfile_metadata_version`
+        """
         for (scope, ver), cls in _concrete_metadata_classes.items():
             if isinstance(self, cls):
-                version = ver
-                break
-        else:
-            raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
-
-        return {
-            "version": version,
-        }
+                return ver
+        raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
 
 
 def calculate_invalidation_digest(requirements: Iterable[str]) -> str:

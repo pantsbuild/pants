@@ -57,15 +57,6 @@ class JVMLockfileMetadata(LockfileMetadata):
             ),
         )
 
-    def _header_dict(self) -> dict[Any, Any]:
-        """Produce a dictionary to be serialized into the lockfile header.
-
-        Subclasses should call `super` and update the resulting dictionary.
-        """
-
-        d = super()._header_dict()
-        return d
-
     def is_valid_for(
         self,
         requirements: Iterable[ArtifactRequirement] | None,
@@ -110,13 +101,14 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
 
         return JVMLockfileMetadataV1(requirements)
 
-    def _header_dict(self) -> dict[Any, Any]:
-        out = super()._header_dict()
-
-        out["generated_with_requirements"] = (
-            sorted(self.requirements) if self.requirements is not None else None
-        )
-        return out
+    @classmethod
+    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(JVMLockfileMetadataV1, instance)
+        return {
+            "generated_with_requirements": sorted(instance.requirements)
+            if instance.requirements is not None
+            else None
+        }
 
     def is_valid_for(
         self,

@@ -59,18 +59,14 @@ class PythonLockfileMetadata(LockfileMetadata):
             ),
         )
 
-    def _header_dict(self) -> dict[Any, Any]:
-        """Produce a dictionary to be serialized into the lockfile header.
-
-        Subclasses should call `super` and update the resulting dictionary.
-        """
-
-        d = super()._header_dict()
-        d["valid_for_interpreter_constraints"] = [
-            str(ic) for ic in self.valid_for_interpreter_constraints
-        ]
-
-        return d
+    @classmethod
+    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadata, instance)
+        return {
+            "valid_for_interpreter_constraints": [
+                str(ic) for ic in instance.valid_for_interpreter_constraints
+            ]
+        }
 
     def is_valid_for(
         self,
@@ -107,10 +103,10 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
 
         return PythonLockfileMetadataV1(interpreter_constraints, requirements_digest)
 
-    def _header_dict(self) -> dict[Any, Any]:
-        d = super()._header_dict()
-        d["requirements_invalidation_digest"] = self.requirements_invalidation_digest
-        return d
+    @classmethod
+    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV1, instance)
+        return {"requirements_invalidation_digest": instance.requirements_invalidation_digest}
 
     def is_valid_for(
         self,
@@ -166,15 +162,16 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 
         return PythonLockfileMetadataV2(interpreter_constraints, requirements)
 
-    def _header_dict(self) -> dict[Any, Any]:
-        out = super()._header_dict()
-
+    @classmethod
+    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV2, instance)
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
-        out["generated_with_requirements"] = (
-            sorted(str(i) for i in self.requirements) if self.requirements is not None else None
-        )
-        return out
+        return {
+            "generated_with_requirements": sorted(str(i) for i in instance.requirements)
+            if instance.requirements is not None
+            else None
+        }
 
     def is_valid_for(
         self,
