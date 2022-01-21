@@ -30,7 +30,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -325,12 +324,10 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 
 
 @rule
-async def generate_scalafmt_lockfile_request(
+def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(
-        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
-    )
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():

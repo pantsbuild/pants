@@ -18,7 +18,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
@@ -71,19 +70,16 @@ class GlobalScalacPluginsToolLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule
-async def generate_global_scalac_plugins_lockfile_request(
+def generate_global_scalac_plugins_lockfile_request(
     _: GlobalScalacPluginsToolLockfileSentinel,
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
     scalac_plugins: Scalac,
-) -> GenerateJvmLockfile:
-    return await Get(
-        GenerateJvmLockfile,
-        GenerateJvmLockfileFromTool(
-            FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
-            artifact_option_name=f"[{scalac_plugins.options_scope}].plugins_global",
-            resolve_name="scalac-plugins",
-            lockfile_dest=scalac_plugins.plugins_global_lockfile,
-        ),
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool(
+        FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
+        artifact_option_name=f"[{scalac_plugins.options_scope}].plugins_global",
+        resolve_name="scalac-plugins",
+        lockfile_dest=scalac_plugins.plugins_global_lockfile,
     )
 
 

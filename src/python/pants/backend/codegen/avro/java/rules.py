@@ -35,7 +35,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -217,12 +216,10 @@ async def compile_avro_source(
 
 
 @rule
-async def generate_avro_tools_lockfile_request(
+def generate_avro_tools_lockfile_request(
     _: AvroToolLockfileSentinel, tool: AvroSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(
-        GenerateJvmLockfile, GenerateJvmLockfileFromTool, GenerateJvmLockfileFromTool.create(tool)
-    )
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
