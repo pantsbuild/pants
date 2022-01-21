@@ -102,9 +102,9 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(JVMLockfileMetadataV1, instance)
         return {
-            "generated_with_requirements": sorted(instance.requirements)
-            if instance.requirements is not None
-            else None
+            "generated_with_requirements": (
+                sorted(instance.requirements) if instance.requirements is not None else None
+            )
         }
 
     def is_valid_for(

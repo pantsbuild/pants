@@ -168,9 +168,11 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
         return {
-            "generated_with_requirements": sorted(str(i) for i in instance.requirements)
-            if instance.requirements is not None
-            else None,
+            "generated_with_requirements": (
+                sorted(str(i) for i in instance.requirements)
+                if instance.requirements is not None
+                else None
+            )
         }
 
     def is_valid_for(
