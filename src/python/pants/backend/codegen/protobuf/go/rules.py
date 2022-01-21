@@ -138,7 +138,7 @@ async def generate_go_from_protobuf(
 # Note: The versions of the Go protoc and gRPC plugins are hard coded in the following go.mod. To update,
 # copy the following go.mod and go.sum contents to go.mod and go.sum files in a new directory. Then update the
 # versions and run `go mod download all`. Copy the go.mod and go.sum contents back into these constants,
-# making sure to repalce tabs with `\t`.
+# making sure to replace tabs with `\t`.
 
 GO_PROTOBUF_GO_MOD = """\
 module org.pantsbuild.backend.go.protobuf
@@ -204,7 +204,7 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
-                env={"__GO_PROTOBUF_PLATFORM": str(platform)},
+                platform=platform,
             ),
         ),
         Get(
@@ -217,7 +217,7 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
-                env={"__GO_PROTOBUF_PLATFORM": str(platform)},
+                platform=platform,
             ),
         ),
     )
