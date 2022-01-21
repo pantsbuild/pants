@@ -50,10 +50,10 @@ class AstVisitor(ast.NodeVisitor):
 
     @staticmethod
     def _is_pragma_ignored(line):
-        return "# pants: ignore" in line
+        return "# pants: no-infer-dep" in line
 
     def _visit_import_stmt(self, node, import_prefix):
-        # N.B. We only add imports whose line doesn't contain "# pants: ignore"
+        # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
         # However, `ast` doesn't expose the exact lines each specific import is on,
         # so we are forced to tokenize the import statement to tease out which imported
         # name is on which line so we can check for the ignore pragma.

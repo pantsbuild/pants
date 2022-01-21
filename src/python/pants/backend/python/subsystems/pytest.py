@@ -11,7 +11,7 @@ from typing import Iterable, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -25,7 +25,7 @@ from pants.backend.python.target_types import (
     format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -204,7 +204,7 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel(ToolLockfileSentinel):
+class PytestLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = PyTest.options_scope
 
 
@@ -217,9 +217,9 @@ class PytestLockfileSentinel(ToolLockfileSentinel):
 )
 async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not pytest.uses_lockfile:
-        return PythonLockfileRequest.from_tool(pytest)
+        return GeneratePythonLockfile.from_tool(pytest)
 
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
@@ -239,7 +239,7 @@ async def setup_pytest_lockfile(
         for transitive_targets in transitive_targets_per_test
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         pytest, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )
 
@@ -248,5 +248,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, PytestLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, PytestLockfileSentinel),
     )

@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(MyPyConfigFile, []),
             QueryRule(MyPyFirstPartyPlugins, []),
-            QueryRule(PythonLockfileRequest, [MyPyLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [MyPyLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, GenericTarget],
     )
@@ -158,7 +158,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [MyPyLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [MyPyLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
         assert lockfile_request.requirements == FrozenOrderedSet(
             [

@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
@@ -30,18 +30,18 @@ class Lambdex(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class LambdexLockfileSentinel(ToolLockfileSentinel):
+class LambdexLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = Lambdex.options_scope
 
 
 @rule
-def setup_lambdex_lockfile(_: LambdexLockfileSentinel, lambdex: Lambdex) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(lambdex)
+def setup_lambdex_lockfile(_: LambdexLockfileSentinel, lambdex: Lambdex) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(lambdex)
 
 
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, LambdexLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, LambdexLockfileSentinel),
     )

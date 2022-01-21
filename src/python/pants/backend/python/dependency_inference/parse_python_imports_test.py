@@ -88,19 +88,19 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
         from project.demo import OriginalName as Renamed
-        import pragma_ignored  # pants: ignore
-        from also_pragma_ignored import doesnt_matter  # pants: ignore
+        import pragma_ignored  # pants: no-infer-dep
+        from also_pragma_ignored import doesnt_matter  # pants: no-infer-dep
         from multiline_import1 import (
             not_ignored1,
-            ignored1 as alias1,  # pants: ignore
+            ignored1 as alias1,  # pants: no-infer-dep
             ignored2 as \\
-                alias2,  # pants: ignore
-            ignored3 as  # pants: ignore
+                alias2,  # pants: no-infer-dep
+            ignored3 as  # pants: no-infer-dep
                 alias3,
-            ignored4 as alias4, ignored4,  # pants: ignore
+            ignored4 as alias4, ignored4,  # pants: no-infer-dep
             not_ignored2,
         )
-        from multiline_import2 import (ignored1,  # pants: ignore
+        from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
 
         if TYPE_CHECKING:
@@ -131,16 +131,16 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
         __import__("pkg_resources")
-        __import__("dunder_import_ignored")  # pants: ignore
-        __import__(  # pants: ignore
+        __import__("dunder_import_ignored")  # pants: no-infer-dep
+        __import__(  # pants: no-infer-dep
             "not_ignored_but_looks_like_it_could_be"
         )
         __import__(
-            "ignored"  # pants: ignore
+            "ignored"  # pants: no-infer-dep
         )
         __import__(
             "also_not_ignored_but_looks_like_it_could_be"
-        )  # pants: ignore
+        )  # pants: no-infer-dep
         """
     )
     assert_imports_parsed(
@@ -196,6 +196,12 @@ def test_try_except(rule_runner: RuleRunner) -> None:
         try: import strong8
         # This would be too complicated to try and handle
         except ImpError: pass
+
+        # At least one test with import on its own line
+        try:
+            import weak8
+        except ImportError:
+            import strong9
         """
     )
     assert_imports_parsed(
@@ -217,6 +223,8 @@ def test_try_except(rule_runner: RuleRunner) -> None:
             "strong6": ImpInfo(lineno=30, weak=False),
             "strong7": ImpInfo(lineno=32, weak=False),
             "strong8": ImpInfo(lineno=37, weak=False),
+            "weak8": ImpInfo(lineno=43, weak=True),
+            "strong9": ImpInfo(lineno=45, weak=False),
         },
     )
 

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, cast
@@ -17,8 +16,6 @@ from pants.core.util_rules.lockfile_metadata import (
 )
 from pants.jvm.resolve.common import ArtifactRequirement
 from pants.util.ordered_set import FrozenOrderedSet
-
-logger = logging.getLogger(__name__)
 
 _jvm_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.JVM)
 

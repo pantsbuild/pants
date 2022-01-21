@@ -13,7 +13,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -45,7 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
@@ -64,7 +64,7 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class ScalapbcToolLockfileSentinel(ToolLockfileSentinel):
+class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = ScalaPBSubsystem.options_scope
 
 
@@ -377,8 +377,8 @@ async def setup_scalapb_shim_classfiles(
 @rule
 async def generate_scalapbc_lockfile_request(
     _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
-) -> JvmLockfileRequest:
-    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(tool))
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
 
 
 def rules():
@@ -386,5 +386,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
-        UnionRule(ToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
     ]
