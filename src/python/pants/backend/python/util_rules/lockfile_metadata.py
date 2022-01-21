@@ -60,7 +60,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         )
 
     @classmethod
-    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadata, instance)
         return {
             "valid_for_interpreter_constraints": [
@@ -104,7 +104,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         return PythonLockfileMetadataV1(interpreter_constraints, requirements_digest)
 
     @classmethod
-    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadataV1, instance)
         return {"requirements_invalidation_digest": instance.requirements_invalidation_digest}
 
@@ -163,14 +163,14 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         return PythonLockfileMetadataV2(interpreter_constraints, requirements)
 
     @classmethod
-    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadataV2, instance)
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
         return {
             "generated_with_requirements": sorted(str(i) for i in instance.requirements)
             if instance.requirements is not None
-            else None
+            else None,
         }
 
     def is_valid_for(

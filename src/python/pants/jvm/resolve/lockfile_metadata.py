@@ -99,7 +99,7 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
         return JVMLockfileMetadataV1(requirements)
 
     @classmethod
-    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(JVMLockfileMetadataV1, instance)
         return {
             "generated_with_requirements": sorted(instance.requirements)

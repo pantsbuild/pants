@@ -166,21 +166,27 @@ class LockfileMetadata:
     def __render_header_dict(self) -> dict[Any, Any]:
         """Produce a dictionary to be serialized into the lockfile header.
 
-        Each class should implement a class method called `header_attrs`, which returns a `dict`
-        containing the metadata attributes that should be stored in the lockfile.
+        Each class should implement a class method called `additional_header_attrs`, which returns a
+        `dict` containing the metadata attributes that should be stored in the lockfile.
         """
 
-        attrs = {}
+        attrs: dict[Any, Tuple[Any, Type]] = {}  # attr name -> (value, where we first saw it)
         for cls in reversed(self.__class__.__mro__[:-1]):
-            new_attrs = cast(LockfileMetadata, cls).header_attrs(self)
-            # TODO: figure out behaviour for multiple classes returning the same attr keys
-            # (possible, especially if a version does not override `header_attrs`)
-            attrs.update(new_attrs)
+            new_attrs = cast(LockfileMetadata, cls).additional_header_attrs(self)
+            for attr in new_attrs:
+                if attr in attrs and attrs[attr][0] != new_attrs[attr]:
+                    raise AssertionError(
+                        f"Lockfile header attribute `{attr}` was returned by both "
+                        f"`{attrs[attr][1]}` and `{cls}`, returning different values. If these "
+                        "classes return the same attribute, they must also return the same "
+                        "value."
+                    )
+                attrs[attr] = new_attrs[attr], cls
 
-        return attrs
+        return {key: val[0] for key, val in attrs.items()}
 
     @classmethod
-    def header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         return {"version": instance.metadata_version()}
 
     def metadata_version(self):
