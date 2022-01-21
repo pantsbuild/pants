@@ -5,7 +5,8 @@ import dataclasses
 import difflib
 import json
 import textwrap
-from typing import Dict, Optional, cast
+from itertools import cycle
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from typing_extensions import Literal
 
@@ -43,6 +44,7 @@ class HelpPrinter(MaybeColor):
         self._help_request = help_request
         self._all_help_info = all_help_info
         self._width = terminal_width()
+        self._reserved_names = {"api-types", "global", "goals", "subsystems", "targets", "tools"}
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
@@ -56,23 +58,13 @@ class HelpPrinter(MaybeColor):
         elif isinstance(self._help_request, AllHelp):
             self._print_all_help()
         elif isinstance(self._help_request, ThingHelp):
-            self._print_thing_help()
+            return self._print_thing_help()
         elif isinstance(self._help_request, UnknownGoalHelp):
             # Only print help and suggestions for the first unknown goal.
             # It gets confusing to try and show suggestions for multiple cases.
             unknown_goal = self._help_request.unknown_goals[0]
             print(f"Unknown goal: {self.maybe_red(unknown_goal)}")
-
-            did_you_mean = list(
-                difflib.get_close_matches(
-                    unknown_goal, self._all_help_info.name_to_goal_info.keys()
-                )
-            )
-
-            if did_you_mean:
-                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
-                print(f"Did you mean {formatted_matches}?")
-
+            self._print_alternatives(unknown_goal, self._all_help_info.name_to_goal_info.keys())
             print_hint()
             return 1
         elif isinstance(self._help_request, NoGoalHelp):
@@ -80,6 +72,13 @@ class HelpPrinter(MaybeColor):
             print_hint()
             return 1
         return 0
+
+    def _print_alternatives(self, match: str, all_things: Iterable[str]) -> None:
+        did_you_mean = list(difflib.get_close_matches(match, all_things))
+
+        if did_you_mean:
+            formatted_matches = self._format_did_you_mean_matches(did_you_mean)
+            print(f"Did you mean {formatted_matches}?")
 
     def _print_title(self, title_text: str) -> None:
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
@@ -99,45 +98,52 @@ class HelpPrinter(MaybeColor):
                 ),
             )
 
-    def _print_all_help(self) -> None:
-        print(self._get_help_json())
+    def _get_thing_help_table(self) -> Dict[str, Callable[[str, bool], None]]:
+        def _help_table(
+            things: Iterable[str], help_printer: Callable[[str, bool], None]
+        ) -> Dict[str, Callable[[str, bool], None]]:
+            return dict(zip(things, cycle((help_printer,))))
 
-    def _print_thing_help(self) -> None:
-        """Print a help screen.
+        top_level_help_items = _help_table(self._reserved_names, self._print_top_level_help)
+        return {
+            **top_level_help_items,
+            **_help_table(self._all_help_info.scope_to_help_info.keys(), self._print_options_help),
+            **_help_table(
+                self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
+            ),
+            **_help_table(
+                self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
+            ),
+            **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
+        }
 
-        Assumes that self._help_request is an instance of OptionsHelp.
+    def _disambiguate_things(
+        self, things: Iterable[str], all_things: Iterable[str]
+    ) -> Tuple[Set[str], Set[str]]:
+        """Returns two sets of strings, one with disambiguated things and the second with
+        unresolvable things."""
+        disambiguated: Set[str] = set()
+        unknown: Set[str] = set()
 
-        Note: Ony useful if called after options have been registered.
-        """
-        help_request = cast(ThingHelp, self._help_request)
-        things = set(help_request.things)
+        for thing in things:
+            # Look for typos and close matches first.
+            alternatives = tuple(difflib.get_close_matches(thing, all_things))
+            if len(alternatives) == 1 and thing in alternatives[0]:
+                disambiguated.add(alternatives[0])
+                continue
 
-        if things:
-            for thing in sorted(things):
-                if thing == "goals":
-                    self._print_all_goals()
-                elif thing == "subsystems":
-                    self._print_all_subsystems()
-                elif thing == "targets":
-                    self._print_all_targets()
-                elif thing == "global":
-                    self._print_options_help(GLOBAL_SCOPE, help_request.advanced)
-                elif thing == "tools":
-                    self._print_all_tools()
-                elif thing == "api-types":
-                    self._print_all_api_types()
-                elif thing in self._all_help_info.scope_to_help_info:
-                    self._print_options_help(thing, help_request.advanced)
-                elif thing in self._all_help_info.name_to_target_type_info:
-                    self._print_target_help(thing)
-                elif thing in self._all_help_info.name_to_api_type_info:
-                    self._print_api_type_help(thing, help_request.advanced)
-                elif thing in self._all_help_info.name_to_rule_info:
-                    self._print_rule_help(thing, help_request.advanced)
-                else:
-                    print(self.maybe_red(f"Unknown entity: {thing}"))
-        else:
-            self._print_global_help()
+            # For api types and rules, see if we get a match, by ignoring the leading module path.
+            found_things: List[str] = []
+            suffix = f".{thing}"
+            for known_thing in all_things:
+                if known_thing.endswith(suffix):
+                    found_things.append(known_thing)
+            if len(found_things) == 1:
+                disambiguated.add(found_things[0])
+                continue
+
+            unknown.add(thing)
+        return disambiguated, unknown
 
     def _format_summary_description(self, descr: str, chars_before_description: int) -> str:
         lines = textwrap.wrap(descr, self._width - chars_before_description)
@@ -147,6 +153,62 @@ class HelpPrinter(MaybeColor):
                 *(f"{' ' * chars_before_description}{line}" for line in lines[1:]),
             ]
         return "\n".join(lines)
+
+    def _print_all_help(self) -> None:
+        print(self._get_help_json())
+
+    def _print_thing_help(self) -> Literal[0, 1]:
+        """Print a help screen.
+
+        Assumes that self._help_request is an instance of OptionsHelp.
+
+        Note: Ony useful if called after options have been registered.
+        """
+        help_request = cast(ThingHelp, self._help_request)
+        things = set(help_request.things)
+        help_table = self._get_thing_help_table()
+        maybe_unknown_things = {thing for thing in things if thing not in help_table}
+        disambiguated_things, unknown_things = self._disambiguate_things(
+            maybe_unknown_things, help_table.keys()
+        )
+        if unknown_things:
+            # Only print help and suggestions for the first unknown thing.
+            # It gets confusing to try and show suggestions for multiple cases.
+            thing = unknown_things.pop()
+            print(self.maybe_red(f"Unknown entity: {thing}"))
+            self._print_alternatives(
+                thing,
+                set(help_table.keys()) - self._reserved_names
+                | {
+                    canonical_name.rsplit(".", 1)[-1]
+                    for canonical_name in help_table.keys()
+                    if "." in canonical_name
+                },
+            )
+            return 1
+
+        things = things - maybe_unknown_things | disambiguated_things
+        if not things:
+            self._print_global_help()
+            return 0
+
+        for thing in sorted(things):
+            help_table[thing](thing, help_request.advanced)
+        return 0
+
+    def _print_top_level_help(self, thing: str, show_advanced: bool) -> None:
+        if thing == "goals":
+            self._print_all_goals()
+        elif thing == "subsystems":
+            self._print_all_subsystems()
+        elif thing == "targets":
+            self._print_all_targets()
+        elif thing == "global":
+            self._print_options_help(GLOBAL_SCOPE, show_advanced)
+        elif thing == "tools":
+            self._print_all_tools()
+        elif thing == "api-types":
+            self._print_all_api_types()
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -312,7 +374,7 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_target_help(self, target_alias: str) -> None:
+    def _print_target_help(self, target_alias: str, show_advanced: bool) -> None:
         self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:

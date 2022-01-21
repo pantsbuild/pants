@@ -672,7 +672,7 @@ class HelpInfoExtracter:
         )
 
         return {
-            api_type.__name__: PluginAPITypeInfo.create(
+            f"{api_type.__module__}.{api_type.__name__}": PluginAPITypeInfo.create(
                 api_type,
                 rules,
                 provider=", ".join(type_graph[api_type]["providers"]),
