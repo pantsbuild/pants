@@ -106,6 +106,7 @@ pub struct CommandRunner {
   retry_interval_duration: Duration,
   capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
+  cache_read_timeout: Duration,
 }
 
 enum StreamOutcome {
@@ -127,6 +128,7 @@ impl CommandRunner {
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
     cache_concurrency_limit: usize,
+    cache_read_timeout: Duration,
     capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
@@ -180,6 +182,7 @@ impl CommandRunner {
       capabilities_cell: capabilities_cell_opt
         .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
       capabilities_client,
+      cache_read_timeout,
     };
 
     Ok(command_runner)
@@ -773,6 +776,7 @@ impl crate::CommandRunner for CommandRunner {
       self.action_cache_client.clone(),
       self.store.clone(),
       false,
+      self.cache_read_timeout,
     )
     .await?;
     debug!(
@@ -1342,6 +1346,7 @@ pub async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   eager_fetch: bool,
+  timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
     context.workunit_store.clone(),
@@ -1368,7 +1373,13 @@ pub async fn check_action_cache(
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
-          async move { client.get_action_result(request).await }
+          async move {
+            let lookup_fut = client.get_action_result(request);
+            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
+            timeout_fut
+              .await
+              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
+          }
         },
         status_is_retryable,
       )

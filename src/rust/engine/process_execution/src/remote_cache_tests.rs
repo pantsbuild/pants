@@ -25,6 +25,8 @@ use crate::{
   RemoteCacheWarningsBehavior,
 };
 
+const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// A mock of the local runner used for better hermeticity of the tests.
 #[derive(Clone)]
 struct MockLocalCommandRunner {
@@ -142,6 +144,7 @@ fn create_cached_runner(
       RemoteCacheWarningsBehavior::FirstOnly,
       eager_fetch,
       256,
+      CACHE_READ_TIMEOUT,
     )
     .expect("caching command runner"),
   );
@@ -592,6 +595,7 @@ async fn make_action_result_basic() {
     RemoteCacheWarningsBehavior::FirstOnly,
     false,
     256,
+    CACHE_READ_TIMEOUT,
   )
   .expect("caching command runner");
 
