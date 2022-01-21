@@ -20,58 +20,19 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapsh
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve import coursier_fetch, jvm_tool
+from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
-
-
-@dataclass(frozen=True)
-class GenerateJvmLockfileFromTool:
-    """Create a `GenerateJvmLockfile` request for a JVM tool.
-
-    We allow tools to either use coordinates or addresses to `jvm_artifact` targets for the artifact
-    inputs. This is a convenience to parse those artifact inputs to create a standardized
-    `GenerateJvmLockfile`.
-    """
-
-    artifact_inputs: FrozenOrderedSet[str]
-    artifact_option_name: str
-    resolve_name: str
-    lockfile_dest: str
-
-    @classmethod
-    def create(cls, tool: JvmToolBase) -> GenerateJvmLockfileFromTool:
-        return GenerateJvmLockfileFromTool(
-            FrozenOrderedSet(tool.artifact_inputs),
-            artifact_option_name=f"[{tool.options_scope}].artifacts",
-            resolve_name=tool.options_scope,
-            lockfile_dest=tool.lockfile,
-        )
-
-
-@rule
-async def setup_lockfile_request_from_tool(
-    request: GenerateJvmLockfileFromTool,
-) -> GenerateJvmLockfile:
-    artifacts = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts, resolve_name=request.resolve_name, lockfile_dest=request.lockfile_dest
-    )
 
 
 @rule
@@ -168,7 +129,6 @@ def rules():
     return (
         *collect_rules(),
         *coursier_fetch.rules(),
-        *jvm_tool.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),
