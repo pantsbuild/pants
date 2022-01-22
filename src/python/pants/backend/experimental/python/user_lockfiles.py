@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
-from pants.core.goals.generate_lockfiles import Lockfile
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -66,8 +66,8 @@ async def generate_user_lockfile_goal(
         return GenerateUserLockfileGoal(exit_code=0)
 
     result = await Get(
-        Lockfile,
-        PythonLockfileRequest(
+        GenerateLockfileResult,
+        GeneratePythonLockfile(
             requirements=req_strings,
             # TODO(#12314): Use interpreter constraints from the transitive closure.
             interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),

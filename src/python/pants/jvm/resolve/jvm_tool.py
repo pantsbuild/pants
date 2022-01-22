@@ -89,8 +89,7 @@ class JvmToolBase(Subsystem):
     @property
     def lockfile(self) -> str:
         f"""The path to a lockfile or special string '{DEFAULT_TOOL_LOCKFILE}'."""
-        lockfile = cast(str, self.options.lockfile)
-        return lockfile
+        return cast(str, self.options.lockfile)
 
     def lockfile_content(self) -> bytes:
         lockfile_path = self.lockfile

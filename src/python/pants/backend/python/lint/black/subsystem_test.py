@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black import skip_field
 from pants.backend.python.lint.black.subsystem import Black, BlackLockfileSentinel
 from pants.backend.python.lint.black.subsystem import rules as subsystem_rules
@@ -20,7 +20,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
-            QueryRule(PythonLockfileRequest, [BlackLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [BlackLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget],
     )
@@ -33,7 +33,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
         rule_runner.write_files({"project/BUILD": build_file})
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [BlackLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [BlackLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     # If all code is Py38+, use those constraints. Otherwise, use subsystem constraints.

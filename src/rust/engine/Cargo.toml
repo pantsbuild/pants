@@ -126,7 +126,7 @@ hashing = { path = "hashing" }
 indexmap = "1.4"
 itertools = "0.10"
 lazy_static = "1"
-libc = "0.2.39"
+libc = "0.2.112"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }

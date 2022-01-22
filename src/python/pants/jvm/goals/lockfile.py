@@ -7,14 +7,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.core.goals.generate_lockfiles import (
+    GenerateLockfile,
+    GenerateLockfileResult,
     GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
-    Lockfile,
-    LockfileRequest,
     RequestedUserResolveNames,
-    UserLockfileRequests,
-    WrappedLockfileRequest,
+    UserGenerateLockfiles,
+    WrappedGenerateLockfile,
 )
 from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
@@ -34,13 +34,13 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
-class JvmLockfileRequest(LockfileRequest):
+class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class JvmLockfileRequestFromTool:
+class GenerateJvmLockfileFromTool:
     artifact_inputs: FrozenOrderedSet[str]
     options_scope: str
     lockfile_dest: str
@@ -54,8 +54,8 @@ class JvmLockfileRequestFromTool:
 
 @rule
 async def setup_lockfile_request_from_tool(
-    request: JvmLockfileRequestFromTool,
-) -> JvmLockfileRequest:
+    request: GenerateJvmLockfileFromTool,
+) -> GenerateJvmLockfile:
     artifacts = await Get(
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
@@ -63,7 +63,7 @@ async def setup_lockfile_request_from_tool(
             f"[{request.options_scope}].artifacts",
         ),
     )
-    return JvmLockfileRequest(
+    return GenerateJvmLockfile(
         artifacts=artifacts,
         resolve_name=request.options_scope,
         lockfile_dest=request.lockfile_dest,
@@ -71,14 +71,14 @@ async def setup_lockfile_request_from_tool(
 
 
 @rule
-def wrap_python_lockfile_request(request: JvmLockfileRequest) -> WrappedLockfileRequest:
-    return WrappedLockfileRequest(request)
+def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLockfile:
+    return WrappedGenerateLockfile(request)
 
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
 async def generate_jvm_lockfile(
-    request: JvmLockfileRequest,
-) -> Lockfile:
+    request: GenerateJvmLockfile,
+) -> GenerateLockfileResult:
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, request.artifacts)
 
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
@@ -91,12 +91,12 @@ async def generate_jvm_lockfile(
         Digest,
         CreateDigest([FileContent(request.lockfile_dest, resolved_lockfile_contents)]),
     )
-    return Lockfile(lockfile_digest, request.resolve_name, request.lockfile_dest)
+    return GenerateLockfileResult(lockfile_digest, request.resolve_name, request.lockfile_dest)
 
 
 @rule
 async def load_jvm_lockfile(
-    request: JvmLockfileRequest,
+    request: GenerateJvmLockfile,
 ) -> CoursierResolvedLockfile:
     """Loads an existing lockfile from disk."""
     if not request.artifacts:
@@ -140,7 +140,7 @@ def determine_jvm_user_resolves(
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedJVMserResolveNames, all_targets: AllTargets, jvm_subsystem: JvmSubsystem
-) -> UserLockfileRequests:
+) -> UserGenerateLockfiles:
     resolve_to_artifacts = defaultdict(set)
     for tgt in all_targets:
         if not tgt.has_field(JvmArtifactCompatibleResolvesField):
@@ -149,8 +149,8 @@ async def setup_user_lockfile_requests(
         for resolve in jvm_subsystem.resolves_for_target(tgt):
             resolve_to_artifacts[resolve].add(artifact)
 
-    return UserLockfileRequests(
-        JvmLockfileRequest(
+    return UserGenerateLockfiles(
+        GenerateJvmLockfile(
             # Note that it's legal to have a resolve with no artifacts.
             artifacts=ArtifactRequirements(sorted(resolve_to_artifacts.get(resolve, ()))),
             resolve_name=resolve,
@@ -165,7 +165,7 @@ def rules():
         *collect_rules(),
         *coursier_fetch.rules(),
         *jvm_tool.rules(),
-        UnionRule(LockfileRequest, JvmLockfileRequest),
+        UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),
     )

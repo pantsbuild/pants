@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `MIN_DOTS=1 weak_imports=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `MIN_DOTS=1 STRING_IMPORTS=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -38,17 +38,22 @@ class AstVisitor(ast.NodeVisitor):
         #   weak/strong)
         self.strong_imports = {}
         self.weak_imports = {}
+        self._weaken_strong_imports = False
 
     def maybe_add_string_import(self, node, s):
         if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
             self.weak_imports.setdefault(s, node.lineno)
 
+    def add_strong_import(self, name, lineno):
+        imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
+        imports.setdefault(name, lineno)
+
     @staticmethod
     def _is_pragma_ignored(line):
-        return "# pants: ignore" in line
+        return "# pants: no-infer-dep" in line
 
     def _visit_import_stmt(self, node, import_prefix):
-        # N.B. We only add imports whose line doesn't contain "# pants: ignore"
+        # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
         # However, `ast` doesn't expose the exact lines each specific import is on,
         # so we are forced to tokenize the import statement to tease out which imported
         # name is on which line so we can check for the ignore pragma.
@@ -72,9 +77,7 @@ class AstVisitor(ast.NodeVisitor):
                 token = next(token_iter)
 
             if not self._is_pragma_ignored(token[4]):
-                self.strong_imports.setdefault(
-                    import_prefix + alias.name, token[3][0] + node.lineno - 1
-                )
+                self.add_strong_import(import_prefix + alias.name, token[3][0] + node.lineno - 1)
             if alias.asname and token[1] != alias.asname:
                 consume_until(alias.asname)
 
@@ -93,21 +96,51 @@ class AstVisitor(ast.NodeVisitor):
             abs_module = node.module
         self._visit_import_stmt(node, abs_module + ".")
 
+    def visit_TryExcept(self, node):
+        for handler in node.handlers:
+            # N.B. Python allows any arbitrary expression as an except handler.
+            # We only parse Name, or (Set/Tuple/List)-of-Names expressions
+            if isinstance(handler.type, ast.Name):
+                exprs = (handler.type,)
+            elif isinstance(handler.type, (ast.Tuple, ast.Set, ast.List)):
+                exprs = handler.type.elts
+            else:
+                continue
+
+            if any(isinstance(expr, ast.Name) and expr.id == "ImportError" for expr in exprs):
+                self._weaken_strong_imports = True
+                break
+
+        for stmt in node.body:
+            self.visit(stmt)
+
+        self._weaken_strong_imports = False
+
+        for handler in node.handlers:
+            self.visit(handler)
+
+        for stmt in node.orelse:
+            self.visit(stmt)
+
+    def visit_Try(self, node):
+        self.visit_TryExcept(node)
+        for stmt in node.finalbody:
+            self.visit(stmt)
+
     def visit_Call(self, node):
         # Handle __import__("string_literal").  This is commonly used in __init__.py files,
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
-            name = None
-            if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-                name = node.args[0].s
-            elif isinstance(node.args[0], ast.Constant):
-                name = str(node.args[0].value)
+            if sys.version_info[0:2] < (3, 8):
+                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
+            else:
+                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
 
             if name is not None:
                 lineno = node.args[0].lineno
                 if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
-                    self.strong_imports.setdefault(name, lineno)
+                    self.add_strong_import(name, lineno)
                 return
 
         self.generic_visit(node)

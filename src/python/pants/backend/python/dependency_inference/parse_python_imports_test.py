@@ -88,40 +88,23 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
         from project.demo import OriginalName as Renamed
-        import pragma_ignored  # pants: ignore
-        from also_pragma_ignored import doesnt_matter  # pants: ignore
+        import pragma_ignored  # pants: no-infer-dep
+        from also_pragma_ignored import doesnt_matter  # pants: no-infer-dep
         from multiline_import1 import (
             not_ignored1,
-            ignored1 as alias1,  # pants: ignore
+            ignored1 as alias1,  # pants: no-infer-dep
             ignored2 as \\
-                alias2,  # pants: ignore
-            ignored3 as  # pants: ignore
+                alias2,  # pants: no-infer-dep
+            ignored3 as  # pants: no-infer-dep
                 alias3,
-            ignored4 as alias4, ignored4,  # pants: ignore
+            ignored4 as alias4, ignored4,  # pants: no-infer-dep
             not_ignored2,
         )
-        from multiline_import2 import (ignored1,  # pants: ignore
+        from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
 
         if TYPE_CHECKING:
             from project.circular_dep import CircularDep
-
-        try:
-            import subprocess
-        except ImportError:
-            import subprocess23 as subprocess
-
-        __import__("pkg_resources")
-        __import__("dunder_import_ignored")  # pants: ignore
-        __import__(  # pants: ignore
-            "not_ignored_but_looks_like_it_could_be"
-        )
-        __import__(
-            "ignored"  # pants: ignore
-        )
-        __import__(
-            "also_not_ignored_but_looks_like_it_could_be"
-        )  # pants: ignore
         """
     )
     assert_imports_parsed(
@@ -140,11 +123,108 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
             "multiline_import2.not_ignored": ImpInfo(lineno=26, weak=False),
             "project.circular_dep.CircularDep": ImpInfo(lineno=29, weak=False),
-            "subprocess": ImpInfo(lineno=32, weak=False),
-            "subprocess23": ImpInfo(lineno=34, weak=False),
-            "pkg_resources": ImpInfo(lineno=36, weak=False),
-            "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=39, weak=False),
-            "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=45, weak=False),
+        },
+    )
+
+
+def test_dunder_import_call(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        __import__("pkg_resources")
+        __import__("dunder_import_ignored")  # pants: no-infer-dep
+        __import__(  # pants: no-infer-dep
+            "not_ignored_but_looks_like_it_could_be"
+        )
+        __import__(
+            "ignored"  # pants: no-infer-dep
+        )
+        __import__(
+            "also_not_ignored_but_looks_like_it_could_be"
+        )  # pants: no-infer-dep
+        """
+    )
+    assert_imports_parsed(
+        rule_runner,
+        content,
+        expected={
+            "pkg_resources": ImpInfo(lineno=1, weak=False),
+            "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
+            "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
+        },
+    )
+
+
+def test_try_except(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        try: import strong1
+        except AssertionError: pass
+
+        try: import weak1
+        except ImportError: pass
+
+        try: import weak2
+        except (AssertionError, ImportError): pass
+
+        try: import weak3
+        except [AssertionError, ImportError]: pass
+
+        try: import weak4
+        except {AssertionError, ImportError}: pass
+        except ImportError: pass
+
+        try: import weak5
+        except AssertionError: pass
+        except ImportError: pass
+
+        try: import weak6
+        except AssertionError: import strong2
+        except ImportError: import strong3
+        else: import strong4
+        finally: import strong5
+
+        try: pass
+        except AssertionError:
+            try: import weak7
+            except ImportError: import strong6
+
+        try: import strong7
+        # This would be too complicated to try and handle
+        except (lambda: ImportError)(): pass
+
+        ImpError = ImportError
+        try: import strong8
+        # This would be too complicated to try and handle
+        except ImpError: pass
+
+        # At least one test with import on its own line
+        try:
+            import weak8
+        except ImportError:
+            import strong9
+        """
+    )
+    assert_imports_parsed(
+        rule_runner,
+        content,
+        expected={
+            "strong1": ImpInfo(lineno=1, weak=False),
+            "weak1": ImpInfo(lineno=4, weak=True),
+            "weak2": ImpInfo(lineno=7, weak=True),
+            "weak3": ImpInfo(lineno=10, weak=True),
+            "weak4": ImpInfo(lineno=13, weak=True),
+            "weak5": ImpInfo(lineno=17, weak=True),
+            "weak6": ImpInfo(lineno=21, weak=True),
+            "strong2": ImpInfo(lineno=22, weak=False),
+            "strong3": ImpInfo(lineno=23, weak=False),
+            "strong4": ImpInfo(lineno=24, weak=False),
+            "strong5": ImpInfo(lineno=25, weak=False),
+            "weak7": ImpInfo(lineno=29, weak=True),
+            "strong6": ImpInfo(lineno=30, weak=False),
+            "strong7": ImpInfo(lineno=32, weak=False),
+            "strong8": ImpInfo(lineno=37, weak=False),
+            "weak8": ImpInfo(lineno=43, weak=True),
+            "strong9": ImpInfo(lineno=45, weak=False),
         },
     )
 
@@ -239,6 +319,20 @@ def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
+    assert_imports_parsed(
+        rule_runner,
+        dedent(
+            """\
+                import one.two.three
+                try: import one.two.three
+                except ImportError: pass
+            """
+        ),
+        expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
+    )
+
+
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
     assert_imports_parsed(rule_runner, "x =", expected={})
 
@@ -259,12 +353,18 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
+        __import__(u"{}".format("interpolation"))
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
         importlib.import_module(u"dep.from.str_狗")
 
         b"\\xa0 a non-utf8 string, make sure we ignore it"
+
+        try: import weak1
+        except ImportError: import strong1
+        else: import strong2
+        finally: import strong3
         """
     )
     assert_imports_parsed(
@@ -276,9 +376,13 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
             "pkg_resources": ImpInfo(lineno=7, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
-            "dep.from.bytes": ImpInfo(lineno=10, weak=True),
-            "dep.from.str": ImpInfo(lineno=11, weak=True),
-            "dep.from.str_狗": ImpInfo(lineno=12, weak=True),
+            "dep.from.bytes": ImpInfo(lineno=11, weak=True),
+            "dep.from.str": ImpInfo(lineno=12, weak=True),
+            "dep.from.str_狗": ImpInfo(lineno=13, weak=True),
+            "weak1": ImpInfo(lineno=17, weak=True),
+            "strong1": ImpInfo(lineno=18, weak=False),
+            "strong2": ImpInfo(lineno=19, weak=False),
+            "strong3": ImpInfo(lineno=20, weak=False),
         },
     )
 

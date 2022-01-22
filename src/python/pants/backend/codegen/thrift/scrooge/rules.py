@@ -7,7 +7,7 @@ from pants.backend.codegen.thrift.scrooge.additional_fields import ScroogeFinagl
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.build_graph.address import Address
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -16,7 +16,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest, JvmLockfileRequestFromTool
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -40,7 +40,7 @@ class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 
 
-class ScroogeToolLockfileSentinel(ToolLockfileSentinel):
+class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
     options_scope = ScroogeSubsystem.options_scope
 
 
@@ -143,8 +143,8 @@ async def generate_scrooge_thrift_sources(
 @rule
 async def generate_scrooge_lockfile_request(
     _: ScroogeToolLockfileSentinel, scrooge: ScroogeSubsystem
-) -> JvmLockfileRequest:
-    return await Get(JvmLockfileRequest, JvmLockfileRequestFromTool(scrooge))
+) -> GenerateJvmLockfile:
+    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(scrooge))
 
 
 def rules():
@@ -152,5 +152,5 @@ def rules():
         *collect_rules(),
         *additional_fields.rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, ScroogeToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScroogeToolLockfileSentinel),
     ]
