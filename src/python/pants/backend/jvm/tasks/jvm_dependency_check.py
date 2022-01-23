@@ -281,10 +281,8 @@ class JvmDependencyCheck(Task):
 
         :returns: A dict of directly declared but unused targets, to sets of suggested replacements.
         """
-        # Flatten the product deps of this target.
-        product_deps = set()
-        for dep_entries in actual_deps:
-            product_deps.update(dep_entries)
+        product_deps = set(actual_deps)
+        print("ACTUAL DEPS {}".format(sorted(product_deps)))
 
         # Determine which of the DEFAULT deps in the declared set of this target were used.
         used = set()
@@ -298,6 +296,7 @@ class JvmDependencyCheck(Task):
                 continue
             # If any of the target's jars or classfiles were used, consider it used.
             if product_deps.isdisjoint(self._analyzer.files_for_target(dep)):
+                print("FILES FOR {}: {}".format(dep, self._analyzer.files_for_target(dep)))
                 unused.add(dep)
             else:
                 used.add(dep)
