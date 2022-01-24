@@ -6,8 +6,8 @@ from pants.backend.codegen.avro.rules import rules as avro_rules
 from pants.backend.codegen.avro.target_types import AvroSourcesGeneratorTarget, AvroSourceTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.jvm import classpath, compile, jdk_rules
-from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.util_rules import rules as util_rules
 
 
