@@ -1,10 +1,11 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::bounded::{balance, AsyncSemaphore, Task};
+use crate::bounded::{balance, AsyncSemaphore, State, Task};
 
 fn mk_semaphore(permits: usize) -> AsyncSemaphore {
   mk_semaphore_with_preemptible_duration(permits, Duration::from_millis(200))
@@ -370,7 +371,7 @@ async fn preemption() {
 /// Given Tasks as triples of desired, actual, and expected concurrency (all of which are
 /// assumed to be preemptible), assert that the expected concurrency is applied.
 fn test_balance(
-  concurrency_limit: usize,
+  total_concurrency: usize,
   expected_preempted: usize,
   task_defs: Vec<(usize, usize, usize)>,
 ) {
@@ -378,13 +379,14 @@ fn test_balance(
   let tasks = task_defs
     .iter()
     .enumerate()
-    .map(|(id, (desired, actual, _))| Task::new(id, *desired, *actual, ten_minutes_from_now))
+    .map(|(id, (desired, actual, _))| {
+      Arc::new(Task::new(id, *desired, *actual, ten_minutes_from_now))
+    })
     .collect::<Vec<_>>();
 
-  assert_eq!(
-    expected_preempted,
-    balance(concurrency_limit, Instant::now(), tasks.iter().collect())
-  );
+  let mut state = State::new_for_tests(total_concurrency, tasks.clone());
+
+  assert_eq!(expected_preempted, balance(Instant::now(), &mut state));
   for (task, (_, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
     assert_eq!(expected, task.concurrency());
   }

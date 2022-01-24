@@ -146,10 +146,21 @@ pub(crate) struct AsyncSemaphore {
   preemptible_duration: Duration,
 }
 
-struct State {
-  total_permits: usize,
+pub(crate) struct State {
+  total_concurrency: usize,
   available_ids: VecDeque<usize>,
   tasks: Vec<Arc<Task>>,
+}
+
+impl State {
+  #[cfg(test)]
+  pub(crate) fn new_for_tests(total_concurrency: usize, tasks: Vec<Arc<Task>>) -> Self {
+    Self {
+      total_concurrency,
+      available_ids: VecDeque::new(),
+      tasks,
+    }
+  }
 }
 
 impl AsyncSemaphore {
@@ -164,7 +175,7 @@ impl AsyncSemaphore {
     }
 
     let state = Arc::new(Mutex::new(State {
-      total_permits: permits,
+      total_concurrency: permits,
       available_ids,
       tasks: Vec::new(),
     }));
@@ -177,12 +188,8 @@ impl AsyncSemaphore {
           sleep(preemptible_duration / 4).await;
           if let Some(state) = state.upgrade() {
             // Balance tasks.
-            let state = state.lock();
-            balance(
-              state.total_permits,
-              Instant::now(),
-              state.tasks.iter().map(|t| t.as_ref()).collect(),
-            );
+            let mut state = state.lock();
+            balance(Instant::now(), &mut state);
           } else {
             // The AsyncSemaphore was torn down.
             break;
@@ -198,8 +205,7 @@ impl AsyncSemaphore {
     }
   }
 
-  // TODO: https://github.com/rust-lang/rust/issues/46379
-  #[allow(dead_code)]
+  #[cfg(test)]
   pub(crate) fn available_permits(&self) -> usize {
     self.sema.available_permits()
   }
@@ -236,13 +242,17 @@ impl AsyncSemaphore {
         .pop_front()
         .expect("More permits were distributed than ids exist.");
 
-      // A Task is initially given its fair share of the available concurrency (i.e., for two
-      // tasks, each gets half), even if that means we overcommit. Balancing will adjust
-      // concurrency later, to the extent that it can given preemption timeouts.
+      // A Task is initially given its fair share of the available concurrency: i.e., the first
+      // arriving task gets all of the slots, and the second arriving gets half, even though that
+      // means that we overcommit. Balancing will adjust concurrency later, to the extent that it
+      // can given preemption timeouts.
+      //
+      // This is because we cannot anticipate the number of inbound processes, and we never want to
+      // delay a process from starting.
       let concurrency_desired = max(concurrency_desired, 1);
       let concurrency_actual = min(
         concurrency_desired,
-        state.total_permits / (state.tasks.len() + 1),
+        state.total_concurrency / (state.tasks.len() + 1),
       );
       let task = Arc::new(Task::new(
         id,
@@ -330,12 +340,16 @@ impl Task {
 }
 
 /// Given a set of Tasks with their desired and actual concurrency, balance the concurrency levels
-/// of any preemptible tasks, and notify them of the changes.
+/// of any preemptible tasks, and notify them of the changes. Returns the number of Tasks that were
+/// preempted.
 ///
-/// Returns the number of Tasks that were preempted.
-pub(crate) fn balance(concurrency_limit: usize, now: Instant, tasks: Vec<&Task>) -> usize {
-  let concurrency_used: usize = tasks.iter().map(|t| t.concurrency()).sum();
-  let mut desired_change_in_commitment = concurrency_limit as isize - concurrency_used as isize;
+/// This method only internally mutates tasks (by adjusting their concurrency levels and notifying
+/// them), but takes State as mutable in order to guarantee that it gets an atomic view of the
+/// tasks.
+pub(crate) fn balance(now: Instant, state: &mut State) -> usize {
+  let concurrency_used: usize = state.tasks.iter().map(|t| t.concurrency()).sum();
+  let mut desired_change_in_commitment =
+    state.total_concurrency as isize - concurrency_used as isize;
   let mut prempted = 0;
 
   // To reduce the number of tasks that we preempty, we preempt them in order by the amount of
@@ -347,7 +361,8 @@ pub(crate) fn balance(concurrency_limit: usize, now: Instant, tasks: Vec<&Task>)
     }
     Ordering::Less => {
       // We're overcommitted: order by the amount that they can relinquish.
-      let mut preemptible_tasks = tasks
+      let mut preemptible_tasks = state
+        .tasks
         .iter()
         .filter_map(|t| {
           // A task may never have less than one slot.
@@ -377,7 +392,8 @@ pub(crate) fn balance(concurrency_limit: usize, now: Instant, tasks: Vec<&Task>)
     }
     Ordering::Greater => {
       // We're undercommitted: order by the amount that they are owed.
-      let mut preemptible_tasks = tasks
+      let mut preemptible_tasks = state
+        .tasks
         .iter()
         .filter_map(|t| {
           let desired = t.concurrency_desired - t.concurrency();
