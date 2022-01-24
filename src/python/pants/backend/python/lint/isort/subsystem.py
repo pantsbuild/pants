@@ -127,7 +127,7 @@ class Isort(PythonToolBase):
 
 
 class IsortLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Isort.options_scope
+    resolve_name = Isort.options_scope
 
 
 @rule

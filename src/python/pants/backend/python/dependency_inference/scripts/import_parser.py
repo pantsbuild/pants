@@ -132,11 +132,10 @@ class AstVisitor(ast.NodeVisitor):
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
-            name = None
-            if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-                name = node.args[0].s
-            elif isinstance(node.args[0], ast.Constant):
-                name = str(node.args[0].value)
+            if sys.version_info[0:2] < (3, 8):
+                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
+            else:
+                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
 
             if name is not None:
                 lineno = node.args[0].lineno

@@ -43,7 +43,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Scalatest.options_scope
+    resolve_name = Scalatest.options_scope
 
 
 @dataclass(frozen=True)

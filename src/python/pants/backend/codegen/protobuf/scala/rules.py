@@ -68,7 +68,7 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
 
 
 class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = ScalaPBSubsystem.options_scope
+    resolve_name = ScalaPBSubsystem.options_scope
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):

@@ -60,7 +60,7 @@ class ScalafmtRequest(FmtRequest, LintRequest):
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = ScalafmtSubsystem.options_scope
+    resolve_name = ScalafmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)

@@ -237,7 +237,7 @@ class CoverageSubsystem(PythonToolBase):
 
 
 class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = CoverageSubsystem.options_scope
+    resolve_name = CoverageSubsystem.options_scope
 
 
 @rule

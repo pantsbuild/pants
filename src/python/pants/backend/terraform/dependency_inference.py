@@ -46,7 +46,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
 
 
 class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = TerraformHcl2Parser.options_scope
+    resolve_name = TerraformHcl2Parser.options_scope
 
 
 @rule

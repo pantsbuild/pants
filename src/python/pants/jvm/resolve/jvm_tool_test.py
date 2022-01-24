@@ -33,7 +33,7 @@ class MockJvmTool(JvmToolBase):
 
 
 class MockJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = MockJvmTool.options_scope
+    resolve_name = MockJvmTool.options_scope
 
 
 @rule
