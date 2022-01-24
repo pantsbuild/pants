@@ -4,17 +4,19 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib.resources
 import json
 import logging
 import os
 from dataclasses import dataclass
 from itertools import chain
-from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
 
 import toml
 
 from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -45,6 +47,7 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    GatherJvmCoordinatesRequest,
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -55,6 +58,9 @@ from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
+
+if TYPE_CHECKING:
+    from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 
 logger = logging.getLogger(__name__)
 
@@ -681,11 +687,11 @@ class ToolClasspathRequest:
     """
 
     prefix: str | None = None
-    lockfile: CoursierResolvedLockfile = CoursierResolvedLockfile(entries=())
+    lockfile: GenerateJvmLockfileFromTool | None = None
     artifact_requirements: ArtifactRequirements = ArtifactRequirements()
 
     def __post_init__(self) -> None:
-        if not bool(self.lockfile.entries) ^ bool(self.artifact_requirements):
+        if not bool(self.lockfile) ^ bool(self.artifact_requirements):
             raise AssertionError(
                 f"Exactly one of `lockfile` or `artifact_requirements` must be provided: {self}"
             )
@@ -723,7 +729,51 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
         )
     else:
-        resolution = request.lockfile
+        lockfile_req = request.lockfile
+        assert lockfile_req is not None
+        regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
+        if lockfile_req.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+            if lockfile_req.default_lockfile_resource is None:
+                raise ValueError(
+                    f"The option {lockfile_req.artifact_option_name} is set to "
+                    f"{DEFAULT_TOOL_LOCKFILE}, but this tool does not have a default resolve. To "
+                    f"fix, please set the option to a path, then run {regen_command}."
+                )
+            lockfile_bytes = importlib.resources.read_binary(
+                *lockfile_req.default_lockfile_resource
+            )
+            resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
+        else:
+            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile_dest]))
+            if not lockfile_snapshot.files:
+                raise ValueError(
+                    f"No lockfile found at {lockfile_req.lockfile_dest}, which is configured "
+                    f"by the option {lockfile_req.artifact_option_name}."
+                    f"Run {regen_command} to generate it."
+                )
+
+            resolution = await Get(
+                CoursierResolvedLockfile,
+                CoursierResolveKey(
+                    name=lockfile_req.resolve_name,
+                    path=lockfile_req.lockfile_dest,
+                    digest=lockfile_snapshot.digest,
+                ),
+            )
+
+        # Validate that the lockfile is correct.
+        lockfile_inputs = await Get(
+            ArtifactRequirements,
+            GatherJvmCoordinatesRequest(
+                lockfile_req.artifact_inputs, lockfile_req.artifact_option_name
+            ),
+        )
+        if resolution.metadata and not resolution.metadata.is_valid_for(lockfile_inputs):
+            raise ValueError(
+                f"The lockfile configured by the option {lockfile_req.artifact_option_name} "
+                "was generated with different requirements than are currently set. Run "
+                f"{regen_command} to regenerate the lockfile."
+            )
 
     classpath_entries = await Get(ResolvedClasspathEntries, CoursierResolvedLockfile, resolution)
     merged_snapshot = await Get(
