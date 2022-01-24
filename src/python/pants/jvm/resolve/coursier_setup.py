@@ -54,6 +54,24 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """
 )
 
+COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
+    """\
+    set -eux
+
+    coursier_exe="$1"
+    shift
+    json_output_file="$1"
+    shift
+
+    working_dir="$(pwd)"
+    "$coursier_exe" fetch {repos_args} \
+        --json-output-file="$json_output_file" \
+        "${{@//{coursier_working_directory}/$working_dir}}"
+    /bin/mkdir -p classpath
+    {python_path} {coursier_bin_dir}/coursier_post_processing_script.py "$json_output_file"
+    """
+)
+
 
 class CoursierSubsystem(TemplatedExternalTool):
     options_scope = "coursier"
@@ -140,22 +158,11 @@ async def setup_coursier(
     python: PythonBinary,
 ) -> Coursier:
     repos_args = " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
-    coursier_wrapper_script = textwrap.dedent(
-        f"""\
-        set -eux
-
-        coursier_exe="$1"
-        shift
-        json_output_file="$1"
-        shift
-
-        working_dir="$(pwd)"
-        "$coursier_exe" fetch {repos_args} \
-          --json-output-file="$json_output_file" \
-          "${{@//{Coursier.working_directory_placeholder}/$working_dir}}"
-        /bin/mkdir -p classpath
-        {python.path} {Coursier.bin_dir}/coursier_post_processing_script.py "$json_output_file"
-        """
+    coursier_wrapper_script = COURSIER_WRAPPER_SCRIPT.format(
+        repos_args=repos_args,
+        coursier_working_directory=Coursier.working_directory_placeholder,
+        python_path=python.path,
+        coursier_bin_dir=Coursier.bin_dir,
     )
 
     downloaded_coursier_get = Get(
