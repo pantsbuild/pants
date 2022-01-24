@@ -29,7 +29,7 @@ use std::cmp;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use futures::future::{self, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
@@ -38,7 +38,7 @@ use parking_lot::Mutex;
 use terminal_size::terminal_size;
 
 use task_executor::Executor;
-use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, SpanId, WorkunitStore};
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
@@ -141,17 +141,18 @@ impl ConsoleUI {
   }
 
   fn get_label_from_heavy_hitters(
-    tasks_to_display: &IndexMap<SpanId, (String, Option<Duration>)>,
+    tasks_to_display: &IndexMap<SpanId, (String, SystemTime)>,
     index: usize,
   ) -> Option<String> {
+    let now = SystemTime::now();
     tasks_to_display
       .get_index(index)
-      .map(|(_, (label, maybe_duration))| {
-        let duration_label = match maybe_duration {
-          None => "(Waiting) ".to_string(),
-          Some(duration) => format_workunit_duration(*duration),
+      .map(|(_, (label, start_time))| {
+        let duration_label = match now.duration_since(*start_time).ok() {
+          None => "(Waiting)".to_string(),
+          Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string()
         };
-        format!("{}{}", duration_label, label)
+        format!("{} {}", duration_label, label)
       })
   }
 
@@ -236,7 +237,7 @@ type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send
 
 /// The state for one run of the ConsoleUI.
 struct Instance {
-  tasks_to_display: IndexMap<SpanId, (String, Option<Duration>)>,
+  tasks_to_display: IndexMap<SpanId, (String, SystemTime)>,
   multi_progress_task: MultiProgressTask,
   bars: Vec<ProgressBar>,
 }
