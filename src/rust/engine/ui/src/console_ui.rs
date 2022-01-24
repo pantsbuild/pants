@@ -120,7 +120,6 @@ impl ConsoleUI {
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
-    multi_progress.set_move_cursor(false);
     let terminal_dimensions = terminal_size().unwrap_or((
       Width(50),
       Height(self.local_parallelism.try_into().unwrap()),
