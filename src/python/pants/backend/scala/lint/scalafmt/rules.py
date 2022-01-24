@@ -30,14 +30,13 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -325,10 +324,10 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 
 
 @rule
-async def generate_scalafmt_lockfile_request(
+def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():

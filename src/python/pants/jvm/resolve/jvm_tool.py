@@ -12,6 +12,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
+from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.target_types import JvmArtifactFieldSet
@@ -105,6 +106,9 @@ class JvmToolBase(Subsystem):
 
 @dataclass(frozen=True)
 class GatherJvmCoordinatesRequest:
+    """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
+    `jar_artifact` targets into `ArtifactRequirements`."""
+
     artifact_inputs: FrozenOrderedSet[str]
     option_name: str
 
@@ -197,6 +201,43 @@ async def validate_jvm_lockfile(
         )
 
     return lockfile
+
+
+@dataclass(frozen=True)
+class GenerateJvmLockfileFromTool:
+    """Create a `GenerateJvmLockfile` request for a JVM tool.
+
+    We allow tools to either use coordinates or addresses to `jvm_artifact` targets for the artifact
+    inputs. This is a convenience to parse those artifact inputs to create a standardized
+    `GenerateJvmLockfile`.
+    """
+
+    artifact_inputs: FrozenOrderedSet[str]
+    artifact_option_name: str
+    resolve_name: str
+    lockfile_dest: str
+
+    @classmethod
+    def create(cls, tool: JvmToolBase) -> GenerateJvmLockfileFromTool:
+        return GenerateJvmLockfileFromTool(
+            FrozenOrderedSet(tool.artifact_inputs),
+            artifact_option_name=f"[{tool.options_scope}].artifacts",
+            resolve_name=tool.options_scope,
+            lockfile_dest=tool.lockfile,
+        )
+
+
+@rule
+async def setup_lockfile_request_from_tool(
+    request: GenerateJvmLockfileFromTool,
+) -> GenerateJvmLockfile:
+    artifacts = await Get(
+        ArtifactRequirements,
+        GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
+    )
+    return GenerateJvmLockfile(
+        artifacts=artifacts, resolve_name=request.resolve_name, lockfile_dest=request.lockfile_dest
+    )
 
 
 def rules():

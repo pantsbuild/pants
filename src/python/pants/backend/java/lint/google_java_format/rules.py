@@ -17,15 +17,14 @@ from pants.engine.process import BashBinary, FallibleProcessResult, Process, Pro
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -168,16 +167,16 @@ async def google_java_format_lint(
 
 
 @rule
-async def generate_google_java_format_lockfile_request(
+def generate_google_java_format_lockfile_request(
     _: GoogleJavaFormatToolLockfileSentinel, tool: GoogleJavaFormatSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
+        *jvm_tool.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
         UnionRule(LintRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),

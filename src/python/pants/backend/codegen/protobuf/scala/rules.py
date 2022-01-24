@@ -45,7 +45,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
@@ -53,7 +52,11 @@ from pants.jvm.resolve.coursier_fetch import (
     MaterializedClasspath,
     MaterializedClasspathRequest,
 )
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.jvm_tool import (
+    GatherJvmCoordinatesRequest,
+    GenerateJvmLockfileFromTool,
+    ValidatedJvmToolLockfileRequest,
+)
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -242,7 +245,7 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
             artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
-            option_name="--scalapb-plugin-artifacts",
+            option_name="[scalapb].jvm_plugins",
         ),
     )
     classpath = await Get(
@@ -375,10 +378,10 @@ async def setup_scalapb_shim_classfiles(
 
 
 @rule
-async def generate_scalapbc_lockfile_request(
+def generate_scalapbc_lockfile_request(
     _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():

@@ -20,54 +20,19 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapsh
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve import coursier_fetch, jvm_tool
+from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class GenerateJvmLockfileFromTool:
-    artifact_inputs: FrozenOrderedSet[str]
-    options_scope: str
-    lockfile_dest: str
-
-    def __init__(self, tool: JvmToolBase) -> None:
-        # Note that `JvmToolBase` is not hashable, so we extract the relevant information eagerly.
-        self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
-        self.options_scope = tool.options_scope
-        self.lockfile_dest = tool.lockfile
-
-
-@rule
-async def setup_lockfile_request_from_tool(
-    request: GenerateJvmLockfileFromTool,
-) -> GenerateJvmLockfile:
-    artifacts = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(
-            request.artifact_inputs,
-            f"[{request.options_scope}].artifacts",
-        ),
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts,
-        resolve_name=request.options_scope,
-        lockfile_dest=request.lockfile_dest,
-    )
 
 
 @rule
@@ -164,7 +129,6 @@ def rules():
     return (
         *collect_rules(),
         *coursier_fetch.rules(),
-        *jvm_tool.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),
