@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 from textwrap import dedent
 
 import pytest
@@ -20,15 +21,13 @@ from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
+from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -46,7 +45,6 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
-            *external_tool_rules(),
             *jdk_util_rules(),
             *scalac_rules(),
             *scalatest_rules(),
@@ -71,13 +69,12 @@ def rule_runner() -> RuleRunner:
 
 @maybe_skip_jdk_test
 def test_simple_success(rule_runner: RuleRunner) -> None:
-    scalatest = rule_runner.request(Scalatest, [])
     scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": TestCoursierWrapper(
-                scalatest.resolved_lockfile()
-            ).serialize([ArtifactRequirement(coordinate=scalatest_coord)]),
+            "3rdparty/jvm/default.lock": importlib.resources.read_text(
+                *Scalatest.default_lockfile_resource
+            ),
             "BUILD": dedent(
                 f"""\
                 jvm_artifact(
