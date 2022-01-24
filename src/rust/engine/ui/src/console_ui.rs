@@ -25,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::cmp;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use futures::future::{self, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
+use terminal_size::terminal_size;
 
 use task_executor::Executor;
 use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
@@ -118,11 +120,14 @@ impl ConsoleUI {
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
+    let (terminal_width, terminal_height) = terminal_size()
+      .map(|terminal_dimensions| (terminal_dimensions.0 .0, terminal_dimensions.1 .0 - 1))
+      .unwrap_or((50, self.local_parallelism.try_into().unwrap()));
 
-    let bars = (0..self.local_parallelism)
+    let bars = (0..cmp::min(self.local_parallelism, terminal_height.into()))
       .map(|_n| {
         let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
-        multi_progress.add(ProgressBar::new(50).with_style(style))
+        multi_progress.add(ProgressBar::new(terminal_width.into()).with_style(style))
       })
       .collect::<Vec<_>>();
     *stderr_dest_bar_guard = Some(bars[0].downgrade());
