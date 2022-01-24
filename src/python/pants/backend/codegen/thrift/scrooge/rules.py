@@ -56,12 +56,7 @@ async def generate_scrooge_thrift_sources(
     lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scrooge))
 
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(WrappedTarget, Address, request.thrift_source_field.address),

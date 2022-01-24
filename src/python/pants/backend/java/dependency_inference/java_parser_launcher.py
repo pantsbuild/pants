@@ -61,8 +61,7 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
         Get(
             ToolClasspath,
             ToolClasspathRequest(
-                prefix="__toolcp",
-                artifact_requirements=(java_parser_artifact_requirements(),),
+                prefix="__toolcp", artifact_requirements=java_parser_artifact_requirements()
             ),
         ),
         Get(

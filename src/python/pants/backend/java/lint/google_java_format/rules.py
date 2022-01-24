@@ -77,12 +77,7 @@ async def setup_google_java_format(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     source_files_snapshot = (

@@ -132,7 +132,7 @@ async def generate_scala_from_protobuf(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
-                lockfiles=(lockfile,),
+                lockfile=lockfile,
             ),
         ),
         Get(Digest, CreateDigest([Directory(output_dir)])),
@@ -248,9 +248,7 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
             option_name="[scalapb].jvm_plugins",
         ),
     )
-    classpath = await Get(
-        ToolClasspath, ToolClasspathRequest(artifact_requirements=(requirements,))
-    )
+    classpath = await Get(ToolClasspath, ToolClasspathRequest(artifact_requirements=requirements))
     return MaterializedJvmPlugin(
         name=request.plugin.name,
         classpath=classpath,
@@ -295,26 +293,24 @@ async def setup_scalapb_shim_classfiles(
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
@@ -322,7 +318,7 @@ async def setup_scalapb_shim_classfiles(
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__shimcp",
-                lockfiles=(lockfile,),
+                lockfile=lockfile,
             ),
         ),
         Get(

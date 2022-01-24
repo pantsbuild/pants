@@ -89,9 +89,7 @@ async def analyze_java_source_dependencies(
     (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(
-                artifact_requirements=(java_parser_artifact_requirements(),),
-            ),
+            ToolClasspathRequest(artifact_requirements=java_parser_artifact_requirements()),
         ),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )

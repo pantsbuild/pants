@@ -102,10 +102,7 @@ async def global_scalac_plugins(
     lockfile = await Get(CoursierResolvedLockfile, GlobalScalacPluginsToolLockfileSentinel())
     classpath = await Get(
         ToolClasspath,
-        ToolClasspathRequest(
-            prefix="__scalac_plugin_cp",
-            lockfiles=(lockfile,),
-        ),
+        ToolClasspathRequest(prefix="__scalac_plugin_cp", lockfile=lockfile),
     )
     return GlobalScalacPlugins(loaded_global_plugins.names, classpath)
 

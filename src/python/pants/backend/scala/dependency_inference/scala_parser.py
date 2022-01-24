@@ -230,9 +230,7 @@ async def analyze_scala_source_dependencies(
     (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(
-                artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,),
-            ),
+            ToolClasspathRequest(artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS),
         ),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
@@ -312,44 +310,34 @@ async def setup_scala_parser_classfiles(
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
         Get(
             ToolClasspath,
             ToolClasspathRequest(
-                prefix="__parsercp", artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,)
+                prefix="__parsercp", artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS
             ),
         ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    parser_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(

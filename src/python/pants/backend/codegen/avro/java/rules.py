@@ -105,12 +105,7 @@ async def compile_avro_source(
     lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(avro_tools))
 
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(
             Digest,
             DigestSubset(

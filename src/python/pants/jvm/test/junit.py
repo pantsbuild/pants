@@ -72,10 +72,7 @@ async def setup_junit_for_target(
 
     classpath, junit_classpath = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(lockfiles=(lockfile,)),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))

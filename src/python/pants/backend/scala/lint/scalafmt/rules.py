@@ -212,7 +212,7 @@ async def setup_scalafmt(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
-                lockfiles=(lockfile,),
+                lockfile=lockfile,
             ),
         ),
     )

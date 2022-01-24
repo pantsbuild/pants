@@ -681,8 +681,8 @@ class ToolClasspathRequest:
     """
 
     prefix: str | None = None
-    lockfiles: tuple[CoursierResolvedLockfile, ...] = ()
-    artifact_requirements: tuple[ArtifactRequirements, ...] = ()
+    lockfile: CoursierResolvedLockfile = CoursierResolvedLockfile(entries=())
+    artifact_requirements: ArtifactRequirements = ArtifactRequirements()
 
 
 @dataclass(frozen=True)
@@ -714,24 +714,19 @@ class ToolClasspath:
 async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
-    artifact_requirements_lockfiles = await MultiGet(
-        Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
-        for artifact_requirements in request.artifact_requirements
+    artifact_requirements_lockfile = await Get(
+        CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
+    )
+    all_classpath_entries = await MultiGet(
+        Get(ResolvedClasspathEntries, CoursierResolvedLockfile, lockfile)
+        for lockfile in (request.lockfile, artifact_requirements_lockfile)
     )
 
-    lockfile_and_requirements_classpath_entries = await MultiGet(
-        Get(
-            ResolvedClasspathEntries,
-            CoursierResolvedLockfile,
-            lockfile,
-        )
-        for lockfile in (*request.lockfiles, *artifact_requirements_lockfiles)
-    )
     merged_snapshot = await Get(
         Snapshot,
         MergeDigests(
             classpath_entry.digest
-            for classpath_entries in lockfile_and_requirements_classpath_entries
+            for classpath_entries in all_classpath_entries
             for classpath_entry in classpath_entries
         ),
     )
