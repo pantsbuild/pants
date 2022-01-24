@@ -49,8 +49,8 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import (
     GatherJvmCoordinatesRequest,
@@ -83,7 +83,7 @@ class MaterializeJvmPluginRequest:
 @dataclass(frozen=True)
 class MaterializedJvmPlugin:
     name: str
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def setup_arg(self, plugin_relpath: str) -> str:
         classpath_arg = ":".join(self.classpath.classpath_entries(plugin_relpath))
@@ -129,12 +129,7 @@ async def generate_scala_from_protobuf(
         inherit_env,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
@@ -180,13 +175,7 @@ async def generate_scala_from_protobuf(
     }
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     result = await Get(
@@ -248,13 +237,8 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
             option_name="[scalapb].jvm_plugins",
         ),
     )
-    classpath = await Get(
-        MaterializedClasspath, MaterializedClasspathRequest(artifact_requirements=(requirements,))
-    )
-    return MaterializedJvmPlugin(
-        name=request.plugin.name,
-        classpath=classpath,
-    )
+    classpath = await Get(ToolClasspath, ToolClasspathRequest(artifact_requirements=requirements))
+    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
 
 
 @rule
@@ -292,59 +276,36 @@ async def setup_scalapb_shim_classfiles(
 
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__shimcp",
-                lockfiles=(lockfile,),
-            ),
-        ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    scalapb_shim_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile)),
+        Get(Digest, CreateDigest([scalapb_shim_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                tool_classpath.digest,
-                shim_classpath.digest,
-                source_digest,
-            )
-        ),
+        Digest, MergeDigests((tool_classpath.digest, shim_classpath.digest, source_digest))
     )
 
     # NB: We do not use nailgun for this process, since it is launched exactly once.

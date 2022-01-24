@@ -13,7 +13,7 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -59,10 +59,9 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
 
     materialized_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__toolcp",
-                artifact_requirements=(java_parser_artifact_requirements(),),
+            ToolClasspath,
+            ToolClasspathRequest(
+                prefix="__toolcp", artifact_requirements=java_parser_artifact_requirements()
             ),
         ),
         Get(

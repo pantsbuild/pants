@@ -21,8 +21,8 @@ from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.util.logging import LogLevel
@@ -77,12 +77,7 @@ async def setup_google_java_format(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     source_files_snapshot = (

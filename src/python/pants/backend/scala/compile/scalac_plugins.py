@@ -20,8 +20,8 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
 )
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
@@ -86,7 +86,7 @@ def generate_global_scalac_plugins_lockfile_request(
 @dataclass(frozen=True)
 class GlobalScalacPlugins:
     names: tuple[str, ...]
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def args(self, prefix: str | None = None) -> Iterator[str]:
         for scalac_plugin_path in self.classpath.classpath_entries(prefix):
@@ -101,11 +101,8 @@ async def global_scalac_plugins(
 ) -> GlobalScalacPlugins:
     lockfile = await Get(CoursierResolvedLockfile, GlobalScalacPluginsToolLockfileSentinel())
     classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__scalac_plugin_cp",
-            lockfiles=(lockfile,),
-        ),
+        ToolClasspath,
+        ToolClasspathRequest(prefix="__scalac_plugin_cp", lockfile=lockfile),
     )
     return GlobalScalacPlugins(loaded_global_plugins.names, classpath)
 
