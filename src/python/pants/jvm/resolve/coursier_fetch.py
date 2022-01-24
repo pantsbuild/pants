@@ -684,6 +684,12 @@ class ToolClasspathRequest:
     lockfile: CoursierResolvedLockfile = CoursierResolvedLockfile(entries=())
     artifact_requirements: ArtifactRequirements = ArtifactRequirements()
 
+    def __post_init__(self) -> None:
+        if not bool(self.lockfile.entries) ^ bool(self.artifact_requirements):
+            raise AssertionError(
+                f"Exactly one of `lockfile` or `artifact_requirements` must be provided: {self}"
+            )
+
 
 @dataclass(frozen=True)
 class ToolClasspath:
@@ -712,27 +718,20 @@ class ToolClasspath:
 
 @rule(level=LogLevel.DEBUG)
 async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
-    """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
+    if request.artifact_requirements:
+        resolution = await Get(
+            CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
+        )
+    else:
+        resolution = request.lockfile
 
-    artifact_requirements_lockfile = await Get(
-        CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
-    )
-    all_classpath_entries = await MultiGet(
-        Get(ResolvedClasspathEntries, CoursierResolvedLockfile, lockfile)
-        for lockfile in (request.lockfile, artifact_requirements_lockfile)
-    )
-
+    classpath_entries = await Get(ResolvedClasspathEntries, CoursierResolvedLockfile, resolution)
     merged_snapshot = await Get(
-        Snapshot,
-        MergeDigests(
-            classpath_entry.digest
-            for classpath_entries in all_classpath_entries
-            for classpath_entry in classpath_entries
-        ),
+        Snapshot, MergeDigests(classpath_entry.digest for classpath_entry in classpath_entries)
     )
     if request.prefix is not None:
         merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
-    return ToolClasspath(content=merged_snapshot)
+    return ToolClasspath(merged_snapshot)
 
 
 def rules():
