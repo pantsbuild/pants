@@ -209,12 +209,7 @@ async def setup_scalafmt(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                lockfile=lockfile,
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     source_files_snapshot = (
@@ -228,13 +223,7 @@ async def setup_scalafmt(
     )
 
     merged_sources_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                source_files_snapshot.digest,
-                config_files.snapshot.digest,
-            ]
-        ),
+        Digest, MergeDigests([source_files_snapshot.digest, config_files.snapshot.digest])
     )
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,

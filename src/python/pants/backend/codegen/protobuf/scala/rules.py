@@ -129,12 +129,7 @@ async def generate_scala_from_protobuf(
         inherit_env,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                lockfile=lockfile,
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
@@ -180,13 +175,7 @@ async def generate_scala_from_protobuf(
     }
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     result = await Get(
@@ -249,10 +238,7 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ),
     )
     classpath = await Get(ToolClasspath, ToolClasspathRequest(artifact_requirements=requirements))
-    return MaterializedJvmPlugin(
-        name=request.plugin.name,
-        classpath=classpath,
-    )
+    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
 
 
 @rule
@@ -314,33 +300,12 @@ async def setup_scalapb_shim_classfiles(
                 ),
             ),
         ),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__shimcp",
-                lockfile=lockfile,
-            ),
-        ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    scalapb_shim_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile)),
+        Get(Digest, CreateDigest([scalapb_shim_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                tool_classpath.digest,
-                shim_classpath.digest,
-                source_digest,
-            )
-        ),
+        Digest, MergeDigests((tool_classpath.digest, shim_classpath.digest, source_digest))
     )
 
     # NB: We do not use nailgun for this process, since it is launched exactly once.
