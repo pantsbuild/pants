@@ -7,14 +7,16 @@ from dataclasses import dataclass
 from typing import ClassVar, cast
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
 from pants.engine.addresses import Addresses
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.meta import frozen_after_init
@@ -92,17 +94,6 @@ class JvmToolBase(Subsystem):
         f"""The path to a lockfile or special string '{DEFAULT_TOOL_LOCKFILE}'."""
         return cast(str, self.options.lockfile)
 
-    def lockfile_content(self) -> bytes:
-        lockfile_path = self.lockfile
-        if lockfile_path == DEFAULT_TOOL_LOCKFILE:
-            return importlib.resources.read_binary(*self.default_lockfile_resource)
-        with open(lockfile_path, "rb") as f:
-            return f.read()
-
-    def resolved_lockfile(self) -> CoursierResolvedLockfile:
-        lockfile_content = self.lockfile_content()
-        return CoursierResolvedLockfile.from_serialized(lockfile_content)
-
 
 @dataclass(frozen=True)
 class GatherJvmCoordinatesRequest:
@@ -168,23 +159,43 @@ async def gather_coordinates_for_jvm_lockfile(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class ValidatedJvmToolLockfileRequest:
-
     options_scope: str
     artifact_inputs: FrozenOrderedSet[str]
-    lockfile: CoursierResolvedLockfile
+    lockfile_dest: str
+    default_lockfile_resource: tuple[str, str]
 
-    def __init__(self, tool: JvmToolBase):
+    def __init__(self, tool: JvmToolBase) -> None:
         self.options_scope = tool.options_scope
         self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
-        self.lockfile = tool.resolved_lockfile()
+        self.lockfile_dest = tool.lockfile
+        self.default_lockfile_resource = tool.default_lockfile_resource
 
 
-@rule(desc="Validate JVM lockfile")
+@rule(desc="Validate JVM tool lockfile")
 async def validate_jvm_lockfile(
     request: ValidatedJvmToolLockfileRequest,
 ) -> CoursierResolvedLockfile:
+    if request.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+        lockfile_bytes = importlib.resources.read_binary(*request.default_lockfile_resource)
+        lockfile = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
+    else:
+        lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
+        if not lockfile_snapshot.files:
+            raise ValueError(
+                f"JVM tool `{request.options_scope}` does not have a lockfile generated. "
+                f"Run `{GenerateLockfilesSubsystem.name} --resolve={request.options_scope}` to "
+                "generate it."
+            )
 
-    lockfile = request.lockfile
+        lockfile = await Get(
+            CoursierResolvedLockfile,
+            CoursierResolveKey(
+                name=request.options_scope,
+                path=request.lockfile_dest,
+                digest=lockfile_snapshot.digest,
+            ),
+        )
+
     requirements = await Get(
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
@@ -197,7 +208,8 @@ async def validate_jvm_lockfile(
             f"The lockfile for {request.options_scope} was generated with different "
             "requirements than are currently set. Check whether any `JAVA` options "
             "(including environment variables) have changed your requirements "
-            "or run `./pants generate-lockfiles` to regenerate the lockfiles."
+            f"or run `{GenerateLockfilesSubsystem.name} --resolve={request.options_scope}` to "
+            f"regenerate the lockfile."
         )
 
     return lockfile
