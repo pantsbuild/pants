@@ -408,9 +408,6 @@ async def build_pex(
 
     argv.append("--no-emit-warnings")
 
-    if python_setup.resolver_jobs:
-        argv.extend(["--jobs", str(python_setup.resolver_jobs)])
-
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])
     else:
@@ -435,6 +432,7 @@ async def build_pex(
     repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
     constraints_file_digest = EMPTY_DIGEST
     requirements_file_digest = EMPTY_DIGEST
+    requirement_count: int
 
     # TODO(#12314): Capture the resolve name for multiple user lockfiles.
     resolve_name = (
@@ -452,22 +450,26 @@ async def build_pex(
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=request.requirements.file_path_description_of_origin,
         )
+        requirements_file_digest = await Get(Digest, PathGlobs, globs)
+        requirements_file_digest_contents = await Get(
+            DigestContents, Digest, requirements_file_digest
+        )
+        requirement_count = len(requirements_file_digest_contents[0].content.decode().splitlines())
         if python_setup.invalid_lockfile_behavior in {
             InvalidLockfileBehavior.warn,
             InvalidLockfileBehavior.error,
         }:
-            requirements_file_digest_contents = await Get(DigestContents, PathGlobs, globs)
             metadata = PythonLockfileMetadata.from_lockfile(
                 requirements_file_digest_contents[0].content,
                 request.requirements.file_path,
                 resolve_name,
             )
             _validate_metadata(metadata, request, request.requirements, python_setup)
-        requirements_file_digest = await Get(Digest, PathGlobs, globs)
 
     elif isinstance(request.requirements, LockfileContent):
         is_monolithic_resolve = True
         file_content = request.requirements.file_content
+        requirement_count = len(file_content.content.decode().splitlines())
         argv.extend(["--requirement", file_content.path])
         argv.append("--no-transitive")
         if python_setup.invalid_lockfile_behavior in {
@@ -482,6 +484,7 @@ async def build_pex(
     else:
         assert isinstance(request.requirements, PexRequirements)
         is_monolithic_resolve = request.requirements.is_all_constraints_resolve
+        requirement_count = len(request.requirements.req_strings)
 
         if request.requirements.constraints_strings:
             constraints_file = "__constraints.txt"
@@ -532,6 +535,10 @@ async def build_pex(
             description=_build_pex_description(request),
             output_files=output_files,
             output_directories=output_directories,
+            # TODO: This is not the best heuristic for available concurrency, since the
+            # requirements almost certainly have transitive deps which also need building, but it
+            # is better than using something hardcoded.
+            concurrency_available=requirement_count,
         ),
     )
 
@@ -979,6 +986,7 @@ class PexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
+    concurrency_available: int
     cache_scope: ProcessCacheScope
 
     def __init__(
@@ -995,6 +1003,7 @@ class PexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.pex = pex
@@ -1008,6 +1017,7 @@ class PexProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
         self.execution_slot_variable = execution_slot_variable
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
 
 
@@ -1037,6 +1047,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         append_only_caches=complete_pex_env.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
+        concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
 
@@ -1055,6 +1066,7 @@ class VenvPexProcess:
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
     execution_slot_variable: str | None
+    concurrency_available: int
     cache_scope: ProcessCacheScope
 
     def __init__(
@@ -1071,6 +1083,7 @@ class VenvPexProcess:
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
         execution_slot_variable: str | None = None,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.venv_pex = venv_pex
@@ -1084,6 +1097,7 @@ class VenvPexProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
         self.execution_slot_variable = execution_slot_variable
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
 
 
@@ -1117,6 +1131,7 @@ async def setup_venv_pex_process(
         ).append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
+        concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
 

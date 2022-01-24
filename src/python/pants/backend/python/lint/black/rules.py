@@ -58,6 +58,7 @@ def generate_argv(source_files: SourceFiles, black: Black, *, check_only: bool) 
         args.append("--check")
     if black.config:
         args.extend(["--config", black.config])
+    args.extend(["-W", "{pants_concurrency}"])
     args.extend(black.args)
     args.extend(source_files.files)
     return tuple(args)
@@ -124,6 +125,7 @@ async def setup_black(
             argv=generate_argv(source_files, black, check_only=setup_request.check_only),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
+            concurrency_available=len(setup_request.request.field_sets),
             description=f"Run Black on {pluralize(len(setup_request.request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),

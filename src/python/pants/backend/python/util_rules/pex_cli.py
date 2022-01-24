@@ -71,6 +71,7 @@ class PexCliProcess:
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
     level: LogLevel
+    concurrency_available: int
     cache_scope: ProcessCacheScope
 
     def __init__(
@@ -86,6 +87,7 @@ class PexCliProcess:
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         self.subcommand = tuple(subcommand)
@@ -98,6 +100,7 @@ class PexCliProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.python = python
         self.level = level
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.__post_init__()
 
@@ -164,6 +167,10 @@ async def setup_pex_cli_process(
         "--tmpdir",
         tmpdir,
     ]
+
+    if request.concurrency_available > 0:
+        global_args.extend(["--jobs", "{pants_concurrency}"])
+
     if pex_runtime_env.verbosity > 0:
         global_args.append(f"-{'v' * pex_runtime_env.verbosity}")
 
@@ -200,6 +207,7 @@ async def setup_pex_cli_process(
         output_directories=request.output_directories,
         append_only_caches=complete_pex_env.append_only_caches,
         level=request.level,
+        concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
 

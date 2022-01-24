@@ -10,7 +10,6 @@ publish = false
 async-trait = "=0.1.42"
 async-lock = "2.4"
 walkdir = "2"
-async_semaphore = { path = "../async_semaphore" }
 protos = { path = "../protos" }
 bytes = "1.0"
 cache = { path = "../cache" }

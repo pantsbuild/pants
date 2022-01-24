@@ -109,15 +109,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async_semaphore"
-version = "0.0.1"
-dependencies = [
- "futures",
- "parking_lot",
- "tokio",
-]
-
-[[package]]
 name = "async_value"
 version = "0.0.1"
 dependencies = [
@@ -608,7 +599,6 @@ dependencies = [
  "async-oncecell",
  "async-trait",
  "async_latch",
- "async_semaphore",
  "bytes",
  "cache",
  "concrete_time",
@@ -2187,7 +2177,6 @@ dependencies = [
  "async-lock",
  "async-oncecell",
  "async-trait",
- "async_semaphore",
  "bincode",
  "bytes",
  "cache",
