@@ -120,12 +120,9 @@ impl ConsoleUI {
     // render might barely miss a data refresh.
     let draw_target = ProgressDrawTarget::term(term, Self::render_rate_hz() * 2);
     let multi_progress = MultiProgress::with_draw_target(draw_target);
-    let (terminal_width, terminal_height) = terminal_size().map(|terminal_dimensions| {
-      (terminal_dimensions.0.0, terminal_dimensions.1.0 - 1)
-    }).unwrap_or((
-      50,
-      self.local_parallelism.try_into().unwrap(),
-    ));
+    let (terminal_width, terminal_height) = terminal_size()
+      .map(|terminal_dimensions| (terminal_dimensions.0 .0, terminal_dimensions.1 .0 - 1))
+      .unwrap_or((50, self.local_parallelism.try_into().unwrap()));
 
     let bars = (0..cmp::min(self.local_parallelism, terminal_height.into()))
       .map(|_n| {
