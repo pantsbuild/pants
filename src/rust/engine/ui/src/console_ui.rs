@@ -35,7 +35,7 @@ use futures::future::{self, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
-use terminal_size::{terminal_size, Height, Width};
+use terminal_size::terminal_size;
 
 use task_executor::Executor;
 use workunit_store::{format_workunit_duration, SpanId, WorkunitStore};
