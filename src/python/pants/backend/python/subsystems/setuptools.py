@@ -45,7 +45,7 @@ class Setuptools(PythonToolRequirementsBase):
 
 
 class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Setuptools.options_scope
+    resolve_name = Setuptools.options_scope
 
 
 @rule(

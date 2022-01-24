@@ -63,7 +63,7 @@ class GenerateToolLockfileSentinel:
     GeneratePythonLockfile. Register a union rule for the `GenerateToolLockfileSentinel` subclass.
     """
 
-    options_scope: ClassVar[str]
+    resolve_name: ClassVar[str]
 
 
 class UserGenerateLockfiles(Collection[GenerateLockfile]):
@@ -192,8 +192,8 @@ def _check_ambiguous_resolve_names(
 ) -> None:
     resolve_name_to_providers = defaultdict(set)
     for sentinel in all_tool_sentinels:
-        resolve_name_to_providers[sentinel.options_scope].add(
-            _ResolveProvider(sentinel.options_scope, _ResolveProviderType.TOOL)
+        resolve_name_to_providers[sentinel.resolve_name].add(
+            _ResolveProvider(sentinel.resolve_name, _ResolveProviderType.TOOL)
         )
     for known_user_resolve_names in all_known_user_resolve_names:
         for resolve_name in known_user_resolve_names.names:
@@ -218,7 +218,7 @@ def determine_resolves_to_generate(
     _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
 
     resolve_names_to_sentinels = {
-        sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
+        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
     }
 
     if not requested_resolve_names:

@@ -53,7 +53,7 @@ class GenerateJavaFromAvroRequest(GenerateSourcesRequest):
 
 
 class AvroToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = AvroSubsystem.options_scope
+    resolve_name = AvroSubsystem.options_scope
 
 
 @dataclass(frozen=True)

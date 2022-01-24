@@ -119,7 +119,7 @@ class Yapf(PythonToolBase):
 
 
 class YapfLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Yapf.options_scope
+    resolve_name = Yapf.options_scope
 
 
 @rule

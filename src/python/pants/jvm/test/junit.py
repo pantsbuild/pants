@@ -44,7 +44,7 @@ class JunitTestFieldSet(TestFieldSet):
 
 
 class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = JUnit.options_scope
+    resolve_name = JUnit.options_scope
 
 
 @dataclass(frozen=True)

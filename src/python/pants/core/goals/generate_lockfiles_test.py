@@ -22,13 +22,13 @@ from pants.core.goals.generate_lockfiles import (
 
 def test_determine_tool_sentinels_to_generate() -> None:
     class Tool1(GenerateToolLockfileSentinel):
-        options_scope = "tool1"
+        resolve_name = "tool1"
 
     class Tool2(GenerateToolLockfileSentinel):
-        options_scope = "tool2"
+        resolve_name = "tool2"
 
     class Tool3(GenerateToolLockfileSentinel):
-        options_scope = "tool3"
+        resolve_name = "tool3"
 
     class Lang1Requested(RequestedUserResolveNames):
         pass
@@ -55,12 +55,12 @@ def test_determine_tool_sentinels_to_generate() -> None:
         assert tools == expected_tools
 
     assert_chosen(
-        {Tool2.options_scope, "u2"},
+        {Tool2.resolve_name, "u2"},
         expected_user_resolves=[Lang1Requested(["u2"])],
         expected_tools=[Tool2],
     )
     assert_chosen(
-        {Tool1.options_scope, Tool3.options_scope},
+        {Tool1.resolve_name, Tool3.resolve_name},
         expected_user_resolves=[],
         expected_tools=[Tool1, Tool3],
     )
@@ -77,7 +77,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
     # Error if same resolve name used for tool lockfiles and user lockfiles.
     class AmbiguousTool(GenerateToolLockfileSentinel):
-        options_scope = "ambiguous"
+        resolve_name = "ambiguous"
 
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(

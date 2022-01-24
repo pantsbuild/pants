@@ -75,7 +75,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 
 class MypyProtobufLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = PythonProtobufMypyPlugin.options_scope
+    resolve_name = PythonProtobufMypyPlugin.options_scope
 
 
 @rule

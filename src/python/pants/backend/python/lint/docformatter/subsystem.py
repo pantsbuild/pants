@@ -61,7 +61,7 @@ class Docformatter(PythonToolBase):
 
 
 class DocformatterLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Docformatter.options_scope
+    resolve_name = Docformatter.options_scope
 
 
 @rule

@@ -66,7 +66,7 @@ class PyUpgrade(PythonToolBase):
 
 
 class PyUpgradeLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = PyUpgrade.options_scope
+    resolve_name = PyUpgrade.options_scope
 
 
 @rule
