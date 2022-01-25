@@ -79,12 +79,12 @@ class DockerOptions(Subsystem):
             default="",
             help=(
                 "Provide a default Docker build context root path for `docker_image` targets that "
-                "does not specify their own `context_root`.\n\n"
+                "does not specify their own `context_root` field.\n\n"
                 "The context root is relative to the build root by default, but may be prefixed "
                 "with `./` to be relative to the directory of the BUILD file of the `docker_image`."
                 "\n\nExamples:\n\n"
                 "    --default-context-root=src/docker\n"
-                "    --default-context-root=./per/image/root\n"
+                "    --default-context-root=./relative_to_the_build_file\n"
             ),
         )
 
