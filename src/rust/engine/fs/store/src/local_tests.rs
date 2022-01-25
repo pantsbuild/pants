@@ -4,11 +4,12 @@ use crate::{EntryType, LocalOptions, ShrinkBehavior};
 use std::path::Path;
 use std::time::Duration;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use tokio::time::sleep;
+use walkdir::WalkDir;
 
 #[tokio::test]
 async fn save_file() {
@@ -431,6 +432,45 @@ async fn garbage_collect_fail_because_too_many_leases() {
   // Whether the unleased file is present is undefined.
 }
 
+async fn write_one_meg(store: &ByteStore, byte: u8) {
+  let mut bytes = BytesMut::with_capacity(1024 * 1024);
+  for _ in 0..1024 * 1024 {
+    bytes.put_u8(byte);
+  }
+  store
+    .store_bytes(EntryType::File, bytes.freeze(), false)
+    .await
+    .expect("Error storing");
+}
+
+#[tokio::test]
+async fn garbage_collect_and_compact() {
+  let dir = TempDir::new().unwrap();
+  let store = new_store(dir.path());
+
+  write_one_meg(&store, b'0').await;
+
+  write_one_meg(&store, b'1').await;
+
+  let size = get_directory_size(dir.path());
+  assert!(
+    size >= 2 * 1024 * 1024,
+    "Expect size to be at least 2MB but was {}",
+    size
+  );
+
+  store
+    .shrink(1024 * 1024, ShrinkBehavior::Compact)
+    .expect("Error shrinking");
+
+  let size = get_directory_size(dir.path());
+  assert!(
+    size < 2 * 1024 * 1024,
+    "Expect size to be less than 2MB but was {}",
+    size
+  );
+}
+
 #[tokio::test]
 async fn entry_type_for_file() {
   let testdata = TestData::roland();
@@ -564,4 +604,16 @@ async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest 
     .store_bytes(EntryType::File, bytes, false)
     .await
     .expect("Error storing file bytes")
+}
+
+fn get_directory_size(path: &Path) -> usize {
+  let mut len: usize = 0;
+  for entry in WalkDir::new(path) {
+    len += entry
+      .expect("Error walking directory")
+      .metadata()
+      .expect("Error reading metadata")
+      .len() as usize;
+  }
+  len
 }

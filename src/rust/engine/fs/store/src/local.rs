@@ -174,10 +174,7 @@ impl ByteStore {
     }
 
     if shrink_behavior == ShrinkBehavior::Compact {
-      todo!(
-        "Not supported! Would require a fork of `lmdb` similar to \
-            `https://github.com/pantsbuild/lmdb-rs.git @ 06bdfbfc6348f6804127176e561843f214fc17f8"
-      );
+      self.inner.file_dbs.clone()?.compact()?;
     }
 
     Ok(used_bytes)

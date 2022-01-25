@@ -9,7 +9,7 @@ bytes = "1.0"
 fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }
-lmdb-rkv = "0.14"
+lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4"
 task_executor = { path = "../task_executor" }
 tempfile = "3"
