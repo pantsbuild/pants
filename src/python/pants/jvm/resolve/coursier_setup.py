@@ -7,7 +7,7 @@ import os
 import shlex
 import textwrap
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import ClassVar, Iterable, Tuple
 
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
@@ -17,8 +17,10 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
+from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.binaries import PythonBinary
+from pants.util.logging import LogLevel
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -150,6 +152,53 @@ class Coursier:
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
         return {self.bin_dir: self._digest}
+
+
+@dataclass(frozen=True)
+class CoursierWrapperRequest:
+
+    args: Tuple[str, ...]
+    input_digest: Digest
+    output_directories: Tuple[str, ...]
+    output_files: Tuple[str, ...]
+    description: str
+
+
+@dataclass(frozen=True)
+class CoursierWrapperResult:
+    output_digest: Digest
+    stdout: bytes
+    stderr: bytes
+
+
+@rule
+async def invoke_coursier_wrapper(
+    bash: BashBinary,
+    coursier: Coursier,
+    request: CoursierWrapperRequest,
+) -> CoursierWrapperResult:
+
+    process_result = await Get(
+        ProcessResult,
+        Process(
+            argv=coursier.args(
+                request.args,
+                wrapper=[bash.path, coursier.wrapper_script],
+            ),
+            input_digest=request.input_digest,
+            immutable_input_digests=coursier.immutable_input_digests,
+            output_directories=request.output_directories,
+            output_files=request.output_files,
+            append_only_caches=coursier.append_only_caches,
+            env=coursier.env,
+            description=request.description,
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    return CoursierWrapperResult(
+        process_result.output_digest, process_result.stdout, process_result.stderr
+    )
 
 
 @rule

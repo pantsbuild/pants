@@ -29,7 +29,6 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
@@ -46,7 +45,7 @@ from pants.jvm.resolve.common import (
     Coordinate,
     Coordinates,
 )
-from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperRequest, CoursierWrapperResult
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
@@ -328,8 +327,6 @@ async def prepare_coursier_resolve_info(
 
 @rule(level=LogLevel.DEBUG)
 async def coursier_resolve_lockfile(
-    bash: BashBinary,
-    coursier: Coursier,
     artifact_requirements: ArtifactRequirements,
 ) -> CoursierResolvedLockfile:
     """Run `coursier fetch ...` against a list of Maven coordinates and capture the result.
@@ -364,38 +361,33 @@ async def coursier_resolve_lockfile(
     )
 
     coursier_report_file_name = "coursier_report.json"
+
     process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=coursier.args(
-                [
-                    coursier_report_file_name,
-                    *coursier_resolve_info.coord_arg_strings,
-                    # TODO(#13496): Disable --strict-include to work around Coursier issue
-                    # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
-                    # artifact rules as malformed.
-                    # *(
-                    #     f"--strict-include={req.to_coord_str(versioned=False)}"
-                    #     for req in artifact_requirements
-                    #     if req.strict
-                    # ),
-                ],
-                wrapper=[bash.path, coursier.wrapper_script],
+        CoursierWrapperResult,
+        CoursierWrapperRequest(
+            args=(
+                coursier_report_file_name,
+                *coursier_resolve_info.coord_arg_strings,
+                # TODO(#13496): Disable --strict-include to work around Coursier issue
+                # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
+                # artifact rules as malformed.
+                # *(
+                #     f"--strict-include={req.to_coord_str(versioned=False)}"
+                #     for req in artifact_requirements
+                #     if req.strict
+                # ),
             ),
             input_digest=coursier_resolve_info.digest,
-            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
-            append_only_caches=coursier.append_only_caches,
-            env=coursier.env,
             description=(
                 "Running `coursier fetch` against "
                 f"{pluralize(len(artifact_requirements), 'requirement')}: "
                 f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
             ),
-            level=LogLevel.DEBUG,
         ),
     )
+
     report_digest = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
     )
@@ -494,8 +486,6 @@ class ResolvedClasspathEntries(Collection[ClasspathEntry]):
 
 @rule
 async def coursier_fetch_one_coord(
-    bash: BashBinary,
-    coursier: Coursier,
     request: CoursierLockfileEntry,
 ) -> ClasspathEntry:
     """Run `coursier fetch --intransitive` to fetch a single artifact.
@@ -531,25 +521,19 @@ async def coursier_fetch_one_coord(
     )
 
     coursier_report_file_name = "coursier_report.json"
+
     process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=coursier.args(
-                [
-                    coursier_report_file_name,
-                    "--intransitive",
-                    *coursier_resolve_info.coord_arg_strings,
-                ],
-                wrapper=[bash.path, coursier.wrapper_script],
+        CoursierWrapperResult,
+        CoursierWrapperRequest(
+            args=(
+                coursier_report_file_name,
+                "--intransitive",
+                *coursier_resolve_info.coord_arg_strings,
             ),
             input_digest=coursier_resolve_info.digest,
-            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
-            append_only_caches=coursier.append_only_caches,
-            env=coursier.env,
             description=f"Fetching with coursier: {request.coord.to_coord_str()}",
-            level=LogLevel.DEBUG,
         ),
     )
     report_digest = await Get(
