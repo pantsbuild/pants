@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.engine.collection import Collection
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class Lockfile:
+class GenerateLockfileResult:
     """The result of generating a lockfile for a particular resolve."""
 
     digest: Digest
@@ -29,15 +31,15 @@ class Lockfile:
 
 @union
 @dataclass(frozen=True)
-class LockfileRequest:
+class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
 
-    Each language ecosystem should set up a subclass of `LockfileRequest`, like
-    `PythonLockfileRequest` and `CoursierLockfileRequest`, and register a union rule. They should
-    also set up a simple rule that goes from that class -> `WrappedLockfileRequest`.
+    Each language ecosystem should set up a subclass of `GenerateLockfile`, like
+    `GeneratePythonLockfile` and `GenerateJVMLockfile`, and register a union rule. They should
+    also set up a simple rule that goes from that class -> `WrappedGenerateLockfile`.
 
-    Subclasses will usually want to add additional properties, such as Python interpreter
-    constraints.
+    Subclasses will usually want to add additional properties, such as what requirements to
+    install and Python interpreter constraints.
     """
 
     resolve_name: str
@@ -45,32 +47,32 @@ class LockfileRequest:
 
 
 @dataclass(frozen=True)
-class WrappedLockfileRequest:
-    request: LockfileRequest
+class WrappedGenerateLockfile:
+    request: GenerateLockfile
 
 
 @union
-class ToolLockfileSentinel:
+class GenerateToolLockfileSentinel:
     """Tools use this as an entry point to say how to generate their tool lockfile.
 
-    Each language ecosystem should set up a union member of `LockfileRequest`, like
-    `PythonLockfileRequest`, as explained in that class's docstring.
+    Each language ecosystem should set up a union member of `GenerateLockfile`, like
+    `GeneratePythonLockfile`, as explained in that class's docstring.
 
-    Then, each tool should subclass `ToolLockfileSentinel` and set up a rule that goes from the
+    Then, each tool should subclass `GenerateToolLockfileSentinel` and set up a rule that goes from the
     subclass -> the language's lockfile request, e.g. BlackLockfileSentinel ->
-    PythonLockfileRequest. Register a union rule for the `ToolLockfileSentinel` subclass.
+    GeneratePythonLockfile. Register a union rule for the `GenerateToolLockfileSentinel` subclass.
     """
 
-    options_scope: ClassVar[str]
+    resolve_name: ClassVar[str]
 
 
-class UserLockfileRequests(Collection[LockfileRequest]):
+class UserGenerateLockfiles(Collection[GenerateLockfile]):
     """All user resolves for a particular language ecosystem to build.
 
     Each language ecosystem should set up a subclass of `RequestedUserResolveNames` (see its
-    docstring), and implement a rule going from that subclass -> UserLockfileRequests. Each element
-    in the returned `UserLockfileRequests` should be a subclass of `LockfileRequest`, like
-    `PythonLockfileRequest`.
+    docstring), and implement a rule going from that subclass -> UserGenerateLockfiles. Each element
+    in the returned `UserGenerateLockfiles` should be a subclass of `GenerateLockfile`, like
+    `GeneratePythonLockfile`.
     """
 
 
@@ -102,7 +104,7 @@ class RequestedUserResolveNames(Collection[str]):
     """The user resolves requested for a particular language ecosystem.
 
     Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
-    rule that goes from the subclass -> UserLockfileRequests.
+    rule that goes from the subclass -> UserGenerateLockfiles.
     """
 
 
@@ -131,40 +133,93 @@ class UnrecognizedResolveNamesError(Exception):
         )
 
 
+class _ResolveProviderType(Enum):
+    TOOL = 1
+    USER = 2
+
+
+@dataclass(frozen=True, order=True)
+class _ResolveProvider:
+    option_name: str
+    type_: _ResolveProviderType
+
+
 class AmbiguousResolveNamesError(Exception):
-    def __init__(self, ambiguous_names: list[str]) -> None:
-        if len(ambiguous_names) == 1:
-            first_paragraph = (
-                "A resolve name from the option `[python].experimental_resolves` collides with the "
-                f"name of a tool resolve: {ambiguous_names[0]}"
-            )
+    def __init__(self, ambiguous_name: str, providers: set[_ResolveProvider]) -> None:
+        tool_providers = []
+        user_providers = []
+        for provider in sorted(providers):
+            if provider.type_ == _ResolveProviderType.TOOL:
+                tool_providers.append(provider.option_name)
+            else:
+                user_providers.append(provider.option_name)
+
+        if tool_providers:
+            if not user_providers:
+                raise AssertionError(
+                    f"{len(tool_providers)} tools have the same options_scope: {ambiguous_name}. "
+                    "If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so "
+                    "that there is no ambiguity. Otherwise, please open a bug at "
+                    "https://github.com/pantsbuild/pants/issues/new."
+                )
+            if len(user_providers) == 1:
+                msg = (
+                    f"A resolve name from the option `{user_providers[0]}` collides with the "
+                    f"name of a tool resolve: {ambiguous_name}\n\n"
+                    f"To fix, please update `{user_providers[0]}` to use a different resolve name."
+                )
+            else:
+                msg = (
+                    f"Multiple options define the resolve name `{ambiguous_name}`, but it is "
+                    f"already claimed by a tool: {user_providers}\n\n"
+                    f"To fix, please update these options so that none of them use "
+                    f"`{ambiguous_name}`."
+                )
         else:
-            first_paragraph = (
-                "Some resolve names from the option `[python].experimental_resolves` collide with "
-                f"the names of tool resolves: {sorted(ambiguous_names)}"
+            assert len(user_providers) > 1
+            msg = (
+                f"The same resolve name `{ambiguous_name}` is used by multiple options, which "
+                f"causes ambiguity: {user_providers}\n\n"
+                f"To fix, please update these options so that `{ambiguous_name}` is not used more "
+                f"than once."
             )
-        super().__init__(
-            f"{first_paragraph}\n\n"
-            "To fix, please update `[python].experimental_resolves` to use different resolve names."
+        super().__init__(msg)
+
+
+def _check_ambiguous_resolve_names(
+    all_known_user_resolve_names: Iterable[KnownUserResolveNames],
+    all_tool_sentinels: Iterable[type[GenerateToolLockfileSentinel]],
+) -> None:
+    resolve_name_to_providers = defaultdict(set)
+    for sentinel in all_tool_sentinels:
+        resolve_name_to_providers[sentinel.resolve_name].add(
+            _ResolveProvider(sentinel.resolve_name, _ResolveProviderType.TOOL)
         )
+    for known_user_resolve_names in all_known_user_resolve_names:
+        for resolve_name in known_user_resolve_names.names:
+            resolve_name_to_providers[resolve_name].add(
+                _ResolveProvider(known_user_resolve_names.option_name, _ResolveProviderType.USER)
+            )
+
+    for resolve_name, providers in resolve_name_to_providers.items():
+        if len(providers) > 1:
+            raise AmbiguousResolveNamesError(resolve_name, providers)
 
 
 def determine_resolves_to_generate(
     all_known_user_resolve_names: Iterable[KnownUserResolveNames],
-    all_tool_sentinels: Iterable[type[ToolLockfileSentinel]],
+    all_tool_sentinels: Iterable[type[GenerateToolLockfileSentinel]],
     requested_resolve_names: set[str],
-) -> tuple[list[RequestedUserResolveNames], list[type[ToolLockfileSentinel]]]:
+) -> tuple[list[RequestedUserResolveNames], list[type[GenerateToolLockfileSentinel]]]:
     """Apply the `--resolve` option to determine which resolves are specified.
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
     """
-    resolve_names_to_sentinels = {
-        sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
-    }
+    _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
 
-    # TODO: check for ambiguity: between tools and user resolves, and across distinct
-    #  `KnownUserResolveNames`s. Update AmbiguousResolveNamesError to say where the resolve
-    #  name is defined, whereas right now we hardcode it to be the `[python]` option.
+    resolve_names_to_sentinels = {
+        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
+    }
 
     if not requested_resolve_names:
         return [
@@ -204,8 +259,8 @@ def determine_resolves_to_generate(
 
 
 def filter_tool_lockfile_requests(
-    specified_requests: Sequence[WrappedLockfileRequest], *, resolve_specified: bool
-) -> list[LockfileRequest]:
+    specified_requests: Sequence[WrappedGenerateLockfile], *, resolve_specified: bool
+) -> list[GenerateLockfile]:
     result = []
     for wrapped_req in specified_requests:
         req = wrapped_req.request
@@ -230,8 +285,7 @@ def filter_tool_lockfile_requests(
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    # TODO: Add back `KnownUserResolveNames` once JVM implements it.
-    required_union_implementations = (ToolLockfileSentinel,)
+    required_union_implementations = (GenerateToolLockfileSentinel, KnownUserResolveNamesRequest)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -292,16 +346,16 @@ async def generate_lockfiles_goal(
     )
     requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
         known_user_resolve_names,
-        union_membership.get(ToolLockfileSentinel),
+        union_membership.get(GenerateToolLockfileSentinel),
         set(generate_lockfiles_subsystem.resolve_names),
     )
 
     all_specified_user_requests = await MultiGet(
-        Get(UserLockfileRequests, RequestedUserResolveNames, resolve_names)
+        Get(UserGenerateLockfiles, RequestedUserResolveNames, resolve_names)
         for resolve_names in requested_user_resolve_names
     )
     specified_tool_requests = await MultiGet(
-        Get(WrappedLockfileRequest, ToolLockfileSentinel, sentinel())
+        Get(WrappedGenerateLockfile, GenerateToolLockfileSentinel, sentinel())
         for sentinel in requested_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
@@ -310,7 +364,7 @@ async def generate_lockfiles_goal(
     )
 
     results = await MultiGet(
-        Get(Lockfile, LockfileRequest, req)
+        Get(GenerateLockfileResult, GenerateLockfile, req)
         for req in (
             *(req for reqs in all_specified_user_requests for req in reqs),
             *applicable_tool_requests,

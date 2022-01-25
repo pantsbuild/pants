@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
@@ -231,8 +231,8 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-class Flake8LockfileSentinel(ToolLockfileSentinel):
-    options_scope = Flake8.options_scope
+class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Flake8.options_scope
 
 
 @rule(
@@ -247,9 +247,9 @@ async def setup_flake8_lockfile(
     first_party_plugins: Flake8FirstPartyPlugins,
     flake8: Flake8,
     python_setup: PythonSetup,
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not flake8.uses_lockfile:
-        return PythonLockfileRequest.from_tool(flake8)
+        return GeneratePythonLockfile.from_tool(flake8)
 
     # While Flake8 will run in partitions, we need a single lockfile that works with every
     # partition.
@@ -276,7 +276,7 @@ async def setup_flake8_lockfile(
             )
         )
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         flake8,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         extra_requirements=first_party_plugins.requirement_strings,
@@ -287,5 +287,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, Flake8LockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, Flake8LockfileSentinel),
     )

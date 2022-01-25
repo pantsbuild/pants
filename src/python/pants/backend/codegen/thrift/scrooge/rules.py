@@ -7,7 +7,7 @@ from pants.backend.codegen.thrift.scrooge.additional_fields import ScroogeFinagl
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.build_graph.address import Address
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -16,9 +16,13 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -35,8 +39,8 @@ class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 
 
-class ScroogeToolLockfileSentinel(ToolLockfileSentinel):
-    options_scope = ScroogeSubsystem.options_scope
+class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = ScroogeSubsystem.options_scope
 
 
 @rule
@@ -49,13 +53,10 @@ async def generate_scrooge_thrift_sources(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scrooge))
+
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(scrooge.resolved_lockfile(),),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(WrappedTarget, Address, request.thrift_source_field.address),
@@ -134,11 +135,10 @@ async def generate_scrooge_thrift_sources(
 
 
 @rule
-async def generate_scrooge_lockfile_request(
-    _: ScroogeToolLockfileSentinel,
-    scrooge: ScroogeSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(scrooge)
+def generate_scrooge_lockfile_request(
+    _: ScroogeToolLockfileSentinel, scrooge: ScroogeSubsystem
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(scrooge)
 
 
 def rules():
@@ -146,5 +146,5 @@ def rules():
         *collect_rules(),
         *additional_fields.rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, ScroogeToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScroogeToolLockfileSentinel),
     ]

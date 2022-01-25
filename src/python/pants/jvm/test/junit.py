@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.java.subsystems.junit import JUnit
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
@@ -21,9 +21,13 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JunitTestSourceField
 from pants.util.logging import LogLevel
@@ -38,8 +42,8 @@ class JunitTestFieldSet(TestFieldSet):
     sources: JunitTestSourceField
 
 
-class JunitToolLockfileSentinel(ToolLockfileSentinel):
-    options_scope = JUnit.options_scope
+class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = JUnit.options_scope
 
 
 @dataclass(frozen=True)
@@ -63,12 +67,12 @@ async def setup_junit_for_target(
     junit: JUnit,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(junit))
+
     classpath, junit_classpath = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(lockfiles=(junit.resolved_lockfile(),)),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
@@ -158,10 +162,10 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 
 
 @rule
-async def generate_junit_lockfile_request(
+def generate_junit_lockfile_request(
     _: JunitToolLockfileSentinel, junit: JUnit
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(junit)
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(junit)
 
 
 def rules():
@@ -169,5 +173,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(TestFieldSet, JunitTestFieldSet),
-        UnionRule(ToolLockfileSentinel, JunitToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
     ]

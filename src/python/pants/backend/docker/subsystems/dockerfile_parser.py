@@ -11,11 +11,11 @@ from typing import Iterator
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
@@ -46,15 +46,15 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class DockerfileParserLockfileSentinel(ToolLockfileSentinel):
-    options_scope = DockerfileParser.options_scope
+class DockerfileParserLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = DockerfileParser.options_scope
 
 
 @rule
 def setup_lockfile_request(
     _: DockerfileParserLockfileSentinel, dockerfile_parser: DockerfileParser
-) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(dockerfile_parser)
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(dockerfile_parser)
 
 
 @dataclass(frozen=True)
@@ -201,5 +201,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, DockerfileParserLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, DockerfileParserLockfileSentinel),
     )

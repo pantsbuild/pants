@@ -86,6 +86,9 @@ struct CommandSpec {
   working_directory: Option<PathBuf>,
 
   #[structopt(long)]
+  concurrency_available: Option<usize>,
+
+  #[structopt(long)]
   cache_key_gen_version: Option<String>,
 }
 
@@ -300,6 +303,7 @@ async fn main() {
             Duration::from_millis(100),
             args.execution_rpc_concurrency,
             args.cache_rpc_concurrency,
+            Duration::from_secs(2),
             None,
           )
           .expect("Failed to make command runner"),
@@ -432,6 +436,7 @@ async fn make_request_from_flat_args(
     jdk_home: args.command.jdk.clone(),
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -513,6 +518,7 @@ async fn extract_request_from_action_digest(
       std::time::Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
     }),
     execution_slot_variable: None,
+    concurrency_available: 0,
     description: "".to_string(),
     level: log::Level::Error,
     append_only_caches: BTreeMap::new(),

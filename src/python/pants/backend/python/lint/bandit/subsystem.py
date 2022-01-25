@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -18,7 +18,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
@@ -111,8 +111,8 @@ class Bandit(PythonToolBase):
         )
 
 
-class BanditLockfileSentinel(ToolLockfileSentinel):
-    options_scope = Bandit.options_scope
+class BanditLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Bandit.options_scope
 
 
 @rule(
@@ -124,9 +124,9 @@ class BanditLockfileSentinel(ToolLockfileSentinel):
 )
 async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not bandit.uses_lockfile:
-        return PythonLockfileRequest.from_tool(bandit)
+        return GeneratePythonLockfile.from_tool(bandit)
 
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
@@ -140,7 +140,7 @@ async def setup_bandit_lockfile(
         if BanditFieldSet.is_applicable(tgt)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         bandit, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )
 
@@ -149,5 +149,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, BanditLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, BanditLockfileSentinel),
     )

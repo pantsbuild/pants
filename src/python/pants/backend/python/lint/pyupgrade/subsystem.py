@@ -6,10 +6,10 @@ from __future__ import annotations
 from typing import cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
@@ -65,20 +65,20 @@ class PyUpgrade(PythonToolBase):
         return tuple(self.options.args)
 
 
-class PyUpgradeLockfileSentinel(ToolLockfileSentinel):
-    options_scope = PyUpgrade.options_scope
+class PyUpgradeLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = PyUpgrade.options_scope
 
 
 @rule
 def setup_pyupgrade_lockfile(
     _: PyUpgradeLockfileSentinel, pyupgrade: PyUpgrade
-) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(pyupgrade)
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(pyupgrade)
 
 
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, PyUpgradeLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, PyUpgradeLockfileSentinel),
     )

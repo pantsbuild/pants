@@ -12,7 +12,7 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -30,9 +30,13 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -55,8 +59,8 @@ class ScalafmtRequest(FmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
 
 
-class ScalafmtToolLockfileSentinel(ToolLockfileSentinel):
-    options_scope = ScalafmtSubsystem.options_scope
+class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = ScalafmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -197,17 +201,15 @@ async def setup_scalafmt(
     bash: BashBinary,
 ) -> Setup:
     toolcp_relpath = "__toolcp"
+
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
+
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(tool.resolved_lockfile(),),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
     )
 
     source_files_snapshot = (
@@ -221,13 +223,7 @@ async def setup_scalafmt(
     )
 
     merged_sources_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                source_files_snapshot.digest,
-                config_files.snapshot.digest,
-            ]
-        ),
+        Digest, MergeDigests([source_files_snapshot.digest, config_files.snapshot.digest])
     )
     immutable_input_digests = {
         **jdk_setup.immutable_input_digests,
@@ -317,11 +313,10 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
 
 
 @rule
-async def generate_scalafmt_lockfile_request(
-    _: ScalafmtToolLockfileSentinel,
-    tool: ScalafmtSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+def generate_scalafmt_lockfile_request(
+    _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
@@ -330,5 +325,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(FmtRequest, ScalafmtRequest),
         UnionRule(LintRequest, ScalafmtRequest),
-        UnionRule(ToolLockfileSentinel, ScalafmtToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

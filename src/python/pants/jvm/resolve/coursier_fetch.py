@@ -48,6 +48,7 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.util_rules import ExtractFileDigest
@@ -177,6 +178,7 @@ class CoursierResolvedLockfile:
     """
 
     entries: tuple[CoursierLockfileEntry, ...]
+    metadata: JVMLockfileMetadata | None = None
 
     @classmethod
     def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
@@ -226,18 +228,23 @@ class CoursierResolvedLockfile:
         """
 
         lockfile_str: str
+        lockfile_bytes: bytes
         if isinstance(lockfile, str):
             lockfile_str = lockfile
+            lockfile_bytes = lockfile.encode("utf-8")
         else:
             lockfile_str = lockfile.decode("utf-8")
+            lockfile_bytes = lockfile
 
         contents = toml.loads(lockfile_str)
         entries = tuple(
             CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
         )
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
 
         return cls(
             entries=entries,
+            metadata=metadata,
         )
 
     @classmethod
@@ -449,13 +456,22 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     # TODO: Loading this per JvmArtifact.
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, request.resolve)
 
+    requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
+
+    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+        raise ValueError(
+            f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
+            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            "lockfile based on the new requirements."
+        )
+
     # All of the transitive dependencies are exported.
     # TODO: Expose an option to control whether this exports only the root, direct dependencies,
     # transitive dependencies, etc.
     assert len(request.component.members) == 1, "JvmArtifact does not have dependencies."
     root_entry, transitive_entries = lockfile.dependencies(
         request.resolve,
-        ArtifactRequirement.from_jvm_artifact_target(request.component.representative).coordinate,
+        requirement.coordinate,
     )
 
     classpath_entries = await MultiGet(
@@ -652,8 +668,9 @@ async def get_coursier_lockfile_for_resolve(
 
 
 @dataclass(frozen=True)
-class MaterializedClasspathRequest:
-    """A helper to merge various classpath elements.
+class ToolClasspathRequest:
+    """A request to set up the classpath for a JVM tool by fetching artifacts and merging the
+    classpath.
 
     :param prefix: if set, should be a relative directory that will
         be prepended to every classpath element.  This is useful for
@@ -664,16 +681,13 @@ class MaterializedClasspathRequest:
     """
 
     prefix: str | None = None
-    lockfiles: tuple[CoursierResolvedLockfile, ...] = ()
-    artifact_requirements: tuple[ArtifactRequirements, ...] = ()
+    lockfile: CoursierResolvedLockfile = CoursierResolvedLockfile(entries=())
+    artifact_requirements: ArtifactRequirements = ArtifactRequirements()
 
 
 @dataclass(frozen=True)
-class MaterializedClasspath:
-    """A fully fetched and merged classpath, ready to hand to a JVM process invocation.
-
-    TODO: Consider renaming to reflect the fact that this is always a 3rdparty classpath.
-    """
+class ToolClasspath:
+    """A fully fetched and merged classpath for running a JVM tool."""
 
     content: Snapshot
 
@@ -697,33 +711,28 @@ class MaterializedClasspath:
 
 
 @rule(level=LogLevel.DEBUG)
-async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
+async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
     """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
 
-    artifact_requirements_lockfiles = await MultiGet(
-        Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
-        for artifact_requirements in request.artifact_requirements
+    artifact_requirements_lockfile = await Get(
+        CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
+    )
+    all_classpath_entries = await MultiGet(
+        Get(ResolvedClasspathEntries, CoursierResolvedLockfile, lockfile)
+        for lockfile in (request.lockfile, artifact_requirements_lockfile)
     )
 
-    lockfile_and_requirements_classpath_entries = await MultiGet(
-        Get(
-            ResolvedClasspathEntries,
-            CoursierResolvedLockfile,
-            lockfile,
-        )
-        for lockfile in (*request.lockfiles, *artifact_requirements_lockfiles)
-    )
     merged_snapshot = await Get(
         Snapshot,
         MergeDigests(
             classpath_entry.digest
-            for classpath_entries in lockfile_and_requirements_classpath_entries
+            for classpath_entries in all_classpath_entries
             for classpath_entry in classpath_entries
         ),
     )
     if request.prefix is not None:
         merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
-    return MaterializedClasspath(content=merged_snapshot)
+    return ToolClasspath(content=merged_snapshot)
 
 
 def rules():

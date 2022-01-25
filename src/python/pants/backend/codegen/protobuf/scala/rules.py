@@ -13,7 +13,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -45,11 +45,18 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import (
+    GatherJvmCoordinatesRequest,
+    GenerateJvmLockfileFromTool,
+    ValidatedJvmToolLockfileRequest,
+)
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -60,8 +67,8 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class ScalapbcToolLockfileSentinel(ToolLockfileSentinel):
-    options_scope = ScalaPBSubsystem.options_scope
+class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = ScalaPBSubsystem.options_scope
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):
@@ -76,7 +83,7 @@ class MaterializeJvmPluginRequest:
 @dataclass(frozen=True)
 class MaterializedJvmPlugin:
     name: str
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def setup_arg(self, plugin_relpath: str) -> str:
         classpath_arg = ":".join(self.classpath.classpath_entries(plugin_relpath))
@@ -112,6 +119,8 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -120,12 +129,7 @@ async def generate_scala_from_protobuf(
         inherit_env,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(scalapb.resolved_lockfile(),),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
@@ -171,13 +175,7 @@ async def generate_scala_from_protobuf(
     }
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     result = await Get(
@@ -236,16 +234,11 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
             artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
-            option_name="--scalapb-plugin-artifacts",
+            option_name="[scalapb].jvm_plugins",
         ),
     )
-    classpath = await Get(
-        MaterializedClasspath, MaterializedClasspathRequest(artifact_requirements=(requirements,))
-    )
-    return MaterializedJvmPlugin(
-        name=request.plugin.name,
-        classpath=classpath,
-    )
+    classpath = await Get(ToolClasspath, ToolClasspathRequest(artifact_requirements=requirements))
+    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
 
 
 @rule
@@ -279,61 +272,40 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
+
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__shimcp",
-                lockfiles=(scalapb.resolved_lockfile(),),
-            ),
-        ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    scalapb_shim_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile)),
+        Get(Digest, CreateDigest([scalapb_shim_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                tool_classpath.digest,
-                shim_classpath.digest,
-                source_digest,
-            )
-        ),
+        Digest, MergeDigests((tool_classpath.digest, shim_classpath.digest, source_digest))
     )
 
     # NB: We do not use nailgun for this process, since it is launched exactly once.
@@ -367,11 +339,10 @@ async def setup_scalapb_shim_classfiles(
 
 
 @rule
-async def generate_scalapbc_lockfile_request(
-    _: ScalapbcToolLockfileSentinel,
-    tool: ScalaPBSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+def generate_scalapbc_lockfile_request(
+    _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
@@ -379,5 +350,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
-        UnionRule(ToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
     ]

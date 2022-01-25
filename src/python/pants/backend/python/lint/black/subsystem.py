@@ -7,13 +7,13 @@ import os.path
 from typing import Iterable, cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
@@ -107,8 +107,8 @@ class Black(PythonToolBase):
         )
 
 
-class BlackLockfileSentinel(ToolLockfileSentinel):
-    options_scope = Black.options_scope
+class BlackLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Black.options_scope
 
 
 @rule(
@@ -117,9 +117,9 @@ class BlackLockfileSentinel(ToolLockfileSentinel):
 )
 async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not black.uses_lockfile:
-        return PythonLockfileRequest.from_tool(black)
+        return GeneratePythonLockfile.from_tool(black)
 
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
@@ -131,12 +131,12 @@ async def setup_black_lockfile(
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
 
-    return PythonLockfileRequest.from_tool(black, constraints)
+    return GeneratePythonLockfile.from_tool(black, constraints)
 
 
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, BlackLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, BlackLockfileSentinel),
     )

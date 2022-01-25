@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Iterable, cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
@@ -283,8 +283,8 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-class MyPyLockfileSentinel(ToolLockfileSentinel):
-    options_scope = MyPy.options_scope
+class MyPyLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = MyPy.options_scope
 
 
 @rule(
@@ -296,9 +296,9 @@ async def setup_mypy_lockfile(
     first_party_plugins: MyPyFirstPartyPlugins,
     mypy: MyPy,
     python_setup: PythonSetup,
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not mypy.uses_lockfile:
-        return PythonLockfileRequest.from_tool(mypy)
+        return GeneratePythonLockfile.from_tool(mypy)
 
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
@@ -316,7 +316,7 @@ async def setup_mypy_lockfile(
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
 
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         mypy, constraints, extra_requirements=first_party_plugins.requirement_strings
     )
 
@@ -325,5 +325,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, MyPyLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, MyPyLockfileSentinel),
     )

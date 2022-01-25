@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8 import skip_field
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *target_types_rules.rules(),
             QueryRule(Flake8FirstPartyPlugins, []),
-            QueryRule(PythonLockfileRequest, [Flake8LockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [Flake8LockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget, PythonRequirementTarget],
     )
@@ -119,7 +119,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner) -> None:
             env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [Flake8LockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [Flake8LockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
         assert lockfile_request.requirements == FrozenOrderedSet(
             [

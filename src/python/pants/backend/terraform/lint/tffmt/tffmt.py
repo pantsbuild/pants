@@ -4,6 +4,7 @@ import logging
 import textwrap
 
 from pants.backend.terraform.style import StyleSetup, StyleSetupRequest
+from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtRequest, FmtResult
@@ -39,7 +40,7 @@ class TfFmtSubsystem(Subsystem):
 
 
 class TffmtRequest(FmtRequest):
-    pass
+    field_set_type = TerraformFieldSet
 
 
 @rule(desc="Format with `terraform fmt`")

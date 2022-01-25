@@ -4,10 +4,10 @@
 from typing import Tuple, cast
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
@@ -60,20 +60,20 @@ class Docformatter(PythonToolBase):
         return tuple(self.options.args)
 
 
-class DocformatterLockfileSentinel(ToolLockfileSentinel):
-    options_scope = Docformatter.options_scope
+class DocformatterLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Docformatter.options_scope
 
 
 @rule
 def setup_lockfile_request(
     _: DocformatterLockfileSentinel, docformatter: Docformatter
-) -> PythonLockfileRequest:
-    return PythonLockfileRequest.from_tool(docformatter)
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(docformatter)
 
 
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, DocformatterLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, DocformatterLockfileSentinel),
     )

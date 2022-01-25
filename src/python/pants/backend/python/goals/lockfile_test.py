@@ -6,14 +6,14 @@ from __future__ import annotations
 from textwrap import dedent
 
 from pants.backend.python.goals.lockfile import (
-    PythonLockfileRequest,
+    GeneratePythonLockfile,
     RequestedPythonUserResolveNames,
     setup_user_lockfile_requests,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import UserLockfileRequests
+from pants.core.goals.generate_lockfiles import UserGenerateLockfiles
 from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -24,7 +24,7 @@ def test_multiple_resolves() -> None:
         rules=[
             setup_user_lockfile_requests,
             SubsystemRule(PythonSetup),
-            QueryRule(UserLockfileRequests, [RequestedPythonUserResolveNames]),
+            QueryRule(UserGenerateLockfiles, [RequestedPythonUserResolveNames]),
         ],
         target_types=[PythonRequirementTarget],
     )
@@ -59,10 +59,10 @@ def test_multiple_resolves() -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     result = rule_runner.request(
-        UserLockfileRequests, [RequestedPythonUserResolveNames(["a", "b"])]
+        UserGenerateLockfiles, [RequestedPythonUserResolveNames(["a", "b"])]
     )
     assert set(result) == {
-        PythonLockfileRequest(
+        GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a", "both1", "both2"]),
             interpreter_constraints=InterpreterConstraints(
                 PythonSetup.default_interpreter_constraints
@@ -70,7 +70,7 @@ def test_multiple_resolves() -> None:
             resolve_name="a",
             lockfile_dest="a.lock",
         ),
-        PythonLockfileRequest(
+        GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["b", "both1", "both2"]),
             interpreter_constraints=InterpreterConstraints(
                 PythonSetup.default_interpreter_constraints

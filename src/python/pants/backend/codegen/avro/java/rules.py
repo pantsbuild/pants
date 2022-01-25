@@ -11,7 +11,7 @@ from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.avro.target_types import AvroSourceField
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -34,10 +34,14 @@ from pants.engine.target import (
     HydrateSourcesRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import JvmLockfileRequest
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve import jvm_tool
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierResolvedLockfile,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -47,8 +51,8 @@ class GenerateJavaFromAvroRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class AvroToolLockfileSentinel(ToolLockfileSentinel):
-    options_scope = AvroSubsystem.options_scope
+class AvroToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = AvroSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -98,13 +102,10 @@ async def compile_avro_source(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
+    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(avro_tools))
+
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(avro_tools.resolved_lockfile(),),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
         Get(
             Digest,
             DigestSubset(
@@ -210,17 +211,16 @@ async def compile_avro_source(
 
 
 @rule
-async def generate_avro_tools_lockfile_request(
-    _: AvroToolLockfileSentinel,
-    tool: AvroSubsystem,
-) -> JvmLockfileRequest:
-    return JvmLockfileRequest.from_tool(tool)
+def generate_avro_tools_lockfile_request(
+    _: AvroToolLockfileSentinel, tool: AvroSubsystem
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
+        *jvm_tool.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
-        UnionRule(ToolLockfileSentinel, AvroToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
     )

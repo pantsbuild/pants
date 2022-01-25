@@ -18,7 +18,7 @@ from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
 from pants.jvm import classpath, jdk_rules, resources
 from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.goals import coursier
+from pants.jvm.goals import lockfile
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test import junit
@@ -48,7 +48,7 @@ def rules():
         *classpath.rules(),
         *junit.rules(),
         *deploy_jar.rules(),
-        *coursier.rules(),
+        *lockfile.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
         *jvm_util_rules.rules(),

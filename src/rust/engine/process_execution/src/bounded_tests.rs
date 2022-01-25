@@ -1,21 +1,34 @@
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
 use futures::future::{self, FutureExt};
 use tokio::time::{sleep, timeout};
 
-use crate::AsyncSemaphore;
+use crate::bounded::{balance, AsyncSemaphore, State, Task};
+
+fn mk_semaphore(permits: usize) -> AsyncSemaphore {
+  mk_semaphore_with_preemptible_duration(permits, Duration::from_millis(200))
+}
+
+fn mk_semaphore_with_preemptible_duration(
+  permits: usize,
+  preemptible_duration: Duration,
+) -> AsyncSemaphore {
+  let executor = task_executor::Executor::new();
+  AsyncSemaphore::new(&executor, permits, preemptible_duration)
+}
 
 #[tokio::test]
 async fn acquire_and_release() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
 
   sema.with_acquired(|_id| future::ready(())).await;
 }
 
 #[tokio::test]
 async fn correct_semaphore_slot_ids() {
-  let sema = AsyncSemaphore::new(2);
+  let sema = mk_semaphore(2);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
   let (tx3, rx3) = oneshot::channel();
@@ -67,7 +80,7 @@ async fn correct_semaphore_slot_ids() {
 
 #[tokio::test]
 async fn correct_semaphore_slot_ids_2() {
-  let sema = AsyncSemaphore::new(4);
+  let sema = mk_semaphore(4);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
   let (tx3, rx3) = oneshot::channel();
@@ -145,7 +158,7 @@ async fn correct_semaphore_slot_ids_2() {
 
 #[tokio::test]
 async fn at_most_n_acquisitions() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
 
@@ -208,7 +221,7 @@ async fn drop_while_waiting() {
   // If the SECOND future was not removed from the waiters queue we would not get a signal
   // that thread3 acquired the lock because the 2nd task would be blocking the queue trying to
   // poll a non existent future.
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
   let handle3 = sema.clone();
@@ -235,7 +248,7 @@ async fn drop_while_waiting() {
 
   // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
   tokio::spawn(async move {
-    let permit_future = handle2.acquire().boxed();
+    let permit_future = handle2.acquire(1).boxed();
     let delay_future = sleep(Duration::from_millis(100)).boxed();
     let raced_result = future::select(delay_future, permit_future).await;
     // We expect to have timed out, because the other Future will not resolve until asked.
@@ -270,7 +283,7 @@ async fn drop_while_waiting() {
 
 #[tokio::test]
 async fn dropped_future_is_removed_from_queue() {
-  let sema = AsyncSemaphore::new(1);
+  let sema = mk_semaphore(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();
 
@@ -326,4 +339,72 @@ async fn dropped_future_is_removed_from_queue() {
     panic!("thread1 didn't exit.");
   }
   assert_eq!(1, sema.available_permits());
+}
+
+#[tokio::test]
+async fn preemption() {
+  let ten_secs = Duration::from_secs(10);
+  let sema = mk_semaphore_with_preemptible_duration(2, ten_secs);
+
+  // Acquire a permit which will take all concurrency, and confirm that it doesn't get preempted.
+  let permit1 = sema.acquire(2).await;
+  assert_eq!(2, permit1.concurrency());
+  if let Ok(_) = timeout(ten_secs / 100, permit1.notified_concurrency_changed()).await {
+    panic!("permit1 should not have been preempted.");
+  }
+
+  // Acquire another permit, and confirm that it doesn't get preempted.
+  let permit2 = sema.acquire(2).await;
+  if let Ok(_) = timeout(ten_secs / 100, permit2.notified_concurrency_changed()).await {
+    panic!("permit2 should not have been preempted.");
+  }
+
+  // But that permit1 does get preempted.
+  if let Err(_) = timeout(ten_secs, permit1.notified_concurrency_changed()).await {
+    panic!("permit1 should have been preempted.");
+  }
+
+  assert_eq!(1, permit1.concurrency());
+  assert_eq!(1, permit2.concurrency());
+}
+
+/// Given Tasks as triples of desired, actual, and expected concurrency (all of which are
+/// assumed to be preemptible), assert that the expected concurrency is applied.
+fn test_balance(
+  total_concurrency: usize,
+  expected_preempted: usize,
+  task_defs: Vec<(usize, usize, usize)>,
+) {
+  let ten_minutes_from_now = Instant::now() + Duration::from_secs(10 * 60);
+  let tasks = task_defs
+    .iter()
+    .enumerate()
+    .map(|(id, (desired, actual, _))| {
+      Arc::new(Task::new(id, *desired, *actual, ten_minutes_from_now))
+    })
+    .collect::<Vec<_>>();
+
+  let mut state = State::new_for_tests(total_concurrency, tasks.clone());
+
+  assert_eq!(expected_preempted, balance(Instant::now(), &mut state));
+  for (task, (_, _, expected)) in tasks.iter().zip(task_defs.into_iter()) {
+    assert_eq!(expected, task.concurrency());
+  }
+}
+
+#[tokio::test]
+async fn balance_noop() {
+  test_balance(2, 0, vec![(1, 1, 1), (1, 1, 1)]);
+}
+
+#[tokio::test]
+async fn balance_overcommitted() {
+  // Preempt the first Task and give it one slot, without adjusting the second task.
+  test_balance(2, 1, vec![(2, 2, 1), (1, 1, 1)]);
+}
+
+#[tokio::test]
+async fn balance_undercommitted() {
+  // Should preempt both Tasks to give them more concurrency.
+  test_balance(4, 2, vec![(2, 1, 2), (2, 1, 2)]);
 }

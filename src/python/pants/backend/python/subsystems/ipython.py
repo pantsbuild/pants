@@ -6,12 +6,12 @@ from __future__ import annotations
 import itertools
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import ToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
@@ -48,8 +48,8 @@ class IPython(PythonToolBase):
         )
 
 
-class IPythonLockfileSentinel(ToolLockfileSentinel):
-    options_scope = IPython.options_scope
+class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = IPython.options_scope
 
 
 @rule(
@@ -61,9 +61,9 @@ class IPythonLockfileSentinel(ToolLockfileSentinel):
 )
 async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
-) -> PythonLockfileRequest:
+) -> GeneratePythonLockfile:
     if not ipython.uses_lockfile:
-        return PythonLockfileRequest.from_tool(ipython)
+        return GeneratePythonLockfile.from_tool(ipython)
 
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
@@ -81,7 +81,7 @@ async def setup_ipython_lockfile(
         if tgt.has_field(InterpreterConstraintsField)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return PythonLockfileRequest.from_tool(
+    return GeneratePythonLockfile.from_tool(
         ipython, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
     )
 
@@ -90,5 +90,5 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(ToolLockfileSentinel, IPythonLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, IPythonLockfileSentinel),
     )

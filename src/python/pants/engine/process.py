@@ -74,6 +74,7 @@ class Process:
     timeout_seconds: int | float
     jdk_home: str | None
     execution_slot_variable: str | None
+    concurrency_available: int
     cache_scope: ProcessCacheScope
     platform: str | None
 
@@ -94,6 +95,7 @@ class Process:
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
         execution_slot_variable: str | None = None,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         platform: Platform | None = None,
     ) -> None:
@@ -140,6 +142,7 @@ class Process:
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
         self.execution_slot_variable = execution_slot_variable
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.platform = platform.value if platform is not None else None
 

@@ -112,7 +112,8 @@ def run_lint_rule(
     *,
     lint_request_types: List[Type[LintRequest]],
     targets: List[Target],
-    per_file_caching: bool,
+    per_file_caching: bool = False,
+    batch_size: int = 128,
 ) -> Tuple[int, str]:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         union_membership = UnionMembership({LintRequest: lint_request_types})
@@ -123,7 +124,9 @@ def run_lint_rule(
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
                 create_goal_subsystem(
-                    LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
+                    LintSubsystem,
+                    per_file_caching=per_file_caching,
+                    batch_size=128,
                 ),
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -141,22 +144,20 @@ def run_lint_rule(
         return result.exit_code, stdio_reader.get_stderr()
 
 
-def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
-    def assert_noops(per_file_caching: bool) -> None:
-        exit_code, stderr = run_lint_rule(
-            rule_runner,
-            lint_request_types=[InvalidRequest],
-            targets=[make_target()],
-            per_file_caching=per_file_caching,
-        )
-        assert exit_code == 0
-        assert stderr == ""
-
-    assert_noops(per_file_caching=False)
-    assert_noops(per_file_caching=True)
+@pytest.mark.parametrize("per_file_caching", [True, False])
+def test_invalid_target_noops(rule_runner: RuleRunner, per_file_caching: bool) -> None:
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=[InvalidRequest],
+        targets=[make_target()],
+        per_file_caching=per_file_caching,
+    )
+    assert exit_code == 0
+    assert stderr == ""
 
 
-def test_summary(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("per_file_caching", [True, False])
+def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
     """Test that we render the summary correctly.
 
     This tests that we:
@@ -166,31 +167,52 @@ def test_summary(rule_runner: RuleRunner) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
 
-    def assert_expected(*, per_file_caching: bool) -> None:
-        exit_code, stderr = run_lint_rule(
-            rule_runner,
-            lint_request_types=[
-                ConditionallySucceedsRequest,
-                FailingRequest,
-                SkippedRequest,
-                SuccessfulRequest,
-            ],
-            targets=[make_target(good_address), make_target(bad_address)],
-            per_file_caching=per_file_caching,
-        )
-        assert exit_code == FailingRequest.exit_code([bad_address])
-        assert stderr == dedent(
-            """\
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=[
+            ConditionallySucceedsRequest,
+            FailingRequest,
+            SkippedRequest,
+            SuccessfulRequest,
+        ],
+        targets=[make_target(good_address), make_target(bad_address)],
+        per_file_caching=per_file_caching,
+    )
+    assert exit_code == FailingRequest.exit_code([bad_address])
+    assert stderr == dedent(
+        """\
 
-            𐄂 ConditionallySucceedsLinter failed.
-            𐄂 FailingLinter failed.
-            - SkippedLinter skipped.
-            ✓ SuccessfulLinter succeeded.
-            """
-        )
+        𐄂 ConditionallySucceedsLinter failed.
+        𐄂 FailingLinter failed.
+        - SkippedLinter skipped.
+        ✓ SuccessfulLinter succeeded.
+        """
+    )
 
-    assert_expected(per_file_caching=False)
-    assert_expected(per_file_caching=True)
+
+@pytest.mark.parametrize("batch_size", [1, 32, 128, 1024])
+def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=[
+            ConditionallySucceedsRequest,
+            FailingRequest,
+            SkippedRequest,
+            SuccessfulRequest,
+        ],
+        targets=[make_target(Address("", target_name=f"good{i}")) for i in range(0, 512)],
+        batch_size=batch_size,
+    )
+    assert exit_code == FailingRequest.exit_code([])
+    assert stderr == dedent(
+        """\
+
+        ✓ ConditionallySucceedsLinter succeeded.
+        𐄂 FailingLinter failed.
+        - SkippedLinter skipped.
+        ✓ SuccessfulLinter succeeded.
+        """
+    )
 
 
 def test_streaming_output_skip() -> None:

@@ -15,7 +15,7 @@ fuser = "0.9.1"
 futures = "0.3"
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-libc = "0.2.39"
+libc = "0.2.112"
 log = "0.4.1"
 parking_lot = "0.11"
 protobuf = { version = "2.25.2", features = ["with-bytes"] }
