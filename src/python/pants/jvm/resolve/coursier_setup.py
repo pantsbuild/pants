@@ -196,8 +196,14 @@ async def invoke_coursier_wrapper(
         ),
     )
 
+    filtered_stderr = b"\n".join(
+        line
+        for line in process_result.stderr.splitlines()
+        if line != "AAAsetrlimit to increase file descriptor limit failed, errno 22"
+    )
+
     return CoursierWrapperResult(
-        process_result.output_digest, process_result.stdout, process_result.stderr
+        process_result.output_digest, process_result.stdout, filtered_stderr
     )
 
 
