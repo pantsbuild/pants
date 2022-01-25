@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 import shlex
@@ -12,6 +13,7 @@ from typing import ClassVar, Iterable
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
+from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
@@ -19,7 +21,9 @@ from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -160,6 +164,99 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         nailgun_jar=os.path.join(JdkSetup.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
+    )
+
+
+"""
+        return Process(
+            [
+                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
+                "org.apache.avro.tool.Main",
+                *args,
+            ],
+            input_digest=overridden_input_digest
+            if overridden_input_digest is not None
+            else input_digest,
+            immutable_input_digests=immutable_input_digests,
+            use_nailgun=immutable_input_digests,
+            description="Generating Java sources from Avro source.",
+            level=LogLevel.DEBUG,
+            output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),
+            env=jdk_setup.env,
+            append_only_caches=jdk_setup.append_only_caches,
+        )
+"""
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class JvmProcess:
+    args: tuple[str, ...]
+    classpath_entries: tuple[str, ...]
+    input_digest: Digest
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
+    use_nailgun: tuple[str, ...]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
+    timeout_seconds: int | float | None
+    platform: Platform | None
+    extra_immutable_input_digests: FrozenDict[str, Digest]
+    extra_env: FrozenDict[str, str]
+
+    def __init__(
+        self,
+        args: Iterable[str],
+        classpath_entries: Iterable[str],
+        input_digest: Digest,
+        description: str,
+        level: LogLevel,
+        use_nailgun: Iterable[str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        extra_immutable_input_digests: dict[str, Digest] | None = None,
+        extra_env: dict[str, str] | None = None,
+        timeout_seconds: int | float | None = None,
+        platform: Platform | None = None,
+    ):
+
+        self.args = tuple(args)
+        self.classpath_entries = tuple(classpath_entries)
+        self.input_digest = input_digest
+        self.description = description
+        self.level = level
+        self.use_nailgun = tuple(use_nailgun or ())
+        self.output_files = tuple(output_files or ())
+        self.output_directories = tuple(output_directories or ())
+        self.timeout_seconds = timeout_seconds
+        self.platform = platform
+
+        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
+        self.extra_env = FrozenDict(extra_env or {})
+
+
+@rule
+async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess) -> Process:
+
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        **request.extra_immutable_input_digests,
+    }
+    env = {**jdk_setup.env, **request.extra_env}
+
+    return Process(
+        [*jdk_setup.args(bash, request.classpath_entries), *request.args],
+        input_digest=request.input_digest,
+        immutable_input_digests=immutable_input_digests,
+        use_nailgun=request.use_nailgun,
+        description=request.description,
+        level=request.level,
+        output_directories=request.output_directories,
+        env=env,
+        platform=request.platform,
+        timeout_seconds=request.timeout_seconds,
+        append_only_caches=jdk_setup.append_only_caches,
+        output_files=request.output_files,
     )
 
 

@@ -25,7 +25,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
@@ -34,7 +34,8 @@ from pants.engine.target import (
     HydrateSourcesRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm import jdk_rules
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -97,7 +98,6 @@ async def compile_avro_source(
     request: CompileAvroSourceRequest,
     avro_tools: AvroSubsystem,
     jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -141,36 +141,38 @@ async def compile_avro_source(
         *,
         overridden_input_digest: Digest | None = None,
         overridden_output_dir: str | None = None,
-    ) -> Process:
-        return Process(
-            [
-                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
+    ) -> JvmProcess:
+
+        return JvmProcess(
+            args=(
                 "org.apache.avro.tool.Main",
                 *args,
-            ],
-            input_digest=overridden_input_digest
-            if overridden_input_digest is not None
-            else input_digest,
-            immutable_input_digests=immutable_input_digests,
+            ),
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            input_digest=(
+                overridden_input_digest if overridden_input_digest is not None else input_digest
+            ),
+            extra_immutable_input_digests={
+                toolcp_relpath: tool_classpath.digest,
+            },
+            # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
             use_nailgun=immutable_input_digests,
             description="Generating Java sources from Avro source.",
             level=LogLevel.DEBUG,
             output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),
-            env=jdk_setup.env,
-            append_only_caches=jdk_setup.append_only_caches,
         )
 
     path = PurePath(request.path)
     if path.suffix == ".avsc":
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(["compile", "schema", request.path, output_dir]),
         )
     elif path.suffix == ".avpr":
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(["compile", "protocol", request.path, output_dir]),
         )
     elif path.suffix == ".avdl":
@@ -182,7 +184,7 @@ async def compile_avro_source(
         idl_input_digest = await Get(Digest, MergeDigests([input_digest, idl_output_dir_digest]))
         idl_result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(
                 ["idl", request.path, avpr_path],
                 overridden_input_digest=idl_input_digest,
@@ -195,7 +197,7 @@ async def compile_avro_source(
         )
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(
                 ["compile", "protocol", avpr_path, output_dir],
                 overridden_input_digest=protocol_input_digest,
@@ -221,6 +223,7 @@ def rules():
     return (
         *collect_rules(),
         *jvm_tool.rules(),
+        *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
     )
