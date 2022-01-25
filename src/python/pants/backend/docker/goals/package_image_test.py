@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os.path
 from textwrap import dedent
-from typing import Callable
+from typing import Callable, ContextManager, cast
 
 import pytest
 
@@ -47,11 +47,17 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import WrappedTarget
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.pytest_util import assert_logged
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.pytest_util import assert_logged, no_exception
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -712,7 +718,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             ],
         ),
         (
-            ".",
+            "./",
             ("config.txt",),
             ("docker/test/conf/config.txt",),
             [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
@@ -870,27 +876,56 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
     "default_context_root, context_root, expected_context_root",
     [
         ("", None, "."),
-        ("/", None, "."),
+        (".", None, "."),
         ("src", None, "src"),
-        ("/src", None, "src"),
-        (".", None, "src/docker"),
+        (
+            "/",
+            None,
+            engine_error(
+                InvalidFieldException,
+                contains=("Use '' for a path relative to the build root, or './' for"),
+            ),
+        ),
+        (
+            "/src",
+            None,
+            engine_error(
+                InvalidFieldException,
+                contains=(
+                    "The `context_root` field in target src/docker:image must be a relative path, but was "
+                    "'/src'. Use 'src' for a path relative to the build root, or './src' for a path "
+                    "relative to the BUILD file (i.e. 'src/docker/src')."
+                ),
+            ),
+        ),
+        ("./", None, "src/docker"),
         ("./build/context/", None, "src/docker/build/context"),
+        (".build/context/", None, ".build/context"),
         ("ignored", "", "."),
+        ("ignored", ".", "."),
         ("ignored", "src/context/", "src/context"),
-        ("ignored", "/", "."),
-        ("ignored", "/src", "src"),
-        ("ignored", ".", "src/docker"),
+        ("ignored", "./", "src/docker"),
+        ("ignored", "src", "src"),
         ("ignored", "./build/context", "src/docker/build/context"),
     ],
 )
 def test_get_context_root(
-    context_root: str | None, default_context_root: str, expected_context_root: str
+    context_root: str | None, default_context_root: str, expected_context_root: str | ContextManager
 ) -> None:
-    docker_options = create_subsystem(
-        DockerOptions,
-        default_context_root=default_context_root,
-    )
-    address = Address("src/docker", target_name="image")
-    tgt = DockerImageTarget({"context_root": context_root}, address)
-    fs = DockerFieldSet.create(tgt)
-    assert fs.get_context_root(docker_options.default_context_root) == expected_context_root
+    if isinstance(expected_context_root, str):
+        raises = cast("ContextManager", no_exception())
+    else:
+        raises = expected_context_root
+        expected_context_root = ""
+
+    with raises:
+        docker_options = create_subsystem(
+            DockerOptions,
+            default_context_root=default_context_root,
+        )
+        address = Address("src/docker", target_name="image")
+        tgt = DockerImageTarget({"context_root": context_root}, address)
+        fs = DockerFieldSet.create(tgt)
+        actual_context_root = fs.get_context_root(docker_options.default_context_root)
+        if expected_context_root:
+            assert actual_context_root == expected_context_root

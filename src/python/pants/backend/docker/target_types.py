@@ -22,6 +22,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    InvalidFieldException,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
@@ -50,18 +51,26 @@ class DockerImageBuildArgsField(StringSequenceField):
 class DockerImageContextRootField(StringField):
     alias = "context_root"
     help = (
-        "Specify which directory to use as the Docker build context root, relative to the build "
-        "root by default. With a `./` prefix it is relative to the directory of the BUILD file. "
-        "This affects the file paths to use for the COPY and ADD instructions.\n\nThe "
-        "default build root is specified in the `[docker].default_context_root` configuration "
-        "option."
+        "Specify which directory to use as the Docker build context root. This affects the file "
+        "paths to use for the `COPY` and `ADD` instructions. For example, whether "
+        "`COPY files/f.txt` should look for the file relative to the build root: "
+        "`<build root>/files/f.txt` vs relative to the BUILD file: "
+        "`<build root>/path_to_build_file/files/f.txt`.\n\n"
+        "Specify the `context_root` path as `files` for relative to build root, or as `./files` "
+        "for relative to the BUILD file.\n\n"
+        "If `context_root` is not specified, it defaults to `[docker].default_context_root`."
     )
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if isinstance(value_or_default, str):
-            return value_or_default.strip("/")
+        if isinstance(value_or_default, str) and value_or_default.startswith("/"):
+            val = value_or_default.strip("/")
+            raise InvalidFieldException(
+                f"The `{cls.alias}` field in target {address} must be a relative path, but was "
+                f"{value_or_default!r}. Use {val!r} for a path relative to the build root, or "
+                f"{'./' + val!r} for a path relative to the BUILD file (i.e. {os.path.join(address.spec_path, val)!r})."
+            )
         return value_or_default
 
 

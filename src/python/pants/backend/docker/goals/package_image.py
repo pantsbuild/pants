@@ -160,7 +160,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             context_root = self.context_root.value
         else:
             context_root = default_context_root
-        if context_root == "." or context_root.startswith("./"):
+        if context_root.startswith("./"):
             context_root = os.path.join(self.address.spec_path, context_root)
         return os.path.normpath(context_root)
 
