@@ -18,14 +18,12 @@ from pants.backend.java.dependency_inference.types import JavaImport, JavaSource
 from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -36,9 +34,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         preserve_tmpdirs=True,
         rules=[
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *jvm_tool.rules(),
             *java_parser_launcher_rules(),
             *java_parser_rules(),
             *source_files.rules(),

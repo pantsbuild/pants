@@ -11,6 +11,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
+from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
@@ -189,4 +190,4 @@ async def setup_lockfile_request_from_tool(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *lockfile.rules())
