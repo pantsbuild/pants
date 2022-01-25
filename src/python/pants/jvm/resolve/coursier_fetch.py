@@ -764,9 +764,9 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         )
         if resolution.metadata and not resolution.metadata.is_valid_for(lockfile_inputs):
             raise ValueError(
-                f"The lockfile configured by the option {lockfile_req.lockfile_option_name} "
-                f"was generated with different requirements than are currently set via "
-                f"{lockfile_req.artifact_option_name}. Run "
+                f"The lockfile {lockfile_req.lockfile_dest} (configured by the option "
+                f"{lockfile_req.lockfile_option_name}) was generated with different requirements "
+                f"than are currently set via {lockfile_req.artifact_option_name}. Run "
                 f"{regen_command} to regenerate the lockfile."
             )
 

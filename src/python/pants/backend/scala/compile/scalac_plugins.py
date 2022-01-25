@@ -74,7 +74,7 @@ def generate_global_scalac_plugins_lockfile_request(
     return GenerateJvmLockfileFromTool(
         FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
         artifact_option_name=f"[{scalac.options_scope}].plugins_global",
-        lockfile_option_name=f"{scalac.options_scope}].plugins_global_lockfile",
+        lockfile_option_name=f"[{scalac.options_scope}].plugins_global_lockfile",
         resolve_name="scalac-plugins",
         lockfile_dest=scalac.plugins_global_lockfile,
         default_lockfile_resource=scalac.default_plugins_lockfile_resource,

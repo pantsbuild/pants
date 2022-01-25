@@ -20,7 +20,7 @@ class TestCoursierWrapper:
     def new(cls, entries: Iterable[CoursierLockfileEntry]):
         return cls(CoursierResolvedLockfile(entries=tuple(entries)))
 
-    def serialize(self, requirements: Iterable[ArtifactRequirement] = []) -> str:
+    def serialize(self, requirements: Iterable[ArtifactRequirement] = ()) -> str:
         return (
             JVMLockfileMetadata.new(requirements)
             .add_header_to_lockfile(
