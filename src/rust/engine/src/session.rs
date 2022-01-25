@@ -21,7 +21,7 @@ use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration, RunId, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, RunId, UserMetadataPyValue, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -346,7 +346,11 @@ impl Session {
               "Long running tasks:\n  {}",
               straggling_workunits
                 .into_iter()
-                .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
+                .map(|(duration, desc)| format!(
+                  "{}\t{}",
+                  format_workunit_duration_ms!(duration.as_millis()),
+                  desc
+                ))
                 .collect::<Vec<_>>()
                 .join("\n  ")
             );
