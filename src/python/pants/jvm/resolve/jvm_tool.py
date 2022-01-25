@@ -158,15 +158,17 @@ class GenerateJvmLockfileFromTool:
 
     artifact_inputs: FrozenOrderedSet[str]
     artifact_option_name: str
+    lockfile_option_name: str
     resolve_name: str
     lockfile_dest: str
-    default_lockfile_resource: tuple[str, str] | None
+    default_lockfile_resource: tuple[str, str]
 
     @classmethod
     def create(cls, tool: JvmToolBase) -> GenerateJvmLockfileFromTool:
         return GenerateJvmLockfileFromTool(
             FrozenOrderedSet(tool.artifact_inputs),
             artifact_option_name=f"[{tool.options_scope}].artifacts",
+            lockfile_option_name=f"[{tool.options_scope}].lockfile",
             resolve_name=tool.options_scope,
             lockfile_dest=tool.lockfile,
             default_lockfile_resource=tool.default_lockfile_resource,

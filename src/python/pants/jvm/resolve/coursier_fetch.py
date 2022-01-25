@@ -733,12 +733,6 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         assert lockfile_req is not None
         regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
         if lockfile_req.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
-            if lockfile_req.default_lockfile_resource is None:
-                raise ValueError(
-                    f"The option {lockfile_req.artifact_option_name} is set to "
-                    f"{DEFAULT_TOOL_LOCKFILE}, but this tool does not have a default resolve. To "
-                    f"fix, please set the option to a path, then run {regen_command}."
-                )
             lockfile_bytes = importlib.resources.read_binary(
                 *lockfile_req.default_lockfile_resource
             )
@@ -748,7 +742,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             if not lockfile_snapshot.files:
                 raise ValueError(
                     f"No lockfile found at {lockfile_req.lockfile_dest}, which is configured "
-                    f"by the option {lockfile_req.artifact_option_name}."
+                    f"by the option {lockfile_req.lockfile_option_name}."
                     f"Run {regen_command} to generate it."
                 )
 
@@ -770,8 +764,9 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         )
         if resolution.metadata and not resolution.metadata.is_valid_for(lockfile_inputs):
             raise ValueError(
-                f"The lockfile configured by the option {lockfile_req.artifact_option_name} "
-                "was generated with different requirements than are currently set. Run "
+                f"The lockfile configured by the option {lockfile_req.lockfile_option_name} "
+                f"was generated with different requirements than are currently set via "
+                f"{lockfile_req.artifact_option_name}. Run "
                 f"{regen_command} to regenerate the lockfile."
             )
 
