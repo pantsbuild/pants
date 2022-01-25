@@ -141,17 +141,21 @@ impl ConsoleUI {
   }
 
   fn get_label_from_heavy_hitters(
-    tasks_to_display: &IndexMap<SpanId, (String, Option<Duration>)>,
+    tasks_to_display: &IndexMap<SpanId, (String, Option<String>, Option<Duration>)>,
     index: usize,
   ) -> Option<String> {
     tasks_to_display
       .get_index(index)
-      .map(|(_, (label, maybe_duration))| {
+      .map(|(_, (label, maybe_goalname, maybe_duration))| {
         let duration_label = match maybe_duration {
           None => "(Waiting) ".to_string(),
           Some(duration) => format_workunit_duration(*duration),
         };
-        format!("{}{}", duration_label, label)
+        let goal_label = match maybe_goalname {
+          None => "".to_string(),
+          Some(label) => format!("[{}] ", label.clone()),
+        };
+        format!("{}{}{}", duration_label, goal_label, label)
       })
   }
 
@@ -236,7 +240,7 @@ type MultiProgressTask = Pin<Box<dyn Future<Output = std::io::Result<()>> + Send
 
 /// The state for one run of the ConsoleUI.
 struct Instance {
-  tasks_to_display: IndexMap<SpanId, (String, Option<Duration>)>,
+  tasks_to_display: IndexMap<SpanId, (String, Option<String>, Option<Duration>)>,
   multi_progress_task: MultiProgressTask,
   bars: Vec<ProgressBar>,
 }
