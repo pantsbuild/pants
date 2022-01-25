@@ -23,12 +23,8 @@ from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    ToolClasspath,
-    ToolClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
@@ -68,11 +64,10 @@ async def setup_scalatest_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalatest))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
     classpath, scalatest_classpath = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
     )
 
     merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))

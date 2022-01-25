@@ -2,24 +2,25 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import importlib.resources
 from dataclasses import dataclass
 from typing import ClassVar, cast
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.engine.addresses import Addresses
-from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Targets
+from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.common import (
+    ArtifactRequirement,
+    ArtifactRequirements,
+    Coordinate,
+    GatherJvmCoordinatesRequest,
+)
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -95,15 +96,6 @@ class JvmToolBase(Subsystem):
         return cast(str, self.options.lockfile)
 
 
-@dataclass(frozen=True)
-class GatherJvmCoordinatesRequest:
-    """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
-    `jar_artifact` targets into `ArtifactRequirements`."""
-
-    artifact_inputs: FrozenOrderedSet[str]
-    option_name: str
-
-
 @rule
 async def gather_coordinates_for_jvm_lockfile(
     request: GatherJvmCoordinatesRequest,
@@ -156,65 +148,6 @@ async def gather_coordinates_for_jvm_lockfile(
     return ArtifactRequirements(requirements)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class ValidatedJvmToolLockfileRequest:
-    options_scope: str
-    artifact_inputs: FrozenOrderedSet[str]
-    lockfile_dest: str
-    default_lockfile_resource: tuple[str, str]
-
-    def __init__(self, tool: JvmToolBase) -> None:
-        self.options_scope = tool.options_scope
-        self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
-        self.lockfile_dest = tool.lockfile
-        self.default_lockfile_resource = tool.default_lockfile_resource
-
-
-@rule(desc="Validate JVM tool lockfile")
-async def validate_jvm_lockfile(
-    request: ValidatedJvmToolLockfileRequest,
-) -> CoursierResolvedLockfile:
-    if request.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
-        lockfile_bytes = importlib.resources.read_binary(*request.default_lockfile_resource)
-        lockfile = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
-    else:
-        lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
-        if not lockfile_snapshot.files:
-            raise ValueError(
-                f"JVM tool `{request.options_scope}` does not have a lockfile generated. "
-                f"Run `{GenerateLockfilesSubsystem.name} --resolve={request.options_scope}` to "
-                "generate it."
-            )
-
-        lockfile = await Get(
-            CoursierResolvedLockfile,
-            CoursierResolveKey(
-                name=request.options_scope,
-                path=request.lockfile_dest,
-                digest=lockfile_snapshot.digest,
-            ),
-        )
-
-    requirements = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(
-            request.artifact_inputs, f"[{request.options_scope}].artifacts"
-        ),
-    )
-
-    if lockfile.metadata and not lockfile.metadata.is_valid_for(requirements):
-        raise ValueError(
-            f"The lockfile for {request.options_scope} was generated with different "
-            "requirements than are currently set. Check whether any `JAVA` options "
-            "(including environment variables) have changed your requirements "
-            f"or run `{GenerateLockfilesSubsystem.name} --resolve={request.options_scope}` to "
-            f"regenerate the lockfile."
-        )
-
-    return lockfile
-
-
 @dataclass(frozen=True)
 class GenerateJvmLockfileFromTool:
     """Create a `GenerateJvmLockfile` request for a JVM tool.
@@ -226,16 +159,20 @@ class GenerateJvmLockfileFromTool:
 
     artifact_inputs: FrozenOrderedSet[str]
     artifact_option_name: str
+    lockfile_option_name: str
     resolve_name: str
     lockfile_dest: str
+    default_lockfile_resource: tuple[str, str]
 
     @classmethod
     def create(cls, tool: JvmToolBase) -> GenerateJvmLockfileFromTool:
         return GenerateJvmLockfileFromTool(
             FrozenOrderedSet(tool.artifact_inputs),
             artifact_option_name=f"[{tool.options_scope}].artifacts",
+            lockfile_option_name=f"[{tool.options_scope}].lockfile",
             resolve_name=tool.options_scope,
             lockfile_dest=tool.lockfile,
+            default_lockfile_resource=tool.default_lockfile_resource,
         )
 
 
@@ -253,4 +190,4 @@ async def setup_lockfile_request_from_tool(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *lockfile.rules())

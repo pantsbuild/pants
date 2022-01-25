@@ -19,12 +19,8 @@ from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import JdkSetup
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    ToolClasspath,
-    ToolClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -70,14 +66,15 @@ async def setup_google_java_format(
     bash: BashBinary,
 ) -> Setup:
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
-
+    lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
+    )
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
     )
 
     source_files_snapshot = (

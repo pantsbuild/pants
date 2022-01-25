@@ -193,6 +193,9 @@ lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"
 [google-java-format]
 lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
 
+[scalac]
+plugins_global_lockfile = "src/python/pants/backend/scala/subsystems/scalac_plugins.default.lockfile.txt"
+
 [scalafmt]
 lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
 

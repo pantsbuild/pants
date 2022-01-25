@@ -17,12 +17,8 @@ from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, Wra
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    ToolClasspath,
-    ToolClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -53,10 +49,9 @@ async def generate_scrooge_thrift_sources(
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scrooge))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScroogeToolLockfileSentinel())
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.thrift_source_field.address])),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(WrappedTarget, Address, request.thrift_source_field.address),
