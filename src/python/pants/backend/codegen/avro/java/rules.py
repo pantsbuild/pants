@@ -25,7 +25,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,

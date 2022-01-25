@@ -9,7 +9,7 @@ import re
 import shlex
 import textwrap
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import ClassVar, Iterable, Mapping
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
@@ -215,7 +215,7 @@ class JvmProcess:
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
         extra_immutable_input_digests: dict[str, Digest] | None = None,
-        extra_env: dict[str, str] | None = None,
+        extra_env: Mapping[str, str] | None = None,
         timeout_seconds: int | float | None = None,
         platform: Platform | None = None,
     ):
