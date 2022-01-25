@@ -17,6 +17,7 @@ from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import LockfileContext
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
 from pants.util.meta import frozen_after_init
@@ -203,7 +204,7 @@ async def validate_jvm_lockfile(
         ),
     )
 
-    if lockfile.metadata and not lockfile.metadata.is_valid_for(requirements):
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(requirements, LockfileContext.TOOL):
         raise ValueError(
             f"The lockfile for {request.options_scope} was generated with different "
             "requirements than are currently set. Check whether any `JAVA` options "

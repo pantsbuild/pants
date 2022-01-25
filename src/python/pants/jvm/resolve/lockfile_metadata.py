@@ -24,6 +24,11 @@ class InvalidJVMLockfileReason(Enum):
     REQUIREMENTS_MISMATCH = "requirements_mismatch"
 
 
+class LockfileContext(Enum):
+    USER = "user"
+    TOOL = "tool"
+
+
 @dataclass(frozen=True)
 class JVMLockfileMetadata(LockfileMetadata):
 
@@ -57,6 +62,7 @@ class JVMLockfileMetadata(LockfileMetadata):
     def is_valid_for(
         self,
         requirements: Iterable[ArtifactRequirement] | None,
+        context: LockfileContext,
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `JVMLockfileMetadata` can be used in the current execution
         context."""
@@ -67,10 +73,13 @@ class JVMLockfileMetadata(LockfileMetadata):
 @_jvm_lockfile_metadata(1)
 @dataclass(frozen=True)
 class JVMLockfileMetadataV1(JVMLockfileMetadata):
-    """Lockfile version that permits specifying a requirements as a set rather than a digest.
+    """Initial metadata version for JVM user lockfiles.
 
-    Validity is tested by the set of requirements strings being the same in the user requirements as
-    those in the stored requirements.
+    User validity is tested by the set of user requirements strings appearing as a subset of those 
+    in the metadata requirements.
+
+    Tool validity is tested by the set of user requirements strings being an exact match of those 
+    in the metadata requirements.
     """
 
     requirements: FrozenOrderedSet[str]
@@ -110,16 +119,17 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     def is_valid_for(
         self,
         requirements: Iterable[ArtifactRequirement] | None,
+        context: LockfileContext,
     ) -> LockfileMetadataValidation:
-        """Returns a truthy object if the request requirements match the metadata requirements.
-
-        For this version, "match" is defined as the request requirements being a non-strict subset
-        of the metadata requirements.
-        """
+       """Returns a truthy object if the request requirements match the metadata requirements.
+       """
 
         failure_reasons: set[InvalidJVMLockfileReason] = set()
+        req_strings = FrozenOrderedSet(i.to_metadata_str() for i in requirements or [])
 
-        if not self.requirements.issuperset(i.to_metadata_str() for i in requirements or []):
+        if (context == LockfileContext.USER and not self.requirements.issuperset(req_strings)) or (
+            context == LockfileContext.TOOL and self.requirements != req_strings
+        ):
             failure_reasons.add(InvalidJVMLockfileReason.REQUIREMENTS_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)
