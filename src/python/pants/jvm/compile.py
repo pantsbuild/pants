@@ -274,11 +274,11 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         exit_code = process_result.exit_code
         # TODO: Coursier renders this line on macOS.
         #   see https://github.com/pantsbuild/pants/issues/13942.
-        stderr = prep_output(process_result.stderr).splitlines()
+        stderr = prep_output(process_result.stderr)
         return cls(
             description=description,
-            result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
             output=output,
+            result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
             exit_code=exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=stderr,

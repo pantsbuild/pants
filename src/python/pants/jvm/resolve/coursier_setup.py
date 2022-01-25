@@ -155,7 +155,7 @@ class Coursier:
 
 
 @dataclass(frozen=True)
-class CoursierWrapperRequest:
+class CoursierWrapperProcess:
 
     args: Tuple[str, ...]
     input_digest: Digest
@@ -175,7 +175,7 @@ class CoursierWrapperResult:
 async def invoke_coursier_wrapper(
     bash: BashBinary,
     coursier: Coursier,
-    request: CoursierWrapperRequest,
+    request: CoursierWrapperProcess,
 ) -> CoursierWrapperResult:
 
     process_result = await Get(
@@ -199,7 +199,7 @@ async def invoke_coursier_wrapper(
     filtered_stderr = b"\n".join(
         line
         for line in process_result.stderr.splitlines()
-        if line != "AAAsetrlimit to increase file descriptor limit failed, errno 22"
+        if line != b"setrlimit to increase file descriptor limit failed, errno 22"
     )
 
     return CoursierWrapperResult(
