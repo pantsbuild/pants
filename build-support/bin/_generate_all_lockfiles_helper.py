@@ -1,18 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Ensure that we generate interpreter constraints using the correct values.
-
-This is necessary because the tool lockfiles we generate are used as the default for all Pants
-users. We need to decouple our own internal usage (e.g. using Flake8 plugins) from what the default
-should be.
-"""
-
 from __future__ import annotations
 
+import argparse
 import itertools
 import logging
 import subprocess
+import sys
 from dataclasses import dataclass
 
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
@@ -145,6 +140,31 @@ AllTools = (
 )
 
 
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate lockfiles for internal usage + default tool lockfiles that we distribute. "
+            "This script makes sure that tool lockfiles are generated with the correct values."
+        ),
+        prog="generate_all_lockfiles.sh",
+    )
+    parser.add_argument(
+        "--internal", action="store_true", help="Regenerate all internal lockfiles."
+    )
+    parser.add_argument(
+        "--tool",
+        nargs="*",
+        help=(
+            f"Regenerate these default tool lockfile(s). Valid options: "
+            f"{sorted(tool.resolve_name for tool in AllTools)}"
+        ),
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="Regenerate all internal and default tool lockfiles."
+    )
+    return parser
+
+
 def update_internal_lockfiles() -> None:
     subprocess.run(
         [
@@ -163,22 +183,34 @@ def update_internal_lockfiles() -> None:
     )
 
 
-def update_default_lockfiles() -> None:
-    subprocess.run(
-        [
-            "./pants",
-            "--concurrent",
-            f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
-            *itertools.chain.from_iterable(tool.args for tool in AllTools),
-            "generate-lockfiles",
-        ],
-        check=True,
-    )
+def update_default_lockfiles(specified: list[str] | None) -> None:
+    args = [
+        "./pants",
+        "--concurrent",
+        f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+        *itertools.chain.from_iterable(tool.args for tool in AllTools),
+        "generate-lockfiles",
+    ]
+    if specified:
+        args.append(f"--resolve={repr(specified)}")
+    subprocess.run(args, check=True)
 
 
 def main() -> None:
-    update_internal_lockfiles()
-    update_default_lockfiles()
+    if len(sys.argv) == 1:
+        create_parser().print_help()
+        return
+    args = create_parser().parse_args()
+
+    if args.all:
+        update_internal_lockfiles()
+        update_default_lockfiles(specified=None)
+        return
+
+    if args.internal:
+        update_internal_lockfiles()
+    if args.tool:
+        update_default_lockfiles(specified=args.tool)
 
 
 if __name__ == "__main__":
