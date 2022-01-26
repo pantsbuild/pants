@@ -46,17 +46,9 @@ from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    ToolClasspath,
-    ToolClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import (
-    GatherJvmCoordinatesRequest,
-    GenerateJvmLockfileFromTool,
-    ValidatedJvmToolLockfileRequest,
-)
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -117,8 +109,7 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -127,7 +118,7 @@ async def generate_scala_from_protobuf(
         inherit_env,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
@@ -267,8 +258,7 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
@@ -295,7 +285,7 @@ async def setup_scalapb_shim_classfiles(
                 ),
             ),
         ),
-        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile_request)),
         Get(Digest, CreateDigest([scalapb_shim_source, Directory(dest_dir)])),
     )
 

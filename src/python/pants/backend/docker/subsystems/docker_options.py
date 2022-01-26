@@ -9,6 +9,7 @@ from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
 from pants.option.custom_types import shell_str
+from pants.option.errors import ParseError
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list
@@ -18,6 +19,20 @@ doc_links = {
         "https://docs.docker.com/engine/reference/commandline/cli/#environment-variables"
     ),
 }
+
+
+def workspace_path(s: str) -> str:
+    """Same type as 'str', but indicates string represents a directory path that is relative to
+    either the build root, or a BUILD file if prefix with `./`.
+
+    :API: public
+    """
+    if s.startswith("/"):
+        raise ParseError(
+            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
+            "`./relative/path` to make it relative to the BUILD files rather than the build root."
+        )
+    return s
 
 
 class DockerOptions(Subsystem):
@@ -71,6 +86,21 @@ class DockerOptions(Subsystem):
             type=str,
             help=default_repository_help,
             default="{name}",
+        )
+
+        register(
+            "--default-context-root",
+            type=workspace_path,
+            default="",
+            help=(
+                "Provide a default Docker build context root path for `docker_image` targets that "
+                "does not specify their own `context_root` field.\n\n"
+                "The context root is relative to the build root by default, but may be prefixed "
+                "with `./` to be relative to the directory of the BUILD file of the `docker_image`."
+                "\n\nExamples:\n\n"
+                "    --default-context-root=src/docker\n"
+                "    --default-context-root=./relative_to_the_build_file\n"
+            ),
         )
 
         register(
@@ -156,6 +186,10 @@ class DockerOptions(Subsystem):
     @property
     def env_vars(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.env_vars)))
+
+    @property
+    def default_context_root(self) -> str:
+        return cast(str, self.options.default_context_root)
 
     @property
     def default_repository(self) -> str:

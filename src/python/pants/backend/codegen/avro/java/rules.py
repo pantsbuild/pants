@@ -37,12 +37,8 @@ from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
 from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    ToolClasspath,
-    ToolClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, ValidatedJvmToolLockfileRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -100,11 +96,9 @@ async def compile_avro_source(
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
-
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(avro_tools))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, AvroToolLockfileSentinel())
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile)),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
             Digest,
             DigestSubset(
