@@ -274,11 +274,15 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         exit_code = process_result.exit_code
         # TODO: Coursier renders this line on macOS.
         #   see https://github.com/pantsbuild/pants/issues/13942.
-        stderr = prep_output(process_result.stderr)
+        stderr = "\n".join(
+            line
+            for line in prep_output(process_result.stderr).splitlines()
+            if line != "setrlimit to increase file descriptor limit failed, errno 22"
+        )
         return cls(
             description=description,
-            output=output,
             result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
+            output=output,
             exit_code=exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=stderr,
