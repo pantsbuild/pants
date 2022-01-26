@@ -237,7 +237,7 @@ async def setup_user_lockfile_requests(
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_field(PythonRequirementCompatibleResolvesField):
+        if not tgt.has_fields((PythonRequirementCompatibleResolvesField, PythonRequirementsField)):
             continue
         tgt[PythonRequirementCompatibleResolvesField].validate(python_setup)
         for resolve in tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup):
