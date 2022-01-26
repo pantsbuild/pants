@@ -249,7 +249,6 @@ async def analyze_scala_source_dependencies(
             input_digest=prefixed_source_files_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
             output_files=(analysis_output_path,),
-            # TODO: etc
             extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,
@@ -340,7 +339,6 @@ async def setup_scala_parser_classfiles() -> ScalaParserCompiledClassfiles:
         ),
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
         JvmProcess(
@@ -359,6 +357,8 @@ async def setup_scala_parser_classfiles() -> ScalaParserCompiledClassfiles:
             output_directories=(dest_dir,),
             description="Compile Scala parser for dependency inference with scalac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(

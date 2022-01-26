@@ -183,6 +183,7 @@ class JvmProcess:
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_env: FrozenDict[str, str]
     cache_scope: ProcessCacheScope | None
+    use_nailgun: bool
 
     def __init__(
         self,
@@ -199,6 +200,7 @@ class JvmProcess:
         timeout_seconds: int | float | None = None,
         platform: Platform | None = None,
         cache_scope: ProcessCacheScope | None = None,
+        use_nailgun: bool = True,
     ):
 
         self.argv = tuple(argv)
@@ -214,6 +216,13 @@ class JvmProcess:
         self.cache_scope = cache_scope
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.extra_env = FrozenDict(extra_env or {})
+        self.use_nailgun = use_nailgun
+
+        if not use_nailgun and extra_nailgun_keys:
+            raise AssertionError(
+                "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
+                "specify `extra_nailgun_keys=None` or `use_nailgun=True`."
+            )
 
 
 @rule
@@ -225,7 +234,9 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
     }
     env = {**jdk_setup.env, **request.extra_env}
 
-    use_nailgun = [*jdk_setup.immutable_input_digests, *request.extra_nailgun_keys]
+    use_nailgun = []
+    if request.use_nailgun:
+        use_nailgun = [*jdk_setup.immutable_input_digests, *request.extra_nailgun_keys]
 
     return Process(
         [*jdk_setup.args(bash, request.classpath_entries), *request.argv],

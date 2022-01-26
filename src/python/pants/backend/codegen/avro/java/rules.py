@@ -124,7 +124,7 @@ async def compile_avro_source(
         ),
     )
 
-    immutable_input_digests = {
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
@@ -147,8 +147,7 @@ async def compile_avro_source(
             extra_immutable_input_digests={
                 toolcp_relpath: tool_classpath.digest,
             },
-            # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
-            extra_nailgun_keys=immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
             description="Generating Java sources from Avro source.",
             level=LogLevel.DEBUG,
             output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),

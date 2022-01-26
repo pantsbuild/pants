@@ -113,7 +113,6 @@ async def generate_scrooge_thrift_sources(
             ],
             input_digest=input_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
-            # TODO: verify this is correct
             extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
             level=LogLevel.DEBUG,

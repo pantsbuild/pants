@@ -114,7 +114,6 @@ async def analyze_java_source_dependencies(
             input_digest=prefixed_source_files_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
             output_files=(analysis_output_path,),
-            # TODO: correct this
             extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,

@@ -155,7 +155,7 @@ async def generate_scala_from_protobuf(
             f"--{plugin.name}_out={output_dir}" for plugin in materialized_jvm_plugins.plugins
         )
 
-    immutable_input_digests = {
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         shimcp_relpath: shim_classfiles.digest,
         plugins_relpath: merged_jvm_plugins_digest,
@@ -179,9 +179,8 @@ async def generate_scala_from_protobuf(
                 *target_sources_stripped.snapshot.files,
             ],
             input_digest=input_digest,
-            # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
-            extra_immutable_input_digests=immutable_input_digests,
-            extra_nailgun_keys=immutable_input_digests,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Generating Scala sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
@@ -293,7 +292,6 @@ async def setup_scalapb_shim_classfiles(
         Digest, MergeDigests((tool_classpath.digest, shim_classpath.digest, source_digest))
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
         JvmProcess(
@@ -312,6 +310,8 @@ async def setup_scalapb_shim_classfiles(
             output_directories=(dest_dir,),
             description="Compile ScalaPB shim with scalac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(

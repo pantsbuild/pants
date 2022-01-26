@@ -172,8 +172,6 @@ async def compile_java_source(
             ],
             input_digest=merged_digest,
             extra_immutable_input_digests=immutable_input_digests,
-            # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
-            extra_nailgun_keys=jdk_setup.immutable_input_digests,
             output_directories=(dest_dir,),
             description=f"Compile {request.component} with javac",
             level=LogLevel.DEBUG,

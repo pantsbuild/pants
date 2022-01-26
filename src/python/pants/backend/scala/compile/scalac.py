@@ -142,7 +142,7 @@ async def compile_scala_source(
         toolcp_relpath: tool_classpath.digest,
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
     }
-    use_nailgun = tuple(extra_immutable_input_digests)
+    extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
 
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
@@ -170,8 +170,7 @@ async def compile_scala_source(
             ],
             input_digest=sources_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
-            # TODO: get this right
-            extra_nailgun_keys=use_nailgun,
+            extra_nailgun_keys=extra_nailgun_keys,
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
