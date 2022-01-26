@@ -56,7 +56,7 @@ class DefaultTool:
     args: tuple[str, ...]
 
     @classmethod
-    def from_python_tool(
+    def python(
         cls,
         tool: type[PythonToolRequirementsBase],
         *,
@@ -79,7 +79,7 @@ class DefaultTool:
         return DefaultTool(tool.options_scope, tuple(args))
 
     @classmethod
-    def from_jvm_tool(cls, tool: type[JvmToolBase], *, backend: str | None = None) -> DefaultTool:
+    def jvm(cls, tool: type[JvmToolBase], *, backend: str | None = None) -> DefaultTool:
         args = [
             f"--{tool.options_scope}-version={tool.default_version}",
             f"--{tool.options_scope}-artifacts={tool.default_artifacts}",
@@ -92,47 +92,35 @@ class DefaultTool:
 
 AllTools = (
     # Python
-    DefaultTool.from_python_tool(Autoflake),
-    DefaultTool.from_python_tool(Bandit, backend="pants.backend.python.lint.bandit"),
-    DefaultTool.from_python_tool(Black),
-    DefaultTool.from_python_tool(Docformatter),
-    DefaultTool.from_python_tool(Flake8, source_plugins=True),
-    DefaultTool.from_python_tool(Isort),
-    DefaultTool.from_python_tool(
-        Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True
-    ),
-    DefaultTool.from_python_tool(Yapf, backend="pants.backend.python.lint.yapf"),
-    DefaultTool.from_python_tool(
-        PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"
-    ),
-    DefaultTool.from_python_tool(IPython),
-    DefaultTool.from_python_tool(Setuptools),
-    DefaultTool.from_python_tool(MyPy, source_plugins=True),
-    DefaultTool.from_python_tool(
-        PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"
-    ),
-    DefaultTool.from_python_tool(Lambdex, backend="pants.backend.awslambda.python"),
-    DefaultTool.from_python_tool(PyTest),
-    DefaultTool.from_python_tool(CoverageSubsystem),
-    DefaultTool.from_python_tool(
-        TerraformHcl2Parser, backend="pants.backend.experimental.terraform"
-    ),
-    DefaultTool.from_python_tool(DockerfileParser, backend="pants.backend.experimental.docker"),
-    DefaultTool.from_python_tool(TwineSubsystem),
+    DefaultTool.python(Autoflake),
+    DefaultTool.python(Bandit, backend="pants.backend.python.lint.bandit"),
+    DefaultTool.python(Black),
+    DefaultTool.python(Docformatter),
+    DefaultTool.python(Flake8, source_plugins=True),
+    DefaultTool.python(Isort),
+    DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
+    DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
+    DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
+    DefaultTool.python(IPython),
+    DefaultTool.python(Setuptools),
+    DefaultTool.python(MyPy, source_plugins=True),
+    DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
+    DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
+    DefaultTool.python(PyTest),
+    DefaultTool.python(CoverageSubsystem),
+    DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
+    DefaultTool.python(DockerfileParser, backend="pants.backend.experimental.docker"),
+    DefaultTool.python(TwineSubsystem),
     # JVM
-    DefaultTool.from_jvm_tool(JUnit),
-    DefaultTool.from_jvm_tool(GoogleJavaFormatSubsystem),
-    DefaultTool.from_jvm_tool(ScalafmtSubsystem),
-    DefaultTool.from_jvm_tool(
-        ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"
-    ),
-    DefaultTool.from_jvm_tool(Scalatest),
-    DefaultTool.from_jvm_tool(
+    DefaultTool.jvm(JUnit),
+    DefaultTool.jvm(GoogleJavaFormatSubsystem),
+    DefaultTool.jvm(ScalafmtSubsystem),
+    DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
+    DefaultTool.jvm(Scalatest),
+    DefaultTool.jvm(
         ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
-    DefaultTool.from_jvm_tool(
-        AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"
-    ),
+    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool(
         "scalac-plugins",
         (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
