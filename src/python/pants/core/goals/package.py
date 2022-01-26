@@ -60,11 +60,16 @@ class OutputPathField(StringField, AsyncFieldMixin):
     def value_or_default(self, *, file_ending: str | None) -> str:
         if self.value:
             return self.value
+        file_prefix = (
+            self.address.generated_name.replace(".", "_")
+            if self.address.is_generated_target
+            else self.address.target_name
+        )
         if file_ending is None:
-            file_name = self.address.target_name
+            file_name = file_prefix
         else:
             assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-            file_name = f"{self.address.target_name}.{file_ending}"
+            file_name = f"{file_prefix}.{file_ending}"
         return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 

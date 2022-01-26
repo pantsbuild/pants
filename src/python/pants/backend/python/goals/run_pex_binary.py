@@ -50,11 +50,16 @@ async def create_pex_binary_run_request(
         InterpreterConstraints, InterpreterConstraintsRequest(addresses)
     )
 
+    pex_filename = (
+        field_set.address.generated_name.replace(".", "_")
+        if field_set.address.is_generated_target
+        else field_set.address.target_name
+    )
     pex_get = Get(
         Pex,
         PexFromTargetsRequest(
             [field_set.address],
-            output_filename=f"{field_set.address.target_name}.pex",
+            output_filename=f"{pex_filename}.pex",
             internal_only=True,
             include_source_files=False,
             # Note that the file for first-party entry points is not in the PEX itself. In that
