@@ -54,6 +54,7 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
                 ],
                 input_digest=EMPTY_DIGEST,
                 description="",
+                use_nailgun=False,
             )
         ],
     )

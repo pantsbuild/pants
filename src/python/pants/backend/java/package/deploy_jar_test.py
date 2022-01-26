@@ -318,6 +318,7 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
                 classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
+                use_nailgun=False,
             )
         ],
     )
