@@ -49,10 +49,15 @@ impl SessionDisplay {
   fn new(
     workunit_store: &WorkunitStore,
     parallelism: usize,
-    ui_renderer: Option<String>,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
   ) -> SessionDisplay {
-    if let Some(renderer) = ui_renderer {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism, renderer))
+    if dynamic_ui {
+      SessionDisplay::ConsoleUI(ConsoleUI::new(
+        workunit_store.clone(),
+        parallelism,
+        ui_use_prodash,
+      ))
     } else {
       SessionDisplay::Logging {
         // TODO: This threshold should likely be configurable, but the interval we render at
@@ -138,16 +143,18 @@ pub struct Session {
 impl Session {
   pub fn new(
     core: Arc<Core>,
-    ui_renderer: Option<String>,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
     build_id: String,
     session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(ui_renderer == None);
+    let workunit_store = WorkunitStore::new(!dynamic_ui);
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,
-      ui_renderer,
+      dynamic_ui,
+      ui_use_prodash,
     ));
 
     let handle = Arc::new(SessionHandle {
@@ -184,7 +191,8 @@ impl Session {
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
-      None,
+      false,
+      false,
     ));
     let handle = Arc::new(SessionHandle {
       build_id,

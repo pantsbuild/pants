@@ -29,7 +29,11 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.global_options import DynamicRemoteOptions, maybe_warn_python_macros_deprecation
+from pants.option.global_options import (
+    DynamicRemoteOptions,
+    DynamicUIRenderer,
+    maybe_warn_python_macros_deprecation,
+)
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
@@ -84,7 +88,8 @@ class LocalPantsRunner:
         return scheduler.new_session(
             run_id,
             dynamic_ui=global_options.dynamic_ui,
-            dynamic_ui_renderer=global_options.dynamic_ui_renderer,
+            ui_use_prodash=global_options.dynamic_ui_renderer
+            == DynamicUIRenderer.experimental_prodash,
             use_colors=global_options.get("colors", True),
             session_values=SessionValues(
                 {

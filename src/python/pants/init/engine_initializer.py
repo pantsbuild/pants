@@ -31,7 +31,6 @@ from pants.init import specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
-    DynamicUIRenderer,
     ExecutionOptions,
     GlobalOptions,
     LocalStoreOptions,
@@ -56,7 +55,7 @@ class GraphScheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
-        dynamic_ui_renderer: DynamicUIRenderer = DynamicUIRenderer.indicatif_spinner,
+        ui_use_prodash: bool = False,
         use_colors=True,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
@@ -64,7 +63,7 @@ class GraphScheduler:
         session = self.scheduler.new_session(
             build_id,
             dynamic_ui,
-            dynamic_ui_renderer,
+            ui_use_prodash,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )

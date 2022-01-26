@@ -3612,7 +3612,6 @@ dependencies = [
  "stdio",
  "task_executor",
  "terminal_size",
- "termion",
  "uuid",
  "workunit_store",
 ]
