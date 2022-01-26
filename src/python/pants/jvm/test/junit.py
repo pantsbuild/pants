@@ -109,7 +109,6 @@ async def setup_junit_for_target(
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
-        # TODO: Should scalatest use nailgun? It previously wasn't.
         use_nailgun=False,
     )
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)

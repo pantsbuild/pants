@@ -375,14 +375,6 @@ async def coursier_resolve_lockfile(
             args=(
                 coursier_report_file_name,
                 *coursier_resolve_info.coord_arg_strings,
-                # TODO(#13496): Disable --strict-include to work around Coursier issue
-                # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
-                # artifact rules as malformed.
-                # *(
-                #     f"--strict-include={req.to_coord_str(versioned=False)}"
-                #     for req in artifact_requirements
-                #     if req.strict
-                # ),
             ),
             input_digest=coursier_resolve_info.digest,
             output_directories=("classpath",),

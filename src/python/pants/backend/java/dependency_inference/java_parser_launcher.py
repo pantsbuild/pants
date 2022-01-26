@@ -88,7 +88,6 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
         ),
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
         JvmProcess(
@@ -105,6 +104,8 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
             output_directories=(dest_dir,),
             description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(

@@ -112,7 +112,6 @@ async def setup_scalatest_for_target(
         description=f"Run Scalatest runner for {request.field_set.address}",
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
-        # TODO: Should scalatest use nailgun? It previously wasn't.
         use_nailgun=False,
     )
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)

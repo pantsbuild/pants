@@ -178,6 +178,7 @@ async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition
         input_digest=sources_digest,
         output_files=request.files,
         extra_immutable_input_digests=request.extra_immutable_input_digests,
+        extra_nailgun_keys=request.extra_immutable_input_digests,
         description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
@@ -233,7 +234,7 @@ async def setup_scalafmt(
             SetupScalafmtPartition(
                 classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 merged_sources_digest=merged_sources_digest,
-                extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
+                extra_immutable_input_digests=extra_immutable_input_digests,
                 config_file=config_file,
                 files=tuple(sorted(files)),
                 check_only=setup_request.check_only,

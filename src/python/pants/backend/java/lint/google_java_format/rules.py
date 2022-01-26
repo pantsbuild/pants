@@ -110,6 +110,7 @@ async def setup_google_java_format(
         classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
         input_digest=source_files_snapshot.digest,
         extra_immutable_input_digests=extra_immutable_input_digests,
+        extra_nailgun_keys=extra_immutable_input_digests,
         output_files=source_files_snapshot.files,
         description=f"Run Google Java Format on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
