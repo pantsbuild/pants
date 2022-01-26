@@ -116,9 +116,16 @@ ignore_adding_targets = [
 venv_use_symlinks = true
 
 [python]
-experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
+
+# To use resolves, switch which line is commented out.
+experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
+#enable_resolves = true
+
+[python.experimental_resolves]
+python-default = "3rdparty/python/lockfiles/user_reqs.lock"
+python-testprojects = "testprojects/3rdparty/python/user_reqs.lock"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
