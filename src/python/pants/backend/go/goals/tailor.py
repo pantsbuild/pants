@@ -70,7 +70,8 @@ async def find_putative_go_targets(
     # Add `go_package` targets.
     unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
     for dirname, filenames in group_by_dir(unowned_go_files).items():
-        if "testdata" in PurePath(dirname).parts:
+        dirname_parts = PurePath(dirname).parts
+        if "testdata" in dirname_parts or "vendor" in dirname_parts:
             continue
         putative_targets.append(
             PutativeTarget.for_target_type(
