@@ -26,11 +26,12 @@
 #![allow(clippy::mutex_atomic)]
 
 use futures::future::{FutureExt, TryFutureExt};
-use indexmap::IndexMap;
+use indexmap::IndexSet;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
 use std::cmp;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -136,7 +137,7 @@ impl ConsoleUI {
 }
 
 pub struct IndicatifInstance {
-  tasks_to_display: IndexMap<SpanId, (String, SystemTime)>,
+  tasks_to_display: IndexSet<SpanId>,
   multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
   bars: Vec<ProgressBar>,
 }
@@ -153,6 +154,12 @@ pub struct ProdashInstance {
 pub enum Instance {
   Indicatif(IndicatifInstance),
   Prodash(ProdashInstance),
+}
+
+enum TaskState {
+  New,
+  Update,
+  Remove,
 }
 
 impl Instance {
@@ -277,7 +284,7 @@ impl Instance {
         .boxed();
 
       Ok(Instance::Indicatif(IndicatifInstance {
-        tasks_to_display: IndexMap::new(),
+        tasks_to_display: IndexSet::new(),
         multi_progress_task,
         bars,
       }))
@@ -285,26 +292,42 @@ impl Instance {
   }
 
   pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
+    let classify_tasks = |mut current_ids: HashSet<SpanId>, handler: &mut dyn FnMut(SpanId, TaskState)| {
+      for span_id in heavy_hitters.keys() {
+        let update = current_ids.remove(span_id);
+        handler(*span_id, if update { TaskState::Update } else { TaskState::New })
+      }
+      for span_id in current_ids {
+        handler(span_id, TaskState::Remove);
+      }
+    };
+
     match self {
       Instance::Indicatif(indicatif) => {
         let tasks_to_display = &mut indicatif.tasks_to_display;
-
-        // Insert every one in the set of tasks to display.
-        // For tasks already here, the durations are overwritten.
-        tasks_to_display.extend(heavy_hitters.clone().into_iter());
-
-        // And remove the tasks that no longer should be there.
-        for (task, _) in tasks_to_display.clone().into_iter() {
-          if !heavy_hitters.contains_key(&task) {
-            tasks_to_display.swap_remove(&task);
-          }
-        }
+        classify_tasks(
+          tasks_to_display.iter().cloned().collect(),
+          &mut |span_id, task_state| {
+            match task_state {
+              TaskState::Remove => {
+                tasks_to_display.swap_remove(&span_id);
+              }
+              TaskState::Update => {
+                tasks_to_display.insert(span_id);
+              }
+              TaskState::New => {
+                tasks_to_display.insert(span_id);
+              }
+            }
+          },
+        );
 
         let now = SystemTime::now();
         for (n, pbar) in indicatif.bars.iter().enumerate() {
           let maybe_label = tasks_to_display
             .get_index(n)
-            .map(|(_, (label, start_time))| {
+            .map(|span_id| {
+              let (label, start_time) = heavy_hitters.get(&span_id).unwrap();
               let duration_label = match now.duration_since(*start_time).ok() {
                 None => "(Waiting)".to_string(),
                 Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
@@ -320,46 +343,37 @@ impl Instance {
       }
       Instance::Prodash(prodash) => {
         let tasks_to_display = &mut prodash.tasks_to_display;
-
-        // Finish any items that are no longer relevant.
-        for span_id in tasks_to_display.keys().cloned().collect::<Vec<_>>() {
-          if heavy_hitters.contains_key(&span_id) {
-            // NB `inc` moves the "worms" to help show continual progress
-            tasks_to_display.get_mut(&span_id).unwrap().inc();
-            continue;
-          }
-          // Drop the item to cause it to be removed from the Tree.
-          let _ = tasks_to_display.remove(&span_id).unwrap();
-        }
-
-        // Start any new items.
-        for (span_id, (description, start_time)) in heavy_hitters {
-          if tasks_to_display.contains_key(&span_id) {
-            // We're already rendering this item, and our dynamic `unit` instance will continue to
-            // handle rendering elapsed time for it.
-            continue;
-          }
-
-          // Else, it's new.
-          // NB We allow a 8 char "buffer" to allow for timing and spaces.
-          let max_len = (prodash.terminal_width as usize) - 8;
-          let description: String = if description.len() < max_len {
-            description.to_string()
-          } else {
-            description
-              .chars()
-              .take(max_len - 3)
-              .chain(std::iter::repeat('.').take(3))
-              .collect()
-          };
-          let mut item = prodash.tree.add_child(description);
-          item.init(
-            None,
-            Some(prodash::unit::dynamic(MillisAsFloatingPointSecs)),
-          );
-          item.set(MillisAsFloatingPointSecs::start_time_to_step(&start_time));
-          tasks_to_display.insert(*span_id, item);
-        }
+        classify_tasks(
+          tasks_to_display.keys().cloned().collect(),
+          &mut |span_id, task_state: TaskState| match task_state {
+            TaskState::Remove => {
+              tasks_to_display.remove(&span_id);
+            }
+            TaskState::Update => {
+              tasks_to_display.get_mut(&span_id).unwrap().inc();
+            }
+            TaskState::New => {
+              let (desc, start_time) = heavy_hitters.get(&span_id).unwrap();
+              let max_len = (prodash.terminal_width as usize) - 8;
+              let description: String = if desc.len() < max_len {
+                desc.to_string()
+              } else {
+                desc
+                  .chars()
+                  .take(max_len - 3)
+                  .chain(std::iter::repeat('.').take(3))
+                  .collect()
+              };
+              let mut item = prodash.tree.add_child(description);
+              item.init(
+                None,
+                Some(prodash::unit::dynamic(MillisAsFloatingPointSecs)),
+              );
+              item.set(MillisAsFloatingPointSecs::start_time_to_step(&start_time));
+              tasks_to_display.insert(span_id, item);
+            }
+          },
+        )
       }
     };
   }
