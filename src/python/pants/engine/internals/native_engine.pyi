@@ -327,7 +327,7 @@ class PySession:
         self,
         *,
         scheduler: PyScheduler,
-        should_render_ui: bool,
+        ui_renderer: str | None,
         build_id: str,
         session_values: SessionValues,
         cancellation_latch: PySessionCancellationLatch,

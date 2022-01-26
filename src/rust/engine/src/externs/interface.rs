@@ -349,7 +349,7 @@ impl PySession {
   #[new]
   fn __new__(
     scheduler: &PyScheduler,
-    should_render_ui: bool,
+    ui_renderer: Option<String>,
     build_id: String,
     session_values: PyObject,
     cancellation_latch: &PySessionCancellationLatch,
@@ -363,7 +363,7 @@ impl PySession {
       .allow_threads(|| {
         Session::new(
           core,
-          should_render_ui,
+          ui_renderer,
           build_id,
           session_values,
           cancellation_latch,

@@ -13,7 +13,6 @@ use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable};
-use futures::FutureExt;
 use graph::LastObserved;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
@@ -50,10 +49,10 @@ impl SessionDisplay {
   fn new(
     workunit_store: &WorkunitStore,
     parallelism: usize,
-    should_render_ui: bool,
+    ui_renderer: Option<String>,
   ) -> SessionDisplay {
-    if should_render_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism))
+    if let Some(renderer) = ui_renderer {
+      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism, renderer))
     } else {
       SessionDisplay::Logging {
         // TODO: This threshold should likely be configurable, but the interval we render at
@@ -139,16 +138,16 @@ pub struct Session {
 impl Session {
   pub fn new(
     core: Arc<Core>,
-    should_render_ui: bool,
+    ui_renderer: Option<String>,
     build_id: String,
     session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(!should_render_ui);
+    let workunit_store = WorkunitStore::new(ui_renderer == None);
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,
-      should_render_ui,
+      ui_renderer,
     ));
 
     let handle = Arc::new(SessionHandle {
@@ -185,7 +184,7 @@ impl Session {
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
-      false,
+      None,
     ));
     let handle = Arc::new(SessionHandle {
       build_id,
@@ -304,19 +303,15 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.handle.display.lock().await {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
+    match *self.handle.display.lock().await {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().await,
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..
       } => {
         *straggler_deadline = None;
-        async { Ok(()) }.boxed()
       }
     };
-    if let Err(e) = teardown.await {
-      warn!("{}", e);
-    }
   }
 
   pub fn maybe_display_render(&self) {

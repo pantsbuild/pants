@@ -60,6 +60,7 @@ from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
+    DynamicUIRenderer,
     ExecutionOptions,
     LocalStoreOptions,
 )
@@ -307,6 +308,7 @@ class Scheduler:
         self,
         build_id: str,
         dynamic_ui: bool = False,
+        dynamic_ui_renderer: DynamicUIRenderer = DynamicUIRenderer.indicatif_spinner,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
@@ -315,7 +317,7 @@ class Scheduler:
             self,
             PySession(
                 scheduler=self.py_scheduler,
-                should_render_ui=dynamic_ui,
+                ui_renderer=dynamic_ui_renderer.value if dynamic_ui else None,
                 build_id=build_id,
                 session_values=session_values or SessionValues(),
                 cancellation_latch=cancellation_latch or PySessionCancellationLatch(),

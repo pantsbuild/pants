@@ -84,6 +84,7 @@ class LocalPantsRunner:
         return scheduler.new_session(
             run_id,
             dynamic_ui=global_options.dynamic_ui,
+            dynamic_ui_renderer=global_options.dynamic_ui_renderer,
             use_colors=global_options.get("colors", True),
             session_values=SessionValues(
                 {
