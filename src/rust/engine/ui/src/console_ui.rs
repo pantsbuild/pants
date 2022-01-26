@@ -213,7 +213,7 @@ impl Instance {
           frames_per_second: ConsoleUI::render_rate_hz() as f32,
           throughput: false,
           terminal_dimensions: (terminal_width, terminal_height),
-          ..Default::default()
+          ..prodash::render::line::Options::default()
         },
       );
 
@@ -332,7 +332,7 @@ impl Instance {
         let now = SystemTime::now();
         for (n, pbar) in indicatif.bars.iter().enumerate() {
           let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
-            let (label, start_time) = heavy_hitters.get(&span_id).unwrap();
+            let (label, start_time) = heavy_hitters.get(span_id).unwrap();
             let duration_label = match now.duration_since(*start_time).ok() {
               None => "(Waiting)".to_string(),
               Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
@@ -376,7 +376,7 @@ impl Instance {
                 None,
                 Some(prodash::unit::dynamic(MillisAsFloatingPointSecs)),
               );
-              item.set(MillisAsFloatingPointSecs::start_time_to_step(&start_time));
+              item.set(MillisAsFloatingPointSecs::start_time_to_step(start_time));
               tasks_to_display.insert(span_id, item);
             }
           },
