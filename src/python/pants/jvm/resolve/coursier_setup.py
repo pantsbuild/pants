@@ -17,7 +17,7 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
@@ -164,46 +164,26 @@ class CoursierWrapperProcess:
     description: str
 
 
-@dataclass(frozen=True)
-class CoursierWrapperResult:
-    output_digest: Digest
-    stdout: bytes
-    stderr: bytes
-
-
 @rule
 async def invoke_coursier_wrapper(
     bash: BashBinary,
     coursier: Coursier,
     request: CoursierWrapperProcess,
-) -> CoursierWrapperResult:
+) -> Process:
 
-    process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=coursier.args(
-                request.args,
-                wrapper=[bash.path, coursier.wrapper_script],
-            ),
-            input_digest=request.input_digest,
-            immutable_input_digests=coursier.immutable_input_digests,
-            output_directories=request.output_directories,
-            output_files=request.output_files,
-            append_only_caches=coursier.append_only_caches,
-            env=coursier.env,
-            description=request.description,
-            level=LogLevel.DEBUG,
+    return Process(
+        argv=coursier.args(
+            request.args,
+            wrapper=[bash.path, coursier.wrapper_script],
         ),
-    )
-
-    filtered_stderr = b"\n".join(
-        line
-        for line in process_result.stderr.splitlines()
-        if line != b"setrlimit to increase file descriptor limit failed, errno 22"
-    )
-
-    return CoursierWrapperResult(
-        process_result.output_digest, process_result.stdout, filtered_stderr
+        input_digest=request.input_digest,
+        immutable_input_digests=coursier.immutable_input_digests,
+        output_directories=request.output_directories,
+        output_files=request.output_files,
+        append_only_caches=coursier.append_only_caches,
+        env=coursier.env,
+        description=request.description,
+        level=LogLevel.DEBUG,
     )
 
 

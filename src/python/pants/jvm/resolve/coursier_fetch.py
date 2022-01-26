@@ -31,6 +31,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
@@ -48,7 +49,7 @@ from pants.jvm.resolve.common import (
     Coordinates,
     GatherJvmCoordinatesRequest,
 )
-from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess, CoursierWrapperResult
+from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
@@ -369,7 +370,7 @@ async def coursier_resolve_lockfile(
     coursier_report_file_name = "coursier_report.json"
 
     process_result = await Get(
-        CoursierWrapperResult,
+        ProcessResult,
         CoursierWrapperProcess(
             args=(
                 coursier_report_file_name,
@@ -529,7 +530,7 @@ async def coursier_fetch_one_coord(
     coursier_report_file_name = "coursier_report.json"
 
     process_result = await Get(
-        CoursierWrapperResult,
+        ProcessResult,
         CoursierWrapperProcess(
             args=(
                 coursier_report_file_name,
