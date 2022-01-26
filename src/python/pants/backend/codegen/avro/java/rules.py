@@ -144,9 +144,7 @@ async def compile_avro_source(
             input_digest=(
                 overridden_input_digest if overridden_input_digest is not None else input_digest
             ),
-            extra_immutable_input_digests={
-                toolcp_relpath: tool_classpath.digest,
-            },
+            extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
             description="Generating Java sources from Avro source.",
             level=LogLevel.DEBUG,
