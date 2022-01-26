@@ -136,13 +136,14 @@ impl ConsoleUI {
   }
 }
 
-pub struct IndicatifInstance {
+struct IndicatifInstance {
+  // NB: The indeces correspond to indeces in
   tasks_to_display: IndexSet<SpanId>,
   multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
   bars: Vec<ProgressBar>,
 }
 
-pub struct ProdashInstance {
+struct ProdashInstance {
   tasks_to_display: HashMap<SpanId, prodash::tree::Item>,
   tree: prodash::Tree,
   handle: line::JoinHandle,
@@ -151,7 +152,7 @@ pub struct ProdashInstance {
 }
 
 /// The state for one run of the ConsoleUI.
-pub enum Instance {
+enum Instance {
   Indicatif(IndicatifInstance),
   Prodash(ProdashInstance),
 }
@@ -292,10 +293,18 @@ impl Instance {
   }
 
   pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
-    let classify_tasks = |mut current_ids: HashSet<SpanId>, handler: &mut dyn FnMut(SpanId, TaskState)| {
+    let classify_tasks = |mut current_ids: HashSet<SpanId>,
+                          handler: &mut dyn FnMut(SpanId, TaskState)| {
       for span_id in heavy_hitters.keys() {
         let update = current_ids.remove(span_id);
-        handler(*span_id, if update { TaskState::Update } else { TaskState::New })
+        handler(
+          *span_id,
+          if update {
+            TaskState::Update
+          } else {
+            TaskState::New
+          },
+        )
       }
       for span_id in current_ids {
         handler(span_id, TaskState::Remove);
@@ -307,33 +316,29 @@ impl Instance {
         let tasks_to_display = &mut indicatif.tasks_to_display;
         classify_tasks(
           tasks_to_display.iter().cloned().collect(),
-          &mut |span_id, task_state| {
-            match task_state {
-              TaskState::Remove => {
-                tasks_to_display.swap_remove(&span_id);
-              }
-              TaskState::Update => {
-                tasks_to_display.insert(span_id);
-              }
-              TaskState::New => {
-                tasks_to_display.insert(span_id);
-              }
+          &mut |span_id, task_state| match task_state {
+            TaskState::Remove => {
+              tasks_to_display.swap_remove(&span_id);
+            }
+            TaskState::Update => {
+              tasks_to_display.insert(span_id);
+            }
+            TaskState::New => {
+              tasks_to_display.insert(span_id);
             }
           },
         );
 
         let now = SystemTime::now();
         for (n, pbar) in indicatif.bars.iter().enumerate() {
-          let maybe_label = tasks_to_display
-            .get_index(n)
-            .map(|span_id| {
-              let (label, start_time) = heavy_hitters.get(&span_id).unwrap();
-              let duration_label = match now.duration_since(*start_time).ok() {
-                None => "(Waiting)".to_string(),
-                Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
-              };
-              format!("{} {}", duration_label, label)
-            });
+          let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
+            let (label, start_time) = heavy_hitters.get(&span_id).unwrap();
+            let duration_label = match now.duration_since(*start_time).ok() {
+              None => "(Waiting)".to_string(),
+              Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
+            };
+            format!("{} {}", duration_label, label)
+          });
 
           match maybe_label {
             Some(label) => pbar.set_message(label),
@@ -350,10 +355,12 @@ impl Instance {
               tasks_to_display.remove(&span_id);
             }
             TaskState::Update => {
+              // NB: `inc` moves the "worms" to help show ongoing progress.
               tasks_to_display.get_mut(&span_id).unwrap().inc();
             }
             TaskState::New => {
               let (desc, start_time) = heavy_hitters.get(&span_id).unwrap();
+              // NB: Allow a 8 char "buffer" to allow for timing and spaces.
               let max_len = (prodash.terminal_width as usize) - 8;
               let description: String = if desc.len() < max_len {
                 desc.to_string()
