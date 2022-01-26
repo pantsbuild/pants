@@ -15,8 +15,6 @@ backend_packages.add = [
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
-  "pants.backend.experimental.codegen.thrift.apache.python",
-  "pants.backend.experimental.codegen.thrift.apache.java",
   "pants.backend.experimental.docker",
   "pants.backend.experimental.docker.lint.hadolint",
   "pants.backend.experimental.go",
@@ -26,9 +24,6 @@ backend_packages.add = [
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
-  "pants.backend.experimental.codegen.avro.java",
-  "pants.backend.experimental.codegen.protobuf.scala",
-  "pants.backend.experimental.codegen.thrift.scrooge.scala",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
@@ -190,30 +185,6 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
-
-[java-avro]
-lockfile = "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
-
-[junit]
-lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"
-
-[google-java-format]
-lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
-
-[scalac]
-plugins_global_lockfile = "src/python/pants/backend/scala/subsystems/scalac_plugins.default.lockfile.txt"
-
-[scalafmt]
-lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
-
-[scalapb]
-lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
-
-[scalatest]
-lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
-
-[scrooge]
-lockfile = "src/python/pants/backend/codegen/thrift/scrooge/scrooge.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"

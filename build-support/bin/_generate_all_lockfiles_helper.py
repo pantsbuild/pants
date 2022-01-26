@@ -15,8 +15,13 @@ import logging
 import subprocess
 from dataclasses import dataclass
 
+from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
+from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
+from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
+from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
@@ -35,7 +40,11 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
+from pants.backend.scala.subsystems.scalac import Scalac
+from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.jvm.resolve.jvm_tool import JvmToolBase
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +83,20 @@ class DefaultTool:
             args.append(f"--backend-packages=+['{backend}']")
         return DefaultTool(tool.options_scope, tuple(args))
 
+    @classmethod
+    def from_jvm_tool(cls, tool: type[JvmToolBase], *, backend: str | None = None) -> DefaultTool:
+        args = [
+            f"--{tool.options_scope}-version={tool.default_version}",
+            f"--{tool.options_scope}-artifacts={tool.default_artifacts}",
+            f"--{tool.options_scope}-lockfile={tool.default_lockfile_path}",  # type: ignore[attr-defined]
+        ]
+        if backend:
+            args.append(f"--backend-packages=+['{backend}']")
+        return DefaultTool(tool.options_scope, tuple(args))
+
 
 AllTools = (
+    # Python
     DefaultTool.from_python_tool(Autoflake),
     DefaultTool.from_python_tool(Bandit, backend="pants.backend.python.lint.bandit"),
     DefaultTool.from_python_tool(Black),
@@ -103,6 +124,24 @@ AllTools = (
     ),
     DefaultTool.from_python_tool(DockerfileParser, backend="pants.backend.experimental.docker"),
     DefaultTool.from_python_tool(TwineSubsystem),
+    # JVM
+    DefaultTool.from_jvm_tool(JUnit),
+    DefaultTool.from_jvm_tool(GoogleJavaFormatSubsystem),
+    DefaultTool.from_jvm_tool(ScalafmtSubsystem),
+    DefaultTool.from_jvm_tool(
+        ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"
+    ),
+    DefaultTool.from_jvm_tool(Scalatest),
+    DefaultTool.from_jvm_tool(
+        ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
+    ),
+    DefaultTool.from_jvm_tool(
+        AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"
+    ),
+    DefaultTool(
+        "scalac-plugins",
+        (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
+    ),
 )
 
 

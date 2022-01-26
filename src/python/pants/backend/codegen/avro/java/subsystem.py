@@ -15,9 +15,10 @@ class AvroSubsystem(JvmToolBase):
         "pants.backend.codegen.avro.java",
         "avro-tools.default.lockfile.txt",
     )
-    default_lockfile_url = git_url(
+    default_lockfile_path = (
         "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
     )
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):

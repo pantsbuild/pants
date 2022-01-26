@@ -14,6 +14,9 @@ class Scalac(Subsystem):
     options_scope = "scalac"
     help = "The Scala compiler."
 
+    default_plugins_lockfile_path = (
+        "src/python/pants/backend/scala/subsystems/scalac_plugins.default.lockfile.txt"
+    )
     default_plugins_lockfile_resource = (
         "pants.backend.scala.subsystems",
         "scalac_plugins.default.lockfile.txt",
