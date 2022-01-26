@@ -62,7 +62,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
             return self.value
         file_prefix = (
             self.address.generated_name.replace(".", "_")
-            if self.address.is_generated_target
+            if self.address.generated_name
             else self.address.target_name
         )
         if file_ending is None:

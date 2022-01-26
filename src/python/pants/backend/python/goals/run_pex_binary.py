@@ -52,7 +52,7 @@ async def create_pex_binary_run_request(
 
     pex_filename = (
         field_set.address.generated_name.replace(".", "_")
-        if field_set.address.is_generated_target
+        if field_set.address.generated_name
         else field_set.address.target_name
     )
     pex_get = Get(
