@@ -11,12 +11,12 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
     ToolClasspath,
@@ -47,8 +47,6 @@ class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
 async def generate_scrooge_thrift_sources(
     request: GenerateScroogeThriftSourcesRequest,
     scrooge: ScroogeSubsystem,
-    jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> GeneratedScroogeThriftSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -100,16 +98,15 @@ async def generate_scrooge_thrift_sources(
     if wrapped_target.target[ScroogeFinagleBoolField].value:
         maybe_finagle_option = ["--finagle"]
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
     result = await Get(
         ProcessResult,
-        Process(
+        JvmProcess(
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
-                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
                 "com.twitter.scrooge.Main",
                 *maybe_include_paths,
                 "--dest",
@@ -120,13 +117,12 @@ async def generate_scrooge_thrift_sources(
                 *target_sources.snapshot.files,
             ],
             input_digest=input_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            # TODO: verify this is correct
+            extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Generating {request.lang_name} sources from {request.thrift_source_field.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
-            env=jdk_setup.env,
-            append_only_caches=jdk_setup.append_only_caches,
         ),
     )
 

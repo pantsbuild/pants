@@ -14,7 +14,7 @@ from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
-from pants.engine.process import BashBinary, FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
@@ -26,10 +26,9 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.coursier_setup import Coursier
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -42,9 +41,6 @@ class CompileScalaSourceRequest(ClasspathEntryRequest):
 
 @rule(desc="Compile with scalac")
 async def compile_scala_source(
-    bash: BashBinary,
-    coursier: Coursier,
-    jdk_setup: JdkSetup,
     scala: ScalaSubsystem,
     scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
@@ -142,22 +138,21 @@ async def compile_scala_source(
         ),
     )
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
     }
-    use_nailgun = tuple(immutable_input_digests.keys())
-    immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
+    use_nailgun = tuple(extra_immutable_input_digests)
+    extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
 
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"
     process_result = await Get(
         FallibleProcessResult,
-        Process(
+        JvmProcess(
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
-                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
@@ -174,13 +169,12 @@ async def compile_scala_source(
                 ),
             ],
             input_digest=sources_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=use_nailgun,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            # TODO: get this right
+            extra_nailgun_keys=use_nailgun,
             output_files=(output_file,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
-            append_only_caches=jdk_setup.append_only_caches,
-            env=jdk_setup.env,
         ),
     )
     output: ClasspathEntry | None = None

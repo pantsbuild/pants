@@ -167,70 +167,51 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
     )
 
 
-"""
-        return Process(
-            [
-                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
-                "org.apache.avro.tool.Main",
-                *args,
-            ],
-            input_digest=overridden_input_digest
-            if overridden_input_digest is not None
-            else input_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests,
-            description="Generating Java sources from Avro source.",
-            level=LogLevel.DEBUG,
-            output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),
-            env=jdk_setup.env,
-            append_only_caches=jdk_setup.append_only_caches,
-        )
-"""
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class JvmProcess:
-    args: tuple[str, ...]
+    argv: tuple[str, ...]
     classpath_entries: tuple[str, ...]
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     level: LogLevel
-    use_nailgun: tuple[str, ...]
+    extra_nailgun_keys: tuple[str, ...]
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     timeout_seconds: int | float | None
     platform: Platform | None
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_env: FrozenDict[str, str]
+    cache_scope: ProcessCacheScope | None
 
     def __init__(
         self,
-        args: Iterable[str],
+        argv: Iterable[str],
         classpath_entries: Iterable[str],
         input_digest: Digest,
         description: str,
-        level: LogLevel,
-        use_nailgun: Iterable[str] | None = None,
+        level: LogLevel = LogLevel.INFO,
+        extra_nailgun_keys: Iterable[str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
-        extra_immutable_input_digests: dict[str, Digest] | None = None,
+        extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         extra_env: Mapping[str, str] | None = None,
         timeout_seconds: int | float | None = None,
         platform: Platform | None = None,
+        cache_scope: ProcessCacheScope | None = None,
     ):
 
-        self.args = tuple(args)
+        self.argv = tuple(argv)
         self.classpath_entries = tuple(classpath_entries)
         self.input_digest = input_digest
         self.description = description
         self.level = level
-        self.use_nailgun = tuple(use_nailgun or ())
+        self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
         self.timeout_seconds = timeout_seconds
         self.platform = platform
-
+        self.cache_scope = cache_scope
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.extra_env = FrozenDict(extra_env or {})
 
@@ -244,11 +225,13 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
     }
     env = {**jdk_setup.env, **request.extra_env}
 
+    use_nailgun = [*jdk_setup.immutable_input_digests, *request.extra_nailgun_keys]
+
     return Process(
-        [*jdk_setup.args(bash, request.classpath_entries), *request.args],
+        [*jdk_setup.args(bash, request.classpath_entries), *request.argv],
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
-        use_nailgun=request.use_nailgun,
+        use_nailgun=use_nailgun,
         description=request.description,
         level=request.level,
         output_directories=request.output_directories,
@@ -257,6 +240,7 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
         timeout_seconds=request.timeout_seconds,
         append_only_caches=jdk_setup.append_only_caches,
         output_files=request.output_files,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
 

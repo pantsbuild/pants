@@ -18,7 +18,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -44,6 +44,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(BashBinary, ()),
             QueryRule(BuiltPackage, (DeployJarFieldSet,)),
             QueryRule(JdkSetup, ()),
+            QueryRule(ProcessResult, (JvmProcess,)),
             QueryRule(ProcessResult, (Process,)),
         ],
         target_types=[
@@ -312,19 +313,14 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         [DeployJarFieldSet.create(tgt)],
     )
 
-    jdk_setup = rule_runner.request(JdkSetup, [])
-    bash = rule_runner.request(BashBinary, [])
-
     process_result = rule_runner.request(
         ProcessResult,
         [
-            Process(
-                argv=jdk_setup.args(bash, []) + ("-jar", "dave.jar"),
+            JvmProcess(
+                argv=("-jar", "dave.jar"),
+                classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
-                append_only_caches=jdk_setup.append_only_caches,
-                immutable_input_digests=jdk_setup.immutable_input_digests,
-                env=jdk_setup.env,
             )
         ],
     )

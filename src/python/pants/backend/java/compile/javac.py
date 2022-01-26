@@ -157,7 +157,7 @@ async def compile_java_source(
         FallibleProcessResult,
         JvmProcess(
             classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
-            args=[
+            argv=[
                 "com.sun.tools.javac.Main",
                 *(("-cp", classpath_arg) if classpath_arg else ()),
                 *javac.args,
@@ -173,7 +173,7 @@ async def compile_java_source(
             input_digest=merged_digest,
             extra_immutable_input_digests=immutable_input_digests,
             # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
-            use_nailgun=jdk_setup.immutable_input_digests,
+            extra_nailgun_keys=jdk_setup.immutable_input_digests,
             output_directories=(dest_dir,),
             description=f"Compile {request.component} with javac",
             level=LogLevel.DEBUG,

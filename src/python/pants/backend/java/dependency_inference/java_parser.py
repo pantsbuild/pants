@@ -16,9 +16,9 @@ from pants.backend.java.dependency_inference.java_parser_launcher import (
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessExecutionFailure
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.logging import LogLevel
@@ -67,8 +67,6 @@ async def make_analysis_request_from_source_files(
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
-    bash: BashBinary,
-    jdk_setup: JdkSetup,
     processor_classfiles: JavaParserCompiledClassfiles,
     request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
@@ -94,8 +92,7 @@ async def analyze_java_source_dependencies(
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         processorcp_relpath: processor_classfiles.digest,
     }
@@ -104,21 +101,21 @@ async def analyze_java_source_dependencies(
 
     process_result = await Get(
         FallibleProcessResult,
-        Process(
+        JvmProcess(
+            classpath_entries=[
+                *tool_classpath.classpath_entries(toolcp_relpath),
+                processorcp_relpath,
+            ],
             argv=[
-                *jdk_setup.args(
-                    bash, [*tool_classpath.classpath_entries(toolcp_relpath), processorcp_relpath]
-                ),
                 "org.pantsbuild.javaparser.PantsJavaParserLauncher",
                 analysis_output_path,
                 source_path,
             ],
             input_digest=prefixed_source_files_digest,
-            immutable_input_digests=immutable_input_digests,
+            extra_immutable_input_digests=extra_immutable_input_digests,
             output_files=(analysis_output_path,),
-            use_nailgun=immutable_input_digests.keys(),
-            append_only_caches=jdk_setup.append_only_caches,
-            env=jdk_setup.env,
+            # TODO: correct this
+            extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,
         ),

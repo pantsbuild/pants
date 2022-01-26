@@ -13,11 +13,11 @@ from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import (
     CoursierResolvedLockfile,
@@ -58,7 +58,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Setup:
-    process: Process
+    process: JvmProcess
     original_digest: Digest
 
 
@@ -67,7 +67,6 @@ async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
     jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> Setup:
 
     lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
@@ -87,8 +86,7 @@ async def setup_google_java_format(
     )
 
     toolcp_relpath = "__toolcp"
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
@@ -103,7 +101,6 @@ async def setup_google_java_format(
         ]
 
     args = [
-        *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
         *maybe_java11_or_higher_options,
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
@@ -111,13 +108,12 @@ async def setup_google_java_format(
         *source_files.files,
     ]
 
-    process = Process(
+    process = JvmProcess(
         argv=args,
+        classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
         input_digest=source_files_snapshot.digest,
-        immutable_input_digests=immutable_input_digests,
+        extra_immutable_input_digests=extra_immutable_input_digests,
         output_files=source_files_snapshot.files,
-        append_only_caches=jdk_setup.append_only_caches,
-        env=jdk_setup.env,
         description=f"Run Google Java Format on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
@@ -132,7 +128,7 @@ async def google_java_format_fmt(
     if tool.skip:
         return FmtResult.skip(formatter_name="Google Java Format")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
-    result = await Get(ProcessResult, Process, setup.process)
+    result = await Get(ProcessResult, JvmProcess, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
@@ -148,7 +144,7 @@ async def google_java_format_lint(
     if tool.skip:
         return LintResults([], linter_name="Google Java Format")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
+    result = await Get(FallibleProcessResult, JvmProcess, setup.process)
     lint_result = LintResult.from_fallible_process_result(result)
     if lint_result.exit_code == 0 and lint_result.stdout.strip() != "":
         # Note: The formetter returns success even if it would have reformatted the files.

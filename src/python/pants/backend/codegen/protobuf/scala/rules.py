@@ -179,7 +179,7 @@ async def generate_scala_from_protobuf(
         ProcessResult,
         JvmProcess(
             classpath_entries=[*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath],
-            args=[
+            argv=[
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
                 f"--protoc={os.path.join(protoc_relpath, downloaded_protoc_binary.exe)}",
                 *maybe_jvm_plugins_setup_args,
@@ -190,7 +190,7 @@ async def generate_scala_from_protobuf(
             input_digest=input_digest,
             # TODO: figure out how to generalise this -- I'm not sure how this argument is actually used.
             extra_immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests,
+            extra_nailgun_keys=immutable_input_digests,
             description=f"Generating Scala sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
@@ -308,7 +308,7 @@ async def setup_scalapb_shim_classfiles(
         ProcessResult,
         JvmProcess(
             classpath_entries=tool_classpath.classpath_entries(),
-            args=[
+            argv=[
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
