@@ -54,6 +54,8 @@ def test_multiple_resolves() -> None:
     rule_runner.set_options(
         [
             "--python-experimental-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            # Override interpreter constraints for 'b', but use default for 'a'.
+            "--python-experimental-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
             "--python-enable-resolves",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -72,9 +74,7 @@ def test_multiple_resolves() -> None:
         ),
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["b", "both1", "both2"]),
-            interpreter_constraints=InterpreterConstraints(
-                PythonSetup.default_interpreter_constraints
-            ),
+            interpreter_constraints=InterpreterConstraints(["==3.7.*"]),
             resolve_name="b",
             lockfile_dest="b.lock",
         ),

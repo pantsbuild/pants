@@ -243,18 +243,17 @@ async def setup_user_lockfile_requests(
         for resolve in tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup):
             resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
-    # TODO: Figure out how to determine which interpreter constraints to use for each resolve...
-    #  Note that `python_requirement` does not have interpreter constraints, so we either need to
-    #  inspect all consumers of that resolve or start to closely couple the resolve with the
-    #  interpreter constraints (a "context").
-
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
             requirements=PexRequirements.create_from_requirement_fields(
                 resolve_to_requirements_fields[resolve],
                 constraints_strings=(),
             ).req_strings,
-            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
+            interpreter_constraints=InterpreterConstraints(
+                python_setup.resolves_to_interpreter_constraints.get(
+                    resolve, python_setup.interpreter_constraints
+                )
+            ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
         )

@@ -11,6 +11,7 @@ from typing import Iterable, Optional, cast
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.memo import memoized_property
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,27 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--experimental-resolves-to-interpreter-constraints",
+            advanced=True,
+            type=dict,
+            default={},
+            help=(
+                "Override the interpreter constraints to use when generating a resolve's lockfile "
+                "with the `generate-lockfiles` goal.\n\n"
+                "By default, each resolve from `[python].experimental_resolves` will use your "
+                "global interpreter constraints set in `[python].interpreter_constraints`. With "
+                "this option, you can override each resolve to use certain interpreter "
+                "constraints, such as `{'data-science': ['==3.8.*']}`.\n\n"
+                "Pants will validate that the interpreter constraints of your code using a "
+                "resolve are compatible with that resolve's own constraints. For example, if your "
+                "code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's "
+                "also using a resolve whose interpreter constraints are set to ['==3.7.*'], then "
+                "Pants will error explaining the incompatibility.\n\n"
+                "The keys must be defined as resolves in `[python].experimental_resolves`.\n\n"
+                "This option is experimental and may change without the normal deprecation policy."
+            ),
+        )
+        register(
             "--invalid-lockfile-behavior",
             advanced=True,
             type=InvalidLockfileBehavior,
@@ -280,6 +302,20 @@ class PythonSetup(Subsystem):
     @property
     def default_resolve(self) -> str:
         return cast(str, self.options.experimental_default_resolve)
+
+    @memoized_property
+    def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
+        result = {}
+        for resolve, ics in self.options.experimental_resolves_to_interpreter_constraints.items():
+            if resolve not in self.resolves:
+                raise KeyError(
+                    "Unrecognized resolve name in the option "
+                    f"`[python].experimental_resolves_to_interpreter_constraints`: {resolve}. Each "
+                    "key must be one of the keys in `[python].experimental_resolves`: "
+                    f"{sorted(self.resolves.keys())}"
+                )
+            result[resolve] = tuple(ics)
+        return result
 
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
