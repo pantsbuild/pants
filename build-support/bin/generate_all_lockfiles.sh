@@ -19,7 +19,7 @@ if is_macos_arm; then
   # Generate the lockfiles with the correct notated interpreter constraints, but make
   # Pants execute with a version of Python that actually runs on MacOS ARM
   unset PANTS_PYTHON_INTERPRETER_CONSTRAINTS
-  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py --python-interpreter-constraints="['==3.9.*']"
+  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py --python-interpreter-constraints="['==3.9.*']" -- "$@"
 else
-  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py
+  exec ./pants run build-support/bin/_generate_all_lockfiles_helper.py -- "$@"
 fi

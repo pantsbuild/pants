@@ -13,9 +13,10 @@ class Scalatest(JvmToolBase):
     default_version = "3.2.10"
     default_artifacts = ("org.scalatest:scalatest_2.13:{version}",)
     default_lockfile_resource = ("pants.backend.scala.subsystems", "scalatest.default.lockfile.txt")
-    default_lockfile_url = git_url(
+    default_lockfile_path = (
         "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
     )
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):
