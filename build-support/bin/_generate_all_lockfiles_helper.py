@@ -137,14 +137,28 @@ def create_parser() -> argparse.ArgumentParser:
         prog="generate_all_lockfiles.sh",
     )
     parser.add_argument(
-        "--internal", action="store_true", help="Regenerate all internal lockfiles."
+        "--internal",
+        action="store_true",
+        help=(
+            "Regenerate all internal lockfiles. Use this when you change our "
+            "`requirements.txt` and/or internal config of tools, like adding a new Flake8 plugin."
+        ),
     )
     parser.add_argument(
         "--tool",
         nargs="*",
         help=(
-            f"Regenerate these default tool lockfile(s). Valid options: "
+            "Regenerate these default tool lockfile(s). Use this when bumping default versions "
+            "of particular tools. Valid options: "
             f"{sorted(tool.resolve_name for tool in AllTools)}"
+        ),
+    )
+    parser.add_argument(
+        "--pex",
+        action="store_true",
+        help=(
+            "Use when bumping the PEX version. (Will regenerate our internal user lockfile & "
+            "the Lambdex tool's lockfile.)"
         ),
     )
     parser.add_argument(
@@ -153,22 +167,25 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def update_internal_lockfiles() -> None:
-    subprocess.run(
-        [
-            "./pants",
-            "--concurrent",
-            "--tag=-lockfile_ignore",
-            # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
-            # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
-            # restore it here so that the lockfile gets generated properly.
-            "--python-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
-            "generate-lockfiles",
-            "generate-user-lockfile",
-            "::",
-        ],
-        check=True,
-    )
+def update_internal_lockfiles(
+    *, python_user_lockfile: bool = True, internal_tools: bool = True
+) -> None:
+    args = ["./pants", "--concurrent"]
+    if python_user_lockfile:
+        args.extend(
+            [
+                "--tag=-lockfile_ignore",
+                # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
+                # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
+                # restore it here so that the lockfile gets generated properly.
+                "--python-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
+                "generate-user-lockfile",
+                "::",
+            ]
+        )
+    if internal_tools:
+        args.append("generate-lockfiles")
+    subprocess.run(args, check=True)
 
 
 def update_default_lockfiles(specified: list[str] | None) -> None:
@@ -193,6 +210,11 @@ def main() -> None:
     if args.all:
         update_internal_lockfiles()
         update_default_lockfiles(specified=None)
+        return
+
+    if args.pex:
+        update_internal_lockfiles(internal_tools=False)
+        update_default_lockfiles(specified=[Lambdex.options_scope])
         return
 
     if args.internal:
