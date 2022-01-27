@@ -148,6 +148,7 @@ async def generate_lockfile(
                 subcommand=("lock", "create"),
                 extra_args=(
                     "--output=lock.json",
+                    "--no-emit-warnings",
                     # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                     # generate universal locks because they have the best compatibility. We may
                     # want to let users change this, as `style=strict` is safer.
