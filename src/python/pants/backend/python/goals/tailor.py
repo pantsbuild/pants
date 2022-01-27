@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
-from pants.backend.python.dependency_inference.module_mapper import PythonModule
+from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -159,8 +159,8 @@ async def find_putative_targets(
             entry_point_path = PurePath(entry_point)
             src_root = src_roots.path_to_root[entry_point_path]
             stripped_entry_point = entry_point_path.relative_to(src_root.path)
-            module = PythonModule.create_from_stripped_path(stripped_entry_point)
-            module_to_entry_point[module.module] = entry_point
+            module = module_from_stripped_path(stripped_entry_point)
+            module_to_entry_point[module] = entry_point
 
         # Get existing binary targets for these entry points.
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}

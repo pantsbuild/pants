@@ -10,7 +10,10 @@ from pants.backend.python.dependency_inference import module_mapper, parse_pytho
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
 from pants.backend.python.dependency_inference.parse_python_imports import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
@@ -186,7 +189,8 @@ async def infer_python_dependencies_via_imports(
     )
 
     owners_per_import = await MultiGet(
-        Get(PythonModuleOwners, PythonModule(imported_module)) for imported_module in parsed_imports
+        Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module))
+        for imported_module in parsed_imports
     )
 
     merged_result: set[Address] = set()

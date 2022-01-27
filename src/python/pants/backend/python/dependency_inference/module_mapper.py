@@ -47,16 +47,11 @@ class ModuleProvider:
     typ: ModuleProviderType
 
 
-@dataclass(frozen=True)
-class PythonModule:
-    module: str
-
-    @classmethod
-    def create_from_stripped_path(cls, path: PurePath) -> PythonModule:
-        module_name_with_slashes = (
-            path.parent if path.name in ("__init__.py", "__init__.pyi") else path.with_suffix("")
-        )
-        return cls(module_name_with_slashes.as_posix().replace("/", "."))
+def module_from_stripped_path(path: PurePath) -> str:
+    module_name_with_slashes = (
+        path.parent if path.name in ("__init__.py", "__init__.pyi") else path.with_suffix("")
+    )
+    return module_name_with_slashes.as_posix().replace("/", ".")
 
 
 @dataclass(frozen=True)
@@ -164,7 +159,7 @@ async def map_first_party_python_targets_to_modules(
         provider_type = (
             ModuleProviderType.TYPE_STUB if stripped_f.suffix == ".pyi" else ModuleProviderType.IMPL
         )
-        module = PythonModule.create_from_stripped_path(stripped_f).module
+        module = module_from_stripped_path(stripped_f)
         modules_to_providers[module].append(ModuleProvider(tgt.address, provider_type))
 
     return FirstPartyPythonMappingImpl(
@@ -314,15 +309,20 @@ class PythonModuleOwners:
             )
 
 
+@dataclass(frozen=True)
+class PythonModuleOwnersRequest:
+    module: str
+
+
 @rule
 async def map_module_to_address(
-    module: PythonModule,
+    request: PythonModuleOwnersRequest,
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
     providers = [
-        *third_party_mapping.providers_for_module(module.module, resolves=None),
-        *first_party_mapping.providers_for_module(module.module),
+        *third_party_mapping.providers_for_module(request.module, resolves=None),
+        *first_party_mapping.providers_for_module(request.module),
     ]
     addresses = tuple(provider.addr for provider in providers)
 

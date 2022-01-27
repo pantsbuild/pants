@@ -21,9 +21,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
     ModuleProvider,
     ModuleProviderType,
-    PythonModule,
     PythonModuleOwners,
+    PythonModuleOwnersRequest,
     ThirdPartyPythonModuleMapping,
+    module_from_stripped_path,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import (
@@ -59,8 +60,8 @@ def test_default_module_mapping_is_normalized() -> None:
         ("src/python/project/not_stripped.py", "src.python.project.not_stripped"),
     ],
 )
-def test_create_module_from_path(stripped_path: str, expected: str) -> None:
-    assert PythonModule.create_from_stripped_path(PurePath(stripped_path)) == PythonModule(expected)
+def test_module_from_stripped_path(stripped_path: str, expected: str) -> None:
+    assert module_from_stripped_path(PurePath(stripped_path)) == expected
 
 
 def test_first_party_modules_mapping() -> None:
@@ -189,7 +190,7 @@ def rule_runner() -> RuleRunner:
             *protobuf_target_type_rules(),
             QueryRule(FirstPartyPythonModuleMapping, []),
             QueryRule(ThirdPartyPythonModuleMapping, []),
-            QueryRule(PythonModuleOwners, [PythonModule]),
+            QueryRule(PythonModuleOwners, [PythonModuleOwnersRequest]),
         ],
         target_types=[
             PythonSourceTarget,
@@ -415,12 +416,12 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     def assert_owners(
         module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
     ) -> None:
-        owners = rule_runner.request(PythonModuleOwners, [PythonModule(module)])
+        owners = rule_runner.request(PythonModuleOwners, [PythonModuleOwnersRequest(module)])
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
         from_import_owners = rule_runner.request(
-            PythonModuleOwners, [PythonModule(f"{module}.Class")]
+            PythonModuleOwners, [PythonModuleOwnersRequest(f"{module}.Class")]
         )
         assert list(from_import_owners.unambiguous) == expected
         assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])

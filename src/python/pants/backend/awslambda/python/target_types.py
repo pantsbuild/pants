@@ -6,7 +6,10 @@ import re
 from dataclasses import dataclass
 from typing import Match, Optional, Tuple, cast
 
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
@@ -140,7 +143,7 @@ async def inject_lambda_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
-    owners = await Get(PythonModuleOwners, PythonModule(module))
+    owners = await Get(PythonModuleOwners, PythonModuleOwnersRequest(module))
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
