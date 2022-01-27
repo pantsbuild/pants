@@ -125,7 +125,7 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   let mut system = System::new();
   system.refresh_process(pid);
   // Check that the recorded pid is a live process.
-  match system.get_process(pid) {
+  match system.process(pid) {
     None => {
       return Err(format!(
         "\

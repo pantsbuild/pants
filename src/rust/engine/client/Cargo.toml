@@ -20,7 +20,7 @@ options = { path = "../options" }
 sha2 = "0.9"
 strum = "0.20"
 strum_macros = "0.23"
-sysinfo = "0.17.1"
+sysinfo = "0.20.0"
 tokio = { version = "1.4", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
 uname = "0.1"
 
