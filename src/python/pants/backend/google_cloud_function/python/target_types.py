@@ -147,7 +147,7 @@ async def inject_cloud_function_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
-    owners = await Get(PythonModuleOwners, PythonModuleOwnersRequest(module))
+    owners = await Get(PythonModuleOwners, PythonModuleOwnersRequest(module, resolve=None))
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,

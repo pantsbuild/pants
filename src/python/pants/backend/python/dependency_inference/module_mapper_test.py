@@ -140,9 +140,9 @@ def test_third_party_modules_mapping() -> None:
     )
 
     def assert_addresses(
-        mod: str, expected: tuple[ModuleProvider, ...], *, resolves: list[str] | None = None
+        mod: str, expected: tuple[ModuleProvider, ...], *, resolve: str | None = None
     ) -> None:
-        assert mapping.providers_for_module(mod, resolves) == expected
+        assert mapping.providers_for_module(mod, resolve) == expected
 
     assert_addresses("colors", (colors_provider, colors_stubs_provider))
     assert_addresses("colors.red", (colors_provider, colors_stubs_provider))
@@ -163,20 +163,19 @@ def test_third_party_modules_mapping() -> None:
     assert_addresses("unknown", ())
     assert_addresses("unknown.pants", ())
 
-    assert_addresses("two_resolves", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves", (colors_provider,), resolves=["default-resolve"])
-    assert_addresses("two_resolves", (pants_provider,), resolves=["another-resolve"])
+    assert_addresses("two_resolves", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves", (colors_provider,), resolve="default-resolve")
+    assert_addresses("two_resolves", (pants_provider,), resolve="another-resolve")
     assert_addresses(
         "two_resolves",
         (
             colors_provider,
             pants_provider,
         ),
-        resolves=["default-resolve", "another-resolve"],
+        resolve=None,
     )
-    assert_addresses("two_resolves", (), resolves=[])
 
 
 @pytest.fixture
@@ -416,12 +415,14 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     def assert_owners(
         module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
     ) -> None:
-        owners = rule_runner.request(PythonModuleOwners, [PythonModuleOwnersRequest(module)])
+        owners = rule_runner.request(
+            PythonModuleOwners, [PythonModuleOwnersRequest(module, resolve=None)]
+        )
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
         from_import_owners = rule_runner.request(
-            PythonModuleOwners, [PythonModuleOwnersRequest(f"{module}.Class")]
+            PythonModuleOwners, [PythonModuleOwnersRequest(f"{module}.Class", resolve=None)]
         )
         assert list(from_import_owners.unambiguous) == expected
         assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])

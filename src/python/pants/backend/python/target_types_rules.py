@@ -21,6 +21,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
     PexBinariesGeneratorTarget,
@@ -32,6 +33,7 @@ from pants.backend.python.target_types import (
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
     PythonProvidesField,
+    PythonResolveField,
     PythonSourcesGeneratingSourcesField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
@@ -299,7 +301,9 @@ class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
 async def inject_pex_binary_entry_point_dependency(
-    request: InjectPexBinaryEntryPointDependency, python_infer_subsystem: PythonInferSubsystem
+    request: InjectPexBinaryEntryPointDependency,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
@@ -314,7 +318,15 @@ async def inject_pex_binary_entry_point_dependency(
     )
     if entry_point.val is None:
         return InjectedDependencies()
-    owners = await Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.val.module))
+
+    resolve_field = original_tgt.target[PythonResolveField]
+    resolve_field.validate(python_setup)
+    owners = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            entry_point.val.module, resolve=resolve_field.value_or_default(python_setup)
+        ),
+    )
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
@@ -507,7 +519,7 @@ async def inject_python_distribution_dependencies(
     ]
     all_module_owners = iter(
         await MultiGet(
-            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module))
+            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
             for _, _, entry_point in all_module_entry_points
         )
     )

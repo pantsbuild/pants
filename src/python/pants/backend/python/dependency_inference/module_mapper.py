@@ -196,20 +196,18 @@ class ThirdPartyPythonModuleMapping(
         parent_module = module.rsplit(".", maxsplit=1)[0]
         return self._providers_for_resolve(parent_module, resolve)
 
-    def providers_for_module(
-        self, module: str, resolves: Iterable[str] | None
-    ) -> tuple[ModuleProvider, ...]:
+    def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
         """Find all providers for the module.
 
-        If `resolves` is None, will not consider resolves, i.e. any `python_requirement` can be
+        If `resolve` is None, will not consider resolves, i.e. any `python_requirement` can be
         consumed. Otherwise, providers can only come from `python_requirements` marked compatible
-        with those resolves.
+        with the resolve.
         """
-        if resolves is None:
-            resolves = list(self.keys())
+        if resolve:
+            return self._providers_for_resolve(module, resolve)
         return tuple(
             itertools.chain.from_iterable(
-                self._providers_for_resolve(module, resolve) for resolve in resolves
+                self._providers_for_resolve(module, resolve) for resolve in list(self.keys())
             )
         )
 
@@ -312,6 +310,7 @@ class PythonModuleOwners:
 @dataclass(frozen=True)
 class PythonModuleOwnersRequest:
     module: str
+    resolve: str | None
 
 
 @rule
@@ -319,9 +318,12 @@ async def map_module_to_address(
     request: PythonModuleOwnersRequest,
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
+    python_setup: PythonSetup,
 ) -> PythonModuleOwners:
     providers = [
-        *third_party_mapping.providers_for_module(request.module, resolves=None),
+        *third_party_mapping.providers_for_module(
+            request.module, resolve=request.resolve if python_setup.enable_resolves else None
+        ),
         *first_party_mapping.providers_for_module(request.module),
     ]
     addresses = tuple(provider.addr for provider in providers)
