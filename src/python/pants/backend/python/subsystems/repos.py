@@ -1,7 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, cast
+from __future__ import annotations
+
+from typing import Iterator, cast
 
 from pants.option.subsystem import Subsystem
 
@@ -41,9 +43,19 @@ class PythonRepos(Subsystem):
         )
 
     @property
-    def repos(self) -> List[str]:
-        return cast(List[str], self.options.repos)
+    def repos(self) -> list[str]:
+        return cast("list[str]", self.options.repos)
 
     @property
-    def indexes(self) -> List[str]:
-        return cast(List[str], self.options.indexes)
+    def indexes(self) -> list[str]:
+        return cast("list[str]", self.options.indexes)
+
+    @property
+    def pex_args(self) -> Iterator[str]:
+        # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
+        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
+        # case. Why set `--no-pypi`, then? We need to do this so that
+        # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
+        yield "--no-pypi"
+        yield from (f"--index={index}" for index in self.indexes)
+        yield from (f"--repo={repo}" for repo in self.repos)

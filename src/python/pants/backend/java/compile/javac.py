@@ -28,7 +28,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -150,17 +150,14 @@ async def compile_java_source(
     usercp = "__cp"
     user_classpath = Classpath(direct_dependency_classpath_entries)
     classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
-        **dict(user_classpath.root_immutable_inputs(prefix=usercp)),
-    }
+    immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
 
     # Compile.
     compile_result = await Get(
         FallibleProcessResult,
-        Process(
+        JvmProcess(
+            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
             argv=[
-                *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
                 "com.sun.tools.javac.Main",
                 *(("-cp", classpath_arg) if classpath_arg else ()),
                 *javac.args,
@@ -174,10 +171,7 @@ async def compile_java_source(
                 ),
             ],
             input_digest=merged_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=jdk_setup.immutable_input_digests.keys(),
-            append_only_caches=jdk_setup.append_only_caches,
-            env=jdk_setup.env,
+            extra_immutable_input_digests=immutable_input_digests,
             output_directories=(dest_dir,),
             description=f"Compile {request.component} with javac",
             level=LogLevel.DEBUG,

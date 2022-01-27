@@ -356,7 +356,13 @@ async def build_pex(
     pex_runtime_env: PexRuntimeEnvironment,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
-    argv = ["--output-file", request.output_filename, *request.additional_args]
+    argv = [
+        "--output-file",
+        request.output_filename,
+        "--no-emit-warnings",
+        *python_setup.manylinux_pex_args,
+        *request.additional_args,
+    ]
 
     repository_pex = (
         request.requirements.repository_pex
@@ -366,19 +372,7 @@ async def build_pex(
     if repository_pex:
         argv.extend(["--pex-repository", repository_pex.name])
     else:
-        # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
-        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
-        # case. Why set `--no-pypi`, then? We need to do this so that
-        # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
-        argv.extend(
-            [
-                "--no-pypi",
-                *(f"--index={index}" for index in python_repos.indexes),
-                *(f"--repo={repo}" for repo in python_repos.repos),
-                "--resolver-version",
-                "pip-2020-resolver",
-            ]
-        )
+        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     python: PythonExecutable | None = None
 
@@ -405,13 +399,6 @@ async def build_pex(
 
     if python:
         argv.extend(["--python", python.path])
-
-    argv.append("--no-emit-warnings")
-
-    if python_setup.manylinux:
-        argv.extend(["--manylinux", python_setup.manylinux])
-    else:
-        argv.append("--no-manylinux")
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())

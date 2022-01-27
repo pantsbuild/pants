@@ -25,12 +25,12 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.frozendict import FrozenDict
@@ -67,7 +67,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Partition:
-    process: Process
+    process: JvmProcess
     description: str
 
 
@@ -90,9 +90,9 @@ class ScalafmtConfigFiles:
 
 @dataclass(frozen=True)
 class SetupScalafmtPartition:
+    classpath_entries: tuple[str, ...]
     merged_sources_digest: Digest
-    jdk_invoke_args: tuple[str, ...]
-    immutable_input_digests: FrozenDict[str, Digest]
+    extra_immutable_input_digests: FrozenDict[str, Digest]
     config_file: str
     files: tuple[str, ...]
     check_only: bool
@@ -147,9 +147,7 @@ async def gather_scalafmt_config_files(
 
 
 @rule
-async def setup_scalafmt_partition(
-    request: SetupScalafmtPartition, jdk_setup: JdkSetup
-) -> Partition:
+async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition:
     sources_digest = await Get(
         Digest,
         DigestSubset(
@@ -164,7 +162,6 @@ async def setup_scalafmt_partition(
     )
 
     args = [
-        *request.jdk_invoke_args,
         "org.scalafmt.cli.Cli",
         f"--config={request.config_file}",
         "--non-interactive",
@@ -175,13 +172,14 @@ async def setup_scalafmt_partition(
         args.append("--quiet")
     args.extend(request.files)
 
-    process = Process(
+    process = JvmProcess(
         argv=args,
+        classpath_entries=request.classpath_entries,
         input_digest=sources_digest,
         output_files=request.files,
-        append_only_caches=jdk_setup.append_only_caches,
-        immutable_input_digests=request.immutable_input_digests,
-        env=jdk_setup.env,
+        extra_immutable_input_digests=request.extra_immutable_input_digests,
+        # extra_nailgun_keys=request.extra_immutable_input_digests,
+        use_nailgun=False,
         description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
@@ -193,8 +191,6 @@ async def setup_scalafmt_partition(
 async def setup_scalafmt(
     setup_request: SetupRequest,
     tool: ScalafmtSubsystem,
-    jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> Setup:
     toolcp_relpath = "__toolcp"
 
@@ -220,8 +216,8 @@ async def setup_scalafmt(
     merged_sources_digest = await Get(
         Digest, MergeDigests([source_files_snapshot.digest, config_files.snapshot.digest])
     )
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
@@ -233,14 +229,13 @@ async def setup_scalafmt(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
-    jdk_invoke_args = jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath))
     partitions = await MultiGet(
         Get(
             Partition,
             SetupScalafmtPartition(
+                classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 merged_sources_digest=merged_sources_digest,
-                immutable_input_digests=FrozenDict(immutable_input_digests),
-                jdk_invoke_args=jdk_invoke_args,
+                extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
                 config_file=config_file,
                 files=tuple(sorted(files)),
                 check_only=setup_request.check_only,
@@ -258,7 +253,7 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
         return FmtResult.skip(formatter_name="scalafmt")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     results = await MultiGet(
-        Get(ProcessResult, Process, partition.process) for partition in setup.partitions
+        Get(ProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
 
     def format(description: str, output) -> str:
@@ -298,7 +293,7 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
         return LintResults([], linter_name="scalafmt")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
     results = await MultiGet(
-        Get(FallibleProcessResult, Process, partition.process) for partition in setup.partitions
+        Get(FallibleProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
     lint_results = [
         LintResult.from_fallible_process_result(result, partition_description=partition.description)

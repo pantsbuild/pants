@@ -10,7 +10,6 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    BashBinary,
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessRequest,
@@ -21,7 +20,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
@@ -50,15 +49,13 @@ class TestSetupRequest:
 
 @dataclass(frozen=True)
 class TestSetup:
-    process: Process
+    process: JvmProcess
     reports_dir_prefix: str
 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_junit_for_target(
     request: TestSetupRequest,
-    bash: BashBinary,
-    jdk_setup: JdkSetup,
     jvm: JvmSubsystem,
     junit: JUnit,
     test_subsystem: TestSubsystem,
@@ -73,8 +70,7 @@ async def setup_junit_for_target(
     merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
 
     toolcp_relpath = "__toolcp"
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: junit_classpath.digest,
     }
 
@@ -93,15 +89,12 @@ async def setup_junit_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
-    process = Process(
+    process = JvmProcess(
+        classpath_entries=[
+            *classpath.args(),
+            *junit_classpath.classpath_entries(toolcp_relpath),
+        ],
         argv=[
-            *jdk_setup.args(
-                bash,
-                [
-                    *classpath.args(),
-                    *junit_classpath.classpath_entries(toolcp_relpath),
-                ],
-            ),
             *extra_jvm_args,
             "org.junit.platform.console.ConsoleLauncher",
             *(("--classpath", user_classpath_arg) if user_classpath_arg else ()),
@@ -111,13 +104,12 @@ async def setup_junit_for_target(
             *junit.options.args,
         ],
         input_digest=merged_classpath_digest,
-        immutable_input_digests=immutable_input_digests,
+        extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
-        append_only_caches=jdk_setup.append_only_caches,
-        env=jdk_setup.env,
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
+        use_nailgun=False,
     )
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)
 
@@ -128,7 +120,7 @@ async def run_junit_test(
     field_set: JunitTestFieldSet,
 ) -> TestResult:
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, Process, test_setup.process)
+    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
@@ -147,11 +139,10 @@ async def run_junit_test(
 @rule(level=LogLevel.DEBUG)
 async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+    process = await Get(Process, JvmProcess, setup.process)
     interactive_process = await Get(
         InteractiveProcess,
-        InteractiveProcessRequest(
-            setup.process, forward_signals_to_process=False, restartable=True
-        ),
+        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
     )
     return TestDebugRequest(interactive_process)
 
