@@ -120,7 +120,7 @@ futures-core = "^0.3.0"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-indexmap = "1.4"
+indexmap = "1.8"
 itertools = "0.10"
 lazy_static = "1"
 libc = "0.2.112"
