@@ -37,7 +37,7 @@ pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 ///
 enum SessionDisplay {
   // The dynamic UI is enabled, and the ConsoleUI should interact with a TTY.
-  ConsoleUI(ConsoleUI),
+  ConsoleUI(Box<ConsoleUI>),
   // The dynamic UI is disabled, and we should use only logging.
   Logging {
     straggler_threshold: Duration,
@@ -53,11 +53,11 @@ impl SessionDisplay {
     ui_use_prodash: bool,
   ) -> SessionDisplay {
     if dynamic_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(
+      SessionDisplay::ConsoleUI(Box::new(ConsoleUI::new(
         workunit_store.clone(),
         parallelism,
         ui_use_prodash,
-      ))
+      )))
     } else {
       SessionDisplay::Logging {
         // TODO: This threshold should likely be configurable, but the interval we render at
