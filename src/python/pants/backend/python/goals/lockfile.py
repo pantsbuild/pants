@@ -155,6 +155,8 @@ async def generate_lockfile(
                     "--style=universal",
                     "--resolver-version",
                     "pip-2020-resolver",
+                    # This makes diffs more readable when lockfiles change.
+                    "--indent=2",
                     *python_repos.pex_args,
                     *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
