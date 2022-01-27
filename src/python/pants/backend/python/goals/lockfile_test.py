@@ -30,9 +30,7 @@ def test_lockfile_generation() -> None:
             QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
         ]
     )
-    rule_runner.set_options(
-        ["--python-experimental-generate-lockfiles-with-pex"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
     result = rule_runner.request(
         GenerateLockfileResult,
         [
@@ -41,6 +39,7 @@ def test_lockfile_generation() -> None:
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name="test",
                 lockfile_dest="test.lock",
+                use_pex=True,
             )
         ],
     )
@@ -64,8 +63,7 @@ def test_lockfile_generation() -> None:
 
         ansicolors==1.1.8 \\
             --hash=sha256:00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187  \\
-            --hash=sha256:99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0 
-        """
+            --hash=sha256:99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0 \n"""
     )
 
 

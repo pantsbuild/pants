@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
+    use_pex: bool = False
     # Only kept for `[python].experimental_lockfile`, which is not using the new
     # "named resolve" semantics yet.
     _description: str | None = None
@@ -134,7 +135,7 @@ async def generate_lockfile(
     python_setup: PythonSetup,
     _: MaybeWarnPythonRepos,
 ) -> GenerateLockfileResult:
-    if python_setup.generate_lockfiles_with_pex:
+    if req.use_pex:
         lock_result = await Get(
             ProcessResult,
             PexCliProcess(

@@ -121,23 +121,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--experimental-generate-lockfiles-with-pex",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                "If true, use Pex's new lockfile generation rather than Poetry with the "
-                "`generate-lockfiles` goal.\n\n"
-                "This option is experimental and may change without the normal deprecation "
-                "policy. Right now, PEX outputs `requirements.txt`-style lockfiles, but it will "
-                "soon output a JSON format, which unlocks better performance and often better "
-                "correctness.\n\n"
-                "Pex's lockfile generation is still new: we would greatly appreciate feedback "
-                "at https://github.com/pantsbuild/pants/issues/new or Slack "
-                f"({doc_url('getting-help')}"
-            ),
-        )
-        register(
             "--enable-resolves",
             advanced=True,
             type=bool,
@@ -307,10 +290,6 @@ class PythonSetup(Subsystem):
     @property
     def lockfile(self) -> str | None:
         return cast("str | None", self.options.experimental_lockfile)
-
-    @property
-    def generate_lockfiles_with_pex(self) -> bool:
-        return cast(bool, self.options.experimental_generate_lockfiles_with_pex)
 
     @property
     def enable_resolves(self) -> bool:
