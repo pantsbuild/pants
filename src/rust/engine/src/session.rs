@@ -12,7 +12,7 @@ use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
-use futures::future::{self, AbortHandle, Abortable};
+use futures::future::{self, AbortHandle, Abortable, FutureExt};
 use graph::LastObserved;
 use log::warn;
 use parking_lot::{Mutex, RwLock};
@@ -311,15 +311,19 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    match *self.handle.display.lock().await {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().await,
+    let teardown = match *self.handle.display.lock().await {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown(),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..
       } => {
         *straggler_deadline = None;
+        futures::future::ready(()).boxed()
       }
     };
+    // NB: We await teardown outside of the display lock to remove a lock interleaving. See
+    // `ConsoleUI::teardown`.
+    teardown.await;
   }
 
   pub fn maybe_display_render(&self) {

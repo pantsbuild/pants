@@ -25,7 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::{BoxFuture, FutureExt};
 use indexmap::IndexSet;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
@@ -129,9 +129,14 @@ impl ConsoleUI {
   ///
   /// If the ConsoleUI is running, completes it.
   ///
-  pub async fn teardown(&mut self) {
+  /// NB: This method returns a Future which will await teardown of the UI, which should be awaited
+  /// outside of any UI locks.
+  ///
+  pub fn teardown(&mut self) -> BoxFuture<'static, ()> {
     if let Some(instance) = self.instance.take() {
-      instance.teardown().await;
+      instance.teardown()
+    } else {
+      futures::future::ready(()).boxed()
     }
   }
 }
@@ -385,15 +390,19 @@ impl Instance {
     };
   }
 
-  pub async fn teardown(self) {
+  pub fn teardown(self) -> BoxFuture<'static, ()> {
     match self {
       Instance::Indicatif(indicatif) => {
         // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
         // direct access to the Console.
         indicatif
           .multi_progress_task
-          .map_err(|e| format!("Failed to render UI: {}", e))
-          .boxed();
+          .map(|res| {
+            // If teardown fails, we can't know whether any error messages will even reach the client, so
+            // there isn't much point in trying to recover gracefully.
+            res.unwrap_or_else(|e| panic!("Failed to render UI: {}", e))
+          })
+          .boxed()
       }
       Instance::Prodash(mut prodash) => {
         // Drop all tasks to clear the Tree. The call to shutdown will render a final "Tick" with the
@@ -402,12 +411,10 @@ impl Instance {
         prodash
           .executor
           .clone()
-          .spawn_blocking(move || {
-            prodash.handle.shutdown_and_wait();
-          })
-          .await
+          .spawn_blocking(move || prodash.handle.shutdown_and_wait())
+          .boxed()
       }
-    };
+    }
   }
 }
 
