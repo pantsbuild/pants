@@ -100,7 +100,7 @@ async def generate_from_pipenv_requirement(
     )
     lock_info = json.loads(digest_contents[0].content)
 
-    generator[PythonRequirementCompatibleResolvesField].validate(python_setup)
+    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value

@@ -193,11 +193,11 @@ async def infer_python_dependencies_via_imports(
         ),
     )
 
-    resolve = None
-    if tgt.has_field(PythonResolveField):
-        resolve_field = tgt[PythonResolveField]
-        resolve_field.validate(python_setup)
-        resolve = resolve_field.value_or_default(python_setup)
+    resolve = (
+        tgt[PythonResolveField].normalized_value(python_setup)
+        if tgt.has_field(PythonResolveField)
+        else None
+    )
 
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))

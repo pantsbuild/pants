@@ -319,12 +319,11 @@ async def inject_pex_binary_entry_point_dependency(
     if entry_point.val is None:
         return InjectedDependencies()
 
-    resolve_field = original_tgt.target[PythonResolveField]
-    resolve_field.validate(python_setup)
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            entry_point.val.module, resolve=resolve_field.value_or_default(python_setup)
+            entry_point.val.module,
+            resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup),
         ),
     )
     address = original_tgt.target.address
