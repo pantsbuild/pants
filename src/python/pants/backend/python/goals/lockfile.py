@@ -106,8 +106,14 @@ class MaybeWarnPythonRepos:
     pass
 
 
+class MaybeWarnPythonReposRequest:
+    pass
+
+
 @rule
-def maybe_warn_python_repos(python_repos: PythonRepos) -> MaybeWarnPythonRepos:
+def maybe_warn_python_repos(
+    _: MaybeWarnPythonReposRequest, python_repos: PythonRepos
+) -> MaybeWarnPythonRepos:
     def warn_python_repos(option: str) -> None:
         logger.warning(
             f"The option `[python-repos].{option}` is configured, but it does not currently work "
@@ -132,22 +138,25 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-    _: MaybeWarnPythonRepos,
+    python_repos: PythonRepos,
+    python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     if req.use_pex:
         result = await Get(
             ProcessResult,
             PexCliProcess(
                 subcommand=("lock", "create"),
-                # TODO: Hook up to [python-repos]. Don't call `MaybeWarnPythonRepos` in this case.
                 extra_args=(
                     "--output=lock.json",
+                    "--no-emit-warnings",
                     # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                     # generate universal locks because they have the best compatibility. We may
                     # want to let users change this, as `style=strict` is safer.
                     "--style=universal",
                     "--resolver-version",
                     "pip-2020-resolver",
+                    *python_repos.pex_args,
+                    *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
                     *req.requirements,
                 ),
@@ -167,6 +176,7 @@ async def generate_lockfile(
             ),
         )
     else:
+        await Get(MaybeWarnPythonRepos, MaybeWarnPythonReposRequest())
         _pyproject_toml = create_pyproject_toml(
             req.requirements, req.interpreter_constraints
         ).encode()
