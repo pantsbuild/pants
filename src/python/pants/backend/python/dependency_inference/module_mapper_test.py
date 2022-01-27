@@ -416,13 +416,14 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
     ) -> None:
         owners = rule_runner.request(
-            PythonModuleOwners, [PythonModuleOwnersRequest(module, resolve=None)]
+            PythonModuleOwners, [PythonModuleOwnersRequest(module, resolve="python-default")]
         )
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
         from_import_owners = rule_runner.request(
-            PythonModuleOwners, [PythonModuleOwnersRequest(f"{module}.Class", resolve=None)]
+            PythonModuleOwners,
+            [PythonModuleOwnersRequest(f"{module}.Class", resolve="python-default")],
         )
         assert list(from_import_owners.unambiguous) == expected
         assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])
@@ -579,4 +580,41 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             Address("root/ambiguous", target_name="ambiguous-stub-types"),
             Address("root/ambiguous", target_name="ambiguous-stub-1stparty"),
         ],
+    )
+
+
+def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                # Note that both `python_requirements` have the same `dep`, which would normally
+                # result in ambiguity.
+                python_requirement(
+                    name="dep1",
+                    experimental_compatible_resolves=["a"],
+                    requirements=["dep"],
+                )
+
+                python_requirement(
+                    name="dep2",
+                    experimental_compatible_resolves=["b"],
+                    requirements=["dep"],
+                )
+                """
+            )
+        }
+    )
+    rule_runner.set_options(
+        ["--python-experimental-resolves={'a': '', 'b': ''}", "--python-enable-resolves"]
+    )
+
+    def get_owners(resolve: str | None) -> PythonModuleOwners:
+        return rule_runner.request(PythonModuleOwners, [PythonModuleOwnersRequest("dep", resolve)])
+
+    assert get_owners("a").unambiguous == (Address("", target_name="dep1"),)
+    assert get_owners("b").unambiguous == (Address("", target_name="dep2"),)
+    assert get_owners(None).ambiguous == (
+        Address("", target_name="dep1"),
+        Address("", target_name="dep2"),
     )
