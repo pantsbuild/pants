@@ -81,7 +81,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-jose": ("jose",),
     "python-pptx": ("pptx",),
     "pyyaml": ("yaml",),
-    "pymongo": ("bson", "gridfs", "requests"),
+    "pymongo": ("bson", "gridfs", "pymongo"),
     "pymupdf": ("fitz",),
     "pytest-runner": ("ptr",),
     "scikit-image": ("skimage",),
