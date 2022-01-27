@@ -1643,7 +1643,10 @@ class ProcessCleanupOption:
 
 
 def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer) -> None:
-    if bootstrap_options.is_default("use_deprecated_python_macros"):
+    if (
+        bootstrap_options.is_default("use_deprecated_python_macros")
+        and "pants.backend.python" in bootstrap_options.backend_packages
+    ):
         warn_or_error(
             "2.11.0.dev0",
             "the option `--use-deprecated-python-macros` defaulting to true",

@@ -6,7 +6,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, Optional, cast
+from typing import Iterable, Iterator, Optional, cast
 
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
@@ -338,6 +338,14 @@ class PythonSetup(Subsystem):
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
+
+    @property
+    def manylinux_pex_args(self) -> Iterator[str]:
+        if self.manylinux:
+            yield "--manylinux"
+            yield self.manylinux
+        else:
+            yield "--no-manylinux"
 
     @property
     def resolver_jobs(self) -> int:
