@@ -197,20 +197,23 @@ async def generate_targets_from_pex_binaries(
     generator_addr = request.generator.address
     entry_points_field = request.generator[PexEntryPointsField].value or []
     overrides = request.generator[OverridesField].flatten()
+    inherited_fields = {
+        field.alias: field.value
+        for field in request.generator.field_values.values()
+        if not isinstance(field, (PexEntryPointsField, OverridesField))
+    }
 
     # Note that we don't check for overlap because it seems unlikely to be a problem.
     # If it does, we should add this check. (E.g. `path.to.app` and `path/to/app.py`)
 
     def create_pex_binary(entry_point_spec: str) -> PexBinary:
-        target_fields = {
-            field.alias: field.value
-            for field in request.generator.field_values.values()
-            if not isinstance(field, (PexEntryPointsField, OverridesField))
-        }
-        target_fields.update(overrides.pop(entry_point_spec, {}))
-
         return PexBinary(
-            {PexEntryPointField.alias: entry_point_spec, **target_fields},
+            {
+                PexEntryPointField.alias: entry_point_spec,
+                **inherited_fields,
+                # Note that overrides comes last to make sure that it indeed overrides.
+                **overrides.pop(entry_point_spec, {}),
+            },
             # ":" is a forbidden character in target names
             generator_addr.create_generated(entry_point_spec.replace(":", "-")),
             union_membership,
