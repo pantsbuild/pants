@@ -11,7 +11,7 @@ from pants.backend.python.lint.flake8.subsystem import (
     Flake8FirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
@@ -137,4 +137,4 @@ async def flake8_lint(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintRequest, Flake8Request), *pex_from_targets.rules()]
+    return [*collect_rules(), UnionRule(LintRequest, Flake8Request), *pex.rules()]

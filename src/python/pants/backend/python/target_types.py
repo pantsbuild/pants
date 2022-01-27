@@ -140,12 +140,8 @@ class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
     alias = "experimental_compatible_resolves"
     required = False
     help = (
-        "The set of resolves from `[python].experimental_resolves` that this target is "
-        "compatible with.\n\n"
-        "If not defined, will default to `[python].default_resolve`.\n\n"
-        "Only applies if `[python].enable_resolves` is true.\n\n"
-        "This field is experimental and may change without the normal deprecation policy."
-        # TODO: Document expectations for dependencies once we validate that.
+        "TODO(#12314): Fill this in once we figure out how compatible_resolves should work with "
+        "python_source targets"
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
@@ -775,6 +771,8 @@ class PythonSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        # TODO(#12314): Switch to compatible_resolves if relevant.
+        PythonResolveField,
         PythonSourceField,
     )
     help = "A single Python source file."
@@ -812,6 +810,8 @@ class PythonTestUtilsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        # TODO(#12314): Switch to compatible_resolves if relevant.
+        PythonResolveField,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
@@ -831,6 +831,8 @@ class PythonSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        # TODO(#12314): Switch to compatible_resolves if relevant.
+        PythonResolveField,
         PythonSourcesGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
