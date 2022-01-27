@@ -105,11 +105,11 @@ async def setup_junit_for_target(
         ],
         input_digest=merged_classpath_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,
-        extra_nailgun_keys=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
+        use_nailgun=False,
     )
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)
 
