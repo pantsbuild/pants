@@ -66,7 +66,7 @@ class MyPy(PythonToolBase):
     options_scope = "mypy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.910"
+    default_version = "mypy==0.931"
     default_main = ConsoleScript("mypy")
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.

@@ -22,7 +22,7 @@ class Yapf(PythonToolBase):
     options_scope = "yapf"
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
-    default_version = "yapf==0.31.0"
+    default_version = "yapf==0.32.0"
     default_extra_requirements = ["toml"]
     default_main = ConsoleScript("yapf")
 

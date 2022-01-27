@@ -24,7 +24,7 @@ class TwineSubsystem(PythonToolBase):
     options_scope = "twine"
     help = "The utility for publishing Python distributions to PyPi and other Python repositories."
 
-    default_version = "twine==3.6.0"
+    default_version = "twine>=3.7.1,<3.8"
     default_main = ConsoleScript("twine")
 
     # This explicit dependency resolves a weird behavior in poetry, where it would include a sys
