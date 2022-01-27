@@ -26,6 +26,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -114,8 +115,8 @@ def maybe_warn_python_repos(python_repos: PythonRepos) -> MaybeWarnPythonRepos:
             "If lockfile generation fails, you can disable lockfiles by setting "
             "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
             "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
-            "`[tool].lockfile` option to the path you manually generated. When manually maintaining "
-            "lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
+            "`[tool].lockfile` option to the path you manually generated. When manually "
+            "maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
         )
 
     if python_repos.repos:
@@ -130,65 +131,103 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    python_setup: PythonSetup,
     _: MaybeWarnPythonRepos,
 ) -> GenerateLockfileResult:
-    pyproject_toml = create_pyproject_toml(req.requirements, req.interpreter_constraints).encode()
-    pyproject_toml_digest, launcher_digest = await MultiGet(
-        Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
-        Get(Digest, CreateDigest([POETRY_LAUNCHER])),
-    )
-
-    poetry_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="poetry.pex",
-            internal_only=True,
-            requirements=poetry_subsystem.pex_requirements(),
-            interpreter_constraints=poetry_subsystem.interpreter_constraints,
-            main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
-            sources=launcher_digest,
-        ),
-    )
-
-    # WONTFIX(#12314): Wire up Poetry to named_caches.
-    # WONTFIX(#12314): Wire up all the pip options like indexes.
-    poetry_lock_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            poetry_pex,
-            argv=("lock",),
-            input_digest=pyproject_toml_digest,
-            output_files=("poetry.lock", "pyproject.toml"),
-            description=req._description or f"Generate lockfile for {req.resolve_name}",
-            # Instead of caching lockfile generation with LMDB, we instead use the invalidation
-            # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
-            # necessary so that our invalidation is resilient to deleting LMDB or running on a
-            # new machine.
-            #
-            # We disable caching with LMDB so that when you generate a lockfile, you always get
-            # the most up-to-date snapshot of the world. This is generally desirable and also
-            # necessary to avoid an awkward edge case where different developers generate different
-            # lockfiles even when generating at the same time. See
-            # https://github.com/pantsbuild/pants/issues/12591.
-            cache_scope=ProcessCacheScope.PER_SESSION,
-        ),
-    )
-    poetry_export_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            poetry_pex,
-            argv=("export", "-o", req.lockfile_dest),
-            input_digest=poetry_lock_result.output_digest,
-            output_files=(req.lockfile_dest,),
-            description=(
-                f"Exporting Poetry lockfile to requirements.txt format for {req.resolve_name}"
+    if python_setup.generate_lockfiles_with_pex:
+        lock_result = await Get(
+            ProcessResult,
+            PexCliProcess(
+                subcommand=("lock", "create"),
+                # TODO: Hook up to [python-repos]. Don't call `MaybeWarnPythonRepos` in this case.
+                extra_args=(
+                    "--output=lock.json",
+                    # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
+                    # generate universal locks because they have the best compatibility. We may
+                    # want to let users change this, as `style=strict` is safer.
+                    "--style=universal",
+                    *req.interpreter_constraints.generate_pex_arg_list(),
+                    *req.requirements,
+                ),
+                output_files=("lock.json",),
+                description=req._description or f"Generate lockfile for {req.resolve_name}",
+                # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+                # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
+                # necessary so that our invalidation is resilient to deleting LMDB or running on a
+                # new machine.
+                #
+                # We disable caching with LMDB so that when you generate a lockfile, you always get
+                # the most up-to-date snapshot of the world. This is generally desirable and also
+                # necessary to avoid an awkward edge case where different developers generate
+                # different lockfiles even when generating at the same time. See
+                # https://github.com/pantsbuild/pants/issues/12591.
+                cache_scope=ProcessCacheScope.PER_SESSION,
             ),
-            level=LogLevel.DEBUG,
-        ),
-    )
+        )
+        export_result = await Get(
+            ProcessResult,
+            PexCliProcess(
+                subcommand=("lock", "export"),
+                extra_args=(f"--output={req.lockfile_dest}", "lock.json"),
+                set_resolve_args=False,
+                additional_input_digest=lock_result.output_digest,
+                output_files=(req.lockfile_dest,),
+                description=(
+                    f"Exporting PEX lockfile to requirements.txt format for {req.resolve_name}"
+                ),
+                level=LogLevel.DEBUG,
+            ),
+        )
+    else:
+        pyproject_toml = create_pyproject_toml(
+            req.requirements, req.interpreter_constraints
+        ).encode()
+        pyproject_toml_digest, launcher_digest = await MultiGet(
+            Get(Digest, CreateDigest([FileContent("pyproject.toml", pyproject_toml)])),
+            Get(Digest, CreateDigest([POETRY_LAUNCHER])),
+        )
+
+        poetry_pex = await Get(
+            VenvPex,
+            PexRequest(
+                output_filename="poetry.pex",
+                internal_only=True,
+                requirements=poetry_subsystem.pex_requirements(),
+                interpreter_constraints=poetry_subsystem.interpreter_constraints,
+                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
+                sources=launcher_digest,
+            ),
+        )
+
+        # WONTFIX(#12314): Wire up Poetry to named_caches.
+        # WONTFIX(#12314): Wire up all the pip options like indexes.
+        lock_result = await Get(
+            ProcessResult,
+            VenvPexProcess(
+                poetry_pex,
+                argv=("lock",),
+                input_digest=pyproject_toml_digest,
+                output_files=("poetry.lock", "pyproject.toml"),
+                description=req._description or f"Generate lockfile for {req.resolve_name}",
+                cache_scope=ProcessCacheScope.PER_SESSION,
+            ),
+        )
+        export_result = await Get(
+            ProcessResult,
+            VenvPexProcess(
+                poetry_pex,
+                argv=("export", "-o", req.lockfile_dest),
+                input_digest=lock_result.output_digest,
+                output_files=(req.lockfile_dest,),
+                description=(
+                    f"Exporting Poetry lockfile to requirements.txt format for {req.resolve_name}"
+                ),
+                level=LogLevel.DEBUG,
+            ),
+        )
 
     initial_lockfile_digest_contents = await Get(
-        DigestContents, Digest, poetry_export_result.output_digest
+        DigestContents, Digest, export_result.output_digest
     )
     # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = PythonLockfileMetadata.new(
