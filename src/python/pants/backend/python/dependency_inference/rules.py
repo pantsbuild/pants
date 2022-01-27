@@ -10,13 +10,20 @@ from pants.backend.python.dependency_inference import module_mapper, parse_pytho
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
 from pants.backend.python.dependency_inference.parse_python_imports import (
     ParsedPythonImports,
     ParsePythonImportsRequest,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonSourceField, PythonTestSourceField
+from pants.backend.python.target_types import (
+    PythonResolveField,
+    PythonSourceField,
+    PythonTestSourceField,
+)
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -171,27 +178,35 @@ async def infer_python_dependencies_via_imports(
     if not python_infer_subsystem.imports:
         return InferredDependencies([])
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    tgt = _wrapped_tgt.target
     explicitly_provided_deps, parsed_imports = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
         Get(
             ParsedPythonImports,
             ParsePythonImportsRequest(
                 cast(PythonSourceField, request.sources_field),
-                InterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+                InterpreterConstraints.create_from_targets([tgt], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
                 string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             ),
         ),
     )
 
+    resolve = None
+    if tgt.has_field(PythonResolveField):
+        resolve_field = tgt[PythonResolveField]
+        resolve_field.validate(python_setup)
+        resolve = resolve_field.value_or_default(python_setup)
+
     owners_per_import = await MultiGet(
-        Get(PythonModuleOwners, PythonModule(imported_module)) for imported_module in parsed_imports
+        Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
+        for imported_module in parsed_imports
     )
 
     merged_result: set[Address] = set()
     unowned_imports: set[str] = set()
-    address = wrapped_tgt.target.address
+    address = tgt.address
     for owners, imp in zip(owners_per_import, parsed_imports):
         merged_result.update(owners.unambiguous)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
