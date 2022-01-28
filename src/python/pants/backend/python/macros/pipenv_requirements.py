@@ -13,7 +13,9 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementsFileSourcesField,
@@ -53,6 +55,7 @@ class PipenvPipfileTargetField(StringField):
 class PipenvRequirementsTargetGenerator(Target):
     alias = "pipenv_requirements"
     help = "Generate a `python_requirement` for each entry in `Pipenv.lock`."
+    # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ModuleMappingField,
@@ -60,6 +63,7 @@ class PipenvRequirementsTargetGenerator(Target):
         PipenvSourceField,
         PipenvPipfileTargetField,
         RequirementsOverrideField,
+        PythonRequirementCompatibleResolvesField,
     )
 
 
@@ -71,7 +75,7 @@ class GenerateFromPipenvRequirementsRequest(GenerateTargetsRequest):
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 @rule(desc="Generate `python_requirement` targets from Pipfile.lock", level=LogLevel.DEBUG)
 async def generate_from_pipenv_requirement(
-    request: GenerateFromPipenvRequirementsRequest,
+    request: GenerateFromPipenvRequirementsRequest, python_setup: PythonSetup
 ) -> GeneratedTargets:
     generator = request.generator
     lock_rel_path = generator[PipenvSourceField].value
@@ -96,9 +100,16 @@ async def generate_from_pipenv_requirement(
     )
     lock_info = json.loads(digest_contents[0].content)
 
+    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
+
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
     overrides = generator[RequirementsOverrideField].flatten_and_normalize()
+    inherited_fields = {
+        field.alias: field.value
+        for field in request.generator.field_values.values()
+        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementCompatibleResolvesField))
+    }
 
     def generate_tgt(raw_req: str, info: dict) -> PythonRequirementTarget:
         if info.get("extras"):
@@ -115,10 +126,9 @@ async def generate_from_pipenv_requirement(
                 file_tgt.address.spec
             ]
 
-        # TODO: Consider letting you set metadata in the target generator and having it pass down
-        #  to all generated targets. Especially useful for compatible_resolves.
         return PythonRequirementTarget(
             {
+                **inherited_fields,
                 PythonRequirementsField.alias: [parsed_req],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(

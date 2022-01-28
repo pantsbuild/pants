@@ -18,10 +18,9 @@ from pants.core.goals.package import BuiltPackage
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -33,8 +32,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *classpath_rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *jvm_tool.rules(),
             *deploy_jar_rules(),
             *javac_rules(),
             *jdk_rules.rules(),
@@ -43,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(BuiltPackage, (DeployJarFieldSet,)),
-            QueryRule(JdkSetup, ()),
+            QueryRule(ProcessResult, (JvmProcess,)),
             QueryRule(ProcessResult, (Process,)),
         ],
         target_types=[
@@ -312,19 +310,15 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         [DeployJarFieldSet.create(tgt)],
     )
 
-    jdk_setup = rule_runner.request(JdkSetup, [])
-    bash = rule_runner.request(BashBinary, [])
-
     process_result = rule_runner.request(
         ProcessResult,
         [
-            Process(
-                argv=jdk_setup.args(bash, []) + ("-jar", "dave.jar"),
+            JvmProcess(
+                argv=("-jar", "dave.jar"),
+                classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
-                append_only_caches=jdk_setup.append_only_caches,
-                immutable_input_digests=jdk_setup.immutable_input_digests,
-                env=jdk_setup.env,
+                use_nailgun=False,
             )
         ],
     )

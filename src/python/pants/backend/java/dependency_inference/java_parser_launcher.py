@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -88,12 +88,11 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
         ),
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
-        Process(
+        JvmProcess(
+            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
             argv=[
-                *jdk_setup.args(bash, [f"{jdk_setup.java_home}/lib/tools.jar"]),
                 "com.sun.tools.javac.Main",
                 "-cp",
                 ":".join(materialized_classpath.classpath_entries()),
@@ -102,12 +101,11 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
                 _LAUNCHER_BASENAME,
             ],
             input_digest=merged_digest,
-            append_only_caches=jdk_setup.append_only_caches,
-            immutable_input_digests=jdk_setup.immutable_input_digests,
-            env=jdk_setup.env,
             output_directories=(dest_dir,),
             description=f"Compile {_LAUNCHER_BASENAME} import processors with javac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(

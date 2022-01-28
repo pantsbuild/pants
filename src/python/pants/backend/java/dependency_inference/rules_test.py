@@ -19,7 +19,6 @@ from pants.backend.java.target_types import (
 )
 from pants.backend.java.target_types import rules as java_target_rules
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.target import (
     Dependencies,
@@ -29,8 +28,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -44,10 +42,8 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *jvm_tool.rules(),
             *dep_inference_rules(),
-            *external_tool_rules(),
             *java_target_rules(),
             *java_util_rules(),
             *javac_rules(),

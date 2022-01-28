@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os.path
 from textwrap import dedent
-from typing import Callable
+from typing import Callable, ContextManager, cast
 
 import pytest
 
@@ -47,11 +47,17 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import WrappedTarget
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.pytest_util import assert_logged
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.pytest_util import assert_logged, no_exception
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -118,7 +124,8 @@ def assert_build(
     if options:
         opts = options or {}
         opts.setdefault("registries", {})
-        opts.setdefault("default_repository", "{directory}/{name}")
+        opts.setdefault("default_repository", "{name}")
+        opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
         opts.setdefault("env_vars", [])
@@ -694,9 +701,10 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    "copy_sources, build_context_files, expect_logged, fail_log_contains",
+    "context_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
         (
+            None,
             ("src/project/bin.pex",),
             (
                 "src.project/binary.pex",
@@ -709,18 +717,74 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "  * src/project/app.py\n\n",
             ],
         ),
+        (
+            "./",
+            ("config.txt",),
+            ("docker/test/conf/config.txt",),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
+            [
+                "suggested renames:\n\n  * config.txt => conf/config.txt\n\n",
+            ],
+        ),
+        (
+            "./",
+            ("conf/config.txt",),
+            (
+                "docker/test/conf/config.txt",
+                "src.project/binary.pex",
+            ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
+            [
+                "There are unreachable files in these directories, excluded from the build context "
+                "due to `context_root` being 'docker/test':\n\n"
+                "  * src.project\n\n"
+                "Suggested `context_root` setting is '' in order to include all files in the "
+                "build context, otherwise relocate the files to be part of the current "
+                "`context_root` 'docker/test'."
+            ],
+        ),
+        (
+            "./config",
+            (),
+            (
+                "docker/test/config/..unusal-name",
+                "docker/test/config/.rc",
+                "docker/test/config/.a",
+                "docker/test/config/.conf.d/b",
+            ),
+            [
+                (
+                    logging.WARNING,
+                    (
+                        "Docker build failed for `docker_image` docker/test:test. The "
+                        "docker/test/Dockerfile have `COPY` instructions where the source files "
+                        "may not have been found in the Docker build context.\n"
+                        "\n"
+                        "There are additional files in the Docker build context that were not "
+                        "referenced by any `COPY` instruction (this is not an error):\n"
+                        "\n"
+                        "  * ..unusal-name\n"
+                        "  * .a\n"
+                        "  * .conf.d/b\n"
+                        "  * .rc\n"
+                    ),
+                )
+            ],
+            [],
+        ),
     ],
 )
 def test_docker_build_fail_logs(
     rule_runner: RuleRunner,
     caplog,
+    context_root: str | None,
     copy_sources: tuple[str, ...],
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
 ) -> None:
     caplog.set_level(logging.INFO)
-    rule_runner.write_files({"docker/test/BUILD": "docker_image()"})
+    rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
     with pytest.raises(ProcessExecutionFailure):
@@ -806,3 +870,62 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
             Address("", target_name="image"),
             version_tags=("build latest", "dev latest", "prod latest"),
         )
+
+
+@pytest.mark.parametrize(
+    "default_context_root, context_root, expected_context_root",
+    [
+        ("", None, "."),
+        (".", None, "."),
+        ("src", None, "src"),
+        (
+            "/",
+            None,
+            engine_error(
+                InvalidFieldException,
+                contains=("Use '' for a path relative to the build root, or './' for"),
+            ),
+        ),
+        (
+            "/src",
+            None,
+            engine_error(
+                InvalidFieldException,
+                contains=(
+                    "The `context_root` field in target src/docker:image must be a relative path, but was "
+                    "'/src'. Use 'src' for a path relative to the build root, or './src' for a path "
+                    "relative to the BUILD file (i.e. 'src/docker/src')."
+                ),
+            ),
+        ),
+        ("./", None, "src/docker"),
+        ("./build/context/", None, "src/docker/build/context"),
+        (".build/context/", None, ".build/context"),
+        ("ignored", "", "."),
+        ("ignored", ".", "."),
+        ("ignored", "src/context/", "src/context"),
+        ("ignored", "./", "src/docker"),
+        ("ignored", "src", "src"),
+        ("ignored", "./build/context", "src/docker/build/context"),
+    ],
+)
+def test_get_context_root(
+    context_root: str | None, default_context_root: str, expected_context_root: str | ContextManager
+) -> None:
+    if isinstance(expected_context_root, str):
+        raises = cast("ContextManager", no_exception())
+    else:
+        raises = expected_context_root
+        expected_context_root = ""
+
+    with raises:
+        docker_options = create_subsystem(
+            DockerOptions,
+            default_context_root=default_context_root,
+        )
+        address = Address("src/docker", target_name="image")
+        tgt = DockerImageTarget({"context_root": context_root}, address)
+        fs = DockerFieldSet.create(tgt)
+        actual_context_root = fs.get_context_root(docker_options.default_context_root)
+        if expected_context_root:
+            assert actual_context_root == expected_context_root

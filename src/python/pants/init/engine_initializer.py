@@ -55,6 +55,7 @@ class GraphScheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
+        ui_use_prodash: bool = False,
         use_colors=True,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
@@ -62,6 +63,7 @@ class GraphScheduler:
         session = self.scheduler.new_session(
             build_id,
             dynamic_ui,
+            ui_use_prodash,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )

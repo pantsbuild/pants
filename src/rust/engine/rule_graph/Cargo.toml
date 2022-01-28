@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 log = "0.4"
 petgraph = "0.5"
-indexmap = "1.4"
+indexmap = "1.8"
 
 [dev-dependencies]
 env_logger = "0.5.4"

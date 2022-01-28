@@ -6,11 +6,12 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, Optional, cast
+from typing import Iterable, Iterator, Optional, cast
 
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.memo import memoized_property
 from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
@@ -81,8 +82,7 @@ class PythonSetup(Subsystem):
                 "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
                 "information on the format of constraint files and how constraints are applied in "
                 "Pex and pip.\n\n"
-                "Mutually exclusive with `[python].experimental_lockfile` and "
-                "`[python].enable_resolves`."
+                "Mutually exclusive with `[python].enable_resolves`."
             ),
         )
         register(
@@ -105,18 +105,18 @@ class PythonSetup(Subsystem):
         register(
             "--experimental-lockfile",
             advanced=True,
-            # TODO(#11719): Switch this to a file_option once env vars can unset a value.
             type=str,
             metavar="<file>",
             mutually_exclusive_group="lockfile",
-            help=(
-                "The lockfile to use when resolving requirements for your own code (vs. tools you "
-                "run).\n\n"
-                "This is highly experimental and will be replaced by `[python].enable_resolves`.\n\n"
-                "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants generate-user-lockfile ::`.\n\n"
-                "Mutually exclusive with `[python].requirement_constraints` and "
-                "`[python].enable_resolves`."
+            help="Deprecated.",
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Instead, use the improved `[python].experimental_resolves` mechanism. Read its "
+                "help message for more information.\n\n"
+                "If you want to keep using a single resolve like before, update "
+                "`[python].experimental_resolves` with a name for the resolve and the path to "
+                "its lockfile, or use the default. Then make sure that "
+                "`[python].experimental_default_resolve` is set to that resolve name."
             ),
         )
         register(
@@ -128,8 +128,7 @@ class PythonSetup(Subsystem):
             help=(
                 "Set to true to enable the multiple resolves mechanism. See "
                 "`[python].experimental_resolves` for an explanation of this feature.\n\n"
-                "Mutually exclusive with `[python].experimental_lockfile` and "
-                "`[python].requirement_constraints`."
+                "Mutually exclusive with `[python].requirement_constraints`."
             ),
         )
         register(
@@ -139,7 +138,9 @@ class PythonSetup(Subsystem):
             default={"python-default": "3rdparty/python/default_lock.txt"},
             help=(
                 "A mapping of logical names to lockfile paths used in your project.\n\n"
-                # TODO(#12314): explain how this feature works.
+                "For now, things only work properly if you define a single resolve and set "
+                "`[python].experimental_default_resolve` to that value. We are close to "
+                "properly supporting multiple (disjoint) resolves.\n\n"
                 "To generate a lockfile, run `./pants generate-lockfiles --resolve=<name>` or "
                 "`./pants generate-lockfiles` to generate for all resolves (including tool "
                 "lockfiles).\n\n"
@@ -155,8 +156,28 @@ class PythonSetup(Subsystem):
             help=(
                 "The default value used for the `experimental_resolve` and "
                 "`experimental_compatible_resolves` fields.\n\n"
-                "Only applies if `[python].enable_resolves` is true.\n\n"
                 "The name must be defined as a resolve in `[python].experimental_resolves`.\n\n"
+                "This option is experimental and may change without the normal deprecation policy."
+            ),
+        )
+        register(
+            "--experimental-resolves-to-interpreter-constraints",
+            advanced=True,
+            type=dict,
+            default={},
+            help=(
+                "Override the interpreter constraints to use when generating a resolve's lockfile "
+                "with the `generate-lockfiles` goal.\n\n"
+                "By default, each resolve from `[python].experimental_resolves` will use your "
+                "global interpreter constraints set in `[python].interpreter_constraints`. With "
+                "this option, you can override each resolve to use certain interpreter "
+                "constraints, such as `{'data-science': ['==3.8.*']}`.\n\n"
+                "Pants will validate that the interpreter constraints of your code using a "
+                "resolve are compatible with that resolve's own constraints. For example, if your "
+                "code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's "
+                "also using a resolve whose interpreter constraints are set to ['==3.7.*'], then "
+                "Pants will error explaining the incompatibility.\n\n"
+                "The keys must be defined as resolves in `[python].experimental_resolves`.\n\n"
                 "This option is experimental and may change without the normal deprecation policy."
             ),
         )
@@ -266,10 +287,6 @@ class PythonSetup(Subsystem):
         return cast("str | None", self.options.requirement_constraints)
 
     @property
-    def lockfile(self) -> str | None:
-        return cast("str | None", self.options.experimental_lockfile)
-
-    @property
     def enable_resolves(self) -> bool:
         return cast(bool, self.options.enable_resolves)
 
@@ -280,6 +297,20 @@ class PythonSetup(Subsystem):
     @property
     def default_resolve(self) -> str:
         return cast(str, self.options.experimental_default_resolve)
+
+    @memoized_property
+    def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
+        result = {}
+        for resolve, ics in self.options.experimental_resolves_to_interpreter_constraints.items():
+            if resolve not in self.resolves:
+                raise KeyError(
+                    "Unrecognized resolve name in the option "
+                    f"`[python].experimental_resolves_to_interpreter_constraints`: {resolve}. Each "
+                    "key must be one of the keys in `[python].experimental_resolves`: "
+                    f"{sorted(self.resolves.keys())}"
+                )
+            result[resolve] = tuple(ics)
+        return result
 
     @property
     def invalid_lockfile_behavior(self) -> InvalidLockfileBehavior:
@@ -302,6 +333,14 @@ class PythonSetup(Subsystem):
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
+
+    @property
+    def manylinux_pex_args(self) -> Iterator[str]:
+        if self.manylinux:
+            yield "--manylinux"
+            yield self.manylinux
+        else:
+            yield "--no-manylinux"
 
     @property
     def resolver_jobs(self) -> int:

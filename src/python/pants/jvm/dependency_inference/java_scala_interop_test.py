@@ -15,13 +15,11 @@ from pants.backend.scala.dependency_inference import scala_parser
 from pants.backend.scala.dependency_inference import symbol_mapper as scala_symbol_mapper
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -31,10 +29,8 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *jvm_tool.rules(),
             *java_dep_inference_rules(),
-            *external_tool_rules(),
             *java_target_rules(),
             *java_util_rules(),
             *javac_rules(),

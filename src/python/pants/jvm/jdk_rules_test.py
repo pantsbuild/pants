@@ -9,10 +9,11 @@ import pytest
 
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import BashBinary, ProcessResult
 from pants.engine.process import rules as process_rules
-from pants.jvm.jdk_rules import JdkSetup, parse_jre_major_version
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -35,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *process_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(JdkSetup, ()),
-            QueryRule(ProcessResult, (Process,)),
+            QueryRule(ProcessResult, (JvmProcess,)),
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -43,20 +44,17 @@ def rule_runner() -> RuleRunner:
 
 
 def run_javac_version(rule_runner: RuleRunner) -> str:
-    jdk_setup = rule_runner.request(JdkSetup, [])
-    bash = rule_runner.request(BashBinary, [])
     process_result = rule_runner.request(
         ProcessResult,
         [
-            Process(
+            JvmProcess(
+                classpath_entries=(),
                 argv=[
-                    *jdk_setup.args(bash, []),
                     "-version",
                 ],
-                append_only_caches=jdk_setup.append_only_caches,
-                immutable_input_digests=jdk_setup.immutable_input_digests,
-                env=jdk_setup.env,
+                input_digest=EMPTY_DIGEST,
                 description="",
+                use_nailgun=False,
             )
         ],
     )

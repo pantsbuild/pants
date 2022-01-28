@@ -596,28 +596,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             )
             """
         )
-        with self.pantsd_successful_run_context() as ctx:
-            with temporary_dir(".") as directory:
-                safe_file_dump(os.path.join(directory, "A.py"), mode="w")
-                safe_file_dump(os.path.join(directory, "B.py"), mode="w")
+        with self.pantsd_successful_run_context() as ctx, temporary_dir(".") as directory:
+            safe_file_dump(os.path.join(directory, "A.py"), mode="w")
+            safe_file_dump(os.path.join(directory, "B.py"), mode="w")
 
-                if directory.startswith("./"):
-                    directory = directory[2:]
+            if directory.startswith("./"):
+                directory = directory[2:]
 
-                def list_and_verify():
-                    result = ctx.runner(["list", f"{directory}:"])
-                    ctx.checker.assert_started()
-                    result.assert_success()
-                    expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
-                    self.assertEqual(expected_targets, set(result.stdout.strip().split("\n")))
+            def list_and_verify(a_deps: str, b_deps: str) -> None:
+                Path(directory, "BUILD").write_text(template.format(a_deps=a_deps, b_deps=b_deps))
+                result = ctx.runner(["list", f"{directory}:"])
+                ctx.checker.assert_started()
+                result.assert_success()
+                expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
+                assert expected_targets == set(result.stdout.strip().split("\n"))
 
-                with open(os.path.join(directory, "BUILD"), "w") as f:
-                    f.write(template.format(a_deps='dependencies = [":B"],', b_deps=""))
-                list_and_verify()
-
-                with open(os.path.join(directory, "BUILD"), "w") as f:
-                    f.write(template.format(a_deps="", b_deps='dependencies = [":A"],'))
-                list_and_verify()
+            list_and_verify(a_deps='dependencies = [":B"],', b_deps="")
+            list_and_verify(a_deps="", b_deps='dependencies = [":A"],')
 
     def test_concurrent_overrides_pantsd(self):
         """Tests that the --concurrent flag overrides the --pantsd flag, because we don't allow
@@ -638,18 +633,26 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
         """
-        with self.pantsd_run_context(success=False) as ctx:
-            result = ctx.runner(["run", "testprojects/src/python/bad_requirements:use_badreq"])
+        with self.pantsd_run_context(success=False) as ctx, temporary_dir(".") as directory:
+            Path(directory, "BUILD").write_text(
+                dedent(
+                    """\
+                    python_requirement(name="badreq", requirements=["badreq==99.99.99"])
+                    pex_binary(name="pex", dependencies=[":badreq"])
+                    """
+                )
+            )
+            result = ctx.runner(["package", f"{directory}:pex"])
             ctx.checker.assert_running()
             result.assert_failure()
             # Assert that the desired exception has been triggered once.
             self.assertRegex(result.stderr, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
-            self.assertNotIn(
-                "During handling of the above exception, another exception occurred:",
-                result.stderr,
+            assert (
+                "During handling of the above exception, another exception occurred:"
+                not in result.stderr
             )
-            self.assertNotIn(
-                "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1",
-                result.stderr,
+            assert (
+                "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1"
+                not in result.stderr
             )

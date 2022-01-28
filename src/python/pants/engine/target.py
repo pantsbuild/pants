@@ -102,7 +102,7 @@ class Field:
             help = "A timeout field.\n\nMore information."
 
             @classmethod
-            def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int:
+            def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
                 value_or_default = super().compute_value(raw_value, address=address)
                 if value_or_default is not None and not isinstance(value_or_default, int):
                     raise ValueError(

@@ -53,6 +53,13 @@ MEGABYTES = 1_000_000
 GIGABYTES = 1_000 * MEGABYTES
 
 
+class DynamicUIRenderer(Enum):
+    """Which renderer to use for dyanmic UI."""
+
+    indicatif_spinner = "indicatif-spinner"
+    experimental_prodash = "experimental-prodash"
+
+
 class FilesNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
@@ -1323,6 +1330,12 @@ class GlobalOptions(Subsystem):
             "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
             "Pants is running in a continuous integration environment.",
         )
+        register(
+            "--dynamic-ui-renderer",
+            type=DynamicUIRenderer,
+            default=DynamicUIRenderer.indicatif_spinner,
+            help="If `--dynamic-ui` is enabled, selects the renderer.",
+        )
 
         register(
             "--tag",
@@ -1643,7 +1656,10 @@ class ProcessCleanupOption:
 
 
 def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer) -> None:
-    if bootstrap_options.is_default("use_deprecated_python_macros"):
+    if (
+        bootstrap_options.is_default("use_deprecated_python_macros")
+        and "pants.backend.python" in bootstrap_options.backend_packages
+    ):
         warn_or_error(
             "2.11.0.dev0",
             "the option `--use-deprecated-python-macros` defaulting to true",

@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
     PexEmitWarningsField,
@@ -25,7 +24,6 @@ from pants.backend.python.target_types import (
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
-    PythonResolveField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -71,7 +69,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
     include_tools: PexIncludeToolsField
-    resolve: PythonResolveField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -102,7 +99,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
-    python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     resolved_entry_point, transitive_targets = await MultiGet(
@@ -136,7 +132,6 @@ async def package_pex_binary(
             internal_only=False,
             main=resolved_entry_point.val or field_set.script.value,
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
-            resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             output_filename=output_filename,
             layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),

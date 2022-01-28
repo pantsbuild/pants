@@ -75,10 +75,10 @@ class JVMLockfileMetadata(LockfileMetadata):
 class JVMLockfileMetadataV1(JVMLockfileMetadata):
     """Initial metadata version for JVM user lockfiles.
 
-    User validity is tested by the set of user requirements strings appearing as a subset of those 
+    User validity is tested by the set of user requirements strings appearing as a subset of those
     in the metadata requirements.
 
-    Tool validity is tested by the set of user requirements strings being an exact match of those 
+    Tool validity is tested by the set of user requirements strings being an exact match of those
     in the metadata requirements.
     """
 
@@ -121,8 +121,7 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
         requirements: Iterable[ArtifactRequirement] | None,
         context: LockfileContext,
     ) -> LockfileMetadataValidation:
-       """Returns a truthy object if the request requirements match the metadata requirements.
-       """
+        """Returns a truthy object if the request requirements match the metadata requirements."""
 
         failure_reasons: set[InvalidJVMLockfileReason] = set()
         req_strings = FrozenOrderedSet(i.to_metadata_str() for i in requirements or [])
