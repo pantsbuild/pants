@@ -3,47 +3,40 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from enum import Enum
+from textwrap import dedent
 
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.process import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+    Process,
+    ProcessResult,
+)
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.python import binaries as python_binaries
+from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
-class PosixTools:
-    """ `BinaryPath`s for standard Unix tools that may be used in internal shell scripts."""
-    ln: BinaryPath
-
+class GrepBinary(BinaryPath):
+    pass
 
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 
 
-@rule(desc="Finding posix tools", level=LogLevel.DEBUG)
-async def find_posix_tools() -> PosixTools:
-    short_requests: dict[str, BinaryPathTest | None] = {
-        "ln": None,
-    }
-
-    requests = [
-        BinaryPathRequest(binary_name=name, search_path=SEARCH_PATHS, test=test)
-        for name, test in short_requests.items()
-    ]
-    all_tool_paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest, request) for request in requests
+@rule(desc="Finding the `grep` binary", level=LogLevel.DEBUG)
+async def find_grep() -> GrepBinary:
+    request = BinaryPathRequest(
+        binary_name="grep", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-V"])
     )
-
-    first_paths = {
-        request.binary_name: paths.first_path_or_raise(
-            request, rationale=f"use `{request.binary_name}` in internal shell scripts"
-        )
-        for request, paths in zip(requests, all_tool_paths)
-    }
-
-    return PosixTools(
-        ln=first_paths["ln"],
-    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="use grep in internal shell scripts")
+    return GrepBinary(first_path.path, first_path.fingerprint)
 
 
 def rules():

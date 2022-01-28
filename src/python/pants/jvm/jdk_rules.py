@@ -11,8 +11,6 @@ import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping
 
-from pants.core.util_rules import posix_tools
-from pants.core.util_rules.posix_tools import PosixTools
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
@@ -74,9 +72,7 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 
 @rule
-async def setup_jdk(
-    coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary, posix: PosixTools
-) -> JdkSetup:
+async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> JdkSetup:
     nailgun = await Get(
         ClasspathEntry,
         CoursierLockfileEntry(
@@ -131,6 +127,7 @@ async def setup_jdk(
             f"with the following output:\n\n{java_version}"
         )
 
+    # TODO: Locate `ln`.
     version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
     jdk_preparation_script = textwrap.dedent(
         f"""\
@@ -138,7 +135,7 @@ async def setup_jdk(
         {version_comment}
         set -eu
 
-        {posix.ln.path} -s "$({java_home_command})" "{JdkSetup.java_home}"
+        /bin/ln -s "$({java_home_command})" "{JdkSetup.java_home}"
         exec "$@"
         """
     )
@@ -259,7 +256,4 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
 
 
 def rules():
-    return [
-        *posix_tools.rules(),
-        *collect_rules(),
-    ]
+    return collect_rules()
