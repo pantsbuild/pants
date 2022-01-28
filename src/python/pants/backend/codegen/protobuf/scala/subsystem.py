@@ -37,9 +37,10 @@ class ScalaPBSubsystem(JvmToolBase):
         "pants.backend.codegen.protobuf.scala",
         "scalapbc.default.lockfile.txt",
     )
-    default_lockfile_url = git_url(
+    default_lockfile_path = (
         "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
     )
+    default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
     def register_options(cls, register):

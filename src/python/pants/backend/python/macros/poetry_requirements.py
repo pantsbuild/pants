@@ -21,7 +21,9 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementsFileSourcesField,
@@ -397,12 +399,14 @@ class PoetryRequirementsSourceField(SingleSourceField):
 class PoetryRequirementsTargetGenerator(Target):
     alias = "poetry_requirements"
     help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ModuleMappingField,
         TypeStubsModuleMappingField,
         PoetryRequirementsSourceField,
         RequirementsOverrideField,
+        PythonRequirementCompatibleResolvesField,
     )
 
 
@@ -412,7 +416,7 @@ class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
 
 @rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
 async def generate_from_python_requirement(
-    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot
+    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot, python_setup: PythonSetup
 ) -> GeneratedTargets:
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
@@ -444,9 +448,16 @@ async def generate_from_python_requirement(
         )
     )
 
+    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
+
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
     overrides = generator[RequirementsOverrideField].flatten_and_normalize()
+    inherited_fields = {
+        field.alias: field.value
+        for field in request.generator.field_values.values()
+        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementCompatibleResolvesField))
+    }
 
     def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
         normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
@@ -456,10 +467,9 @@ async def generate_from_python_requirement(
                 file_tgt.address.spec
             ]
 
-        # TODO: Consider letting you set metadata in the target generator and having it pass down
-        #  to all generated targets. Especially useful for compatible_resolves.
         return PythonRequirementTarget(
             {
+                **inherited_fields,
                 PythonRequirementsField.alias: [parsed_req],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(

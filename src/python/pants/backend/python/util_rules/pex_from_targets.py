@@ -75,7 +75,6 @@ class PexFromTargetsRequest:
     include_local_dists: bool
     additional_sources: Digest | None
     additional_inputs: Digest | None
-    resolve_and_lockfile: tuple[str, str] | None
     hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
     # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
@@ -100,7 +99,6 @@ class PexFromTargetsRequest:
         additional_sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
-        resolve_and_lockfile: tuple[str, str] | None = None,
         direct_deps_only: bool = False,
         description: str | None = None,
     ) -> None:
@@ -138,7 +136,6 @@ class PexFromTargetsRequest:
             directly in the Pex, but should be present in the environment when building the Pex.
         :param hardcoded_interpreter_constraints: Use these constraints rather than resolving the
             constraints from the input.
-        :param resolve_and_lockfile: if set, use this "named resolve" and lockfile.
         :param direct_deps_only: Only consider the input addresses and their direct dependencies,
             rather than the transitive closure.
         :param description: A human-readable description to render in the dynamic UI when building
@@ -159,7 +156,6 @@ class PexFromTargetsRequest:
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
-        self.resolve_and_lockfile = resolve_and_lockfile
         self.direct_deps_only = direct_deps_only
         self.description = description
 
@@ -285,7 +281,6 @@ class _RepositoryPexRequest:
     direct_deps_only: bool
     platforms: PexPlatforms
     internal_only: bool
-    resolve_and_lockfile: tuple[str, str] | None
     additional_lockfile_args: tuple[str, ...]
     additional_requirements: tuple[str, ...]
 
@@ -297,7 +292,6 @@ class _RepositoryPexRequest:
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         direct_deps_only: bool = False,
         platforms: PexPlatforms = PexPlatforms(),
-        resolve_and_lockfile: tuple[str, str] | None = None,
         additional_lockfile_args: tuple[str, ...] = (),
         additional_requirements: tuple[str, ...] = (),
     ) -> None:
@@ -306,7 +300,6 @@ class _RepositoryPexRequest:
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.direct_deps_only = direct_deps_only
         self.platforms = platforms
-        self.resolve_and_lockfile = resolve_and_lockfile
         self.additional_lockfile_args = additional_lockfile_args
         self.additional_requirements = additional_requirements
 
@@ -405,7 +398,6 @@ async def pex_from_targets(
                 direct_deps_only=request.direct_deps_only,
                 platforms=request.platforms,
                 internal_only=request.internal_only,
-                resolve_and_lockfile=request.resolve_and_lockfile,
                 additional_lockfile_args=request.additional_lockfile_args,
                 additional_requirements=request.additional_requirements,
             ),
@@ -453,8 +445,11 @@ async def get_repository_pex(
             "`[python].resolve_all_constraints` is enabled, so "
             "`[python].requirement_constraints` must also be set."
         )
-    elif request.resolve_and_lockfile:
-        resolve, lockfile = request.resolve_and_lockfile
+    elif python_setup.enable_resolves:
+        # TODO: compute the resolve based on request.addresses, and validate that the
+        #  transitive closure is compatible. See coursier_fetch.py for inspiration.
+        resolve = python_setup.default_resolve
+        lockfile = python_setup.resolves[resolve]
         repository_pex_request = PexRequest(
             description=f"Installing {lockfile} for the resolve `{resolve}`",
             output_filename=f"{path_safe(resolve)}_lockfile.pex",
@@ -465,23 +460,6 @@ async def get_repository_pex(
                     f"the resolve `{resolve}` (from `[python].experimental_resolves`)"
                 ),
                 # TODO(#12314): Hook up lockfile staleness check.
-                lockfile_hex_digest=None,
-                req_strings=None,
-            ),
-            interpreter_constraints=interpreter_constraints,
-            platforms=request.platforms,
-            additional_args=request.additional_lockfile_args,
-        )
-    elif python_setup.lockfile:
-        repository_pex_request = PexRequest(
-            description=f"Installing {python_setup.lockfile}",
-            output_filename="lockfile.pex",
-            internal_only=request.internal_only,
-            requirements=Lockfile(
-                file_path=python_setup.lockfile,
-                file_path_description_of_origin="the option `[python].experimental_lockfile`",
-                # TODO(#12314): Hook up lockfile staleness check once multiple lockfiles
-                # are supported.
                 lockfile_hex_digest=None,
                 req_strings=None,
             ),
@@ -591,7 +569,6 @@ class RequirementsPexRequest:
     internal_only: bool
     hardcoded_interpreter_constraints: InterpreterConstraints | None
     direct_deps_only: bool
-    resolve_and_lockfile: tuple[str, str] | None
 
     def __init__(
         self,
@@ -600,13 +577,11 @@ class RequirementsPexRequest:
         internal_only: bool,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         direct_deps_only: bool = False,
-        resolve_and_lockfile: tuple[str, str] | None = None,
     ) -> None:
         self.addresses = Addresses(addresses)
         self.internal_only = internal_only
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.direct_deps_only = direct_deps_only
-        self.resolve_and_lockfile = resolve_and_lockfile
 
 
 @rule
@@ -619,7 +594,6 @@ async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSet
                 internal_only=request.internal_only,
                 hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
                 direct_deps_only=request.direct_deps_only,
-                resolve_and_lockfile=request.resolve_and_lockfile,
             ),
         )
         if opt_pex_request.maybe_pex_request is None:
@@ -639,7 +613,6 @@ async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSet
             include_source_files=False,
             hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
             direct_deps_only=request.direct_deps_only,
-            resolve_and_lockfile=request.resolve_and_lockfile,
         ),
     )
     return pex_request

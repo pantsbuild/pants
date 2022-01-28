@@ -18,6 +18,7 @@ from pants.jvm.target_types import (
     JvmArtifactUrlField,
     JvmArtifactVersionField,
 )
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class InvalidCoordinateString(Exception):
@@ -191,3 +192,12 @@ class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
     @classmethod
     def from_coordinates(cls, coordinates: Iterable[Coordinate]) -> ArtifactRequirements:
         return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
+
+
+@dataclass(frozen=True)
+class GatherJvmCoordinatesRequest:
+    """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
+    `jar_artifact` targets into `ArtifactRequirements`."""
+
+    artifact_inputs: FrozenOrderedSet[str]
+    option_name: str

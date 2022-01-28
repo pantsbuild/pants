@@ -356,6 +356,8 @@ impl ExecuteProcess {
     let execution_slot_variable =
       externs::getattr_as_optional_string(value, "execution_slot_variable");
 
+    let concurrency_available: usize = externs::getattr(value, "concurrency_available").unwrap();
+
     let cache_scope: ProcessCacheScope = {
       let cache_scope_enum = externs::getattr(value, "cache_scope").unwrap();
       externs::getattr::<String>(cache_scope_enum, "name")
@@ -384,6 +386,7 @@ impl ExecuteProcess {
       jdk_home,
       platform_constraint,
       execution_slot_variable,
+      concurrency_available,
       cache_scope,
     })
   }

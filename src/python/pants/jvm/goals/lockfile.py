@@ -9,65 +9,28 @@ from dataclasses import dataclass
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
-    GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
-from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
-from pants.jvm.resolve import coursier_fetch, jvm_tool
+from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, JvmToolBase
-from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class GenerateJvmLockfileFromTool:
-    artifact_inputs: FrozenOrderedSet[str]
-    options_scope: str
-    lockfile_dest: str
-
-    def __init__(self, tool: JvmToolBase) -> None:
-        # Note that `JvmToolBase` is not hashable, so we extract the relevant information eagerly.
-        self.artifact_inputs = FrozenOrderedSet(tool.artifact_inputs)
-        self.options_scope = tool.options_scope
-        self.lockfile_dest = tool.lockfile
-
-
-@rule
-async def setup_lockfile_request_from_tool(
-    request: GenerateJvmLockfileFromTool,
-) -> GenerateJvmLockfile:
-    artifacts = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(
-            request.artifact_inputs,
-            f"[{request.options_scope}].artifacts",
-        ),
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts,
-        resolve_name=request.options_scope,
-        lockfile_dest=request.lockfile_dest,
-    )
 
 
 @rule
@@ -92,30 +55,6 @@ async def generate_jvm_lockfile(
         CreateDigest([FileContent(request.lockfile_dest, resolved_lockfile_contents)]),
     )
     return GenerateLockfileResult(lockfile_digest, request.resolve_name, request.lockfile_dest)
-
-
-@rule
-async def load_jvm_lockfile(
-    request: GenerateJvmLockfile,
-) -> CoursierResolvedLockfile:
-    """Loads an existing lockfile from disk."""
-    if not request.artifacts:
-        return CoursierResolvedLockfile(entries=())
-
-    lockfile_snapshot = await Get(Snapshot, PathGlobs([request.lockfile_dest]))
-    if not lockfile_snapshot.files:
-        raise ValueError(
-            f"JVM resolve `{request.resolve_name}` does not have a lockfile generated. "
-            f"Run `{GenerateLockfilesSubsystem.name} --resolve={request.resolve_name} to "
-            "generate it."
-        )
-
-    return await Get(
-        CoursierResolvedLockfile,
-        CoursierResolveKey(
-            name=request.resolve_name, path=request.lockfile_dest, digest=lockfile_snapshot.digest
-        ),
-    )
 
 
 class RequestedJVMserResolveNames(RequestedUserResolveNames):
@@ -164,7 +103,6 @@ def rules():
     return (
         *collect_rules(),
         *coursier_fetch.rules(),
-        *jvm_tool.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),

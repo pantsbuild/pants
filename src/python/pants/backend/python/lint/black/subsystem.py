@@ -108,7 +108,7 @@ class Black(PythonToolBase):
 
 
 class BlackLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Black.options_scope
+    resolve_name = Black.options_scope
 
 
 @rule(

@@ -284,7 +284,7 @@ async def mypy_first_party_plugins(
 
 
 class MyPyLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = MyPy.options_scope
+    resolve_name = MyPy.options_scope
 
 
 @rule(

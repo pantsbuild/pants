@@ -61,11 +61,7 @@ _orgs = (
         "https://www.geminus.ai/",
         "https://files.readme.io/0da3c3f-geminus-small.png",
     ),
-    Org(
-        "Grapl",
-        "https://www.graplsecurity.com/",
-        "https://files.readme.io/8802ffd-grapl-small.png",
-    ),
+    Org("Grapl", "https://www.graplsecurity.com/", "https://files.readme.io/341b9cd-grapl.png"),
     Org(
         "HousingAnywhere",
         "https://housinganywhere.com/",
@@ -79,6 +75,7 @@ _orgs = (
         "https://orca.security/",
         "https://files.readme.io/e87f6c5-Orca_Security-small.png",
     ),
+    Org("Pave", "https://www.pave.dev/", "https://files.readme.io/924aa3e-pave-small.png"),
     Org(
         "People Data Labs",
         "https://www.peopledatalabs.com/",

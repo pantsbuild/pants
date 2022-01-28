@@ -47,7 +47,7 @@ class DockerfileParser(PythonToolRequirementsBase):
 
 
 class DockerfileParserLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = DockerfileParser.options_scope
+    resolve_name = DockerfileParser.options_scope
 
 
 @rule

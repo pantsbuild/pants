@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 import shlex
 import textwrap
 from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from typing import ClassVar, Iterable, Mapping
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
+from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
@@ -19,7 +21,9 @@ from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -160,6 +164,94 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         nailgun_jar=os.path.join(JdkSetup.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
+    )
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class JvmProcess:
+    argv: tuple[str, ...]
+    classpath_entries: tuple[str, ...]
+    input_digest: Digest
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
+    extra_nailgun_keys: tuple[str, ...]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
+    timeout_seconds: int | float | None
+    platform: Platform | None
+    extra_immutable_input_digests: FrozenDict[str, Digest]
+    extra_env: FrozenDict[str, str]
+    cache_scope: ProcessCacheScope | None
+    use_nailgun: bool
+
+    def __init__(
+        self,
+        argv: Iterable[str],
+        classpath_entries: Iterable[str],
+        input_digest: Digest,
+        description: str,
+        level: LogLevel = LogLevel.INFO,
+        extra_nailgun_keys: Iterable[str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+        extra_immutable_input_digests: Mapping[str, Digest] | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        timeout_seconds: int | float | None = None,
+        platform: Platform | None = None,
+        cache_scope: ProcessCacheScope | None = None,
+        use_nailgun: bool = True,
+    ):
+
+        self.argv = tuple(argv)
+        self.classpath_entries = tuple(classpath_entries)
+        self.input_digest = input_digest
+        self.description = description
+        self.level = level
+        self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
+        self.output_files = tuple(output_files or ())
+        self.output_directories = tuple(output_directories or ())
+        self.timeout_seconds = timeout_seconds
+        self.platform = platform
+        self.cache_scope = cache_scope
+        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
+        self.extra_env = FrozenDict(extra_env or {})
+        self.use_nailgun = use_nailgun
+
+        if not use_nailgun and extra_nailgun_keys:
+            raise AssertionError(
+                "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
+                "specify `extra_nailgun_keys=None` or `use_nailgun=True`."
+            )
+
+
+@rule
+async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess) -> Process:
+
+    immutable_input_digests = {
+        **jdk_setup.immutable_input_digests,
+        **request.extra_immutable_input_digests,
+    }
+    env = {**jdk_setup.env, **request.extra_env}
+
+    use_nailgun = []
+    if request.use_nailgun:
+        use_nailgun = [*jdk_setup.immutable_input_digests, *request.extra_nailgun_keys]
+
+    return Process(
+        [*jdk_setup.args(bash, request.classpath_entries), *request.argv],
+        input_digest=request.input_digest,
+        immutable_input_digests=immutable_input_digests,
+        use_nailgun=use_nailgun,
+        description=request.description,
+        level=request.level,
+        output_directories=request.output_directories,
+        env=env,
+        platform=request.platform,
+        timeout_seconds=request.timeout_seconds,
+        append_only_caches=jdk_setup.append_only_caches,
+        output_files=request.output_files,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
 

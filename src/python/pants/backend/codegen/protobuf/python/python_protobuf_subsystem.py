@@ -58,7 +58,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
-    default_version = "mypy-protobuf==2.4"
+    default_version = "mypy-protobuf==2.10"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
@@ -75,7 +75,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 
 class MypyProtobufLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = PythonProtobufMypyPlugin.options_scope
+    resolve_name = PythonProtobufMypyPlugin.options_scope
 
 
 @rule

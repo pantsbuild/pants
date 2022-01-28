@@ -235,7 +235,7 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 
 
 class PylintLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Pylint.options_scope
+    resolve_name = Pylint.options_scope
 
 
 @rule(

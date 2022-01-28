@@ -63,7 +63,7 @@ class Autoflake(PythonToolBase):
 
 
 class AutoflakeLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Autoflake.options_scope
+    resolve_name = Autoflake.options_scope
 
 
 @rule()

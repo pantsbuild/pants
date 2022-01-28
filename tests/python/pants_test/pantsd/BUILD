@@ -13,7 +13,6 @@ python_tests(
     sources=["pantsd_integration_test.py"],
     dependencies=[
         "testprojects/src/python:hello_directory",
-        "testprojects/src/python:bad_requirements_directory",
         "testprojects/src/python:print_env_directory",
     ],
     timeout=2100,

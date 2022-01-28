@@ -77,6 +77,7 @@ def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
+    args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
     args.extend(source_files.files)
     return tuple(args)
@@ -95,7 +96,6 @@ async def pylint_lint_partition(
             # in a PEX runtime error about missing dependencies.
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
             internal_only=True,
-            direct_deps_only=True,
         ),
     )
 
@@ -180,6 +180,7 @@ async def pylint_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
+            concurrency_available=len(partition.field_sets),
             description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),

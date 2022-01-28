@@ -13,7 +13,11 @@ from pants.backend.python.lint.pylint.rules import PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
@@ -37,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(LintResults, [PylintRequest]),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+        target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 
@@ -222,12 +226,14 @@ def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement(name='transitive_req', requirements=['fake'])
+                python_requirement(name='transitive_req', requirements=['freezegun'])
                 python_requirement(name='direct_req', requirements=['ansicolors'])
                 """
             ),
             f"{PACKAGE}/transitive_dep.py": dedent(
                 """\
+                import freezegun
+
                 A = NotImplemented
                 """
             ),
@@ -254,18 +260,26 @@ def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources(name='transitive_dep', sources=['transitive_dep.py'])
-                python_sources(
-                    name='direct_dep',
-                    sources=['direct_dep.py'],
-                    dependencies=['//:transitive_req', ':transitive_dep']
+                python_source(
+                    name='transitive_dep',
+                    source='transitive_dep.py',
+                    dependencies=['//:transitive_req'],
                 )
-                python_sources(sources=['f.py'], dependencies=['//:direct_req', ':direct_dep'])
+                python_source(
+                    name='direct_dep',
+                    source='direct_dep.py',
+                    dependencies=[':transitive_dep']
+                )
+                python_source(
+                    name="f",
+                    source='f.py',
+                    dependencies=['//:direct_req', ':direct_dep'],
+                )
                 """
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    tgt = rule_runner.get_target(Address(PACKAGE, target_name="f"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == PYLINT_ERROR_FAILURE_RETURN_CODE

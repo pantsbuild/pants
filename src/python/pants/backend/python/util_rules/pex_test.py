@@ -776,10 +776,7 @@ ansicolors==1.1.8
         rule_runner,
         interpreter_constraints=InterpreterConstraints([expected_constraints]),
         requirements=requirements,
-        additional_pants_args=(
-            "--python-experimental-lockfile=lockfile.txt",
-            f"--python-invalid-lockfile-behavior={behavior}",
-        ),
+        additional_pants_args=(f"--python-invalid-lockfile-behavior={behavior}",),
     )
 
 

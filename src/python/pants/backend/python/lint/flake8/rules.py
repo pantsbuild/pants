@@ -39,6 +39,7 @@ def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
     args = []
     if flake8.config:
         args.append(f"--config={flake8.config}")
+    args.append("--jobs={pants_concurrency}")
     args.extend(flake8.args)
     args.extend(source_files.files)
     return tuple(args)
@@ -90,6 +91,7 @@ async def flake8_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": first_party_plugins.PREFIX},
+            concurrency_available=len(partition.field_sets),
             description=f"Run Flake8 on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),

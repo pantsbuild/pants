@@ -198,7 +198,9 @@ impl ByteStore {
       let mut cursor = txn
         .open_ro_cursor(*database)
         .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
-      for (key, bytes) in cursor.iter() {
+      for key_res in cursor.iter() {
+        let (key, bytes) =
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
         *used_bytes += bytes.len();
 
         // Random access into the lease_database is slower than iterating, but hopefully garbage
@@ -345,7 +347,9 @@ impl ByteStore {
       let mut cursor = txn
         .open_ro_cursor(*database)
         .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
-      for (key, bytes) in cursor.iter() {
+      for key_res in cursor.iter() {
+        let (key, bytes) =
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         digests.push(Digest::new(fingerprint, bytes.len()));

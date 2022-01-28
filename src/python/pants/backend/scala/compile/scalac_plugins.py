@@ -18,14 +18,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile
-from pants.jvm.resolve.common import ArtifactRequirements
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
@@ -68,33 +62,29 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
 
 
 class GlobalScalacPluginsToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = "scalac-plugins"
+    resolve_name = "scalac-plugins"
 
 
 @rule
-async def generate_global_scalac_plugins_lockfile_request(
+def generate_global_scalac_plugins_lockfile_request(
     _: GlobalScalacPluginsToolLockfileSentinel,
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
-    scalac_plugins: Scalac,
-) -> GenerateJvmLockfile:
-    artifacts = await Get(
-        ArtifactRequirements,
-        GatherJvmCoordinatesRequest(
-            FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
-            f"[{scalac_plugins.options_scope}].plugins_global",
-        ),
-    )
-    return GenerateJvmLockfile(
-        artifacts=artifacts,
+    scalac: Scalac,
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool(
+        FrozenOrderedSet(loaded_global_plugins.artifact_address_inputs),
+        artifact_option_name=f"[{scalac.options_scope}].plugins_global",
+        lockfile_option_name=f"[{scalac.options_scope}].plugins_global_lockfile",
         resolve_name="scalac-plugins",
-        lockfile_dest=scalac_plugins.plugins_global_lockfile,
+        lockfile_dest=scalac.plugins_global_lockfile,
+        default_lockfile_resource=scalac.default_plugins_lockfile_resource,
     )
 
 
 @dataclass(frozen=True)
 class GlobalScalacPlugins:
     names: tuple[str, ...]
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def args(self, prefix: str | None = None) -> Iterator[str]:
         for scalac_plugin_path in self.classpath.classpath_entries(prefix):
@@ -107,13 +97,12 @@ class GlobalScalacPlugins:
 async def global_scalac_plugins(
     loaded_global_plugins: _LoadedGlobalScalacPlugins,
 ) -> GlobalScalacPlugins:
-    lockfile = await Get(CoursierResolvedLockfile, GlobalScalacPluginsToolLockfileSentinel())
+    lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, GlobalScalacPluginsToolLockfileSentinel()
+    )
     classpath = await Get(
-        MaterializedClasspath,
-        MaterializedClasspathRequest(
-            prefix="__scalac_plugin_cp",
-            lockfiles=(lockfile,),
-        ),
+        ToolClasspath,
+        ToolClasspathRequest(prefix="__scalac_plugin_cp", lockfile=lockfile_request),
     )
     return GlobalScalacPlugins(loaded_global_plugins.names, classpath)
 

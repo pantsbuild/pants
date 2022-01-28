@@ -15,8 +15,6 @@ backend_packages.add = [
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
-  "pants.backend.experimental.codegen.thrift.apache.python",
-  "pants.backend.experimental.codegen.thrift.apache.java",
   "pants.backend.experimental.docker",
   "pants.backend.experimental.docker.lint.hadolint",
   "pants.backend.experimental.go",
@@ -26,9 +24,6 @@ backend_packages.add = [
   "pants.backend.experimental.python",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
-  "pants.backend.experimental.codegen.avro.java",
-  "pants.backend.experimental.codegen.protobuf.scala",
-  "pants.backend.experimental.codegen.thrift.scrooge.scala",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
@@ -116,9 +111,10 @@ ignore_adding_targets = [
 venv_use_symlinks = true
 
 [python]
-experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
+experimental_resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
+enable_resolves = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -127,7 +123,8 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
-  "flake8-2020>=1.6.0,<1.7.0"
+  "flake8-2020>=1.6.0,<1.7.0",
+  "flake8-no-implicit-concat",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
 
@@ -182,27 +179,6 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
-
-[java-avro]
-lockfile = "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
-
-[junit]
-lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"
-
-[google-java-format]
-lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
-
-[scalafmt]
-lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
-
-[scalapb]
-lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
-
-[scalatest]
-lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
-
-[scrooge]
-lockfile = "src/python/pants/backend/codegen/thrift/scrooge/scrooge.default.lockfile.txt"
 
 [toolchain-setup]
 repo = "pants"

@@ -26,6 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::cell::RefCell;
+use std::cmp::Reverse;
 use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap};
 use std::future::Future;
@@ -425,23 +426,24 @@ impl HeavyHittersData {
     }
   }
 
-  fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, Option<Duration>)> {
+  fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
     self.refresh_store();
 
-    let now = SystemTime::now();
     let inner = self.inner.lock();
 
-    // Initialize the heap with the leaves of the running workunit graph.
-    let mut queue: BinaryHeap<(Duration, SpanId)> = inner
+    // Initialize the heap with the leaves of the running workunit graph, sorted oldest first.
+    let mut queue: BinaryHeap<(Reverse<SystemTime>, SpanId)> = inner
       .running_graph
       .externals(petgraph::Direction::Outgoing)
       .map(|entry| inner.running_graph[entry])
       .flat_map(|span_id: SpanId| {
-        let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
-        match workunit {
-          Some(workunit) if !workunit.state.blocked() => {
-            Self::duration_for(now, workunit).map(|d| (d, span_id))
-          }
+        let workunit: &Workunit = inner.workunit_records.get(&span_id)?;
+        match workunit.state {
+          WorkunitState::Started {
+            ref blocked,
+            start_time,
+            ..
+          } if !blocked.load(atomic::Ordering::Relaxed) => Some((Reverse(start_time), span_id)),
           _ => None,
         }
       })
@@ -451,17 +453,21 @@ impl HeavyHittersData {
     let mut res = HashMap::new();
     while let Some((_dur, span_id)) = queue.pop() {
       // If the leaf is visible or has a visible parent, emit it.
-      if let Some(span_id) = first_matched_parent(
+      let parent_span_id = if let Some(span_id) = first_matched_parent(
         &inner.workunit_records,
         Some(span_id),
         |wu| wu.state.completed(),
         Self::is_visible,
       ) {
-        let workunit = inner.workunit_records.get(&span_id).unwrap();
-        if let Some(effective_name) = workunit.metadata.desc.as_ref() {
-          let maybe_duration = Self::duration_for(now, workunit);
+        span_id
+      } else {
+        continue;
+      };
 
-          res.insert(span_id, (effective_name.to_string(), maybe_duration));
+      let workunit = inner.workunit_records.get(&parent_span_id).unwrap();
+      if let Some(effective_name) = workunit.metadata.desc.as_ref() {
+        if let Some(start_time) = Self::start_time_for(workunit) {
+          res.insert(parent_span_id, (effective_name.to_string(), start_time));
           if res.len() >= k {
             break;
           }
@@ -516,11 +522,15 @@ impl HeavyHittersData {
       && matches!(workunit.state, WorkunitState::Started { .. })
   }
 
-  fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
+  fn start_time_for(workunit: &Workunit) -> Option<SystemTime> {
     match workunit.state {
-      WorkunitState::Started { ref start_time, .. } => now.duration_since(*start_time).ok(),
+      WorkunitState::Started { start_time, .. } => Some(start_time),
       _ => None,
     }
+  }
+
+  fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
+    now.duration_since(Self::start_time_for(workunit)?).ok()
   }
 }
 
@@ -586,9 +596,10 @@ impl WorkunitStore {
   }
 
   ///
-  /// Find the longest running leaf workunits, and return their first visible parents.
+  /// Find the longest running leaf workunits, and return the description and start time of their
+  /// first visible parents.
   ///
-  pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, Option<Duration>)> {
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
     self.heavy_hitters_data.heavy_hitters(k)
   }
 
@@ -785,9 +796,11 @@ impl WorkunitStore {
   }
 }
 
-pub fn format_workunit_duration(duration: Duration) -> String {
-  let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
-  format!("{:.2}s ", duration_secs)
+#[macro_export]
+macro_rules! format_workunit_duration_ms {
+  ($workunit_duration_ms:expr) => {{
+    format_args!("{:.2}s", ($workunit_duration_ms as f64) / 1000.0)
+  }};
 }
 
 ///

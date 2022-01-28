@@ -353,6 +353,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
+        __import__(u"{}".format("interpolation"))
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
@@ -375,13 +376,13 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
             "pkg_resources": ImpInfo(lineno=7, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
-            "dep.from.bytes": ImpInfo(lineno=10, weak=True),
-            "dep.from.str": ImpInfo(lineno=11, weak=True),
-            "dep.from.str_狗": ImpInfo(lineno=12, weak=True),
-            "weak1": ImpInfo(lineno=16, weak=True),
-            "strong1": ImpInfo(lineno=17, weak=False),
-            "strong2": ImpInfo(lineno=18, weak=False),
-            "strong3": ImpInfo(lineno=19, weak=False),
+            "dep.from.bytes": ImpInfo(lineno=11, weak=True),
+            "dep.from.str": ImpInfo(lineno=12, weak=True),
+            "dep.from.str_狗": ImpInfo(lineno=13, weak=True),
+            "weak1": ImpInfo(lineno=17, weak=True),
+            "strong1": ImpInfo(lineno=18, weak=False),
+            "strong2": ImpInfo(lineno=19, weak=False),
+            "strong3": ImpInfo(lineno=20, weak=False),
         },
     )
 
