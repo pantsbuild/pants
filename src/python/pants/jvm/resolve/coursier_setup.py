@@ -75,6 +75,20 @@ COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
 )
 
 
+POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
+    """\
+#!{python_path}
+import sys
+from subprocess import run, PIPE
+
+proc = run(sys.argv[1:], stdout=PIPE, stderr=PIPE)
+
+sys.stdout.buffer.write(proc.stdout)
+sys.stderr.buffer.write(proc.stderr.replace(b"setrlimit to increase file descriptor limit failed, errno 22\\n", b""))
+"""
+)
+
+
 class CoursierSubsystem(TemplatedExternalTool):
     options_scope = "coursier"
     name = "coursier"
@@ -127,12 +141,20 @@ class Coursier:
     bin_dir: ClassVar[str] = "__coursier"
     wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_wrapper_script.sh"
     post_processing_script: ClassVar[str] = f"{bin_dir}/coursier_post_processing_script.py"
+    post_process_stderr: ClassVar[str] = f"{bin_dir}/coursier_post_process_stderr.py"
     cache_name: ClassVar[str] = "coursier"
     cache_dir: ClassVar[str] = ".cache"
     working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
-        return tuple((*wrapper, os.path.join(self.bin_dir, self.coursier.exe), *args))
+        return tuple(
+            (
+                self.post_process_stderr,
+                *wrapper,
+                os.path.join(self.bin_dir, self.coursier.exe),
+                *args,
+            )
+        )
 
     @property
     def env(self) -> dict[str, str]:
@@ -200,6 +222,8 @@ async def setup_coursier(
         coursier_bin_dir=Coursier.bin_dir,
     )
 
+    post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)
+
     downloaded_coursier_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
@@ -217,6 +241,11 @@ async def setup_coursier(
                 FileContent(
                     os.path.basename(Coursier.post_processing_script),
                     COURSIER_POST_PROCESSING_SCRIPT.encode("utf-8"),
+                    is_executable=True,
+                ),
+                FileContent(
+                    os.path.basename(Coursier.post_process_stderr),
+                    post_process_stderr.encode("utf-8"),
                     is_executable=True,
                 ),
             ]
