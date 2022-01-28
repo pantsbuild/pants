@@ -1,4 +1,3 @@
-from chevron import render
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 
 
@@ -14,24 +13,50 @@ def test_run_module_with_entry_point():
 
 def test_render_without_template_uses_default():
     config = PyOxidizerConfig(
-        executable_name="my-output", 
-        wheels=["wheel1", "wheel2"], 
-        entry_point="helloworld.main", 
-        unclassified_resources=["resource1", "resource2"])
-    
+        executable_name="my-output",
+        wheels=["wheel1", "wheel2"],
+        entry_point="helloworld.main",
+        unclassified_resources=["resource1", "resource2"],
+    )
+
     rendered_config = config.render()
     assert "resolve_targets" in rendered_config
-    assert all([item in rendered_config for item in ("my-output", "wheel1", "wheel2", "helloworld.main", "resource1", "resource2")])
+    assert all(
+        [
+            item in rendered_config
+            for item in (
+                "my-output",
+                "wheel1",
+                "wheel2",
+                "helloworld.main",
+                "resource1",
+                "resource2",
+            )
+        ]
+    )
 
 
 def test_render_with_template():
     config = PyOxidizerConfig(
-        executable_name="my-output", 
-        wheels=["wheel1", "wheel2"], 
-        entry_point="helloworld.main", 
-        unclassified_resources=["resource1", "resource2"], 
-        template="$NAME | $WHEELS | $RUN_MODULE | $UNCLASSIFIED_RESOURCE_INSTALLATION")
-    
-    rendered_config = config.render() 
+        executable_name="my-output",
+        wheels=["wheel1", "wheel2"],
+        entry_point="helloworld.main",
+        unclassified_resources=["resource1", "resource2"],
+        template="$NAME | $WHEELS | $RUN_MODULE | $UNCLASSIFIED_RESOURCE_INSTALLATION",
+    )
+
+    rendered_config = config.render()
     assert "resolve_targets" not in rendered_config
-    assert all([item in rendered_config for item in ("my-output", "wheel1", "wheel2", "helloworld.main", "resource1", "resource2")])
+    assert all(
+        [
+            item in rendered_config
+            for item in (
+                "my-output",
+                "wheel1",
+                "wheel2",
+                "helloworld.main",
+                "resource1",
+                "resource2",
+            )
+        ]
+    )

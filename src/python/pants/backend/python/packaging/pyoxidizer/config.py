@@ -64,7 +64,11 @@ class PyOxidizerConfig:
 
     @property
     def run_module(self) -> str:
-        return f"python_config.run_module = '{self.entry_point}'" if self.entry_point is not None else ""
+        return (
+            f"python_config.run_module = '{self.entry_point}'"
+            if self.entry_point is not None
+            else ""
+        )
 
     def render(self) -> str:
         unclassified_resource_snippet = ""
@@ -73,9 +77,7 @@ class PyOxidizerConfig:
                 UNCLASSIFIED_RESOURCES_TEMPLATE
             ).safe_substitute(UNCLASSIFIED_RESOURCES=self.unclassified_resources)
 
-            unclassified_resource_snippet = indent(
-                unclassified_resource_snippet, "    "
-            )
+            unclassified_resource_snippet = indent(unclassified_resource_snippet, "    ")
 
         template = Template(self.template or DEFAULT_TEMPLATE)
         return template.safe_substitute(

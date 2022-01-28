@@ -3,6 +3,7 @@ from textwrap import dedent
 
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
+
 def test_local_dist(caplog) -> None:
     caplog.set_level(logging.DEBUG)
     sources = {

@@ -1,5 +1,6 @@
 from pants.testutil.pants_integration_test import run_pants
 
+
 def test_target_help_is_registered() -> None:
     pants_run = run_pants(
         [
@@ -9,4 +10,6 @@ def test_target_help_is_registered() -> None:
         ]
     )
     pants_run.assert_success()
-    assert all([field in pants_run.stdout for field in ("entry_point", "filesystem_resources", "template")])
+    assert all(
+        [field in pants_run.stdout for field in ("entry_point", "filesystem_resources", "template")]
+    )

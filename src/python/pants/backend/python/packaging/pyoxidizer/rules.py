@@ -55,9 +55,7 @@ async def package_pyoxidizer_binary(
     targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
     target = targets[0]
 
-    logger.debug(
-        f"Received these targets inside pyox targets: {target.address.target_name}"
-    )
+    logger.debug(f"Received these targets inside pyox targets: {target.address.target_name}")
 
     packages = await Get(
         FieldSetsPerTarget,
@@ -66,8 +64,7 @@ async def package_pyoxidizer_binary(
     logger.debug(f"Retrieved the following FieldSetsPerTarget {packages}")
 
     built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
-        for field_set in packages.field_sets
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in packages.field_sets
     )
 
     wheels = [
@@ -95,13 +92,9 @@ async def package_pyoxidizer_binary(
 
     config_template = None
     if field_set.template.value is not None:
-        config_template_source = await Get(
-            SourceFiles, SourceFilesRequest([field_set.template])
-        )
+        config_template_source = await Get(SourceFiles, SourceFilesRequest([field_set.template]))
 
-        digest_contents = await Get(
-            DigestContents, Digest, config_template_source.snapshot.digest
-        )
+        digest_contents = await Get(DigestContents, Digest, config_template_source.snapshot.digest)
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
@@ -113,7 +106,7 @@ async def package_pyoxidizer_binary(
         if not field_set.unclassified_resources.value
         else list(field_set.unclassified_resources.value),
     )
-    
+
     rendered_config = config.render()
     logger.debug(f"Rendered configuation to use -> {rendered_config}")
     config_digest = await Get(
@@ -147,4 +140,7 @@ async def package_pyoxidizer_binary(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PackageFieldSet, PyOxidizerFieldSet),)
+    return (
+        *collect_rules(),
+        UnionRule(PackageFieldSet, PyOxidizerFieldSet),
+    )
