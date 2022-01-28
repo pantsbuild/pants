@@ -209,6 +209,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.go",
         "pants.backend.experimental.java",
         "pants.backend.experimental.java.lint.google_java_format",
+        "pants.backend.experimental.python",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
         "pants.backend.experimental.scala",
