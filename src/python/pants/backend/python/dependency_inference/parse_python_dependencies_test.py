@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.dependency_inference import parse_python_deps
+from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonDependencies,
     ParsedPythonImportInfo as ImpInfo,
@@ -30,7 +31,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *parse_python_deps.rules(),
+            *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
             QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
@@ -74,9 +75,9 @@ def assert_deps_parsed(
         ],
     )
     assert dict(result.imports) == expected_imports
-    assert list(result.resources) == sorted(
-        ("project.foo", resource) for resource in expected_resources
-    )
+    assert list(result.resources) == [
+        ("project.foo", resource) for resource in sorted(expected_resources)
+    ]
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -457,3 +458,54 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
             "dep.from.str": ImpInfo(lineno=13, weak=True),
         },
     )
+
+
+@pytest.mark.parametrize("min_slashes", [1, 2, 3, 4])
+def test_resources(rule_runner: RuleRunner, min_slashes: int) -> None:
+    content = dedent(
+        """\
+        modules = [
+            # Potentially valid resources (depending on min_slashes).
+            'data/a.json',
+            'data/a.txt',
+            'data/a.tar.gz',
+            'data/subdir1/a.json',
+            'data/subdir1/subdir2/a.json',
+            'data/subdir1/subdir2/subdir3/a.json',
+            '狗/狗.狗',
+
+            # :ooks weird, but Unix and pathlib treat repeated "/" as one slash.
+            # Our parsing, however considers this as multiple slashes.
+            '//foo.bar',
+            '//foo/////bar.txt',
+
+            # Probably invalid resources.
+            'noslashes',
+            'data/database',  # Unfortunately, extenionless files don't get matched.
+
+            # Definitely invalid resources.
+            'a/........',
+            '\\n/foo.json',
+            'data/a.b/c.d',
+            'windows\\style.txt',
+        ]
+        """
+    )
+
+    potentially_valid = {
+        'data/a.json',
+        'data/a.txt',
+        'data/a.tar.gz',
+        'data/subdir1/a.json',
+        'data/subdir1/subdir2/a.json',
+        'data/subdir1/subdir2/subdir3/a.json',
+        '狗/狗.狗',
+        '//foo.bar',
+        '//foo/////bar.txt',
+    }
+    expected = [s for s in potentially_valid if s.count("/") >= min_slashes]
+
+    assert_deps_parsed(
+        rule_runner, content, expected_resources=expected, string_resources_min_slashes=min_slashes
+    )
+    assert_deps_parsed(rule_runner, content, string_resources=False, expected_resources=[])

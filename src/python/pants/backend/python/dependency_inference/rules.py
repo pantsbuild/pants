@@ -9,7 +9,7 @@ import pathlib
 from enum import Enum
 from typing import Dict, Iterator, cast
 
-from pants.backend.python.dependency_inference import module_mapper, parse_python_deps
+from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
@@ -31,11 +31,10 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules import resources, stripped_source_files
-from pants.core.util_rules.resources import AllResourcesTargets
+from pants.core.target_types import AllResourceAndFileTargetsRequest, FileSourceField, ResourceSourceField, AllResourceAndFileTargets
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import Owners, OwnersRequest, target_types_to_generate_targets_requests
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -104,13 +103,13 @@ class PythonInferSubsystem(Subsystem):
             ),
         )
         register(
-            "--string-resources-and-files",
+            "--resources-and-files-from-strings",
             default=False,
             type=bool,
             help=("@TODO"),
         )
         register(
-            "--string-resources-and-files-min-slashes",
+            "--resources-and-files-from-strings-min-slashes",
             default=1,
             type=int,
             help=("@TODO"),
@@ -168,12 +167,12 @@ class PythonInferSubsystem(Subsystem):
         return cast(int, self.options.string_imports_min_dots)
 
     @property
-    def string_resources(self) -> bool:
-        return cast(bool, self.options.string_resources)
+    def resources_and_files_from_strings(self) -> bool:
+        return cast(bool, self.options.resources_and_files_from_strings)
 
     @property
-    def string_resources_min_slashes(self) -> int:
-        return cast(int, self.options.string_resources_min_slashes)
+    def resources_and_files_from_strings_min_slashes(self) -> int:
+        return cast(int, self.options.resources_and_files_from_strings_min_slashes)
 
     @property
     def inits(self) -> bool:
@@ -197,13 +196,13 @@ class InferPythonImportDependencies(InferDependenciesRequest):
 
 
 def _get_inferred_resource_deps(
-    all_resource_targets: AllResourcesTargets,
+    all_resource_and_file_targets: AllResourceAndFileTargets,
     detected_resources: ParsedPythonResources,
 ) -> Iterator[Address]:
     resources_by_path: Dict[pathlib.Path, Target] = {}
-    for file_tgt in all_resource_targets.files:
+    for file_tgt in all_resource_and_file_targets.files:
         resources_by_path[pathlib.Path(file_tgt[FileSourceField].file_path)] = file_tgt
-    for resource_tgt in all_resource_targets.resources:
+    for resource_tgt in all_resource_and_file_targets.resources:
         path = pathlib.Path(resource_tgt[ResourceSourceField].file_path)
         resources_by_path[path] = resource_tgt
 
@@ -219,7 +218,6 @@ async def infer_python_dependencies_via_imports(
     request: InferPythonImportDependencies,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-    all_resource_targets: AllResourcesTargets,
 ) -> InferredDependencies:
     if not python_infer_subsystem.imports:
         return InferredDependencies([])
@@ -235,17 +233,19 @@ async def infer_python_dependencies_via_imports(
                 InterpreterConstraints.create_from_targets([tgt], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
                 string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-                string_resources=python_infer_subsystem.string_resources,
-                string_resources_min_slashes=python_infer_subsystem.string_resources_min_slashes,
+                string_resources=python_infer_subsystem.resources_and_files_from_strings,
+                string_resources_min_slashes=python_infer_subsystem.resources_and_files_from_strings_min_slashes,
             ),
         ),
     )
 
+    inferred_deps: set[Address] = set()
     detected_imports = detected_dependencies.imports
     detected_resources = detected_dependencies.resources
-    inferred_deps: set[Address] = set(
-        _get_inferred_resource_deps(all_resource_targets, detected_resources)
-    )
+    if detected_resources:
+        all_resource_and_file_targets = await Get(AllResourceAndFileTargets, AllResourceAndFileTargetsRequest())
+        inferred_deps.update(_get_inferred_resource_deps(all_resource_and_file_targets, detected_resources))
+
     resolve = tgt[PythonResolveField].normalized_value(python_setup)
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
@@ -350,9 +350,8 @@ def import_rules():
     return [
         infer_python_dependencies_via_imports,
         *pex.rules(),
-        *parse_python_deps.rules(),
+        *parse_python_dependencies.rules(),
         *module_mapper.rules(),
-        *resources.rules(),
         *stripped_source_files.rules(),
         SubsystemRule(PythonInferSubsystem),
         SubsystemRule(PythonSetup),

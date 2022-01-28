@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `MIN_DOTS=1 STRING_IMPORTS=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `MIN_DOTS=1 ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -33,7 +33,7 @@ STRING_IMPORT_REGEX = re.compile(
 # Since Unix allows basically anything for filenames, we require some "sane" subset of possibilities
 #  namely, word-character filenames and a mandatory extension.
 STRING_RESOURCE_REGEX = re.compile(
-    r"^([\w]*\/){" + MIN_SLASHES + r",}\w*(\.[^\/\.]+)+$",
+    r"^([\w]*\/){" + MIN_SLASHES + r",}\w*(\.[^\/\.\n]+)+$",
     re.UNICODE,
 )
 
