@@ -204,14 +204,37 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.java.debug_goals",
         "pants.backend.experimental.scala.debug_goals",
     ]
+    deactivated_plugins = ["toolchain.pants.plugin==0.17.0"]
+    # List all (stable enough) backends here, even if we use them internally.
     activated_backends = [
-        "pants.backend.codegen.protobuf.python",
         "pants.backend.awslambda.python",
+        "pants.backend.codegen.protobuf.python",
+        "pants.backend.experimental.codegen.thrift.apache.python",
+        "pants.backend.experimental.docker",
+        "pants.backend.experimental.docker.lint.hadolint",
+        "pants.backend.experimental.go",
+        "pants.backend.experimental.java",
+        "pants.backend.experimental.java.lint.google_java_format",
+        "pants.backend.experimental.python.lint.autoflake",
+        "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.scala",
+        "pants.backend.experimental.scala.lint.scalafmt",
+        "pants.backend.google_cloud_function.python",
+        "pants.backend.plugin_development",
+        "pants.backend.python",
         "pants.backend.python.lint.bandit",
+        "pants.backend.python.lint.black",
+        "pants.backend.python.lint.docformatter",
+        "pants.backend.python.lint.flake8",
+        "pants.backend.python.lint.isort",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
+        "pants.backend.python.mixed_interpreter_constraints",
+        "pants.backend.python.typecheck.mypy",
+        "pants.backend.shell",
+        "pants.backend.shell.lint.shellcheck",
+        "pants.backend.shell.lint.shfmt",
     ]
-    deactivated_plugins = ["toolchain.pants.plugin==0.17.0"]
     argv = [
         "./pants",
         "--concurrent",
