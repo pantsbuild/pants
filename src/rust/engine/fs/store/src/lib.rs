@@ -978,9 +978,9 @@ impl Store {
           let path = destination.join(file_node.name.clone());
           let digest = try_future!(require_digest(file_node.digest.as_ref()));
           let mode = match perms {
-            Permissions::ReadOnly if file_node.is_executable => 0o544,
+            Permissions::ReadOnly if file_node.is_executable => 0o555,
             Permissions::ReadOnly => 0o444,
-            Permissions::Writable if file_node.is_executable => 0o744,
+            Permissions::Writable if file_node.is_executable => 0o755,
             Permissions::Writable => 0o644,
           };
           store.materialize_file(path, digest, mode).boxed()
