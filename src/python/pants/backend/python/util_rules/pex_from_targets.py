@@ -16,7 +16,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
-    PythonCompatibleResolvesField,
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementsField,
     PythonResolveField,
     parse_requirements_file,
@@ -213,8 +213,10 @@ class NoCompatibleResolveException(Exception):
             if tgt.has_field(PythonResolveField):
                 resolve = tgt[PythonResolveField].normalized_value(python_setup)
                 resolves_to_addresses[resolve].append(tgt.address.spec)
-            elif tgt.has_field(PythonCompatibleResolvesField):
-                resolves = tgt[PythonCompatibleResolvesField].normalized_value(python_setup)
+            elif tgt.has_field(PythonRequirementCompatibleResolvesField):
+                resolves = tgt[PythonRequirementCompatibleResolvesField].normalized_value(
+                    python_setup
+                )
                 for resolve in resolves:
                     resolves_to_addresses[resolve].append(tgt.address.spec)
 
@@ -280,10 +282,12 @@ async def choose_python_resolve(
             and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
         )
         invalid_compatible_resolves_field = tgt.has_field(
-            PythonCompatibleResolvesField
+            PythonRequirementCompatibleResolvesField
         ) and not any(
             resolve == chosen_resolve
-            for resolve in tgt[PythonCompatibleResolvesField].normalized_value(python_setup)
+            for resolve in tgt[PythonRequirementCompatibleResolvesField].normalized_value(
+                python_setup
+            )
         )
         if invalid_resolve_field or invalid_compatible_resolves_field:
             plural = ("s", "their") if len(transitive_targets.roots) > 1 else ("", "its")
