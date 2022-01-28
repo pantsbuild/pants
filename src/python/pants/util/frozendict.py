@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Iterator, Mapping, TypeVar, overload
+from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, overload
+
+from pants.util.memo import memoized_method
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -33,7 +35,7 @@ class FrozenDict(Mapping[K, V]):
         """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
         if len(item) > 1:
             raise ValueError(
-                f"FrozenDict was called with {len(item)} positional arguments but it expects one."
+                f"{type(self).__name__} was called with {len(item)} positional arguments but it expects one."
             )
 
         # NB: Keep the variable name `_data` in sync with `externs/mod.rs`.
@@ -69,12 +71,13 @@ class FrozenDict(Mapping[K, V]):
 
     def _calculate_hash(self) -> int:
         try:
-            return hash(tuple(self.items()))
+            return hash(tuple(self._data.items()))
         except TypeError as e:
             raise TypeError(
-                "Even though you are using a `FrozenDict`, the underlying values are not hashable. "
-                "Please use hashable (and preferably immutable) types for the underlying values, "
-                "e.g. use tuples instead of lists and use FrozenOrderedSet instead of set().\n\n"
+                f"Even though you are using a `{type(self).__name__}`, the underlying values are "
+                "not hashable. Please use hashable (and preferably immutable) types for the "
+                "underlying values, e.g. use tuples instead of lists and use FrozenOrderedSet "
+                "instead of set().\n\n"
                 f"Original error message: {e}\n\nValue: {self}"
             )
 
@@ -82,4 +85,15 @@ class FrozenDict(Mapping[K, V]):
         return self._hash
 
     def __repr__(self) -> str:
-        return f"FrozenDict({repr(self._data)})"
+        return f"{type(self).__name__}({self._data!r})"
+
+
+class LazyFrozenDict(FrozenDict[K, Callable[[], V]]):
+    """A lazy version of `FrozenDict` where the values are not loaded until referenced."""
+
+    def __getitem__(self, k: K) -> V:  # type: ignore[override]
+        return self._get_value(k)
+
+    @memoized_method
+    def _get_value(self, k: K) -> V:
+        return self._data[k]()
