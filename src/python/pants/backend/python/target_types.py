@@ -109,9 +109,11 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     help = (
         "The resolve from `[python].experimental_resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
-        "Only applies if `[python].enable_resolves` is true.\n\n"
+        "All dependencies must share the same resolve. This means that you can only depend on "
+        "first-party targets like `python_source` that set their `experimental_resolve` field "
+        "to the same value, and on `python_requirement` targets that include the resolve in "
+        "their `experimental_compatible_resolves` field.\n\n"
         "This field is experimental and may change without the normal deprecation policy."
-        # TODO: Document expectations for dependencies once we validate that.
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
