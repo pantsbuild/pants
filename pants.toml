@@ -30,7 +30,6 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  # NOTE: Keep this version in sync with `generate_docs.py`!
   "toolchain.pants.plugin==0.17.0",
 ]
 
