@@ -56,7 +56,7 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """
 )
 
-COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
+COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
     """\
     set -eux
 
@@ -71,6 +71,23 @@ COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
         "${{@//{coursier_working_directory}/$working_dir}}"
     /bin/mkdir -p classpath
     {python_path} {coursier_bin_dir}/coursier_post_processing_script.py "$json_output_file"
+    """
+)
+
+
+# TODO: Coursier renders setrlimit error line on macOS.
+#   see https://github.com/pantsbuild/pants/issues/13942.
+POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
+    """\
+    #!{python_path}
+    import sys
+    from subprocess import run, PIPE
+
+    proc = run(sys.argv[1:], stdout=PIPE, stderr=PIPE)
+
+    sys.stdout.buffer.write(proc.stdout)
+    sys.stderr.buffer.write(proc.stderr.replace(b"setrlimit to increase file descriptor limit failed, errno 22\\n", b""))
+    sys.exit(proc.returncode)
     """
 )
 
@@ -125,14 +142,20 @@ class Coursier:
     _digest: Digest
 
     bin_dir: ClassVar[str] = "__coursier"
-    wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_wrapper_script.sh"
+    fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
     post_processing_script: ClassVar[str] = f"{bin_dir}/coursier_post_processing_script.py"
+    post_process_stderr: ClassVar[str] = f"{bin_dir}/coursier_post_process_stderr.py"
     cache_name: ClassVar[str] = "coursier"
     cache_dir: ClassVar[str] = ".cache"
     working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
-        return tuple((*wrapper, os.path.join(self.bin_dir, self.coursier.exe), *args))
+        return (
+            self.post_process_stderr,
+            *wrapper,
+            os.path.join(self.bin_dir, self.coursier.exe),
+            *args,
+        )
 
     @property
     def env(self) -> dict[str, str]:
@@ -174,7 +197,7 @@ async def invoke_coursier_wrapper(
     return Process(
         argv=coursier.args(
             request.args,
-            wrapper=[bash.path, coursier.wrapper_script],
+            wrapper=[bash.path, coursier.fetch_wrapper_script],
         ),
         input_digest=request.input_digest,
         immutable_input_digests=coursier.immutable_input_digests,
@@ -193,12 +216,14 @@ async def setup_coursier(
     python: PythonBinary,
 ) -> Coursier:
     repos_args = " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
-    coursier_wrapper_script = COURSIER_WRAPPER_SCRIPT.format(
+    coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
         coursier_working_directory=Coursier.working_directory_placeholder,
         python_path=python.path,
         coursier_bin_dir=Coursier.bin_dir,
     )
+
+    post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)
 
     downloaded_coursier_get = Get(
         DownloadedExternalTool,
@@ -210,13 +235,18 @@ async def setup_coursier(
         CreateDigest(
             [
                 FileContent(
-                    os.path.basename(Coursier.wrapper_script),
+                    os.path.basename(Coursier.fetch_wrapper_script),
                     coursier_wrapper_script.encode("utf-8"),
                     is_executable=True,
                 ),
                 FileContent(
                     os.path.basename(Coursier.post_processing_script),
                     COURSIER_POST_PROCESSING_SCRIPT.encode("utf-8"),
+                    is_executable=True,
+                ),
+                FileContent(
+                    os.path.basename(Coursier.post_process_stderr),
+                    post_process_stderr.encode("utf-8"),
                     is_executable=True,
                 ),
             ]
