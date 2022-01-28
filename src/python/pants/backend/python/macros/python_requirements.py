@@ -103,7 +103,7 @@ async def generate_from_python_requirement(
         requirements, lambda parsed_req: parsed_req.project_name
     )
 
-    generator[PythonRequirementCompatibleResolvesField].validate(python_setup)
+    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value

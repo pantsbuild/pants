@@ -114,18 +114,16 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         # TODO: Document expectations for dependencies once we validate that.
     )
 
-    def value_or_default(self, python_setup: PythonSetup) -> str:
-        return self.value or python_setup.default_resolve
-
-    def validate(self, python_setup: PythonSetup) -> None:
-        """Check that the resolve name is recognized."""
-        resolve = self.value_or_default(python_setup)
+    def normalized_value(self, python_setup: PythonSetup) -> str:
+        """Get the value after applying the default and validating that the key is recognized."""
+        resolve = self.value or python_setup.default_resolve
         if resolve not in python_setup.resolves:
             raise UnrecognizedResolveNamesError(
                 [resolve],
                 python_setup.resolves.keys(),
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
+        return resolve
 
     def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
         """If configured, return the resolve name with its lockfile.
@@ -134,8 +132,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         """
         if not python_setup.enable_resolves:
             return None
-        self.validate(python_setup)
-        resolve = self.value_or_default(python_setup)
+        resolve = self.normalized_value(python_setup)
         return (resolve, python_setup.resolves[resolve])
 
 
@@ -151,18 +148,17 @@ class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
         # TODO: Document expectations for dependencies once we validate that.
     )
 
-    def value_or_default(self, python_setup: PythonSetup) -> tuple[str, ...]:
-        return self.value or (python_setup.default_resolve,)
-
-    def validate(self, python_setup: PythonSetup) -> None:
-        """Check that the resolve names are recognized."""
-        invalid_resolves = set(self.value_or_default(python_setup)) - set(python_setup.resolves)
+    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
+        """Get the value after applying the default and validating every key is recognized."""
+        value_or_default = self.value or (python_setup.default_resolve,)
+        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
         if invalid_resolves:
             raise UnrecognizedResolveNamesError(
                 sorted(invalid_resolves),
                 python_setup.resolves.keys(),
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
+        return value_or_default
 
 
 # -----------------------------------------------------------------------------------------------

@@ -155,6 +155,8 @@ async def generate_lockfile(
                     "--style=universal",
                     "--resolver-version",
                     "pip-2020-resolver",
+                    # This makes diffs more readable when lockfiles change.
+                    "--indent=2",
                     *python_repos.pex_args,
                     *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
@@ -274,8 +276,7 @@ async def setup_user_lockfile_requests(
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementCompatibleResolvesField, PythonRequirementsField)):
             continue
-        tgt[PythonRequirementCompatibleResolvesField].validate(python_setup)
-        for resolve in tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup):
+        for resolve in tgt[PythonRequirementCompatibleResolvesField].normalized_value(python_setup):
             resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
     return UserGenerateLockfiles(
