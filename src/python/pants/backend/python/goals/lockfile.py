@@ -54,10 +54,6 @@ class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
     use_pex: bool = False
-    # Only kept for `[python].experimental_lockfile`, which is not using the new
-    # "named resolve" semantics yet.
-    _description: str | None = None
-    _regenerate_command: str | None = None
 
     @classmethod
     def from_tool(
@@ -163,7 +159,7 @@ async def generate_lockfile(
                     *req.requirements,
                 ),
                 output_files=("lock.json",),
-                description=req._description or f"Generate lockfile for {req.resolve_name}",
+                description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
                 # necessary so that our invalidation is resilient to deleting LMDB or running on a
@@ -208,7 +204,7 @@ async def generate_lockfile(
                 argv=("lock",),
                 input_digest=_pyproject_toml_digest,
                 output_files=("poetry.lock", "pyproject.toml"),
-                description=req._description or f"Generate lockfile for {req.resolve_name}",
+                description=f"Generate lockfile for {req.resolve_name}",
                 cache_scope=ProcessCacheScope.PER_SESSION,
             ),
         )
@@ -236,7 +232,6 @@ async def generate_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
             generate_lockfiles_subsystem.custom_command
-            or req._regenerate_command
             or f"./pants generate-lockfiles --resolve={req.resolve_name}"
         ),
     )
