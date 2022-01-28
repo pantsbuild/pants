@@ -56,7 +56,7 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """
 )
 
-COURSIER_WRAPPER_SCRIPT = textwrap.dedent(
+COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
     """\
     set -eux
 
@@ -139,7 +139,7 @@ class Coursier:
     _digest: Digest
 
     bin_dir: ClassVar[str] = "__coursier"
-    wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_wrapper_script.sh"
+    fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
     post_processing_script: ClassVar[str] = f"{bin_dir}/coursier_post_processing_script.py"
     post_process_stderr: ClassVar[str] = f"{bin_dir}/coursier_post_process_stderr.py"
     cache_name: ClassVar[str] = "coursier"
@@ -196,7 +196,7 @@ async def invoke_coursier_wrapper(
     return Process(
         argv=coursier.args(
             request.args,
-            wrapper=[bash.path, coursier.wrapper_script],
+            wrapper=[bash.path, coursier.fetch_wrapper_script],
         ),
         input_digest=request.input_digest,
         immutable_input_digests=coursier.immutable_input_digests,
@@ -215,7 +215,7 @@ async def setup_coursier(
     python: PythonBinary,
 ) -> Coursier:
     repos_args = " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
-    coursier_wrapper_script = COURSIER_WRAPPER_SCRIPT.format(
+    coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
         coursier_working_directory=Coursier.working_directory_placeholder,
         python_path=python.path,
@@ -234,7 +234,7 @@ async def setup_coursier(
         CreateDigest(
             [
                 FileContent(
-                    os.path.basename(Coursier.wrapper_script),
+                    os.path.basename(Coursier.fetch_wrapper_script),
                     coursier_wrapper_script.encode("utf-8"),
                     is_executable=True,
                 ),
