@@ -1,9 +1,10 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from string import Template
 from textwrap import indent
-from typing import Optional
+from typing import List, Optional
 
 DEFAULT_TEMPLATE = """
 def make_exe():
@@ -15,7 +16,7 @@ def make_exe():
     policy.resources_location_fallback = "filesystem-relative:lib"
 
     python_config = dist.make_python_interpreter_config()
-    $ENTRY_POINT
+    $RUN_MODULE
 
     exe = dist.to_python_executable(
         name="$NAME",
@@ -53,26 +54,19 @@ for resource in exe.pip_install($UNCLASSIFIED_RESOURCES):
 """
 
 
+@dataclass(frozen=True, unsafe_hash=True)
 class PyOxidizerConfig:
-    def __init__(
-        self,
-        executable_name: str,
-        wheels: list[str],
-        entry_point: Optional[str] = None,
-        template: Optional[str] = None,
-        unclassified_resources: Optional[list[str]] = None,
-    ):
-        self.executable_name = executable_name
-        self.wheels = wheels
-        self.entry_point = (
-            f"python_config.run_module = '{entry_point}'"
-            if entry_point is not None
-            else ""
-        )
-        self.template = template
-        self.unclassified_resources = unclassified_resources
+    executable_name: str
+    wheels: List[str]
+    entry_point: Optional[str] = None
+    template: Optional[str] = None
+    unclassified_resources: Optional[List[str]] = None
 
-    def output(self) -> str:
+    @property
+    def run_module(self) -> str:
+        return f"python_config.run_module = '{self.entry_point}'" if self.entry_point is not None else ""
+
+    def render(self) -> str:
         unclassified_resource_snippet = ""
         if self.unclassified_resources is not None:
             unclassified_resource_snippet = Template(
@@ -87,6 +81,6 @@ class PyOxidizerConfig:
         return template.safe_substitute(
             NAME=self.executable_name,
             WHEELS=self.wheels,
-            ENTRY_POINT=self.entry_point,
+            RUN_MODULE=self.run_module,
             UNCLASSIFIED_RESOURCE_INSTALLATION=unclassified_resource_snippet,
         )

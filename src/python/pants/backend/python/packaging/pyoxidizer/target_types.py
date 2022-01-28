@@ -56,7 +56,7 @@ class PyOxidizerConfigSourceField(SingleSourceField):
         Path is relative to the BUILD file's directory.
         Template requires a .bzlt extension. Parameters must be prefixed by $ or surrounded with ${ }
         Template parameters:
-            - ENTRY_POINT - The entry_point passed to this target (or None).
+            - RUN_MODULE - The re-formatted entry_point passed to this target (or None).
             - NAME - This target's name.
             - WHEELS - All python distributions passed to this target (or []).
             - UNCLASSIFIED_RESOURCE_INSTALLATION - This will populate a snippet of code to correctly inject the targets filesystem_resources.
