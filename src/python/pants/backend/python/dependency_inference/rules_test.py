@@ -42,6 +42,7 @@ def test_infer_python_imports(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
@@ -204,7 +205,10 @@ def test_infer_python_resources() -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        args = ["--source-root-patterns=src/python", "--python-infer-string-resources"]
+        args = [
+            "--source-root-patterns=src/python",
+            "--python-infer-resources-and-files-from-strings",
+        ]
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
@@ -235,6 +239,7 @@ def test_infer_python_inits() -> None:
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_init_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
@@ -287,6 +292,7 @@ def test_infer_python_conftests() -> None:
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_conftest_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
@@ -335,6 +341,7 @@ def test_infer_python_strict(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],

@@ -379,6 +379,7 @@ class GenericTarget(Target):
         "that your other targets only need to depend on one thing."
     )
 
+
 # -----------------------------------------------------------------------------------------------
 # `AllResourceAndFileTargets` target
 # -----------------------------------------------------------------------------------------------
@@ -386,6 +387,7 @@ class GenericTarget(Target):
 
 class AllResourceAndFileTargetsRequest:
     pass
+
 
 @dataclass(frozen=True)
 class AllResourceAndFileTargets:

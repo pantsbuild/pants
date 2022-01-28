@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
@@ -11,7 +10,11 @@ import pytest
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonDependencies,
+)
+from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonImportInfo as ImpInfo,
+)
+from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsePythonDependenciesRequest,
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
@@ -493,15 +496,15 @@ def test_resources(rule_runner: RuleRunner, min_slashes: int) -> None:
     )
 
     potentially_valid = {
-        'data/a.json',
-        'data/a.txt',
-        'data/a.tar.gz',
-        'data/subdir1/a.json',
-        'data/subdir1/subdir2/a.json',
-        'data/subdir1/subdir2/subdir3/a.json',
-        '狗/狗.狗',
-        '//foo.bar',
-        '//foo/////bar.txt',
+        "data/a.json",
+        "data/a.txt",
+        "data/a.tar.gz",
+        "data/subdir1/a.json",
+        "data/subdir1/subdir2/a.json",
+        "data/subdir1/subdir2/subdir3/a.json",
+        "狗/狗.狗",
+        "//foo.bar",
+        "//foo/////bar.txt",
     }
     expected = [s for s in potentially_valid if s.count("/") >= min_slashes]
 
