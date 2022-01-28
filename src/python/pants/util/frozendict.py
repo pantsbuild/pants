@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, overload
+from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
 
@@ -88,12 +88,33 @@ class FrozenDict(Mapping[K, V]):
         return f"{type(self).__name__}({self._data!r})"
 
 
-class LazyFrozenDict(FrozenDict[K, Callable[[], V]]):
+class LazyFrozenDict(FrozenDict[K, V]):
     """A lazy version of `FrozenDict` where the values are not loaded until referenced."""
 
-    def __getitem__(self, k: K) -> V:  # type: ignore[override]
+    @overload
+    def __init__(
+        self, __items: Iterable[tuple[K, Callable[[], V]]], **kwargs: Callable[[], V]
+    ) -> None:
+        ...
+
+    @overload
+    def __init__(self, __other: Mapping[K, Callable[[], V]], **kwargs: Callable[[], V]) -> None:
+        ...
+
+    @overload
+    def __init__(self, **kwargs: Callable[[], V]) -> None:
+        ...
+
+    def __init__(
+        self,
+        *item: Mapping[K, Callable[[], V]] | Iterable[tuple[K, Callable[[], V]]],
+        **kwargs: Callable[[], V],
+    ) -> None:
+        super().__init__(*item, **kwargs)  # type: ignore[arg-type]
+
+    def __getitem__(self, k: K) -> V:
         return self._get_value(k)
 
     @memoized_method
     def _get_value(self, k: K) -> V:
-        return self._data[k]()
+        return cast("Callable[[], V]", self._data[k])()
