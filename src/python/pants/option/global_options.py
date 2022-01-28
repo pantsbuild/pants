@@ -53,6 +53,13 @@ MEGABYTES = 1_000_000
 GIGABYTES = 1_000 * MEGABYTES
 
 
+class DynamicUIRenderer(Enum):
+    """Which renderer to use for dyanmic UI."""
+
+    indicatif_spinner = "indicatif-spinner"
+    experimental_prodash = "experimental-prodash"
+
+
 class FilesNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
@@ -1322,6 +1329,12 @@ class GlobalOptions(Subsystem):
             help="Display a dynamically-updating console UI as Pants runs. This is true by default "
             "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
             "Pants is running in a continuous integration environment.",
+        )
+        register(
+            "--dynamic-ui-renderer",
+            type=DynamicUIRenderer,
+            default=DynamicUIRenderer.indicatif_spinner,
+            help="If `--dynamic-ui` is enabled, selects the renderer.",
         )
 
         register(
