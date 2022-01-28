@@ -199,14 +199,8 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run_pants_help_all() -> dict[str, Any]:
-    deactivated_backends = [
-        "internal_plugins.releases",
-        "pants.backend.experimental.java.debug_goals",
-        "pants.backend.experimental.scala.debug_goals",
-    ]
-    deactivated_plugins = ["toolchain.pants.plugin==0.17.0"]
-    # List all (stable enough) backends here, even if we use them internally.
-    activated_backends = [
+    # List all (stable enough) backends here.
+    backends = [
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.python",
         "pants.backend.experimental.codegen.thrift.apache.python",
@@ -238,9 +232,8 @@ def run_pants_help_all() -> dict[str, Any]:
     argv = [
         "./pants",
         "--concurrent",
-        f"--plugins=-[{', '.join(map(repr, deactivated_plugins))}]",
-        f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
-        f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
+        "--plugins=[]",
+        f"--backend-packages={repr(backends)}",
         "--no-verify-config",
         "--remote-auth-plugin= ",
         "help-all",
