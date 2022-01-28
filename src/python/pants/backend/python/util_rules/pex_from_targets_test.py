@@ -82,16 +82,16 @@ def test_no_compatible_resolve_error() -> None:
     assert str(NoCompatibleResolveException(python_setup, "Prefix", targets)).startswith(
         dedent(
             """\
-        Prefix:
+            Prefix:
 
-        a:
-          * //:t1
-          * //:t2
+            a:
+              * //:t1
+              * //:t2
 
-        b:
-          * //:t1
-          * //:t3
-        """
+            b:
+              * //:t1
+              * //:t3
+            """
         )
     )
 

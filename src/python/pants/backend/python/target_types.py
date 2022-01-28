@@ -752,7 +752,6 @@ class PythonSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
-        # TODO(#12314): Switch to compatible_resolves if relevant.
         PythonResolveField,
         PythonSourceField,
     )
@@ -791,7 +790,6 @@ class PythonTestUtilsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
-        # TODO(#12314): Switch to compatible_resolves if relevant.
         PythonResolveField,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
@@ -812,7 +810,6 @@ class PythonSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
-        # TODO(#12314): Switch to compatible_resolves if relevant.
         PythonResolveField,
         PythonSourcesGeneratingSourcesField,
         PythonSourcesOverridesField,

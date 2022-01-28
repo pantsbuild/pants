@@ -264,7 +264,7 @@ async def choose_python_resolve(
             "If you encountered this bug while using core Pants functionality, please open a "
             "bug at https://github.com/pantsbuild/pants/issues/new with this error message when "
             "`--print-stacktrace` is enabled. If this is from your own plugin, register "
-            "`PythonResolveField` on the relevant target types.)"
+            "`PythonResolveField` on the relevant target types."
         )
     if len(root_resolves) > 1:
         raise NoCompatibleResolveException(
