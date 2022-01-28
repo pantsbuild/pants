@@ -75,7 +75,7 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
 )
 
 
-# TODO: Coursier renders this line on macOS.
+# TODO: Coursier renders setrlimit error line on macOS.
 #   see https://github.com/pantsbuild/pants/issues/13942.
 POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
     """\
@@ -87,6 +87,7 @@ POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
 
     sys.stdout.buffer.write(proc.stdout)
     sys.stderr.buffer.write(proc.stderr.replace(b"setrlimit to increase file descriptor limit failed, errno 22\\n", b""))
+    sys.exit(proc.returncode)
     """
 )
 
