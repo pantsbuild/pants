@@ -147,13 +147,11 @@ class Coursier:
     working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
-        return tuple(
-            (
-                self.post_process_stderr,
-                *wrapper,
-                os.path.join(self.bin_dir, self.coursier.exe),
-                *args,
-            )
+        return (
+            self.post_process_stderr,
+            *wrapper,
+            os.path.join(self.bin_dir, self.coursier.exe),
+            *args,
         )
 
     @property
