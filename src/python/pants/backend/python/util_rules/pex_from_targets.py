@@ -187,6 +187,27 @@ async def interpreter_constraints_for_targets(
     return interpreter_constraints
 
 
+@dataclass(frozen=True)
+class ChosenPythonResolve:
+    name: str
+    lockfile_path: str
+
+
+@dataclass(frozen=True)
+class ChosenPythonResolveRequest:
+    addresses: Addresses
+
+
+@rule
+async def choose_python_resolve(
+    request: ChosenPythonResolveRequest, python_setup: PythonSetup
+) -> ChosenPythonResolve:
+    return ChosenPythonResolve(
+        name=python_setup.default_resolve,
+        lockfile_path=python_setup.resolves[python_setup.default_resolve],
+    )
+
+
 class GlobalRequirementConstraints(DeduplicatedCollection[PipRequirement]):
     """Global constraints specified by the `[python].requirement_constraints` setting, if any."""
 
@@ -376,18 +397,19 @@ async def get_repository_pex(
             "`[python].requirement_constraints` must also be set."
         )
     elif python_setup.enable_resolves:
-        # TODO: compute the resolve based on request.addresses, and validate that the
-        #  transitive closure is compatible. See coursier_fetch.py for inspiration.
-        resolve = python_setup.default_resolve
-        lockfile = python_setup.resolves[resolve]
+        chosen_resolve = await Get(
+            ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+        )
         repository_pex_request = PexRequest(
-            description=f"Installing {lockfile} for the resolve `{resolve}`",
-            output_filename=f"{path_safe(resolve)}_lockfile.pex",
+            description=(
+                f"Installing {chosen_resolve.lockfile_path} for the resolve `{chosen_resolve.name}`"
+            ),
+            output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
             internal_only=request.internal_only,
             requirements=Lockfile(
-                file_path=lockfile,
+                file_path=chosen_resolve.lockfile_path,
                 file_path_description_of_origin=(
-                    f"the resolve `{resolve}` (from `[python].experimental_resolves`)"
+                    f"the resolve `{chosen_resolve.name}` (from `[python].experimental_resolves`)"
                 ),
                 # TODO(#12314): Hook up lockfile staleness check.
                 lockfile_hex_digest=None,
