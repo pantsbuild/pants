@@ -11,9 +11,9 @@ cd "$REPO_ROOT" || exit 1
 source "${REPO_ROOT}/build-support/common.sh"
 
 # To solve the chicken and egg problem of https://github.com/pantsbuild/pants/issues/12457, we
-# temporarily disable the lockfile. This means that `./pants run` will ignore the lockfile. While
-# the script is then running, it will set the option again to generate the lockfile where we want.
-export PANTS_PYTHON_EXPERIMENTAL_LOCKFILE=""
+# temporarily disable resolves. This means that `./pants run` will not use a lockfile. While
+# the script is then running, it will set the option again to generate the lockfile.
+export PANTS_PYTHON_ENABLE_RESOLVES=false
 
 if is_macos_arm; then
   # Generate the lockfiles with the correct notated interpreter constraints, but make

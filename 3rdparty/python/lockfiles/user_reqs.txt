@@ -19,6 +19,7 @@
 #     "packaging==21.3",
 #     "pex==2.1.65",
 #     "psutil==5.9.0",
+#     "pydevd-pycharm==203.5419.8",
 #     "pytest<6.3,>=6.2.4",
 #     "requests[security]>=2.25.1",
 #     "setproctitle==1.2.2",
@@ -180,6 +181,8 @@ psutil==5.9.0; (python_version >= "2.6" and python_full_version < "3.0.0") or (p
 py==1.11.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6" \
     --hash=sha256:607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378 \
     --hash=sha256:51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719
+pydevd-pycharm==203.5419.8 \
+    --hash=sha256:21e8035830546d89caf8669b0d01d4626c9c8d51799b591d522a6fd5a50b539c
 pyparsing==3.0.7; python_version >= "3.6" \
     --hash=sha256:a6c06a88f252e6c322f65faf8f418b16213b51bdfaece0524c1c1bc30c63c484 \
     --hash=sha256:18ee9022775d270c55187733956460083db60b37d0d0fb357445f3094eed3eea
