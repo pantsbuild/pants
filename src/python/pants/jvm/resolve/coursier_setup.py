@@ -75,17 +75,19 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
 )
 
 
+# TODO: Coursier renders this line on macOS.
+#   see https://github.com/pantsbuild/pants/issues/13942.
 POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
     """\
-#!{python_path}
-import sys
-from subprocess import run, PIPE
+    #!{python_path}
+    import sys
+    from subprocess import run, PIPE
 
-proc = run(sys.argv[1:], stdout=PIPE, stderr=PIPE)
+    proc = run(sys.argv[1:], stdout=PIPE, stderr=PIPE)
 
-sys.stdout.buffer.write(proc.stdout)
-sys.stderr.buffer.write(proc.stderr.replace(b"setrlimit to increase file descriptor limit failed, errno 22\\n", b""))
-"""
+    sys.stdout.buffer.write(proc.stdout)
+    sys.stderr.buffer.write(proc.stderr.replace(b"setrlimit to increase file descriptor limit failed, errno 22\\n", b""))
+    """
 )
 
 
