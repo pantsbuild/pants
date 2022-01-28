@@ -222,8 +222,7 @@ async def map_third_party_modules_to_addresses(
     ] = {}
 
     for tgt in all_python_tgts.third_party:
-        tgt[PythonRequirementCompatibleResolvesField].validate(python_setup)
-        resolves = tgt[PythonRequirementCompatibleResolvesField].value_or_default(python_setup)
+        resolves = tgt[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
             for resolve in resolves:
