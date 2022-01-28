@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -15,7 +16,9 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
+    PythonCompatibleResolvesField,
     PythonRequirementsField,
+    PythonResolveField,
     parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -40,11 +43,11 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import path_safe
+from pants.util.strutil import bullet_list, path_safe
 
 logger = logging.getLogger(__name__)
 
@@ -198,13 +201,103 @@ class ChosenPythonResolveRequest:
     addresses: Addresses
 
 
+# Note: Inspired by `coursier_fetch.py`.
+class NoCompatibleResolveException(Exception):
+    """No compatible resolve could be found for a set of targets."""
+
+    def __init__(
+        self, python_setup: PythonSetup, msg_prefix: str, relevant_targets: Iterable[Target]
+    ) -> None:
+        resolves_to_addresses = defaultdict(list)
+        for tgt in relevant_targets:
+            if tgt.has_field(PythonResolveField):
+                resolve = tgt[PythonResolveField].normalized_value(python_setup)
+                resolves_to_addresses[resolve].append(tgt.address.spec)
+            elif tgt.has_field(PythonCompatibleResolvesField):
+                resolves = tgt[PythonCompatibleResolvesField].normalized_value(python_setup)
+                for resolve in resolves:
+                    resolves_to_addresses[resolve].append(tgt.address.spec)
+
+        formatted_resolve_lists = "\n\n".join(
+            f"{resolve}:\n{bullet_list(sorted(addresses))}"
+            for resolve, addresses in sorted(resolves_to_addresses.items())
+        )
+        super().__init__(
+            f"{msg_prefix}:\n\n"
+            f"{formatted_resolve_lists}\n\n"
+            "Targets which will be used together must all have the same resolve (from the "
+            f"[resolve]({doc_url('reference-python_test#codeexperimental_resolvecode')}) or "
+            f"[compatible_resolves]({doc_url('reference-python_requirement#codeexperimental_compatible_resolvescode')}) "
+            "fields) in common."
+        )
+
+
 @rule
 async def choose_python_resolve(
     request: ChosenPythonResolveRequest, python_setup: PythonSetup
 ) -> ChosenPythonResolve:
+    # If there are no targets, we fall back to the default resolve. This is relevant,
+    # for example, when running `./pants repl` with no specs.
+    if not request.addresses:
+        return ChosenPythonResolve(
+            name=python_setup.default_resolve,
+            lockfile_path=python_setup.resolves[python_setup.default_resolve],
+        )
+
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+
+    # First, choose the resolve by inspecting the root targets.
+    root_resolves = {
+        root[PythonResolveField].normalized_value(python_setup)
+        for root in transitive_targets.roots
+        if root.has_field(PythonResolveField)
+    }
+    if not root_resolves:
+        root_targets = bullet_list(
+            f"{tgt.address.spec} ({tgt.alias})" for tgt in transitive_targets.roots
+        )
+        raise AssertionError(
+            "Used `ChosenPythonResolveRequest` with input addresses that don't have the "
+            f"`PythonResolveField` field registered:\n\n{root_targets}\n\n"
+            "If you encountered this bug while using core Pants functionality, please open a "
+            "bug at https://github.com/pantsbuild/pants/issues/new with this error message when "
+            "`--print-stacktrace` is enabled. If this is from your own plugin, register "
+            "`PythonResolveField` on the relevant target types.)"
+        )
+    if len(root_resolves) > 1:
+        raise NoCompatibleResolveException(
+            python_setup,
+            "The input targets did not have a resolve in common",
+            transitive_targets.roots,
+        )
+
+    chosen_resolve = next(iter(root_resolves))
+
+    # Then, validate that all transitive deps are compatible.
+    for tgt in transitive_targets.dependencies:
+        invalid_resolve_field = (
+            tgt.has_field(PythonResolveField)
+            and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
+        )
+        invalid_compatible_resolves_field = tgt.has_field(
+            PythonCompatibleResolvesField
+        ) and not any(
+            resolve == chosen_resolve
+            for resolve in tgt[PythonCompatibleResolvesField].normalized_value(python_setup)
+        )
+        if invalid_resolve_field or invalid_compatible_resolves_field:
+            plural = ("s", "their") if len(transitive_targets.roots) > 1 else ("", "its")
+            raise NoCompatibleResolveException(
+                python_setup,
+                (
+                    f"The resolve chosen for the root target{plural[0]} was {chosen_resolve}, but "
+                    f"some of {plural[1]} dependencies are not compatible with that resolve"
+                ),
+                transitive_targets.closure,
+            )
+
     return ChosenPythonResolve(
-        name=python_setup.default_resolve,
-        lockfile_path=python_setup.resolves[python_setup.default_resolve],
+        name=chosen_resolve, lockfile_path=python_setup.resolves[chosen_resolve]
     )
 
 
