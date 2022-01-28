@@ -167,24 +167,18 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def update_internal_lockfiles(
-    *, python_user_lockfile: bool = True, internal_tools: bool = True
-) -> None:
-    args = ["./pants", "--concurrent"]
-    if python_user_lockfile:
-        args.extend(
-            [
-                "--tag=-lockfile_ignore",
-                # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
-                # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
-                # restore it here so that the lockfile gets generated properly.
-                "--python-experimental-lockfile=3rdparty/python/lockfiles/user_reqs.txt",
-                "generate-user-lockfile",
-                "::",
-            ]
-        )
-    if internal_tools:
-        args.append("generate-lockfiles")
+def update_internal_lockfiles(specified: list[str] | None) -> None:
+    args = [
+        "./pants",
+        "--concurrent",
+        # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
+        # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
+        # restore it here so that the lockfile gets generated properly.
+        "--python-enable-resolves",
+        "generate-lockfiles",
+    ]
+    if specified:
+        args.append(f"--resolve={repr(specified)}")
     subprocess.run(args, check=True)
 
 
@@ -208,17 +202,17 @@ def main() -> None:
     args = create_parser().parse_args()
 
     if args.all:
-        update_internal_lockfiles()
+        update_internal_lockfiles(specified=None)
         update_default_lockfiles(specified=None)
         return
 
     if args.pex:
-        update_internal_lockfiles(internal_tools=False)
+        update_internal_lockfiles(specified=["python-default"])
         update_default_lockfiles(specified=[Lambdex.options_scope])
         return
 
     if args.internal:
-        update_internal_lockfiles()
+        update_internal_lockfiles(specified=None)
     if args.tool:
         update_default_lockfiles(specified=args.tool)
 

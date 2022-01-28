@@ -82,8 +82,7 @@ class PythonSetup(Subsystem):
                 "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
                 "information on the format of constraint files and how constraints are applied in "
                 "Pex and pip.\n\n"
-                "Mutually exclusive with `[python].experimental_lockfile` and "
-                "`[python].enable_resolves`."
+                "Mutually exclusive with `[python].enable_resolves`."
             ),
         )
         register(
@@ -106,18 +105,18 @@ class PythonSetup(Subsystem):
         register(
             "--experimental-lockfile",
             advanced=True,
-            # TODO(#11719): Switch this to a file_option once env vars can unset a value.
             type=str,
             metavar="<file>",
             mutually_exclusive_group="lockfile",
-            help=(
-                "The lockfile to use when resolving requirements for your own code (vs. tools you "
-                "run).\n\n"
-                "This is highly experimental and will be replaced by `[python].enable_resolves`.\n\n"
-                "To generate a lockfile, activate the backend `pants.backend.experimental.python`"
-                "and run `./pants generate-user-lockfile ::`.\n\n"
-                "Mutually exclusive with `[python].requirement_constraints` and "
-                "`[python].enable_resolves`."
+            help="Deprecated.",
+            removal_version="2.11.0.dev0",
+            removal_hint=(
+                "Instead, use the improved `[python].experimental_resolves` mechanism. Read its "
+                "help message for more information.\n\n"
+                "If you want to keep using a single resolve like before, update "
+                "`[python].experimental_resolves` with a name for the resolve and the path to "
+                "its lockfile, or use the default. Then make sure that "
+                "`[python].experimental_default_resolve` is set to that resolve name."
             ),
         )
         register(
@@ -129,8 +128,7 @@ class PythonSetup(Subsystem):
             help=(
                 "Set to true to enable the multiple resolves mechanism. See "
                 "`[python].experimental_resolves` for an explanation of this feature.\n\n"
-                "Mutually exclusive with `[python].experimental_lockfile` and "
-                "`[python].requirement_constraints`."
+                "Mutually exclusive with `[python].requirement_constraints`."
             ),
         )
         register(
@@ -140,7 +138,9 @@ class PythonSetup(Subsystem):
             default={"python-default": "3rdparty/python/default_lock.txt"},
             help=(
                 "A mapping of logical names to lockfile paths used in your project.\n\n"
-                # TODO(#12314): explain how this feature works.
+                "For now, things only work properly if you define a single resolve and set "
+                "`[python].experimental_default_resolve` to that value. We are close to "
+                "properly supporting multiple (disjoint) resolves.\n\n"
                 "To generate a lockfile, run `./pants generate-lockfiles --resolve=<name>` or "
                 "`./pants generate-lockfiles` to generate for all resolves (including tool "
                 "lockfiles).\n\n"
@@ -156,7 +156,6 @@ class PythonSetup(Subsystem):
             help=(
                 "The default value used for the `experimental_resolve` and "
                 "`experimental_compatible_resolves` fields.\n\n"
-                "Only applies if `[python].enable_resolves` is true.\n\n"
                 "The name must be defined as a resolve in `[python].experimental_resolves`.\n\n"
                 "This option is experimental and may change without the normal deprecation policy."
             ),
@@ -286,10 +285,6 @@ class PythonSetup(Subsystem):
     def requirement_constraints(self) -> str | None:
         """Path to constraint file."""
         return cast("str | None", self.options.requirement_constraints)
-
-    @property
-    def lockfile(self) -> str | None:
-        return cast("str | None", self.options.experimental_lockfile)
 
     @property
     def enable_resolves(self) -> bool:

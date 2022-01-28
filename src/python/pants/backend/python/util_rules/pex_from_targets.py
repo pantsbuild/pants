@@ -467,21 +467,6 @@ async def get_repository_pex(
             platforms=request.platforms,
             additional_args=request.additional_lockfile_args,
         )
-    elif python_setup.lockfile:
-        repository_pex_request = PexRequest(
-            description=f"Installing {python_setup.lockfile}",
-            output_filename="lockfile.pex",
-            internal_only=request.internal_only,
-            requirements=Lockfile(
-                file_path=python_setup.lockfile,
-                file_path_description_of_origin="the option `[python].experimental_lockfile`",
-                lockfile_hex_digest=None,
-                req_strings=None,
-            ),
-            interpreter_constraints=interpreter_constraints,
-            platforms=request.platforms,
-            additional_args=request.additional_lockfile_args,
-        )
     return OptionalPexRequest(repository_pex_request)
 
 

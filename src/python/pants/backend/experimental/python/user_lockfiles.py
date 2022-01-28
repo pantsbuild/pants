@@ -5,27 +5,19 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementsField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult
-from pants.engine.addresses import Addresses
-from pants.engine.fs import Workspace
+from pants.base.deprecated import warn_or_error
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
-from pants.util.strutil import pluralize
+from pants.engine.rules import collect_rules, goal_rule
 
 logger = logging.getLogger(__name__)
 
 
-# TODO(#12314): Unify with the `generate-lockfiles` goal. Stop looking at specs and instead have
-#  an option like `--lock-resolves` with a list of named resolves (including tools).
 class GenerateUserLockfileSubsystem(GoalSubsystem):
     name = "generate-user-lockfile"
-    help = "Generate a lockfile for Python user requirements (experimental)."
+    help = (
+        "Deprecated: use the option `[python].experimental_resolves` and the "
+        "`generate-lockfiles` goal instead"
+    )
 
 
 class GenerateUserLockfileGoal(Goal):
@@ -33,59 +25,17 @@ class GenerateUserLockfileGoal(Goal):
 
 
 @goal_rule
-async def generate_user_lockfile_goal(
-    addresses: Addresses,
-    python_setup: PythonSetup,
-    workspace: Workspace,
-) -> GenerateUserLockfileGoal:
-    if python_setup.lockfile is None:
-        logger.warning(
-            "You ran `./pants generate-user-lockfile`, but `[python].experimental_lockfile` "
-            "is not set. Please set this option to the path where you'd like the lockfile for "
-            "your code's dependencies to live."
-        )
-        return GenerateUserLockfileGoal(exit_code=1)
-
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    req_strings = PexRequirements.create_from_requirement_fields(
+async def generate_user_lockfile_goal() -> GenerateUserLockfileGoal:
+    warn_or_error(
+        "2.11.0.dev0",
+        "the `generate-user-lockfile` goal",
         (
-            tgt[PythonRequirementsField]
-            # NB: By looking at the dependencies, rather than the closure, we only generate for
-            # requirements that are actually used in the project.
-            for tgt in transitive_targets.dependencies
-            if tgt.has_field(PythonRequirementsField)
-        ),
-        constraints_strings=(),
-    ).req_strings
-
-    if not req_strings:
-        logger.warning(
-            "No third-party requirements found for the transitive closure, so a lockfile will not "
-            "be generated."
-        )
-        return GenerateUserLockfileGoal(exit_code=0)
-
-    result = await Get(
-        GenerateLockfileResult,
-        GeneratePythonLockfile(
-            requirements=req_strings,
-            # TODO(#12314): Use interpreter constraints from the transitive closure.
-            interpreter_constraints=InterpreterConstraints(python_setup.interpreter_constraints),
-            resolve_name="not yet implemented",
-            lockfile_dest=python_setup.lockfile,
-            _description=(
-                f"Generate lockfile for {pluralize(len(req_strings), 'requirement')}: "
-                f"{', '.join(req_strings)}"
-            ),
-            # TODO(12382): Make this command actually accurate once we figure out the semantics
-            #  for user lockfiles. This is currently misleading.
-            _regenerate_command="./pants generate-user-lockfile ::",
+            "Instead, configure the option `[python].experimental_resolves`, then use the "
+            "`generate-lockfiles` goal. Read the deprecation message on "
+            "`[python].experimental_lockfile` for more information."
         ),
     )
-    workspace.write_digest(result.digest)
-    logger.info(f"Wrote lockfile to {result.path}")
-
-    return GenerateUserLockfileGoal(exit_code=0)
+    return GenerateUserLockfileGoal(exit_code=1)
 
 
 def rules():
