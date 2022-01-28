@@ -102,27 +102,39 @@ async def resolve_plugins(
 
 
 class PluginResolver:
-    def __init__(self, scheduler: BootstrapScheduler) -> None:
+    """Encapsulates the state of plugin loading for the given WorkingSet.
+
+    Plugin loading is inherently stateful, and so this class captures the state of the WorkingSet at
+    creation time, even though it will be mutated by each call to `PluginResolver.resolve`. This
+    makes the inputs to each `resolve(..)` call idempotent, even if the output is not.
+    """
+
+    def __init__(
+        self,
+        scheduler: BootstrapScheduler,
+        interpreter_constraints: Optional[InterpreterConstraints] = None,
+        working_set: Optional[WorkingSet] = None,
+    ) -> None:
         self._scheduler = scheduler
+        self._working_set = working_set or global_working_set
+        self._request = PluginsRequest(
+            interpreter_constraints, tuple(dist.as_requirement() for dist in self._working_set)
+        )
 
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironment,
-        interpreter_constraints: Optional[InterpreterConstraints] = None,
-        working_set: Optional[WorkingSet] = None,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-        working_set = working_set or global_working_set
-        request = PluginsRequest(
-            interpreter_constraints, tuple(dist.as_requirement() for dist in working_set)
-        )
-        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
+        for resolved_plugin_location in self._resolve_plugins(
+            options_bootstrapper, env, self._request
+        ):
             site.addsitedir(
                 resolved_plugin_location
             )  # Activate any .pth files plugin wheels may have.
-            working_set.add_entry(resolved_plugin_location)
-        return working_set
+            self._working_set.add_entry(resolved_plugin_location)
+        return self._working_set
 
     def _resolve_plugins(
         self,
