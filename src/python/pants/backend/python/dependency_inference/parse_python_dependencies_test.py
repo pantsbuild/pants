@@ -7,13 +7,11 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.dependency_inference import parse_python_imports
-from pants.backend.python.dependency_inference.parse_python_imports import (
+from pants.backend.python.dependency_inference import parse_python_deps
+from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ParsedPythonDependencies,
     ParsedPythonImportInfo as ImpInfo,
-)
-from pants.backend.python.dependency_inference.parse_python_imports import (
-    ParsedPythonImports,
-    ParsePythonImportsRequest,
+    ParsePythonDependenciesRequest,
 )
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
@@ -32,24 +30,27 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *parse_python_imports.rules(),
+            *parse_python_deps.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
-            QueryRule(ParsedPythonImports, [ParsePythonImportsRequest]),
+            QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
         ],
         target_types=[PythonSourceTarget],
     )
 
 
-def assert_imports_parsed(
+def assert_deps_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
-    expected: dict[str, ImpInfo],
+    expected_imports: dict[str, ImpInfo] = {},
+    expected_resources: list[str] = [],
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
+    string_resources: bool = True,
+    string_resources_min_slashes: int = 1,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.write_files(
@@ -59,18 +60,23 @@ def assert_imports_parsed(
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t"))
-    imports = rule_runner.request(
-        ParsedPythonImports,
+    result = rule_runner.request(
+        ParsedPythonDependencies,
         [
-            ParsePythonImportsRequest(
+            ParsePythonDependenciesRequest(
                 tgt[PythonSourceField],
                 InterpreterConstraints([constraints]),
                 string_imports=string_imports,
                 string_imports_min_dots=string_imports_min_dots,
+                string_resources=string_resources,
+                string_resources_min_slashes=string_resources_min_slashes,
             )
         ],
     )
-    assert dict(imports) == expected
+    assert dict(result.imports) == expected_imports
+    assert list(result.resources) == sorted(
+        ("project.foo", resource) for resource in expected_resources
+    )
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -107,10 +113,10 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             from project.circular_dep import CircularDep
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
-        expected={
+        expected_imports={
             "__future__.print_function": ImpInfo(lineno=1, weak=False),
             "os": ImpInfo(lineno=3, weak=False),
             "os.path": ImpInfo(lineno=5, weak=False),
@@ -143,10 +149,10 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         )  # pants: no-infer-dep
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
-        expected={
+        expected_imports={
             "pkg_resources": ImpInfo(lineno=1, weak=False),
             "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
             "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
@@ -204,10 +210,10 @@ def test_try_except(rule_runner: RuleRunner) -> None:
             import strong9
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
-        expected={
+        expected_imports={
             "strong1": ImpInfo(lineno=1, weak=False),
             "weak1": ImpInfo(lineno=4, weak=True),
             "weak2": ImpInfo(lineno=7, weak=True),
@@ -243,11 +249,11 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
         )
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
         filename=f"project/util/{basename}",
-        expected={
+        expected_imports={
             "project.util.sibling": ImpInfo(lineno=1, weak=False),
             "project.util.sibling.Nibling": ImpInfo(lineno=2, weak=False),
             "project.util.subdir.child.Child": ImpInfo(lineno=3, weak=False),
@@ -307,20 +313,22 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     }
     expected = {sym: info for sym, info in potentially_valid.items() if sym.count(".") >= min_dots}
 
-    assert_imports_parsed(rule_runner, content, expected=expected, string_imports_min_dots=min_dots)
-    assert_imports_parsed(rule_runner, content, string_imports=False, expected={})
+    assert_deps_parsed(
+        rule_runner, content, expected_imports=expected, string_imports_min_dots=min_dots
+    )
+    assert_deps_parsed(rule_runner, content, string_imports=False, expected_imports={})
 
 
 def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         "import one.two.three; 'one.two.three'",
-        expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
+        expected_imports={"one.two.three": ImpInfo(lineno=1, weak=False)},
     )
 
 
 def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         dedent(
             """\
@@ -329,16 +337,16 @@ def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
                 except ImportError: pass
             """
         ),
-        expected={"one.two.three": ImpInfo(lineno=1, weak=False)},
+        expected_imports={"one.two.three": ImpInfo(lineno=1, weak=False)},
     )
 
 
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, "x =", expected={})
+    assert_deps_parsed(rule_runner, "x =", expected_imports={})
 
 
 def test_handle_unicode(rule_runner: RuleRunner) -> None:
-    assert_imports_parsed(rule_runner, "x = 'äbç'", expected={})
+    assert_deps_parsed(rule_runner, "x = 'äbç'", expected_imports={})
 
 
 @skip_unless_python27_present
@@ -367,11 +375,11 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         finally: import strong3
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
         constraints="==2.7.*",
-        expected={
+        expected_imports={
             "demo": ImpInfo(lineno=4, weak=False),
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
             "pkg_resources": ImpInfo(lineno=7, weak=False),
@@ -404,11 +412,11 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         importlib.import_module("dep.from.str")
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
         constraints=">=3.8",
-        expected={
+        expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
             "pkg_resources": ImpInfo(lineno=8, weak=False),
@@ -437,11 +445,11 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         importlib.import_module("dep.from.str")
         """
     )
-    assert_imports_parsed(
+    assert_deps_parsed(
         rule_runner,
         content,
         constraints=">=3.9",
-        expected={
+        expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),
             "pkg_resources": ImpInfo(lineno=10, weak=False),

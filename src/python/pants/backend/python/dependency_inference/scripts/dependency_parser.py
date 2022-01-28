@@ -17,12 +17,23 @@ import sys
 import tokenize
 from io import open
 
+STRING_IMPORTS = os.environ["STRING_IMPORTS"] == "y"
 MIN_DOTS = os.environ["MIN_DOTS"]
+STRING_RESOURCES = os.environ["STRING_RESOURCES"] == "y"
+MIN_SLASHES = os.environ["MIN_SLASHES"]
 
 # This regex is used to infer imports from strings, e.g.
 #  `importlib.import_module("example.subdir.Foo")`.
 STRING_IMPORT_REGEX = re.compile(
     r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
+    re.UNICODE,
+)
+# This regex is used to infer resource names from strings, e.g.
+#  `load_resource("data/db1.json")
+# Since Unix allows basically anything for filenames, we require some "sane" subset of possibilities
+#  namely, word-character filenames and a mandatory extension.
+STRING_RESOURCE_REGEX = re.compile(
+    r"^([\w]*\/){" + MIN_SLASHES + r",}\w*(\.[^\/\.]+)+$",
     re.UNICODE,
 )
 
@@ -38,11 +49,8 @@ class AstVisitor(ast.NodeVisitor):
         #   weak/strong)
         self.strong_imports = {}
         self.weak_imports = {}
+        self.resources = set()
         self._weaken_strong_imports = False
-
-    def maybe_add_string_import(self, node, s):
-        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
-            self.weak_imports.setdefault(s, node.lineno)
 
     def add_strong_import(self, name, lineno):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
@@ -80,6 +88,12 @@ class AstVisitor(ast.NodeVisitor):
                 self.add_strong_import(import_prefix + alias.name, token[3][0] + node.lineno - 1)
             if alias.asname and token[1] != alias.asname:
                 consume_until(alias.asname)
+
+    def maybe_add_string_dependency(self, node, s):
+        if STRING_IMPORTS and STRING_IMPORT_REGEX.match(s):
+            self.weak_imports.setdefault(s, node.lineno)
+        if STRING_RESOURCES and STRING_RESOURCE_REGEX.match(s):
+            self.resources.add((None, s))
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
@@ -149,14 +163,14 @@ class AstVisitor(ast.NodeVisitor):
     def visit_Str(self, node):
         try:
             val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
-            self.maybe_add_string_import(node, val)
+            self.maybe_add_string_dependency(node, val)
         except UnicodeError:
             pass
 
     # For Python 3.8+
     def visit_Constant(self, node):
         if isinstance(node.value, str):
-            self.maybe_add_string_import(node, node.value)
+            self.maybe_add_string_dependency(node, node.value)
 
 
 def main(filename):
@@ -176,18 +190,25 @@ def main(filename):
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
 
     # N.B. Start with weak and `update` with definitive so definite "wins"
-    result = {
+    imports_result = {
         module_name: {"lineno": lineno, "weak": True}
         for module_name, lineno in visitor.weak_imports.items()
     }
-    result.update(
+    imports_result.update(
         {
             module_name: {"lineno": lineno, "weak": False}
             for module_name, lineno in visitor.strong_imports.items()
         }
     )
 
-    buffer.write(json.dumps(result).encode("utf8"))
+    buffer.write(
+        json.dumps(
+            {
+                "imports": imports_result,
+                "resources": list(sorted(visitor.resources)),
+            }
+        ).encode("utf8")
+    )
 
 
 if __name__ == "__main__":

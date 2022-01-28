@@ -115,6 +115,11 @@ macos_big_sur_compatibility = true
 experimental_resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
 enable_resolves = true
 
+[python-infer]
+# @TODO: Add the python-infer flags at the BUILD level and move this down into
+# the relevant BUILD files
+string_resources = true
+
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 

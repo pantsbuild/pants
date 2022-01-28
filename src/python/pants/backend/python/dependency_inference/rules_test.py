@@ -28,6 +28,8 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
+from pants.core.target_types import ResourcesGeneratorTarget
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule
@@ -154,6 +156,78 @@ def test_infer_python_imports(caplog) -> None:
     assert "The target src/python/ambiguous/main.py:main imports `ambiguous.dep`" in caplog.text
     assert "['src/python/ambiguous/dep.py:dep1', 'src/python/ambiguous/dep.py:dep2']" in caplog.text
     assert "disambiguated_via_ignores.py" not in caplog.text
+
+
+def test_infer_python_resources() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *import_rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+        ],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            ResourcesGeneratorTarget,
+        ],
+    )
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": "resources(name='jsonfiles', sources=['*.json'])",
+            "src/python/data/db.json": "",
+            "src/python/data/db2.json": "",
+            "src/python/data/flavors.txt": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/db.json")
+                pkgutil.get_data(__name__, "data/db2.json")
+                """
+            ),
+            "src/python/f.py": dedent(
+                """\
+                idk_kinda_looks_resourcey = "data/db.json"
+                CustomResourceType("data/flavors.txt")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources()
+                # Also test resources declared from parent dir
+                resources(
+                    name="txtfiles",
+                    sources=["data/*.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    def run_dep_inference(address: Address) -> InferredDependencies:
+        args = ["--source-root-patterns=src/python", "--python-infer-string-resources"]
+        rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+        target = rule_runner.get_target(address)
+        return rule_runner.request(
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
+        )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db2.json"),
+        ],
+    )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="f.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python", target_name="txtfiles", relative_file_path="data/flavors.txt"),
+        ],
+    )
 
 
 def test_infer_python_inits() -> None:

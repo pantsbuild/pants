@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from textwrap import dedent
 
@@ -24,6 +26,7 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     Dependencies,
     FieldSet,
     FieldSetsPerTarget,
@@ -375,6 +378,34 @@ class GenericTarget(Target):
         'dependencies", i.e. you can group several different targets into one single target so '
         "that your other targets only need to depend on one thing."
     )
+
+# -----------------------------------------------------------------------------------------------
+# `AllResourceAndFileTargets` target
+# -----------------------------------------------------------------------------------------------
+
+
+class AllResourceAndFileTargetsRequest:
+    pass
+
+@dataclass(frozen=True)
+class AllResourceAndFileTargets:
+    resources: tuple[Target, ...]
+    files: tuple[Target, ...]
+
+
+@rule(desc="Find all resources in project")
+def find_all_resources(
+    all_targets: AllTargets,
+    _: AllResourceAndFileTargetsRequest,
+) -> AllResourceAndFileTargets:
+    resources = []
+    files = []
+    for tgt in all_targets:
+        if tgt.has_field(ResourceSourceField):
+            resources.append(tgt)
+        if tgt.has_field(FileSourceField):
+            files.append(tgt)
+    return AllResourceAndFileTargets(tuple(resources), tuple(files))
 
 
 # -----------------------------------------------------------------------------------------------

@@ -1,12 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import logging
+import pathlib
 from enum import Enum
-from typing import cast
+from typing import Dict, Iterator, cast
 
-from pants.backend.python.dependency_inference import module_mapper, parse_python_imports
+from pants.backend.python.dependency_inference import module_mapper, parse_python_deps
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
@@ -14,9 +17,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.parse_python_imports import (
-    ParsedPythonImports,
-    ParsePythonImportsRequest,
+from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ParsedPythonDependencies,
+    ParsedPythonResources,
+    ParsePythonDependenciesRequest,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -27,7 +31,9 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.util_rules import stripped_source_files
+from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.util_rules import resources, stripped_source_files
+from pants.core.util_rules.resources import AllResourcesTargets
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
@@ -37,6 +43,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -97,6 +104,18 @@ class PythonInferSubsystem(Subsystem):
             ),
         )
         register(
+            "--string-resources-and-files",
+            default=False,
+            type=bool,
+            help=("@TODO"),
+        )
+        register(
+            "--string-resources-and-files-min-slashes",
+            default=1,
+            type=int,
+            help=("@TODO"),
+        )
+        register(
             "--inits",
             default=False,
             type=bool,
@@ -149,6 +168,14 @@ class PythonInferSubsystem(Subsystem):
         return cast(int, self.options.string_imports_min_dots)
 
     @property
+    def string_resources(self) -> bool:
+        return cast(bool, self.options.string_resources)
+
+    @property
+    def string_resources_min_slashes(self) -> int:
+        return cast(int, self.options.string_resources_min_slashes)
+
+    @property
     def inits(self) -> bool:
         return cast(bool, self.options.inits)
 
@@ -169,41 +196,66 @@ class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSourceField
 
 
+def _get_inferred_resource_deps(
+    all_resource_targets: AllResourcesTargets,
+    detected_resources: ParsedPythonResources,
+) -> Iterator[Address]:
+    resources_by_path: Dict[pathlib.Path, Target] = {}
+    for file_tgt in all_resource_targets.files:
+        resources_by_path[pathlib.Path(file_tgt[FileSourceField].file_path)] = file_tgt
+    for resource_tgt in all_resource_targets.resources:
+        path = pathlib.Path(resource_tgt[ResourceSourceField].file_path)
+        resources_by_path[path] = resource_tgt
+
+    for pkgname, filepath in detected_resources:
+        resource_path = pathlib.Path(*pkgname.split(".")).parent / filepath
+        inferred_resource_tgt = resources_by_path.get(resource_path)
+        if inferred_resource_tgt:
+            yield inferred_resource_tgt.address
+
+
 @rule(desc="Inferring Python dependencies by analyzing imports")
 async def infer_python_dependencies_via_imports(
     request: InferPythonImportDependencies,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
+    all_resource_targets: AllResourcesTargets,
 ) -> InferredDependencies:
     if not python_infer_subsystem.imports:
         return InferredDependencies([])
 
     _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
     tgt = _wrapped_tgt.target
-    explicitly_provided_deps, parsed_imports = await MultiGet(
+    explicitly_provided_deps, detected_dependencies = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
         Get(
-            ParsedPythonImports,
-            ParsePythonImportsRequest(
+            ParsedPythonDependencies,
+            ParsePythonDependenciesRequest(
                 cast(PythonSourceField, request.sources_field),
                 InterpreterConstraints.create_from_targets([tgt], python_setup),
                 string_imports=python_infer_subsystem.string_imports,
                 string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
+                string_resources=python_infer_subsystem.string_resources,
+                string_resources_min_slashes=python_infer_subsystem.string_resources_min_slashes,
             ),
         ),
     )
 
+    detected_imports = detected_dependencies.imports
+    detected_resources = detected_dependencies.resources
+    inferred_deps: set[Address] = set(
+        _get_inferred_resource_deps(all_resource_targets, detected_resources)
+    )
     resolve = tgt[PythonResolveField].normalized_value(python_setup)
     owners_per_import = await MultiGet(
         Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
-        for imported_module in parsed_imports
+        for imported_module in detected_imports
     )
 
-    merged_result: set[Address] = set()
     unowned_imports: set[str] = set()
     address = tgt.address
-    for owners, imp in zip(owners_per_import, parsed_imports):
-        merged_result.update(owners.unambiguous)
+    for owners, imp in zip(owners_per_import, detected_imports):
+        inferred_deps.update(owners.unambiguous)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
@@ -212,19 +264,19 @@ async def infer_python_dependencies_via_imports(
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
-            merged_result.add(maybe_disambiguated)
+            inferred_deps.add(maybe_disambiguated)
 
         if (
             not owners.unambiguous
             and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
-            and not parsed_imports[imp].weak
+            and not detected_imports[imp].weak
         ):
             unowned_imports.add(imp)
 
     unowned_dependency_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
         unowned_imports_with_lines = [
-            f"{module_name} ({request.sources_field.file_path}:{parsed_imports[module_name].lineno})"
+            f"{module_name} ({request.sources_field.file_path}:{detected_imports[module_name].lineno})"
             for module_name in sorted(unowned_imports)
         ]
         raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
@@ -242,7 +294,7 @@ async def infer_python_dependencies_via_imports(
                 "One or more unowned dependencies detected. Check logs for more details."
             )
 
-    return InferredDependencies(sorted(merged_result))
+    return InferredDependencies(sorted(inferred_deps))
 
 
 class InferInitDependencies(InferDependenciesRequest):
@@ -298,8 +350,9 @@ def import_rules():
     return [
         infer_python_dependencies_via_imports,
         *pex.rules(),
-        *parse_python_imports.rules(),
+        *parse_python_deps.rules(),
         *module_mapper.rules(),
+        *resources.rules(),
         *stripped_source_files.rules(),
         SubsystemRule(PythonInferSubsystem),
         SubsystemRule(PythonSetup),
