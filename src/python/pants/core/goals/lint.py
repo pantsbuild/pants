@@ -6,13 +6,13 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, cast
+from typing import Any, ClassVar, Iterable, cast
 
 from pants.core.goals.style_request import StyleRequest, style_batch_size_help, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -134,6 +134,19 @@ class LintRequest(StyleRequest):
     """
 
 
+@union
+@dataclass(frozen=True)
+class LintFilesRequest(EngineAwareParameter):
+    """The entry point for linters that do not use targets."""
+
+    name: ClassVar[str]
+
+    file_paths: tuple[str, ...]
+
+    def debug_hint(self) -> str:
+        return self.name
+
+
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
 # are written under this directory. E.g.,
 # ./pants --flake8-args="--output-file=reports/report.txt" lint <target>
@@ -199,43 +212,63 @@ async def lint(
     console: Console,
     workspace: Workspace,
     targets: Targets,
+    specs_snapshot: SpecsSnapshot,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
-    requests = tuple(
+    target_request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
+    target_requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if request_type.field_set_type.is_applicable(target)
         )
-        for request_type in request_types
+        for request_type in target_request_types
+    )
+    file_requests = tuple(
+        request_type(specs_snapshot.snapshot.files)
+        for request_type in union_membership[LintFilesRequest]
     )
 
     if lint_subsystem.per_file_caching:
-        all_batch_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__([field_set]))
-            for request in requests
-            if request.field_sets
-            for field_set in request.field_sets
-        )
+        all_requests = [
+            *(
+                Get(LintResults, LintRequest, request.__class__([field_set]))
+                for request in target_requests
+                if request.field_sets
+                for field_set in request.field_sets
+            ),
+            *(
+                Get(LintResults, LintFilesRequest, request.__class__((fp,)))
+                for request in file_requests
+                for fp in request.file_paths
+            ),
+        ]
     else:
 
         def address_str(fs: FieldSet) -> str:
             return fs.address.spec
 
-        all_batch_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__(field_set_batch))
-            for request in requests
-            if request.field_sets
-            for field_set_batch in partition_sequentially(
-                request.field_sets,
-                key=address_str,
-                size_target=lint_subsystem.batch_size,
-                size_max=4 * lint_subsystem.batch_size,
-            )
-        )
+        all_requests = [
+            *(
+                Get(LintResults, LintRequest, request.__class__(field_set_batch))
+                for request in target_requests
+                if request.field_sets
+                for field_set_batch in partition_sequentially(
+                    request.field_sets,
+                    key=address_str,
+                    size_target=lint_subsystem.batch_size,
+                    size_max=4 * lint_subsystem.batch_size,
+                )
+            ),
+            *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
+        ]
+
+    all_batch_results = cast(
+        "tuple[LintResults, ...]",
+        await MultiGet(all_requests),  # type: ignore[arg-type]
+    )
 
     def key_fn(results: LintResults):
         return results.linter_name
