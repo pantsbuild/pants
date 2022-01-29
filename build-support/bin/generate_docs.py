@@ -203,8 +203,8 @@ def run_pants_help_all() -> dict[str, Any]:
     backends = [
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.python",
+        "pants.backend.docker",
         "pants.backend.experimental.codegen.thrift.apache.python",
-        "pants.backend.experimental.docker",
         "pants.backend.experimental.docker.lint.hadolint",
         "pants.backend.experimental.go",
         "pants.backend.experimental.java",
