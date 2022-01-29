@@ -161,7 +161,6 @@ def test_summary() -> None:
 
         𐄂 ConditionallySucceedsChecker failed.
         𐄂 FailingChecker failed.
-        - SkippedChecker skipped.
         ✓ SuccessfulChecker succeeded.
         """
     )
