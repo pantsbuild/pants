@@ -145,7 +145,6 @@ class Option(Generic[_T]):
         engine.cylinders  # mypy knows this is an int
 
     Under-the-hood:
-        - The `type` argument if omitted defaults to the type of `default`
         - You can pass a `converter` function to convert the option value into the property value
             E.g. `converter=tuple`
     """
@@ -162,8 +161,6 @@ class Option(Generic[_T]):
     ):
         self.args = args
         self.converter = converter
-        if "type" not in kwargs:
-            kwargs.setdefault("type", type(kwargs["default"]))
         self.kwargs = kwargs
 
     @overload
