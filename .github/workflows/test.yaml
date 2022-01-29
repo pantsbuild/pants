@@ -515,11 +515,9 @@ jobs:
 
         '
     - name: Lint
-      run: './pants validate ''**''
+      run: './pants update-build-files --check
 
-        ./pants update-build-files --check
-
-        ./pants lint check ::
+        ./pants lint check ''**''
 
         '
     - if: always()
