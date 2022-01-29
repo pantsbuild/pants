@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from ctypes import cast
 
 import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import Any, ClassVar, TypeVar
+from token import OP
+from typing import Any, ClassVar, Generic, TypeVar, Callable, overload
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
@@ -100,6 +102,10 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses may override and call register(*args, **kwargs).
         """
+        for attrname in dir(cls):
+            attr = getattr(cls, attrname)
+            if isinstance(attr, Option):
+                register(*attr.args, **attr.kwargs)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -119,9 +125,37 @@ class Subsystem(metaclass=ABCMeta):
         return bool(self.options == other.options)
 
 
-_T = TypeVar("_T", bound=Subsystem)
+_SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
+_T = TypeVar("_T")
+
+class Option(Generic[_T]):
+    def __init__(self,
+        *args: str,
+        converter: Callable[[Any], _T] =lambda x: x,  # type: ignore
+        **kwargs: Any,
+    ):
+        self.args = args
+        self.converter = converter
+        if "type" not in kwargs:
+            kwargs.setdefault("type", type(kwargs["default"]))
+        self.kwargs = kwargs
+
+    @overload
+    def __get__(self, obj: None, *args: Any) -> Option:
+        ...
+
+    @overload
+    def __get__(self, obj: _SubsystemT, *args: Any) -> _T:
+        ...
+
+    def __get__(self, obj: _SubsystemT | None, *args: Any) -> Option | _T:
+        if obj is None:
+            return self
+        long_name = self.args[-1]
+        option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
+        return self.converter(option_value)
 
 
-async def _construct_subsytem(subsystem_typ: type[_T]) -> _T:
+async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
