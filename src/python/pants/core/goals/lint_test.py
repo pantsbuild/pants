@@ -126,7 +126,7 @@ def run_lint_rule(
                 create_goal_subsystem(
                     LintSubsystem,
                     per_file_caching=per_file_caching,
-                    batch_size=128,
+                    batch_size=batch_size,
                 ),
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -184,7 +184,6 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
 
         𐄂 ConditionallySucceedsLinter failed.
         𐄂 FailingLinter failed.
-        - SkippedLinter skipped.
         ✓ SuccessfulLinter succeeded.
         """
     )
@@ -209,7 +208,6 @@ def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
 
         ✓ ConditionallySucceedsLinter succeeded.
         𐄂 FailingLinter failed.
-        - SkippedLinter skipped.
         ✓ SuccessfulLinter succeeded.
         """
     )

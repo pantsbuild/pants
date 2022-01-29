@@ -1332,12 +1332,19 @@ fn file_contents(path: &Path) -> Bytes {
 }
 
 fn is_executable(path: &Path) -> bool {
-  std::fs::metadata(path)
+  let mode = std::fs::metadata(path)
     .expect("Getting metadata")
     .permissions()
-    .mode()
-    & 0o100
-    == 0o100
+    .mode();
+
+  // NB: macOS's default umask is applied when we create files, and removes the executable bit
+  // for "all". There probably isn't a good reason to try to override that.
+  let executable_mask = if cfg!(target_os = "macos") {
+    0o110
+  } else {
+    0o111
+  };
+  mode & executable_mask == executable_mask
 }
 
 fn is_readonly(path: &Path) -> bool {

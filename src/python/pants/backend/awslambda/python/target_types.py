@@ -11,6 +11,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
 )
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -130,7 +132,9 @@ class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):
 
 @rule(desc="Inferring dependency from the python_awslambda `handler` field")
 async def inject_lambda_handler_dependency(
-    request: InjectPythonLambdaHandlerDependency, python_infer_subsystem: PythonInferSubsystem
+    request: InjectPythonLambdaHandlerDependency,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
@@ -143,7 +147,12 @@ async def inject_lambda_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
-    owners = await Get(PythonModuleOwners, PythonModuleOwnersRequest(module, resolve=None))
+    owners = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            module, resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup)
+        ),
+    )
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
@@ -202,6 +211,7 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaRuntime,
+        PythonResolveField,
     )
     help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\n"

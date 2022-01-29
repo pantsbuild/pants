@@ -18,6 +18,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSourceField,
 )
+from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
@@ -287,5 +288,6 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
+        *python_sources.rules(),
         UnionRule(GenerateToolLockfileSentinel, Flake8LockfileSentinel),
     )

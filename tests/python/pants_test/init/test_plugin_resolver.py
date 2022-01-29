@@ -185,17 +185,17 @@ def plugin_resolution(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
-        plugin_resolver = PluginResolver(bootstrap_scheduler)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         input_working_set = WorkingSet(entries=[])
         for dist in working_set_entries:
             input_working_set.add(dist)
+        plugin_resolver = PluginResolver(
+            bootstrap_scheduler, interpreter_constraints, input_working_set
+        )
         working_set = plugin_resolver.resolve(
             options_bootstrapper,
             complete_env,
-            interpreter_constraints,
-            input_working_set,
         )
         for dist in working_set:
             assert (
