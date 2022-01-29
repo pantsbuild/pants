@@ -3,13 +3,14 @@
 
 python_sources(dependencies=[":plugins"])
 
-# NOTE: When adding a new backend, add it `generate_docs.py` too! (If stable enough for docs)
+# NOTE: When adding a new backend, add it to `generate_docs.py` too! (If stable enough for docs)
 target(
     name="plugins",
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/docker",
+        "src/python/pants/backend/docker/lint/hadolint",
         "src/python/pants/backend/experimental/codegen/avro/java",
         "src/python/pants/backend/experimental/codegen/protobuf/java",
         "src/python/pants/backend/experimental/codegen/protobuf/scala",
