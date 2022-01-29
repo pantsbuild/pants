@@ -93,7 +93,7 @@ class PythonInferSubsystem(Subsystem):
             default=False,
             type=bool,
             help=(
-                "Infer a target's dependencies based on strings that look like dynamic "
+                "Infer a target's imported dependencies based on strings that look like dynamic "
                 "dependencies, such as Django settings files expressing dependencies as strings. "
                 "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
                 "of your target."
@@ -114,9 +114,9 @@ class PythonInferSubsystem(Subsystem):
             default=False,
             type=bool,
             help=(
-                "Infer a target's dependencies based on strings that look like Posix filepaths, "
-                "such as those given to `open` or `pkgutil.get_data`. To ignore any false "
-                "positives, put `!{bad_address}` in the `dependencies` field of your target."
+                "Infer a target's asset dependencies based on strings that look like Posix "
+                "filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any "
+                "false positives, put `!{bad_address}` in the `dependencies` field of your target."
             ),
         )
         register(
