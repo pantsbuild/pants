@@ -256,10 +256,11 @@ class AllHelpInfo:
     def asdict(self) -> dict[str, Any]:
         return {
             field: {
-                # This will be simplified when the rule infos are flattened...
-                thing: tuple(dataclasses.asdict(t) for t in info)
-                if isinstance(info, tuple)
-                else dataclasses.asdict(info)
+                thing: (
+                    tuple(dataclasses.asdict(t) for t in info)
+                    if isinstance(info, tuple)
+                    else dataclasses.asdict(info)
+                )
                 for thing, info in value.items()
             }
             for field, value in dataclasses.asdict(self).items()
@@ -471,13 +472,6 @@ class HelpInfoExtracter:
         if build_configuration is None:
             return LazyFrozenDict({})
 
-        # This whole function is going to be refactored in another branch, where all rule infos will
-        # be in a flat structure rather than grouped by output type as it is here.
-        #
-        # The introduction of lazy loading the extracted data is pre-work to make that work not
-        # having a negative impact of the overall performance of the help goal for the general
-        # case. Only `help-all` will take longer to complete.
-
         rule_infos = [
             RuleInfo(
                 name=rule.canonical_name,
@@ -494,6 +488,8 @@ class HelpInfoExtracter:
         ]
 
         def _capture(t: Iterable[RuleInfo]) -> Callable[[], tuple[RuleInfo, ...]]:
+            # The `t` value from `groupby` is only live for the duration of the current for-loop
+            # iteration, so we capture the data here now.
             data = tuple(t)
 
             def load() -> tuple[RuleInfo, ...]:
