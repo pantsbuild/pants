@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TypeVar, cast
+from typing import ClassVar, TypeVar, cast
 
 from pants.core.goals.style_request import StyleRequest, style_batch_size_help
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -101,7 +101,8 @@ class FmtResult(EngineAwareReturnType):
 
 @union
 class FmtRequest(StyleRequest):
-    pass
+    # Set to `True` if this formatter makes semantic changes to the code.
+    fixer: ClassVar[bool] = False
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,16 @@ class FmtSubsystem(GoalSubsystem):
     @classmethod
     def register_options(cls, register) -> None:
         super().register_options(register)
+        register(
+            "--fixers",
+            type=bool,
+            default=True,
+            help=(
+                "If True, run formatters that make semantic changes, such as removing imports "
+                "or upgrading to more modern syntax. Otherwise, only run formatters that make "
+                "no semantic changes."
+            ),
+        )
         register(
             "--per-file-caching",
             advanced=True,
@@ -164,6 +175,10 @@ class FmtSubsystem(GoalSubsystem):
         )
 
     @property
+    def fixers(self) -> bool:
+        return cast(bool, self.options.fixers)
+
+    @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
 
@@ -189,7 +204,9 @@ async def fmt(
     for target in targets:
         fmt_requests = []
         for fmt_request in union_membership[FmtRequest]:
-            if fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
+            if fmt_request.field_set_type.is_applicable(target) and (  # type: ignore[misc]
+                fmt_subsystem.fixers or not fmt_request.fixer
+            ):
                 fmt_requests.append(fmt_request)
         if fmt_requests:
             targets_by_fmt_request_order[tuple(fmt_requests)].append(target)

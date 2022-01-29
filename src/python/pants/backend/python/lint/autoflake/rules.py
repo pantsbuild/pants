@@ -36,6 +36,7 @@ class AutoflakeFieldSet(FieldSet):
 class AutoflakeRequest(FmtRequest, LintRequest):
     field_set_type = AutoflakeFieldSet
     name = "autoflake"
+    fixer = True
 
 
 @dataclass(frozen=True)

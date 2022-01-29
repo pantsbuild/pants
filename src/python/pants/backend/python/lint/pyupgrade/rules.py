@@ -35,6 +35,7 @@ class PyUpgradeFieldSet(FieldSet):
 class PyUpgradeRequest(FmtRequest, LintRequest):
     field_set_type = PyUpgradeFieldSet
     name = "pyupgrade"
+    fixer = True
 
 
 @dataclass(frozen=True)

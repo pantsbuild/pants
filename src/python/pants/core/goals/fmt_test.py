@@ -92,11 +92,30 @@ async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
 
 class SmalltalkSkipRequest(FmtRequest):
     field_set_type = SmalltalkFieldSet
+    name = "SmalltalkSkipped"
 
 
 @rule
-def smalltalk_skip(_: SmalltalkSkipRequest) -> FmtResult:
-    return FmtResult.skip(formatter_name="SmalltalkSkipped")
+def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
+    return FmtResult.skip(formatter_name=request.name)
+
+
+class SmalltalkFixerRequest(FmtRequest):
+    field_set_type = SmalltalkFieldSet
+    name = "SmalltalkFixer"
+    fixer = True
+
+
+@rule
+async def smalltalk_fixer(request: SmalltalkFixerRequest) -> FmtResult:
+    result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
+    return FmtResult(
+        input=EMPTY_DIGEST,
+        output=result_digest,
+        stdout="",
+        stderr="",
+        formatter_name=request.name,
+    )
 
 
 def fmt_rule_runner(
@@ -124,9 +143,20 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
     ).digest
 
 
-def run_fmt(rule_runner: RuleRunner, *, target_specs: List[str], per_file_caching: bool) -> str:
+def run_fmt(
+    rule_runner: RuleRunner,
+    *,
+    target_specs: List[str],
+    per_file_caching: bool = False,
+    fixers: bool = True,
+) -> str:
     result = rule_runner.run_goal_rule(
-        Fmt, args=[f"--fmt-per-file-caching={per_file_caching!r}", *target_specs]
+        Fmt,
+        args=[
+            f"--fmt-per-file-caching={per_file_caching!r}",
+            f"--fmt-fixers={fixers!r}",
+            *target_specs,
+        ],
     )
     assert result.exit_code == 0
     assert not result.stdout
@@ -180,6 +210,31 @@ def test_summary(per_file_caching: bool) -> None:
     assert fortran_file.is_file()
     assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
     assert not smalltalk_file.is_file()
+
+
+def test_fixers_toggle() -> None:
+    rule_runner = fmt_rule_runner(
+        target_types=[SmalltalkTarget],
+        fmt_request_types=[SmalltalkNoopRequest, SmalltalkFixerRequest],
+    )
+    rule_runner.write_files({"BUILD": "smalltalk(name='s')"})
+
+    stderr = run_fmt(rule_runner, target_specs=["//:s"])
+    assert stderr == dedent(
+        """\
+
+        ✓ SmalltalkDidNotChange made no changes.
+        + SmalltalkFixer made changes.
+        """
+    )
+
+    stderr = run_fmt(rule_runner, target_specs=["//:s"], fixers=False)
+    assert stderr == dedent(
+        """\
+
+        ✓ SmalltalkDidNotChange made no changes.
+        """
+    )
 
 
 def test_streaming_output_skip() -> None:
