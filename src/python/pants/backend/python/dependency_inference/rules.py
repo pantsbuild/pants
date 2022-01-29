@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import itertools
 import logging
-from pathlib import PurePath
 from enum import Enum
+from pathlib import PurePath
 from typing import Dict, Iterable, Iterator, cast
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
