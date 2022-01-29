@@ -126,7 +126,9 @@ class FmtSubsystem(GoalSubsystem):
     name = "fmt"
     help = "Autoformat source code."
 
-    required_union_implementations = (FmtRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return union_membership.has_members(FmtRequest)
 
     @classmethod
     def register_options(cls, register) -> None:

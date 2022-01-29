@@ -285,7 +285,12 @@ def filter_tool_lockfile_requests(
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    required_union_implementations = (GenerateToolLockfileSentinel, KnownUserResolveNamesRequest)
+
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return union_membership.has_members(
+            GenerateToolLockfileSentinel
+        ) or union_membership.has_members(KnownUserResolveNamesRequest)
 
     @classmethod
     def register_options(cls, register) -> None:

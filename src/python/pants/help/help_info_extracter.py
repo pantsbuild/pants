@@ -321,14 +321,11 @@ class HelpInfoExtracter:
                         build_configuration.subsystem_to_providers.get(subsystem_cls)
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
-                is_implemented = union_membership.has_members_for_all(
-                    goal_subsystem_cls.required_union_implementations
-                )
                 return GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
                     provider,
-                    is_implemented,
+                    goal_subsystem_cls.activated(union_membership),
                     consumed_scopes_mapper(scope_info.scope),
                 )
 

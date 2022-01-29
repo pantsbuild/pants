@@ -45,7 +45,9 @@ class ReplSubsystem(GoalSubsystem):
     name = "repl"
     help = "Open a REPL with the specified code loadable."
 
-    required_union_implementations = (ReplImplementation,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return union_membership.has_members(ReplImplementation)
 
     @classmethod
     def register_options(cls, register) -> None:

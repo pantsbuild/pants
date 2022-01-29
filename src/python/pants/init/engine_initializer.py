@@ -124,10 +124,7 @@ class GraphSession:
             # NB: We no-op for goals that have no implementation because no relevant backends are
             # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
-            is_implemented = union_membership.has_members_for_all(
-                goal_product.subsystem_cls.required_union_implementations
-            )
-            if not is_implemented:
+            if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(specs, self.console, workspace)

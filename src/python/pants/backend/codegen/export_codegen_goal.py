@@ -24,7 +24,9 @@ class ExportCodegenSubsystem(GoalSubsystem):
     name = "export-codegen"
     help = "Write generated files to `dist/codegen` for use outside of Pants."
 
-    required_union_implementations = (GenerateSourcesRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return union_membership.has_members(GenerateSourcesRequest)
 
 
 class ExportCodegen(Goal):

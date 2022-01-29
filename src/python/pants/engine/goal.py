@@ -4,10 +4,11 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cast
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
+from pants.engine.unions import UnionMembership
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
@@ -34,9 +35,13 @@ class GoalSubsystem(Subsystem):
     ```
     """
 
-    # If the goal requires downstream implementations to work properly, such as `test` and `run`,
-    # it should declare the union types that must have members.
-    required_union_implementations: Tuple[Type, ...] = ()
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        """Return `False` if this goal should not show up in `./pants help`.
+
+        Usually this is determined by calling `union_membership.has_members()`.
+        """
+        return True
 
     @classmethod
     def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:

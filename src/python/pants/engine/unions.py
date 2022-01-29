@@ -112,7 +112,3 @@ class UnionMembership:
     def has_members(self, union_type: type) -> bool:
         """Check whether the union has an implementation or not."""
         return bool(self.union_rules.get(union_type))
-
-    def has_members_for_all(self, union_types: Iterable[type]) -> bool:
-        """Check whether every union given has an implementation or not."""
-        return all(self.has_members(union_type) for union_type in union_types)
