@@ -8,10 +8,18 @@ from typing import Iterable, List, Optional, Tuple, Type
 
 import pytest
 
-from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
+from pants.core.goals.lint import (
+    Lint,
+    LintFilesRequest,
+    LintRequest,
+    LintResult,
+    LintResults,
+    LintSubsystem,
+    lint,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
+from pants.engine.fs import SpecsSnapshot, Workspace
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -97,6 +105,14 @@ class InvalidRequest(MockLintRequest):
         return -1
 
 
+class MockFilesRequest(LintFilesRequest):
+    name = "FilesLinter"
+
+    @property
+    def lint_results(self) -> LintResults:
+        return LintResults([LintResult(0, "", "")], linter_name=self.name)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -111,22 +127,31 @@ def run_lint_rule(
     *,
     lint_request_types: List[Type[LintRequest]],
     targets: List[Target],
+    run_files_linter: bool = False,
     per_file_caching: bool = False,
     batch_size: int = 128,
 ) -> Tuple[int, str]:
+    union_membership = UnionMembership(
+        {
+            LintRequest: lint_request_types,
+            LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
+        }
+    )
+    lint_subsystem = create_goal_subsystem(
+        LintSubsystem,
+        per_file_caching=per_file_caching,
+        batch_size=batch_size,
+    )
+    specs_snapshot = SpecsSnapshot(rule_runner.make_snapshot_of_empty_files(["f.txt"]))
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
-        union_membership = UnionMembership({LintRequest: lint_request_types})
         result: Lint = run_rule_with_mocks(
             lint,
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Targets(targets),
-                create_goal_subsystem(
-                    LintSubsystem,
-                    per_file_caching=per_file_caching,
-                    batch_size=batch_size,
-                ),
+                specs_snapshot,
+                lint_subsystem,
                 union_membership,
                 DistDir(relpath=Path("dist")),
             ],
@@ -134,8 +159,13 @@ def run_lint_rule(
                 MockGet(
                     output_type=LintResults,
                     input_type=LintRequest,
-                    mock=lambda field_set_collection: field_set_collection.lint_results,
-                )
+                    mock=lambda mock_request: mock_request.lint_results,
+                ),
+                MockGet(
+                    output_type=LintResults,
+                    input_type=LintFilesRequest,
+                    mock=lambda mock_request: mock_request.lint_results,
+                ),
             ],
             union_membership=union_membership,
         )
@@ -176,6 +206,7 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
         ],
         targets=[make_target(good_address), make_target(bad_address)],
         per_file_caching=per_file_caching,
+        run_files_linter=True,
     )
     assert exit_code == FailingRequest.exit_code([bad_address])
     assert stderr == dedent(
@@ -183,6 +214,7 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
 
         𐄂 ConditionallySucceedsLinter failed.
         𐄂 FailingLinter failed.
+        ✓ FilesLinter succeeded.
         ✓ SuccessfulLinter succeeded.
         """
     )

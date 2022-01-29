@@ -380,9 +380,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 {
                     "name": "Lint",
                     "run": (
-                        "./pants validate '**'\n"
                         "./pants update-build-files --check\n"
-                        "./pants lint check ::\n"
+                        # Note: we use `**` rather than `::` because regex-lint.
+                        "./pants lint check '**'\n"
                     ),
                 },
                 upload_log_artifacts(name="lint"),
