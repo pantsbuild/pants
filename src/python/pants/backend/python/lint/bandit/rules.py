@@ -9,7 +9,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
@@ -20,7 +20,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class BanditRequest(LintRequest):
+class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
     name = "Bandit"
 
@@ -113,4 +113,4 @@ async def bandit_lint(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintRequest, BanditRequest), *pex.rules()]
+    return [*collect_rules(), UnionRule(LintTargetsRequest, BanditRequest), *pex.rules()]

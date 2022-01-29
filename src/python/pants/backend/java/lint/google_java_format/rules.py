@@ -9,7 +9,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
@@ -38,7 +38,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(FmtRequest, LintRequest):
+class GoogleJavaFormatRequest(FmtRequest, LintTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
     name = "Google Java Format"
 
@@ -168,6 +168,6 @@ def rules():
         *collect_rules(),
         *jvm_tool.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
-        UnionRule(LintRequest, GoogleJavaFormatRequest),
+        UnionRule(LintTargetsRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

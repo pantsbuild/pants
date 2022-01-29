@@ -11,10 +11,10 @@ import pytest
 from pants.core.goals.lint import (
     Lint,
     LintFilesRequest,
-    LintRequest,
     LintResult,
     LintResults,
     LintSubsystem,
+    LintTargetsRequest,
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -36,7 +36,7 @@ class MockLinterFieldSet(FieldSet):
     required_fields = (MultipleSourcesField,)
 
 
-class MockLintRequest(LintRequest, metaclass=ABCMeta):
+class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
     field_set_type = MockLinterFieldSet
 
     @staticmethod
@@ -125,7 +125,7 @@ def make_target(address: Optional[Address] = None) -> Target:
 def run_lint_rule(
     rule_runner: RuleRunner,
     *,
-    lint_request_types: List[Type[LintRequest]],
+    lint_request_types: List[Type[LintTargetsRequest]],
     targets: List[Target],
     run_files_linter: bool = False,
     per_file_caching: bool = False,
@@ -133,7 +133,7 @@ def run_lint_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
-            LintRequest: lint_request_types,
+            LintTargetsRequest: lint_request_types,
             LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
         }
     )
@@ -158,7 +158,7 @@ def run_lint_rule(
             mock_gets=[
                 MockGet(
                     output_type=LintResults,
-                    input_type=LintRequest,
+                    input_type=LintTargetsRequest,
                     mock=lambda mock_request: mock_request.lint_results,
                 ),
                 MockGet(

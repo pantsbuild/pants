@@ -127,11 +127,8 @@ class LintResults(EngineAwareReturnType):
 
 
 @union
-class LintRequest(StyleRequest):
-    """A union for StyleRequests that should be lintable.
-
-    Subclass and install a member of this type to provide a linter.
-    """
+class LintTargetsRequest(StyleRequest):
+    """AThe entry point for linters that need targets."""
 
 
 @union
@@ -157,7 +154,7 @@ class LintSubsystem(GoalSubsystem):
     name = "lint"
     help = "Run all linters and/or formatters in check mode."
 
-    required_union_implementations = (LintRequest,)
+    required_union_implementations = (LintTargetsRequest,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -217,7 +214,9 @@ async def lint(
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    target_request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
+    target_request_types = cast(
+        "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
+    )
     target_requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
@@ -234,7 +233,7 @@ async def lint(
     if lint_subsystem.per_file_caching:
         all_requests = [
             *(
-                Get(LintResults, LintRequest, request.__class__([field_set]))
+                Get(LintResults, LintTargetsRequest, request.__class__([field_set]))
                 for request in target_requests
                 if request.field_sets
                 for field_set in request.field_sets
@@ -252,7 +251,7 @@ async def lint(
 
         all_requests = [
             *(
-                Get(LintResults, LintRequest, request.__class__(field_set_batch))
+                Get(LintResults, LintTargetsRequest, request.__class__(field_set_batch))
                 for request in target_requests
                 if request.field_sets
                 for field_set_batch in partition_sequentially(
