@@ -109,9 +109,11 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     help = (
         "The resolve from `[python].experimental_resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
-        "Only applies if `[python].enable_resolves` is true.\n\n"
+        "All dependencies must share the same resolve. This means that you can only depend on "
+        "first-party targets like `python_source` that set their `experimental_resolve` field "
+        "to the same value, and on `python_requirement` targets that include the resolve in "
+        "their `experimental_compatible_resolves` field.\n\n"
         "This field is experimental and may change without the normal deprecation policy."
-        # TODO: Document expectations for dependencies once we validate that.
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
@@ -134,31 +136,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
             return None
         resolve = self.normalized_value(python_setup)
         return (resolve, python_setup.resolves[resolve])
-
-
-class PythonCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "experimental_compatible_resolves"
-    required = False
-    help = (
-        "The set of resolves from `[python].experimental_resolves` that this target is "
-        "compatible with.\n\n"
-        "If not defined, will default to `[python].default_resolve`.\n\n"
-        "Only applies if `[python].enable_resolves` is true.\n\n"
-        "This field is experimental and may change without the normal deprecation policy."
-        # TODO: Document expectations for dependencies once we validate that.
-    )
-
-    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
-        """Get the value after applying the default and validating every key is recognized."""
-        value_or_default = self.value or (python_setup.default_resolve,)
-        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
-        if invalid_resolves:
-            raise UnrecognizedResolveNamesError(
-                sorted(invalid_resolves),
-                python_setup.resolves.keys(),
-                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
-            )
-        return value_or_default
 
 
 # -----------------------------------------------------------------------------------------------
@@ -775,6 +752,7 @@ class PythonSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        PythonResolveField,
         PythonSourceField,
     )
     help = "A single Python source file."
@@ -812,6 +790,7 @@ class PythonTestUtilsGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        PythonResolveField,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
@@ -831,6 +810,7 @@ class PythonSourcesGeneratorTarget(Target):
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
         Dependencies,
+        PythonResolveField,
         PythonSourcesGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
@@ -975,19 +955,32 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class PythonRequirementCompatibleResolvesField(PythonCompatibleResolvesField):
+class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
+    alias = "experimental_compatible_resolves"
+    required = False
     help = (
         "The resolves from `[python].experimental_resolves` that this requirement should be "
         "included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
         "it will include all requirements that are declared compatible with that resolve. "
-        "First-party targets like `python_source` and `pex_binary` then declare which resolve(s) "
-        "they use via the `experimental_resolve` and `experimental_compatible_resolves` field; so, "
-        "for your first-party code to use a particular `python_requirement` target, that "
-        "requirement must be included in the resolve(s) "
+        "First-party targets like `python_source` and `pex_binary` then declare which resolve "
+        "they use via the `experimental_resolve` field; so, for your first-party code to use a "
+        "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )
+
+    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
+        """Get the value after applying the default and validating every key is recognized."""
+        value_or_default = self.value or (python_setup.default_resolve,)
+        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
+        if invalid_resolves:
+            raise UnrecognizedResolveNamesError(
+                sorted(invalid_resolves),
+                python_setup.resolves.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
+        return value_or_default
 
 
 class PythonRequirementTarget(Target):
