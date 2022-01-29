@@ -256,13 +256,26 @@ class Workspace(SideEffecting):
 
 @dataclass(frozen=True)
 class SpecsSnapshot:
-    """All files matched by command line specs.
+    """A snapshot of all files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.
+
+    Use `SpecsPaths` if you don't need a digest or you plan to filter the specified files and get
+    the digest of only that subset (via `PathGlobs`).
     """
 
     snapshot: Snapshot
+
+
+class SpecsPaths(Paths):
+    """All file names matched by command line specs.
+
+    `@goal_rule`s may request this when they only need source file names to operate and do not
+    need any target information. This allows running on files with no owning targets.
+
+    Use `SpecsSnapshot` if you plan to operate on every specified file and will need the digest.
+    """
 
 
 def rules():

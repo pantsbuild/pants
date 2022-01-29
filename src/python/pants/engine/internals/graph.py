@@ -36,6 +36,7 @@ from pants.engine.fs import (
     PathGlobs,
     Paths,
     Snapshot,
+    SpecsPaths,
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
@@ -687,6 +688,33 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
 # -----------------------------------------------------------------------------------------------
 
 
+@rule(desc="Find all file names from input specs", level=LogLevel.DEBUG)
+async def resolve_specs_paths(
+    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
+) -> SpecsPaths:
+    targets, filesystem_specs_paths = await MultiGet(
+        Get(Targets, AddressSpecs, specs.address_specs),
+        Get(
+            Paths,
+            PathGlobs,
+            specs.filesystem_specs.to_path_globs(
+                owners_not_found_behavior.to_glob_match_error_behavior()
+            ),
+        ),
+    )
+    all_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
+        for tgt in targets
+        if tgt.has_field(SourcesField)
+    )
+    files = OrderedSet()
+    dirs = OrderedSet()
+    for paths in (filesystem_specs_paths, *all_sources_paths):
+        files.update(paths.files)
+        dirs.update(paths.dirs)
+    return SpecsPaths(tuple(files), tuple(dirs))
+
+
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
 async def resolve_specs_snapshot(
     specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
@@ -696,31 +724,30 @@ async def resolve_specs_snapshot(
     Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
     were given. Filesystem specs may safely refer to files with no owning target.
     """
-    targets = await Get(Targets, AddressSpecs, specs.address_specs)
-    all_hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
-        for tgt in targets
-        if tgt.has_field(SourcesField)
-    )
-
-    filesystem_specs_digest = (
-        await Get(
+    targets, filesystem_specs_digest = await MultiGet(
+        Get(Targets, AddressSpecs, specs.address_specs),
+        Get(
             Digest,
             PathGlobs,
             specs.filesystem_specs.to_path_globs(
                 owners_not_found_behavior.to_glob_match_error_behavior()
             ),
-        )
-        if specs.filesystem_specs
-        else None
+        ),
     )
-
-    # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
-    # covered both by address specs and filesystem specs.
-    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_digest:
-        digests.append(filesystem_specs_digest)
-    result = await Get(Snapshot, MergeDigests(digests))
+    all_hydrated_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
+        for tgt in targets
+        if tgt.has_field(SourcesField)
+    )
+    result = await Get(
+        Snapshot,
+        MergeDigests(
+            (
+                filesystem_specs_digest,
+                *(hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources),
+            )
+        ),
+    )
     return SpecsSnapshot(result)
 
 
