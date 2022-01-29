@@ -293,7 +293,7 @@ async def lint(
         )
     )
 
-    def get_tool_name(res: LintResults) -> str:
+    def get_name(res: LintResults) -> str:
         return res.linter_name
 
     write_reports(
@@ -301,7 +301,7 @@ async def lint(
         workspace,
         dist_dir,
         goal_name=LintSubsystem.name,
-        get_tool_name=get_tool_name,
+        get_name=get_name,
     )
 
     exit_code = 0

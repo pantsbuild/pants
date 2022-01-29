@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type
+from typing import Iterable, List, Optional, Tuple, Type
 
 from pants.core.goals.check import Check, CheckRequest, CheckResult, CheckResults, check
 from pants.core.util_rules.distdir import DistDir
@@ -28,7 +28,6 @@ class MockCheckFieldSet(FieldSet):
 
 class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
     field_set_type = MockCheckFieldSet
-    checker_name: ClassVar[str]
 
     @staticmethod
     @abstractmethod
@@ -39,19 +38,13 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
     def check_results(self) -> CheckResults:
         addresses = [config.address for config in self.field_sets]
         return CheckResults(
-            [
-                CheckResult(
-                    self.exit_code(addresses),
-                    "",
-                    "",
-                )
-            ],
-            checker_name=self.checker_name,
+            [CheckResult(self.exit_code(addresses), "", "")],
+            checker_name=self.name,
         )
 
 
 class SuccessfulRequest(MockCheckRequest):
-    checker_name = "SuccessfulChecker"
+    name = "SuccessfulChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -59,7 +52,7 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    checker_name = "FailingChecker"
+    name = "FailingChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -67,7 +60,7 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    checker_name = "ConditionallySucceedsChecker"
+    name = "ConditionallySucceedsChecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -77,13 +70,15 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
+    name = "SkippedChecker"
+
     @staticmethod
     def exit_code(_) -> int:
         return 0
 
     @property
     def check_results(self) -> CheckResults:
-        return CheckResults([], checker_name="SkippedChecker")
+        return CheckResults([], checker_name=self.name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -96,7 +91,7 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    checker_name = "InvalidChecker"
+    name = "InvalidChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:

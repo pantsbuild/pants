@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import difflib
 import json
 import textwrap
@@ -351,5 +350,5 @@ class HelpPrinter(MaybeColor):
     def _get_help_json(self) -> str:
         """Return a JSON object containing all the help info we have, for every scope."""
         return json.dumps(
-            dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=HelpJSONEncoder
+            self._all_help_info.asdict(), sort_keys=True, indent=2, cls=HelpJSONEncoder
         )

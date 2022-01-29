@@ -40,6 +40,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
+    name = "Google Java Format"
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -121,27 +122,27 @@ async def setup_google_java_format(
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_fmt(
-    field_sets: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
+    request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
 ) -> FmtResult:
     if tool.skip:
-        return FmtResult.skip(formatter_name="Google Java Format")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
+        return FmtResult.skip(formatter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, JvmProcess, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="Google Java Format",
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
 
 @rule(desc="Lint with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_lint(
-    field_sets: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
+    request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
 ) -> LintResults:
     if tool.skip:
-        return LintResults([], linter_name="Google Java Format")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
+        return LintResults([], linter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, JvmProcess, setup.process)
     lint_result = LintResult.from_fallible_process_result(result)
     if lint_result.exit_code == 0 and lint_result.stdout.strip() != "":
@@ -152,7 +153,7 @@ async def google_java_format_lint(
             exit_code=1,
             stdout=f"The following Java files require formatting:\n{lint_result.stdout}\n",
         )
-    return LintResults([lint_result], linter_name="Google Java Format")
+    return LintResults([lint_result], linter_name=request.name)
 
 
 @rule

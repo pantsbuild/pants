@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
@@ -292,7 +291,8 @@ def test_get_all_help_info():
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
         bc_builder.create(),
     )
-    all_help_info_dict = dataclasses.asdict(all_help_info)
+
+    all_help_info_dict = all_help_info.asdict()
     expected_all_help_info_dict = {
         "scope_to_help_info": {
             GLOBAL_SCOPE: {

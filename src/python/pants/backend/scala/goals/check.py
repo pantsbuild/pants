@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ScalacCheckRequest(CheckRequest):
     field_set_type = ScalaFieldSet
+    name = "scalac"
 
 
 @rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
@@ -48,7 +49,7 @@ async def scalac_check(
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
     exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name="scalac")
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.name)
 
 
 def rules():

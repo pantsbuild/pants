@@ -35,6 +35,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtRequest, LintRequest):
     field_set_type = YapfFieldSet
+    name = "yapf"
 
 
 @dataclass(frozen=True)
@@ -117,25 +118,25 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
-        return FmtResult.skip(formatter_name="yapf")
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="yapf",
+        formatter_name=request.name,
     )
 
 
 @rule(desc="Lint with yapf", level=LogLevel.DEBUG)
 async def yapf_lint(request: YapfRequest, yapf: Yapf) -> LintResults:
     if yapf.skip:
-        return LintResults([], linter_name="yapf")
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result)],
-        linter_name="yapf",
+        linter_name=request.name,
     )
 
 

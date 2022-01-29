@@ -36,7 +36,7 @@ def test_write_reports() -> None:
         checker_name="partition_duplicate",
     )
 
-    def get_tool_name(res: CheckResults) -> str:
+    def get_name(res: CheckResults) -> str:
         return res.checker_name
 
     write_reports(
@@ -51,7 +51,7 @@ def test_write_reports() -> None:
         Workspace(rule_runner.scheduler, _enforce_effects=False),
         DistDir(Path("dist")),
         goal_name="check",
-        get_tool_name=get_tool_name,
+        get_name=get_name,
     )
 
     check_dir = Path(rule_runner.build_root, "dist", "check")
