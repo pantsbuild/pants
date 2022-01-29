@@ -174,7 +174,6 @@ def test_summary(per_file_caching: bool) -> None:
 
         + FortranConditionallyDidChange made changes.
         ✓ SmalltalkDidNotChange made no changes.
-        - SmalltalkSkipped skipped.
         """
     )
 

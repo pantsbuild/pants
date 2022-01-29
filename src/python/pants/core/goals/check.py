@@ -180,8 +180,7 @@ async def check(
         console.print_stderr("")
     for results in sorted(all_results, key=lambda results: results.checker_name):
         if results.skipped:
-            sigil = console.sigil_skipped()
-            status = "skipped"
+            continue
         elif results.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "succeeded"

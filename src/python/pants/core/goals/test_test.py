@@ -271,7 +271,6 @@ def test_summary(rule_runner: RuleRunner) -> None:
         """\
 
         ✓ //:good succeeded in 1.00s (memoized).
-        - //:skipped skipped.
         𐄂 //:bad failed in 1.00s (memoized).
         """
     )
@@ -324,12 +323,6 @@ def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
         exit_code=0,
         run_id=1234,
         result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
-    )
-
-
-def test_format_summary_skipped(rule_runner: RuleRunner) -> None:
-    _assert_test_summary(
-        "- //:dummy_address skipped.", exit_code=None, run_id=0, result_metadata=None
     )
 
 
