@@ -10,7 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -33,7 +33,7 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest, LintRequest):
+class IsortRequest(FmtRequest, LintTargetsRequest):
     field_set_type = IsortFieldSet
     name = "isort"
 
@@ -162,6 +162,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, IsortRequest),
-        UnionRule(LintRequest, IsortRequest),
+        UnionRule(LintTargetsRequest, IsortRequest),
         *pex.rules(),
     ]

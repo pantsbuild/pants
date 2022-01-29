@@ -10,7 +10,7 @@ from pants.backend.python.target_types import InterpreterConstraintsField, Pytho
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -33,7 +33,7 @@ class AutoflakeFieldSet(FieldSet):
         return tgt.get(SkipAutoflakeField).value
 
 
-class AutoflakeRequest(FmtRequest, LintRequest):
+class AutoflakeRequest(FmtRequest, LintTargetsRequest):
     field_set_type = AutoflakeFieldSet
     name = "autoflake"
 
@@ -143,6 +143,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, AutoflakeRequest),
-        UnionRule(LintRequest, AutoflakeRequest),
+        UnionRule(LintTargetsRequest, AutoflakeRequest),
         *pex.rules(),
     ]

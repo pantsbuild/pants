@@ -13,7 +13,7 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
@@ -114,5 +114,5 @@ def rules():
         *collect_rules(),
         *golang.rules(),
         UnionRule(FmtRequest, GofmtRequest),
-        UnionRule(LintRequest, GofmtRequest),
+        UnionRule(LintTargetsRequest, GofmtRequest),
     ]

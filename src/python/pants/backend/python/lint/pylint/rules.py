@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -69,7 +69,7 @@ class PylintPartition:
         self.interpreter_constraints = interpreter_constraints
 
 
-class PylintRequest(LintRequest):
+class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
     name = "Pylint"
 
@@ -254,6 +254,6 @@ async def pylint_lint(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintRequest, PylintRequest),
+        UnionRule(LintTargetsRequest, PylintRequest),
         *pex_from_targets.rules(),
     ]

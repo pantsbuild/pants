@@ -10,7 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -33,7 +33,7 @@ class YapfFieldSet(FieldSet):
         return tgt.get(SkipYapfField).value
 
 
-class YapfRequest(FmtRequest, LintRequest):
+class YapfRequest(FmtRequest, LintTargetsRequest):
     field_set_type = YapfFieldSet
     name = "yapf"
 
@@ -144,6 +144,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, YapfRequest),
-        UnionRule(LintRequest, YapfRequest),
+        UnionRule(LintTargetsRequest, YapfRequest),
         *pex.rules(),
     ]

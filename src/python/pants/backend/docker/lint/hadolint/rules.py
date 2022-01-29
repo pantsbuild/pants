@@ -8,7 +8,7 @@ from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -32,7 +32,7 @@ class HadolintFieldSet(FieldSet):
         return tgt.get(SkipHadolintField).value
 
 
-class HadolintRequest(LintRequest):
+class HadolintRequest(LintTargetsRequest):
     field_set_type = HadolintFieldSet
     name = "Hadolint"
 
@@ -104,5 +104,5 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintRequest, HadolintRequest),
+        UnionRule(LintTargetsRequest, HadolintRequest),
     ]
