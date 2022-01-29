@@ -48,13 +48,13 @@ def assert_deps_parsed(
     content: str,
     *,
     expected_imports: dict[str, ImpInfo] = {},
-    expected_resources: list[str] = [],
+    expected_assets: list[str] = [],
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
-    string_resources: bool = True,
-    string_resources_min_slashes: int = 1,
+    assets: bool = True,
+    asset_min_slashes: int = 1,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.write_files(
@@ -72,14 +72,14 @@ def assert_deps_parsed(
                 InterpreterConstraints([constraints]),
                 string_imports=string_imports,
                 string_imports_min_dots=string_imports_min_dots,
-                string_resources=string_resources,
-                string_resources_min_slashes=string_resources_min_slashes,
+                assets=assets,
+                asset_min_slashes=asset_min_slashes,
             )
         ],
     )
     assert dict(result.imports) == expected_imports
-    assert list(result.resources) == [
-        ("project.foo", resource) for resource in sorted(expected_resources)
+    assert list(result.assets) == [
+        ("project.foo", resource) for resource in sorted(expected_assets)
     ]
 
 
@@ -140,7 +140,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
 def test_dunder_import_call(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
-        __import__("pkg_resources")
+        __import__("pkg_assets")
         __import__("dunder_import_ignored")  # pants: no-infer-dep
         __import__(  # pants: no-infer-dep
             "not_ignored_but_looks_like_it_could_be"
@@ -157,7 +157,7 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         expected_imports={
-            "pkg_resources": ImpInfo(lineno=1, weak=False),
+            "pkg_assets": ImpInfo(lineno=1, weak=False),
             "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
             "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
         },
@@ -363,7 +363,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__(u"pkg_resources")
+        __import__(u"pkg_assets")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
         __import__(u"{}".format("interpolation"))
 
@@ -386,7 +386,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=4, weak=False),
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
-            "pkg_resources": ImpInfo(lineno=7, weak=False),
+            "pkg_assets": ImpInfo(lineno=7, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
             "dep.from.bytes": ImpInfo(lineno=11, weak=True),
             "dep.from.str": ImpInfo(lineno=12, weak=True),
@@ -410,7 +410,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__("pkg_resources")
+        __import__("pkg_assets")
         __import__("treat.as.a.regular.import.not.a.string.import")
 
         importlib.import_module("dep.from.str")
@@ -423,7 +423,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
-            "pkg_resources": ImpInfo(lineno=8, weak=False),
+            "pkg_assets": ImpInfo(lineno=8, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=9, weak=False),
             "dep.from.str": ImpInfo(lineno=11, weak=True),
         },
@@ -443,7 +443,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__("pkg_resources")
+        __import__("pkg_assets")
         __import__("treat.as.a.regular.import.not.a.string.import")
 
         importlib.import_module("dep.from.str")
@@ -456,7 +456,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),
-            "pkg_resources": ImpInfo(lineno=10, weak=False),
+            "pkg_assets": ImpInfo(lineno=10, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=11, weak=False),
             "dep.from.str": ImpInfo(lineno=13, weak=True),
         },
@@ -464,11 +464,11 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize("min_slashes", [1, 2, 3, 4])
-def test_resources(rule_runner: RuleRunner, min_slashes: int) -> None:
+def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
     content = dedent(
         """\
         modules = [
-            # Potentially valid resources (depending on min_slashes).
+            # Potentially valid assets (depending on min_slashes).
             'data/a.json',
             'data/a.txt',
             'data/a.tar.gz',
@@ -477,16 +477,16 @@ def test_resources(rule_runner: RuleRunner, min_slashes: int) -> None:
             'data/subdir1/subdir2/subdir3/a.json',
             '狗/狗.狗',
 
-            # :ooks weird, but Unix and pathlib treat repeated "/" as one slash.
+            # Looks weird, but Unix and pathlib treat repeated "/" as one slash.
             # Our parsing, however considers this as multiple slashes.
             '//foo.bar',
             '//foo/////bar.txt',
 
-            # Probably invalid resources.
+            # Probably invalid assets.
             'noslashes',
             'data/database',  # Unfortunately, extenionless files don't get matched.
 
-            # Definitely invalid resources.
+            # Definitely invalid assets.
             'a/........',
             '\\n/foo.json',
             'data/a.b/c.d',
@@ -509,6 +509,6 @@ def test_resources(rule_runner: RuleRunner, min_slashes: int) -> None:
     expected = [s for s in potentially_valid if s.count("/") >= min_slashes]
 
     assert_deps_parsed(
-        rule_runner, content, expected_resources=expected, string_resources_min_slashes=min_slashes
+        rule_runner, content, expected_assets=expected, asset_min_slashes=min_slashes
     )
-    assert_deps_parsed(rule_runner, content, string_resources=False, expected_resources=[])
+    assert_deps_parsed(rule_runner, content, assets=False, expected_assets=[])

@@ -5,5 +5,5 @@ python_sources()
 
 python_tests(
     name="tests",
-    overrides={"parse_python_imports_test.py": {"timeout": 120}},
+    overrides={"parse_python_dependencies_test.py": {"timeout": 120}},
 )

@@ -34,8 +34,8 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
     """All the discovered imports from a Python source file mapped to the relevant info."""
 
 
-class ParsedPythonResources(DeduplicatedCollection[Tuple[str, str]]):
-    """All the discovered possible resources from a Python source file.
+class ParsedPythonAssets(DeduplicatedCollection[Tuple[str, str]]):
+    """All the discovered possible assets from a Python source file.
 
     The tuple is of (containing module, filename).
     """
@@ -46,7 +46,7 @@ class ParsedPythonResources(DeduplicatedCollection[Tuple[str, str]]):
 @dataclass(frozen=True)
 class ParsedPythonDependencies:
     imports: ParsedPythonImports
-    resources: ParsedPythonResources
+    assets: ParsedPythonAssets
 
 
 @dataclass(frozen=True)
@@ -55,8 +55,8 @@ class ParsePythonDependenciesRequest:
     interpreter_constraints: InterpreterConstraints
     string_imports: bool
     string_imports_min_dots: int
-    string_resources: bool
-    string_resources_min_slashes: int
+    assets: bool
+    asset_min_slashes: int
 
 
 def _filepath_to_modname(filepath: str) -> str:
@@ -94,9 +94,9 @@ async def parse_python_dependencies(
             description=f"Determine Python dependencies for {request.source.address}",
             env={
                 "STRING_IMPORTS": "y" if request.string_imports else "n",
-                "MIN_DOTS": str(request.string_imports_min_dots),
-                "STRING_RESOURCES": "y" if request.string_resources else "n",
-                "MIN_SLASHES": str(request.string_resources_min_slashes),
+                "STRING_IMPORT_MIN_DOTS": str(request.string_imports_min_dots),
+                "ASSETS": "y" if request.assets else "n",
+                "ASSET_MIN_SLASHES": str(request.asset_min_slashes),
             },
             level=LogLevel.DEBUG,
         ),
@@ -110,13 +110,13 @@ async def parse_python_dependencies(
         imports=ParsedPythonImports(
             (key, ParsedPythonImportInfo(**val)) for key, val in output.get("imports", {}).items()
         ),
-        resources=ParsedPythonResources(
+        assets=ParsedPythonAssets(
             [
                 (
                     _filepath_to_modname(request.source.file_path) if pkgname is None else pkgname,
                     filepath,
                 )
-                for pkgname, filepath in output.get("resources", [])
+                for pkgname, filepath in output.get("assets", [])
             ]
         ),
     )

@@ -18,9 +18,9 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ParsedPythonAssets,
     ParsedPythonDependencies,
     ParsedPythonImports,
-    ParsedPythonResources,
     ParsePythonDependenciesRequest,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -34,8 +34,8 @@ from pants.backend.python.util_rules.ancestor_files import AncestorFiles, Ancest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core import target_types
 from pants.core.target_types import (
-    AllResourceAndFileTargets,
-    AllResourceAndFileTargetsRequest,
+    AllAssetTargets,
+    AllAssetTargetsRequest,
     FileSourceField,
     ResourceSourceField,
 )
@@ -110,7 +110,7 @@ class PythonInferSubsystem(Subsystem):
             ),
         )
         register(
-            "--resources-and-files-from-strings",
+            "--assets",
             default=False,
             type=bool,
             help=(
@@ -120,14 +120,13 @@ class PythonInferSubsystem(Subsystem):
             ),
         )
         register(
-            "--resources-and-files-from-strings-min-slashes",
+            "--asset-min-slashes",
             default=1,
             type=int,
             help=(
-                "If --resources-and-files-from-strings is True, treat valid-looking strings with "
-                "at least this many forward slash characters as potential resources or files."
-                "E.g. `'data/databases/prod.db'` will be treated as a potential candidate if this "
-                "option is set to 2 but not to 3."
+                "If --assets is True, treat valid-looking strings with at least this many forward "
+                "slash characters as potential assets. E.g. `'data/databases/prod.db'` will be "
+                "treated as a potential candidate if this option is set to 2 but not to 3."
             ),
         )
         register(
@@ -183,12 +182,12 @@ class PythonInferSubsystem(Subsystem):
         return cast(int, self.options.string_imports_min_dots)
 
     @property
-    def resources_and_files_from_strings(self) -> bool:
-        return cast(bool, self.options.resources_and_files_from_strings)
+    def assets(self) -> bool:
+        return cast(bool, self.options.assets)
 
     @property
-    def resources_and_files_from_strings_min_slashes(self) -> int:
-        return cast(int, self.options.resources_and_files_from_strings_min_slashes)
+    def asset_min_slashes(self) -> int:
+        return cast(int, self.options.asset_min_slashes)
 
     @property
     def inits(self) -> bool:
@@ -212,19 +211,19 @@ class InferPythonImportDependencies(InferDependenciesRequest):
 
 
 def _get_inferred_resource_deps(
-    all_resource_and_file_targets: AllResourceAndFileTargets,
-    parsed_resources: ParsedPythonResources,
+    all_asset_targets: AllAssetTargets,
+    assets: ParsedPythonAssets,
 ) -> Iterator[Address]:
-    resources_by_path: Dict[PurePath, Target] = {}
-    for file_tgt in all_resource_and_file_targets.files:
-        resources_by_path[PurePath(file_tgt[FileSourceField].file_path)] = file_tgt
-    for resource_tgt in all_resource_and_file_targets.resources:
+    assets_by_path: Dict[PurePath, Target] = {}
+    for file_tgt in all_asset_targets.files:
+        assets_by_path[PurePath(file_tgt[FileSourceField].file_path)] = file_tgt
+    for resource_tgt in all_asset_targets.resources:
         path = PurePath(resource_tgt[ResourceSourceField].file_path)
-        resources_by_path[path] = resource_tgt
+        assets_by_path[path] = resource_tgt
 
-    for pkgname, filepath in parsed_resources:
+    for pkgname, filepath in assets:
         resource_path = PurePath(*pkgname.split(".")).parent / filepath
-        inferred_resource_tgt = resources_by_path.get(resource_path)
+        inferred_resource_tgt = assets_by_path.get(resource_path)
         if inferred_resource_tgt:
             yield inferred_resource_tgt.address
 
@@ -294,10 +293,7 @@ async def infer_python_dependencies_via_source(
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> InferredDependencies:
-    if (
-        not python_infer_subsystem.imports
-        and not python_infer_subsystem.resources_and_files_from_strings
-    ):
+    if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
     _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
@@ -309,15 +305,15 @@ async def infer_python_dependencies_via_source(
             InterpreterConstraints.create_from_targets([tgt], python_setup),
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            string_resources=python_infer_subsystem.resources_and_files_from_strings,
-            string_resources_min_slashes=python_infer_subsystem.resources_and_files_from_strings_min_slashes,
+            assets=python_infer_subsystem.assets,
+            asset_min_slashes=python_infer_subsystem.asset_min_slashes,
         ),
     )
 
     inferred_deps: set[Address] = set()
     unowned_imports: set[str] = set()
     parsed_imports = parsed_dependencies.imports
-    parsed_resources = parsed_dependencies.resources
+    parsed_assets = parsed_dependencies.assets
     if not python_infer_subsystem.imports:
         parsed_imports = ParsedPythonImports([])
 
@@ -337,13 +333,9 @@ async def infer_python_dependencies_via_source(
         )
         inferred_deps.update(import_deps)
 
-    if parsed_resources:
-        all_resource_and_file_targets = await Get(
-            AllResourceAndFileTargets, AllResourceAndFileTargetsRequest()
-        )
-        inferred_deps.update(
-            _get_inferred_resource_deps(all_resource_and_file_targets, parsed_resources)
-        )
+    if parsed_assets:
+        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
+        inferred_deps.update(_get_inferred_resource_deps(all_asset_targets, parsed_assets))
 
     _maybe_warn_unowned(
         tgt.address,

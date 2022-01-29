@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `MIN_DOTS=1 ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `STRING_IMPORT_MIN_DOTS=1 ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -18,22 +18,22 @@ import tokenize
 from io import open
 
 STRING_IMPORTS = os.environ["STRING_IMPORTS"] == "y"
-MIN_DOTS = os.environ["MIN_DOTS"]
-STRING_RESOURCES = os.environ["STRING_RESOURCES"] == "y"
-MIN_SLASHES = os.environ["MIN_SLASHES"]
+STRING_IMPORT_MIN_DOTS = os.environ["STRING_IMPORT_MIN_DOTS"]
+ASSETS = os.environ["ASSETS"] == "y"
+ASSET_MIN_SLASHES = os.environ["ASSET_MIN_SLASHES"]
 
 # This regex is used to infer imports from strings, e.g.
 #  `importlib.import_module("example.subdir.Foo")`.
 STRING_IMPORT_REGEX = re.compile(
-    r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
+    r"^([a-z_][a-z_\d]*\.){" + STRING_IMPORT_MIN_DOTS + r",}[a-zA-Z_]\w*$",
     re.UNICODE,
 )
-# This regex is used to infer resource names from strings, e.g.
+# This regex is used to infer asset names from strings, e.g.
 #  `load_resource("data/db1.json")
 # Since Unix allows basically anything for filenames, we require some "sane" subset of possibilities
 #  namely, word-character filenames and a mandatory extension.
-STRING_RESOURCE_REGEX = re.compile(
-    r"^([\w]*\/){" + MIN_SLASHES + r",}\w*(\.[^\/\.\n]+)+$",
+ASSET_REGEX = re.compile(
+    r"^([\w]*\/){" + ASSET_MIN_SLASHES + r",}\w*(\.[^\/\.\n]+)+$",
     re.UNICODE,
 )
 
@@ -49,7 +49,7 @@ class AstVisitor(ast.NodeVisitor):
         #   weak/strong)
         self.strong_imports = {}
         self.weak_imports = {}
-        self.resources = set()
+        self.assets = set()
         self._weaken_strong_imports = False
 
     def add_strong_import(self, name, lineno):
@@ -92,8 +92,8 @@ class AstVisitor(ast.NodeVisitor):
     def maybe_add_string_dependency(self, node, s):
         if STRING_IMPORTS and STRING_IMPORT_REGEX.match(s):
             self.weak_imports.setdefault(s, node.lineno)
-        if STRING_RESOURCES and STRING_RESOURCE_REGEX.match(s):
-            self.resources.add((None, s))
+        if ASSETS and ASSET_REGEX.match(s):
+            self.assets.add((None, s))
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
@@ -205,7 +205,7 @@ def main(filename):
         json.dumps(
             {
                 "imports": imports_result,
-                "resources": list(sorted(visitor.resources)),
+                "assets": list(sorted(visitor.assets)),
             }
         ).encode("utf8")
     )

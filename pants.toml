@@ -118,7 +118,7 @@ enable_resolves = true
 [python-infer]
 # @TODO: Add the python-infer flags at the BUILD level and move this down into
 # the relevant BUILD files
-resources_and_files_from_strings = true
+assets = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]

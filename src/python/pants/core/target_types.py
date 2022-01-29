@@ -381,25 +381,25 @@ class GenericTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `AllResourceAndFileTargets` target
+# `Asset` targets (resources and files)
 # -----------------------------------------------------------------------------------------------
 
 
-class AllResourceAndFileTargetsRequest:
+class AllAssetTargetsRequest:
     pass
 
 
 @dataclass(frozen=True)
-class AllResourceAndFileTargets:
+class AllAssetTargets:
     resources: tuple[Target, ...]
     files: tuple[Target, ...]
 
 
-@rule(desc="Find all resources in project")
-def find_all_resources(
+@rule(desc="Find all assets in project")
+def find_all_assets(
     all_targets: AllTargets,
-    _: AllResourceAndFileTargetsRequest,
-) -> AllResourceAndFileTargets:
+    _: AllAssetTargetsRequest,
+) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -407,7 +407,7 @@ def find_all_resources(
             resources.append(tgt)
         if tgt.has_field(FileSourceField):
             files.append(tgt)
-    return AllResourceAndFileTargets(tuple(resources), tuple(files))
+    return AllAssetTargets(tuple(resources), tuple(files))
 
 
 # -----------------------------------------------------------------------------------------------

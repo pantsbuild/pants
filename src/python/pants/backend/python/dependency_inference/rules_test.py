@@ -159,7 +159,7 @@ def test_infer_python_imports(caplog) -> None:
     assert "disambiguated_via_ignores.py" not in caplog.text
 
 
-def test_infer_python_resources() -> None:
+def test_infer_python_assets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *import_rules(),
@@ -173,6 +173,7 @@ def test_infer_python_resources() -> None:
             ResourcesGeneratorTarget,
         ],
     )
+    # @TODO: Add file assets as well
     rule_runner.write_files(
         {
             "src/python/data/BUILD": "resources(name='jsonfiles', sources=['*.json'])",
@@ -194,7 +195,7 @@ def test_infer_python_resources() -> None:
             "src/python/BUILD": dedent(
                 """\
                 python_sources()
-                # Also test resources declared from parent dir
+                # Also test assets declared from parent dir
                 resources(
                     name="txtfiles",
                     sources=["data/*.txt"],
@@ -207,7 +208,7 @@ def test_infer_python_resources() -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         args = [
             "--source-root-patterns=src/python",
-            "--python-infer-resources-and-files-from-strings",
+            "--python-infer-assets",
         ]
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
