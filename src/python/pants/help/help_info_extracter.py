@@ -334,6 +334,27 @@ class HelpInfoExtracter:
 
             return load
 
+        def target_type_info_for(target_type: type[Target]) -> Callable[[], TargetTypeHelpInfo]:
+            def load() -> TargetTypeHelpInfo:
+                return TargetTypeHelpInfo.create(
+                    target_type,
+                    union_membership=union_membership,
+                    provider=cls.get_first_provider(
+                        build_configuration
+                        and build_configuration.target_type_to_providers.get(target_type)
+                        or None
+                    ),
+                    get_field_type_provider=lambda field_type: cls.get_first_provider(
+                        build_configuration.union_rule_to_providers.get(
+                            UnionRule(target_type._plugin_field_cls, field_type)
+                        )
+                        if build_configuration is not None
+                        else None
+                    ),
+                )
+
+            return load
+
         known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
         scope_to_help_info = LazyFrozenDict(
             {
@@ -353,22 +374,7 @@ class HelpInfoExtracter:
 
         name_to_target_type_info = LazyFrozenDict(
             {
-                alias: lambda: TargetTypeHelpInfo.create(
-                    target_type,
-                    union_membership=union_membership,
-                    provider=cls.get_first_provider(
-                        build_configuration
-                        and build_configuration.target_type_to_providers.get(target_type)
-                        or None
-                    ),
-                    get_field_type_provider=lambda field_type: cls.get_first_provider(
-                        build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type._plugin_field_cls, field_type)
-                        )
-                        if build_configuration is not None
-                        else None
-                    ),
-                )
+                alias: target_type_info_for(target_type)
                 for alias, target_type in registered_target_types.aliases_to_types.items()
                 if (
                     not alias.startswith("_")
