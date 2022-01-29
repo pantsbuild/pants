@@ -40,7 +40,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtRequest, LintRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    tool_name = "Google Java Format"
+    name = "Google Java Format"
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -125,13 +125,13 @@ async def google_java_format_fmt(
     request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
 ) -> FmtResult:
     if tool.skip:
-        return FmtResult.skip(formatter_name=request.tool_name)
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, JvmProcess, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name=request.tool_name,
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
@@ -141,7 +141,7 @@ async def google_java_format_lint(
     request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
 ) -> LintResults:
     if tool.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, JvmProcess, setup.process)
     lint_result = LintResult.from_fallible_process_result(result)
@@ -153,7 +153,7 @@ async def google_java_format_lint(
             exit_code=1,
             stdout=f"The following Java files require formatting:\n{lint_result.stdout}\n",
         )
-    return LintResults([lint_result], linter_name=request.tool_name)
+    return LintResults([lint_result], linter_name=request.name)
 
 
 @rule

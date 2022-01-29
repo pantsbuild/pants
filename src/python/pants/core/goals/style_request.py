@@ -54,7 +54,7 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     """
 
     field_set_type: ClassVar[type[_FS]]
-    tool_name: ClassVar[str]
+    name: ClassVar[str]
 
     field_sets: Collection[_FS]
     # TODO: Move this onto `FmtRequest`.
@@ -70,7 +70,7 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
         self.prior_formatter_result = prior_formatter_result
 
     def debug_hint(self) -> str:
-        return self.tool_name
+        return self.name
 
     def metadata(self) -> dict[str, Any]:
         return {"addresses": [fs.address.spec for fs in self.field_sets]}
@@ -101,7 +101,7 @@ def write_reports(
     dist_dir: DistDir,
     *,
     goal_name: str,
-    get_tool_name: Callable[[_R], str],
+    get_name: Callable[[_R], str],
 ) -> None:
     disambiguated_dirs: set[str] = set()
 
@@ -116,7 +116,7 @@ def write_reports(
         logger.info(f"Wrote {goal_name} report files to {output_dir}.")
 
     for results in all_results:
-        tool_name = get_tool_name(results).lower()  # type: ignore[arg-type]
+        tool_name = get_name(results).lower()  # type: ignore[arg-type]
         if len(results.results) == 1 and results.results[0].report != EMPTY_DIGEST:
             write_report(results.results[0].report, tool_name)
         else:

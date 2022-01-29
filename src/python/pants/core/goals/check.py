@@ -164,7 +164,7 @@ async def check(
         Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
     )
 
-    def get_tool_name(res: CheckResults) -> str:
+    def get_name(res: CheckResults) -> str:
         return res.checker_name
 
     write_reports(
@@ -172,7 +172,7 @@ async def check(
         workspace,
         dist_dir,
         goal_name=CheckSubsystem.name,
-        get_tool_name=get_tool_name,
+        get_name=get_name,
     )
 
     exit_code = 0

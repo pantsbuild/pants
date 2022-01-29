@@ -41,13 +41,13 @@ class ShellcheckFieldSet(FieldSet):
 
 class ShellcheckRequest(LintRequest):
     field_set_type = ShellcheckFieldSet
-    tool_name = "Shellcheck"
+    name = "Shellcheck"
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> LintResults:
     if shellcheck.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
 
     # Shellcheck looks at direct dependencies to make sure that every symbol is defined, so we must
     # include those in the run.
@@ -106,7 +106,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
         ),
     )
     result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name=request.tool_name)
+    return LintResults([result], linter_name=request.name)
 
 
 def rules():

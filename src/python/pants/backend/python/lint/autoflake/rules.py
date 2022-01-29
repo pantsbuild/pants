@@ -35,7 +35,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FmtRequest, LintRequest):
     field_set_type = AutoflakeFieldSet
-    tool_name = "autoflake"
+    name = "autoflake"
 
 
 @dataclass(frozen=True)
@@ -106,13 +106,13 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
-        return FmtResult.skip(formatter_name=request.tool_name)
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name=request.tool_name,
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
@@ -120,7 +120,7 @@ async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtR
 @rule(desc="Lint with autoflake", level=LogLevel.DEBUG)
 async def autoflake_lint(request: AutoflakeRequest, autoflake: Autoflake) -> LintResults:
     if autoflake.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -135,7 +135,7 @@ async def autoflake_lint(request: AutoflakeRequest, autoflake: Autoflake) -> Lin
                 result.stderr.decode(),
             )
         ],
-        linter_name=request.tool_name,
+        linter_name=request.name,
     )
 
 

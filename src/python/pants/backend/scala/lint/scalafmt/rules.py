@@ -53,7 +53,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtRequest, LintRequest):
     field_set_type = ScalafmtFieldSet
-    tool_name = "scalafmt"
+    name = "scalafmt"
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -251,7 +251,7 @@ async def setup_scalafmt(
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
 async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
     if tool.skip:
-        return FmtResult.skip(formatter_name=request.tool_name)
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     results = await MultiGet(
         Get(ProcessResult, JvmProcess, partition.process) for partition in setup.partitions
@@ -283,7 +283,7 @@ async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Fmt
         output=output_digest,
         stdout=stdout_content,
         stderr=stderr_content,
-        formatter_name=request.tool_name,
+        formatter_name=request.name,
     )
     return fmt_result
 
@@ -291,7 +291,7 @@ async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Fmt
 @rule(desc="Lint with scalafmt", level=LogLevel.DEBUG)
 async def scalafmt_lint(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
     if tool.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     results = await MultiGet(
         Get(FallibleProcessResult, JvmProcess, partition.process) for partition in setup.partitions
@@ -300,7 +300,7 @@ async def scalafmt_lint(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Li
         LintResult.from_fallible_process_result(result, partition_description=partition.description)
         for result, partition in zip(results, setup.partitions)
     ]
-    return LintResults(lint_results, linter_name=request.tool_name)
+    return LintResults(lint_results, linter_name=request.name)
 
 
 @rule

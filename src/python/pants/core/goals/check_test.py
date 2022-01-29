@@ -39,12 +39,12 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
         addresses = [config.address for config in self.field_sets]
         return CheckResults(
             [CheckResult(self.exit_code(addresses), "", "")],
-            checker_name=self.tool_name,
+            checker_name=self.name,
         )
 
 
 class SuccessfulRequest(MockCheckRequest):
-    tool_name = "SuccessfulChecker"
+    name = "SuccessfulChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -52,7 +52,7 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    tool_name = "FailingChecker"
+    name = "FailingChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -60,7 +60,7 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    tool_name = "ConditionallySucceedsChecker"
+    name = "ConditionallySucceedsChecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -70,7 +70,7 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    tool_name = "SkippedChecker"
+    name = "SkippedChecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -78,7 +78,7 @@ class SkippedRequest(MockCheckRequest):
 
     @property
     def check_results(self) -> CheckResults:
-        return CheckResults([], checker_name=self.tool_name)
+        return CheckResults([], checker_name=self.name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -91,7 +91,7 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidChecker"
+    name = "InvalidChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:

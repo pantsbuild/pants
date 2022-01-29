@@ -34,7 +34,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FmtRequest, LintRequest):
     field_set_type = PyUpgradeFieldSet
-    tool_name = "pyupgrade"
+    name = "pyupgrade"
 
 
 @dataclass(frozen=True)
@@ -84,22 +84,22 @@ async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUp
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_fmt(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> FmtResult:
     if pyupgrade.skip:
-        return FmtResult.skip(formatter_name=PyUpgradeRequest.tool_name)
+        return FmtResult.skip(formatter_name=PyUpgradeRequest.name)
 
     return FmtResult.from_process_result(
         result.process_result,
         original_digest=result.original_digest,
-        formatter_name=PyUpgradeRequest.tool_name,
+        formatter_name=PyUpgradeRequest.name,
     )
 
 
 @rule(desc="Lint with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_lint(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> LintResults:
     if pyupgrade.skip:
-        return LintResults([], linter_name=PyUpgradeRequest.tool_name)
+        return LintResults([], linter_name=PyUpgradeRequest.name)
     return LintResults(
         [LintResult.from_fallible_process_result(result.process_result)],
-        linter_name=PyUpgradeRequest.tool_name,
+        linter_name=PyUpgradeRequest.name,
     )
 
 

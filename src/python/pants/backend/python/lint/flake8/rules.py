@@ -27,7 +27,7 @@ from pants.util.strutil import pluralize
 
 class Flake8Request(LintRequest):
     field_set_type = Flake8FieldSet
-    tool_name = "Flake8"
+    name = "Flake8"
 
 
 @dataclass(frozen=True)
@@ -113,7 +113,7 @@ async def flake8_lint(
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResults:
     if flake8.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
 
     # NB: Flake8 output depends upon which Python interpreter version it's run with
     # (http://flake8.pycqa.org/en/latest/user/invocation.html). We batch targets by their
@@ -134,7 +134,7 @@ async def flake8_lint(
         )
         for constraints, field_sets in sorted(results.items())
     )
-    return LintResults(partitioned_results, linter_name=request.tool_name)
+    return LintResults(partitioned_results, linter_name=request.name)
 
 
 def rules():

@@ -38,7 +38,7 @@ class BlackFieldSet(FieldSet):
 
 class BlackRequest(FmtRequest, LintRequest):
     field_set_type = BlackFieldSet
-    tool_name = "Black"
+    name = "Black"
 
 
 @dataclass(frozen=True)
@@ -137,13 +137,13 @@ async def setup_black(
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
-        return FmtResult.skip(formatter_name=request.tool_name)
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name=request.tool_name,
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
@@ -151,12 +151,12 @@ async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
 @rule(desc="Lint with Black", level=LogLevel.DEBUG)
 async def black_lint(request: BlackRequest, black: Black) -> LintResults:
     if black.skip:
-        return LintResults([], linter_name=request.tool_name)
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name=request.tool_name,
+        linter_name=request.name,
     )
 
 

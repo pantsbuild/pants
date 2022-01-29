@@ -39,13 +39,11 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
     @property
     def lint_results(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
-        return LintResults(
-            [LintResult(self.exit_code(addresses), "", "")], linter_name=self.tool_name
-        )
+        return LintResults([LintResult(self.exit_code(addresses), "", "")], linter_name=self.name)
 
 
 class SuccessfulRequest(MockLintRequest):
-    tool_name = "SuccessfulLinter"
+    name = "SuccessfulLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -53,7 +51,7 @@ class SuccessfulRequest(MockLintRequest):
 
 
 class FailingRequest(MockLintRequest):
-    tool_name = "FailingLinter"
+    name = "FailingLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -61,7 +59,7 @@ class FailingRequest(MockLintRequest):
 
 
 class ConditionallySucceedsRequest(MockLintRequest):
-    tool_name = "ConditionallySucceedsLinter"
+    name = "ConditionallySucceedsLinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -71,7 +69,7 @@ class ConditionallySucceedsRequest(MockLintRequest):
 
 
 class SkippedRequest(MockLintRequest):
-    tool_name = "SkippedLinter"
+    name = "SkippedLinter"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -79,7 +77,7 @@ class SkippedRequest(MockLintRequest):
 
     @property
     def lint_results(self) -> LintResults:
-        return LintResults([], linter_name=self.tool_name)
+        return LintResults([], linter_name=self.name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -92,7 +90,7 @@ class InvalidFieldSet(MockLinterFieldSet):
 
 class InvalidRequest(MockLintRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidLinter"
+    name = "InvalidLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
