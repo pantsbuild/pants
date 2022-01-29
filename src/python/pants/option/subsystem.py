@@ -130,7 +130,7 @@ _T = TypeVar("_T")
 class Option(Generic[_T]):
     """Data-descriptor for subsystem options.
 
-    This class exists to help eliminate the repitition of declaring options in `register_options`
+    This class exists to help eliminate the repetition of declaring options in `register_options`
     and having to declare properties for mypy's sake.
 
     Usage:
