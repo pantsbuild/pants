@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-import pathlib
+from pathlib import PurePath
 from enum import Enum
 from typing import Dict, Iterable, Iterator, cast
 
@@ -206,15 +206,15 @@ def _get_inferred_resource_deps(
     all_resource_and_file_targets: AllResourceAndFileTargets,
     parsed_resources: ParsedPythonResources,
 ) -> Iterator[Address]:
-    resources_by_path: Dict[pathlib.Path, Target] = {}
+    resources_by_path: Dict[PurePath, Target] = {}
     for file_tgt in all_resource_and_file_targets.files:
-        resources_by_path[pathlib.Path(file_tgt[FileSourceField].file_path)] = file_tgt
+        resources_by_path[PurePath(file_tgt[FileSourceField].file_path)] = file_tgt
     for resource_tgt in all_resource_and_file_targets.resources:
-        path = pathlib.Path(resource_tgt[ResourceSourceField].file_path)
+        path = PurePath(resource_tgt[ResourceSourceField].file_path)
         resources_by_path[path] = resource_tgt
 
     for pkgname, filepath in parsed_resources:
-        resource_path = pathlib.Path(*pkgname.split(".")).parent / filepath
+        resource_path = PurePath(*pkgname.split(".")).parent / filepath
         inferred_resource_tgt = resources_by_path.get(resource_path)
         if inferred_resource_tgt:
             yield inferred_resource_tgt.address
