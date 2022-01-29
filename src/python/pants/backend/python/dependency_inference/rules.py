@@ -113,13 +113,22 @@ class PythonInferSubsystem(Subsystem):
             "--resources-and-files-from-strings",
             default=False,
             type=bool,
-            help=("@TODO"),
+            help=(
+                "Infer a target's dependencies based on strings that look like Posix filepaths, "
+                "such as those given to `open` or `pkgutil.get_data`. To ignore any false "
+                "positives, put `!{bad_address}` in the `dependencies` field of your target."
+            ),
         )
         register(
             "--resources-and-files-from-strings-min-slashes",
             default=1,
             type=int,
-            help=("@TODO"),
+            help=(
+                "If --resources-and-files-from-strings is True, treat valid-looking strings with "
+                "at least this many forward slash characters as potential resources or files."
+                "E.g. `'data/databases/prod.db'` will be treated as a potential candidate if this "
+                "option is set to 2 but not to 3."
+            ),
         )
         register(
             "--inits",
