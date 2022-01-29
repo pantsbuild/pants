@@ -129,8 +129,30 @@ _SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
 _T = TypeVar("_T")
 
 class Option(Generic[_T]):
+    """Data-descriptor for subsystem options.
+
+    This class exists to help eliminate the repitition of declaring options in `register_options`
+    and having to declare properties for mypy's sake.
+
+    Usage:
+        class Engine(Subsystem):
+            ...
+
+            cylinders = Option[int]("--cylinders", default=6, help="...")
+
+        ...
+
+        engine: Engine = ...
+        engine.cylinders  # mypy knows this is an int
+
+    Under-the-hood:
+        - The `type` argument if omitted defaults to the type of `default`
+        - You can pass a `converter` function to convert the option value into the property value
+            E.g. `converter=tuple`
+    """
     def __init__(self,
         *args: str,
+        # @TODO: Don't igore type
         converter: Callable[[Any], _T] =lambda x: x,  # type: ignore
         **kwargs: Any,
     ):
