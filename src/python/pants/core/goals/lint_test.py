@@ -125,7 +125,7 @@ def run_lint_rule(
                 create_goal_subsystem(
                     LintSubsystem,
                     per_file_caching=per_file_caching,
-                    batch_size=128,
+                    batch_size=batch_size,
                 ),
                 union_membership,
                 DistDir(relpath=Path("dist")),
