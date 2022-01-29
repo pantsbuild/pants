@@ -4,7 +4,7 @@
 import itertools
 import logging
 from enum import Enum
-from typing import TypeVar, cast, Callable
+from typing import cast
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_imports
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -41,7 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
-from pants.option.subsystem import Subsystem, Option
+from pants.option.subsystem import Option, Subsystem
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list
 
@@ -64,8 +64,15 @@ class PythonInferSubsystem(Subsystem):
     options_scope = "python-infer"
     help = "Options controlling which dependencies will be inferred for Python targets."
 
-    imports = Option[bool]("--imports", default=True, help="Infer a target's imported dependencies by parsing import statements from sources.",)
-    string_imports = Option[bool]("--string-imports", default=False, help=(
+    imports = Option[bool](
+        "--imports",
+        default=True,
+        help="Infer a target's imported dependencies by parsing import statements from sources.",
+    )
+    string_imports = Option[bool](
+        "--string-imports",
+        default=False,
+        help=(
             "Infer a target's dependencies based on strings that look like dynamic "
             "dependencies, such as Django settings files expressing dependencies as strings. "
             "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "

@@ -2,14 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-from ctypes import cast
 
 import functools
 import inspect
 import re
 from abc import ABCMeta
-from token import OP
-from typing import Any, ClassVar, Generic, TypeVar, Callable, overload
+from typing import Any, Callable, ClassVar, Generic, TypeVar, overload
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
@@ -128,6 +126,7 @@ class Subsystem(metaclass=ABCMeta):
 _SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
 _T = TypeVar("_T")
 
+
 class Option(Generic[_T]):
     """Data-descriptor for subsystem options.
 
@@ -150,10 +149,15 @@ class Option(Generic[_T]):
         - You can pass a `converter` function to convert the option value into the property value
             E.g. `converter=tuple`
     """
-    def __init__(self,
+
+    # NB: We have to ignore type because we can't `cast(_T, x)` as `_T` is purely a type-checking
+    # construct and `cast()` is a runtime function.
+    DEFAULT_CONVERTER: Callable[[Any], _T] = lambda x: x  # type: ignore
+
+    def __init__(
+        self,
         *args: str,
-        # @TODO: Don't igore type
-        converter: Callable[[Any], _T] =lambda x: x,  # type: ignore
+        converter: Callable[[Any], _T] = DEFAULT_CONVERTER,
         **kwargs: Any,
     ):
         self.args = args

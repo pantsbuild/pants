@@ -33,22 +33,19 @@ class Hadolint(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-
     skip = Option[bool](
         "--skip",
         default=False,
         help="Don't use Hadolint when running `./pants lint`.",
     )
-    args = Option['tuple[str, ...]'](
+    args = Option["tuple[str, ...]"](
         "--args",
         type=list,
         member_type=shell_str,
         converter=tuple,
-        help=(
-            "Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"
-        ),
+        help=("Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"),
     )
-    config = Option['str | None'](
+    config = Option["str | None"](
         "--config",
         type=file_option,
         default=None,
