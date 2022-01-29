@@ -291,12 +291,13 @@ async def infer_python_dependencies_via_source(
     ):
         return InferredDependencies([])
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    tgt = _wrapped_tgt.target
     parsed_dependencies = await Get(
         ParsedPythonDependencies,
         ParsePythonDependenciesRequest(
             cast(PythonSourceField, request.sources_field),
-            InterpreterConstraints.create_from_targets([wrapped_tgt.target], python_setup),
+            InterpreterConstraints.create_from_targets([tgt], python_setup),
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             string_resources=python_infer_subsystem.resources_and_files_from_strings,
@@ -311,13 +312,13 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports:
         parsed_imports = ParsedPythonImports([])
 
-    address = wrapped_tgt.target.address
     if parsed_imports:
         explicitly_provided_deps = await Get(
-            ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])
+            ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])
         )
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
         import_deps, unowned_imports = _get_imports_info(
-            address=wrapped_tgt.target.address,
+            address=tgt.address,
             owners_per_import=await MultiGet(
                 Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
                 for imported_module in parsed_imports
@@ -336,7 +337,7 @@ async def infer_python_dependencies_via_source(
         )
 
     _maybe_warn_unowned(
-        address,
+        tgt.address,
         request.sources_field.file_path,
         python_infer_subsystem.unowned_dependency_behavior,
         unowned_imports,
