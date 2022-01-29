@@ -41,12 +41,13 @@ class GoVetFieldSet(FieldSet):
 
 class GoVetRequest(LintRequest):
     field_set_type = GoVetFieldSet
+    name = "go vet"
 
 
 @rule(level=LogLevel.DEBUG)
 async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) -> LintResults:
     if go_vet_subsystem.skip:
-        return LintResults([], linter_name="go vet")
+        return LintResults([], linter_name=request.name)
 
     source_files = await Get(
         SourceFiles,
@@ -80,7 +81,7 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
     )
 
     result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name="go vet")
+    return LintResults([result], linter_name=request.name)
 
 
 def rules():

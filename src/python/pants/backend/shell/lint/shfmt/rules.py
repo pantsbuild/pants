@@ -34,6 +34,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtRequest, LintRequest):
     field_set_type = ShfmtFieldSet
+    name = "shfmt"
 
 
 @dataclass(frozen=True)
@@ -97,21 +98,21 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
     if shfmt.skip:
-        return FmtResult.skip(formatter_name="shfmt")
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="shfmt"
+        result, original_digest=setup.original_digest, formatter_name=request.name
     )
 
 
 @rule(desc="Lint with shfmt", level=LogLevel.DEBUG)
 async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
     if shfmt.skip:
-        return LintResults([], linter_name="shfmt")
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults([LintResult.from_fallible_process_result(result)], linter_name="shfmt")
+    return LintResults([LintResult.from_fallible_process_result(result)], linter_name=request.name)
 
 
 def rules():

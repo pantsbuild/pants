@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type
+from typing import Iterable, List, Optional, Tuple, Type
 
 import pytest
 
@@ -30,7 +30,6 @@ class MockLinterFieldSet(FieldSet):
 
 class MockLintRequest(LintRequest, metaclass=ABCMeta):
     field_set_type = MockLinterFieldSet
-    linter_name: ClassVar[str]
 
     @staticmethod
     @abstractmethod
@@ -40,13 +39,11 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
     @property
     def lint_results(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
-        return LintResults(
-            [LintResult(self.exit_code(addresses), "", "")], linter_name=self.linter_name
-        )
+        return LintResults([LintResult(self.exit_code(addresses), "", "")], linter_name=self.name)
 
 
 class SuccessfulRequest(MockLintRequest):
-    linter_name = "SuccessfulLinter"
+    name = "SuccessfulLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -54,7 +51,7 @@ class SuccessfulRequest(MockLintRequest):
 
 
 class FailingRequest(MockLintRequest):
-    linter_name = "FailingLinter"
+    name = "FailingLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -62,7 +59,7 @@ class FailingRequest(MockLintRequest):
 
 
 class ConditionallySucceedsRequest(MockLintRequest):
-    linter_name = "ConditionallySucceedsLinter"
+    name = "ConditionallySucceedsLinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -72,13 +69,15 @@ class ConditionallySucceedsRequest(MockLintRequest):
 
 
 class SkippedRequest(MockLintRequest):
+    name = "SkippedLinter"
+
     @staticmethod
     def exit_code(_) -> int:
         return 0
 
     @property
     def lint_results(self) -> LintResults:
-        return LintResults([], linter_name="SkippedLinter")
+        return LintResults([], linter_name=self.name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -91,7 +90,7 @@ class InvalidFieldSet(MockLinterFieldSet):
 
 class InvalidRequest(MockLintRequest):
     field_set_type = InvalidFieldSet
-    linter_name = "InvalidLinter"
+    name = "InvalidLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
