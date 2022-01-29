@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from itertools import groupby
-from typing import Any, Callable, Tuple, Type, Union, cast, get_type_hints
+from typing import Any, Callable, Iterable, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -20,6 +20,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
+from pants.option.scope import ScopeInfo
+from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph
 
 
@@ -246,10 +248,23 @@ class RuleInfo:
 class AllHelpInfo:
     """All available help info."""
 
-    scope_to_help_info: dict[str, OptionScopeHelpInfo]
-    name_to_goal_info: dict[str, GoalHelpInfo]
-    name_to_target_type_info: dict[str, TargetTypeHelpInfo]
-    rule_output_type_to_rule_infos: dict[str, tuple[RuleInfo, ...]]
+    scope_to_help_info: LazyFrozenDict[str, OptionScopeHelpInfo]
+    name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
+    name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
+    rule_output_type_to_rule_infos: LazyFrozenDict[str, tuple[RuleInfo, ...]]
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            field: {
+                thing: (
+                    tuple(dataclasses.asdict(t) for t in info)
+                    if isinstance(info, tuple)
+                    else dataclasses.asdict(info)
+                )
+                for thing, info in value.items()
+            }
+            for field, value in dataclasses.asdict(self).items()
+        }
 
 
 ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
@@ -267,41 +282,49 @@ class HelpInfoExtracter:
         registered_target_types: RegisteredTargetTypes,
         build_configuration: BuildConfiguration | None = None,
     ) -> AllHelpInfo:
-        scope_to_help_info = {}
-        name_to_goal_info = {}
-        for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
-            if scope_info.scope.startswith("_"):
-                # Exclude "private" subsystems.
-                continue
-            options.for_scope(scope_info.scope)  # Force parsing.
-            subsystem_cls = scope_info.subsystem_cls
-            if not scope_info.description:
-                cls_name = (
-                    f"{subsystem_cls.__module__}.{subsystem_cls.__qualname__}"
-                    if subsystem_cls
-                    else ""
+        def option_scope_help_info_loader_for(
+            scope_info: ScopeInfo,
+        ) -> Callable[[], OptionScopeHelpInfo]:
+            def load() -> OptionScopeHelpInfo:
+                options.for_scope(scope_info.scope)  # Force parsing.
+                subsystem_cls = scope_info.subsystem_cls
+                if not scope_info.description:
+                    cls_name = (
+                        f"{subsystem_cls.__module__}.{subsystem_cls.__qualname__}"
+                        if subsystem_cls
+                        else ""
+                    )
+                    raise ValueError(
+                        f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
+                        f"Add a class property `help`."
+                    )
+                provider = ""
+                if subsystem_cls is not None and build_configuration is not None:
+                    provider = cls.get_first_provider(
+                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                    )
+                return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
+                    scope_info.description,
+                    options.get_parser(scope_info.scope),
+                    scope_info.is_goal,
+                    provider,
                 )
-                raise ValueError(
-                    f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
-                    f"Add a class property `help`."
-                )
-            provider = ""
-            if subsystem_cls is not None and build_configuration is not None:
-                provider = cls.get_first_provider(
-                    build_configuration.subsystem_to_providers.get(subsystem_cls)
-                )
-            is_goal = subsystem_cls is not None and issubclass(subsystem_cls, GoalSubsystem)
-            oshi = HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
-                scope_info.description, options.get_parser(scope_info.scope), is_goal, provider
-            )
-            scope_to_help_info[oshi.scope] = oshi
 
-            if is_goal:
+            return load
+
+        def goal_help_info_loader_for(scope_info: ScopeInfo) -> Callable[[], GoalHelpInfo]:
+            def load() -> GoalHelpInfo:
+                subsystem_cls = scope_info.subsystem_cls
+                assert subsystem_cls is not None
+                if build_configuration is not None:
+                    provider = cls.get_first_provider(
+                        build_configuration.subsystem_to_providers.get(subsystem_cls)
+                    )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
                 is_implemented = union_membership.has_members_for_all(
                     goal_subsystem_cls.required_union_implementations
                 )
-                name_to_goal_info[scope_info.scope] = GoalHelpInfo(
+                return GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
                     provider,
@@ -309,30 +332,57 @@ class HelpInfoExtracter:
                     consumed_scopes_mapper(scope_info.scope),
                 )
 
-        name_to_target_type_info = {
-            alias: TargetTypeHelpInfo.create(
-                target_type,
-                union_membership=union_membership,
-                provider=cls.get_first_provider(
-                    build_configuration
-                    and build_configuration.target_type_to_providers.get(target_type)
-                    or None
-                ),
-                get_field_type_provider=lambda field_type: cls.get_first_provider(
-                    build_configuration.union_rule_to_providers.get(
-                        UnionRule(target_type._plugin_field_cls, field_type)
-                    )
-                    if build_configuration is not None
-                    else None
-                ),
-            )
-            for alias, target_type in registered_target_types.aliases_to_types.items()
-            if (
-                not alias.startswith("_")
-                and target_type.removal_version is None
-                and alias != target_type.deprecated_alias
-            )
-        }
+            return load
+
+        def target_type_info_for(target_type: type[Target]) -> Callable[[], TargetTypeHelpInfo]:
+            def load() -> TargetTypeHelpInfo:
+                return TargetTypeHelpInfo.create(
+                    target_type,
+                    union_membership=union_membership,
+                    provider=cls.get_first_provider(
+                        build_configuration
+                        and build_configuration.target_type_to_providers.get(target_type)
+                        or None
+                    ),
+                    get_field_type_provider=lambda field_type: cls.get_first_provider(
+                        build_configuration.union_rule_to_providers.get(
+                            UnionRule(target_type._plugin_field_cls, field_type)
+                        )
+                        if build_configuration is not None
+                        else None
+                    ),
+                )
+
+            return load
+
+        known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
+        scope_to_help_info = LazyFrozenDict(
+            {
+                scope_info.scope: option_scope_help_info_loader_for(scope_info)
+                for scope_info in known_scope_infos
+                if not scope_info.scope.startswith("_")
+            }
+        )
+
+        name_to_goal_info = LazyFrozenDict(
+            {
+                scope_info.scope: goal_help_info_loader_for(scope_info)
+                for scope_info in known_scope_infos
+                if scope_info.is_goal and not scope_info.scope.startswith("_")
+            }
+        )
+
+        name_to_target_type_info = LazyFrozenDict(
+            {
+                alias: target_type_info_for(target_type)
+                for alias, target_type in registered_target_types.aliases_to_types.items()
+                if (
+                    not alias.startswith("_")
+                    and target_type.removal_version is None
+                    and alias != target_type.deprecated_alias
+                )
+            }
+        )
 
         return AllHelpInfo(
             scope_to_help_info=scope_to_help_info,
@@ -424,9 +474,9 @@ class HelpInfoExtracter:
     @classmethod
     def get_rule_infos(
         cls, build_configuration: BuildConfiguration | None
-    ) -> dict[str, tuple[RuleInfo, ...]]:
+    ) -> LazyFrozenDict[str, tuple[RuleInfo, ...]]:
         if build_configuration is None:
-            return {}
+            return LazyFrozenDict({})
 
         rule_infos = [
             RuleInfo(
@@ -442,12 +492,25 @@ class HelpInfoExtracter:
             for rule, providers in build_configuration.rule_to_providers.items()
             if isinstance(rule, TaskRule)
         ]
-        return {
-            rule_output_type: tuple(infos)
-            for rule_output_type, infos in groupby(
-                sorted(rule_infos, key=cls.rule_info_output_type), key=cls.rule_info_output_type
-            )
-        }
+
+        def _capture(t: Iterable[RuleInfo]) -> Callable[[], tuple[RuleInfo, ...]]:
+            # The `t` value from `groupby` is only live for the duration of the current for-loop
+            # iteration, so we capture the data here now.
+            data = tuple(t)
+
+            def load() -> tuple[RuleInfo, ...]:
+                return data
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                rule_output_type: _capture(infos)
+                for rule_output_type, infos in groupby(
+                    sorted(rule_infos, key=cls.rule_info_output_type), key=cls.rule_info_output_type
+                )
+            }
+        )
 
     def __init__(self, scope: str):
         self._scope = scope
@@ -455,7 +518,7 @@ class HelpInfoExtracter:
 
     def get_option_scope_help_info(
         self, description: str, parser: Parser, is_goal: bool, provider: str = ""
-    ):
+    ) -> OptionScopeHelpInfo:
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 
         basic_options = []
