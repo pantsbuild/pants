@@ -109,7 +109,7 @@ AllTools = (
     DefaultTool.python(PyTest),
     DefaultTool.python(CoverageSubsystem),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
-    DefaultTool.python(DockerfileParser, backend="pants.backend.experimental.docker"),
+    DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
     # JVM
     DefaultTool.jvm(JUnit),
