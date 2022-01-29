@@ -22,6 +22,7 @@ from pants.util.strutil import pluralize
 
 class BanditRequest(LintRequest):
     field_set_type = BanditFieldSet
+    tool_name = "Bandit"
 
 
 @dataclass(frozen=True)
@@ -95,7 +96,7 @@ async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
     if bandit.skip:
-        return LintResults([], linter_name="Bandit")
+        return LintResults([], linter_name=request.tool_name)
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
@@ -108,7 +109,7 @@ async def bandit_lint(
         Get(LintResult, BanditPartition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
-    return LintResults(partitioned_results, linter_name="Bandit")
+    return LintResults(partitioned_results, linter_name=request.tool_name)
 
 
 def rules():

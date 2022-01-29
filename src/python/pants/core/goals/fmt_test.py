@@ -42,6 +42,7 @@ class FortranFieldSet(FieldSet):
 
 class FortranFmtRequest(FmtRequest):
     field_set_type = FortranFieldSet
+    tool_name = "FortranConditionallyDidChange"
 
 
 @rule
@@ -52,11 +53,7 @@ async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
         else EMPTY_DIGEST
     )
     return FmtResult(
-        input=EMPTY_DIGEST,
-        output=output,
-        stdout="",
-        stderr="",
-        formatter_name="FortranConditionallyDidChange",
+        input=EMPTY_DIGEST, output=output, stdout="", stderr="", formatter_name=request.tool_name
     )
 
 
@@ -78,17 +75,18 @@ class SmalltalkFieldSet(FieldSet):
 
 class SmalltalkNoopRequest(FmtRequest):
     field_set_type = SmalltalkFieldSet
+    tool_name = "SmalltalkDidNotChange"
 
 
 @rule
-async def smalltalk_noop(_: SmalltalkNoopRequest) -> FmtResult:
+async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
     result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
     return FmtResult(
         input=result_digest,
         output=result_digest,
         stdout="",
         stderr="",
-        formatter_name="SmalltalkDidNotChange",
+        formatter_name=request.tool_name,
     )
 
 

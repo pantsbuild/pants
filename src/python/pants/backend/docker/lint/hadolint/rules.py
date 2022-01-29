@@ -34,6 +34,7 @@ class HadolintFieldSet(FieldSet):
 
 class HadolintRequest(LintRequest):
     field_set_type = HadolintFieldSet
+    tool_name = "Hadolint"
 
 
 def generate_argv(
@@ -50,7 +51,7 @@ def generate_argv(
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResults:
     if hadolint.skip:
-        return LintResults([], linter_name="Hadolint")
+        return LintResults([], linter_name=request.tool_name)
 
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
@@ -96,7 +97,7 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
     )
 
     return LintResults(
-        [LintResult.from_fallible_process_result(process_result)], linter_name="hadolint"
+        [LintResult.from_fallible_process_result(process_result)], linter_name=request.tool_name
     )
 
 

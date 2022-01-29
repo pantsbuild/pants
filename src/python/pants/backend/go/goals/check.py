@@ -24,6 +24,7 @@ class GoCheckFieldSet(FieldSet):
 
 class GoCheckRequest(CheckRequest):
     field_set_type = GoCheckFieldSet
+    tool_name = "go compile"
 
 
 @rule(desc="Check Go compilation", level=LogLevel.DEBUG)
@@ -53,7 +54,7 @@ async def check_go(request: GoCheckRequest) -> CheckResults:
         ),
         0,
     )
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name="go compile")
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.tool_name)
 
 
 def rules():

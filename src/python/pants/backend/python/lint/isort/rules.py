@@ -35,6 +35,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtRequest, LintRequest):
     field_set_type = IsortFieldSet
+    tool_name = "isort"
 
 
 @dataclass(frozen=True)
@@ -134,13 +135,13 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
-        return FmtResult.skip(formatter_name="isort")
+        return FmtResult.skip(formatter_name=request.tool_name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="isort",
+        formatter_name=request.tool_name,
         strip_chroot_path=True,
     )
 
@@ -148,12 +149,12 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
 @rule(desc="Lint with isort", level=LogLevel.DEBUG)
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.skip:
-        return LintResults([], linter_name="isort")
+        return LintResults([], linter_name=request.tool_name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name="isort",
+        linter_name=request.tool_name,
     )
 
 

@@ -54,6 +54,7 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     """
 
     field_set_type: ClassVar[type[_FS]]
+    tool_name: ClassVar[str]
 
     field_sets: Collection[_FS]
     # TODO: Move this onto `FmtRequest`.
@@ -67,6 +68,9 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
         self.prior_formatter_result = prior_formatter_result
+
+    def debug_hint(self) -> str:
+        return self.tool_name
 
     def metadata(self) -> dict[str, Any]:
         return {"addresses": [fs.address.spec for fs in self.field_sets]}

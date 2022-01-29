@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class TfFmtSubsystem(Subsystem):
     options_scope = "terraform-fmt"
-    help = """Terraform fmt options."""
+    help = "Terraform fmt options."
 
     @classmethod
     def register_options(cls, register):
@@ -41,12 +41,13 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtRequest):
     field_set_type = TerraformFieldSet
+    tool_name = "tffmt"
 
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
     if tffmt.options.skip:
-        return FmtResult.skip(formatter_name="tffmt")
+        return FmtResult.skip(formatter_name=request.tool_name)
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt",)))
     results = await MultiGet(
         Get(ProcessResult, TerraformProcess, process)
@@ -79,7 +80,7 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
         output=output_digest,
         stdout=stdout_content,
         stderr=stderr_content,
-        formatter_name="tffmt",
+        formatter_name=request.tool_name,
     )
     return fmt_result
 
@@ -87,14 +88,14 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
 @rule(desc="Lint with `terraform fmt`", level=LogLevel.DEBUG)
 async def tffmt_lint(request: TffmtRequest, tffmt: TfFmtSubsystem) -> LintResults:
     if tffmt.options.skip:
-        return LintResults([], linter_name="tffmt")
+        return LintResults([], linter_name=request.tool_name)
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt", "-check")))
     results = await MultiGet(
         Get(FallibleProcessResult, TerraformProcess, process)
         for _, (process, _) in setup.directory_to_process.items()
     )
     lint_results = [LintResult.from_fallible_process_result(result) for result in results]
-    return LintResults(lint_results, linter_name="tffmt")
+    return LintResults(lint_results, linter_name=request.tool_name)
 
 
 def rules():

@@ -38,6 +38,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtRequest):
     field_set_type = GofmtFieldSet
+    tool_name = "gofmt"
 
 
 @dataclass(frozen=True)
@@ -82,18 +83,18 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
     if gofmt.options.skip:
-        return FmtResult.skip(formatter_name="gofmt")
+        return FmtResult.skip(formatter_name=request.tool_name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="gofmt"
+        result, original_digest=setup.original_digest, formatter_name=request.tool_name
     )
 
 
 @rule(desc="Lint with gofmt", level=LogLevel.DEBUG)
 async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResults:
     if gofmt.options.skip:
-        return LintResults([], linter_name="gofmt")
+        return LintResults([], linter_name=request.tool_name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     lint_result = LintResult.from_fallible_process_result(result)
@@ -105,7 +106,7 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
             exit_code=1,
             stdout=f"The following Go files require formatting:\n{lint_result.stdout}\n",
         )
-    return LintResults([lint_result], linter_name="gofmt")
+    return LintResults([lint_result], linter_name=request.tool_name)
 
 
 def rules():
