@@ -8,7 +8,6 @@ from typing import cast
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.option.custom_types import file_option, shell_str
-from pants.option.subsystem import Option
 
 
 class Hadolint(TemplatedExternalTool):
@@ -33,41 +32,59 @@ class Hadolint(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    skip = Option[bool](
-        "--skip",
-        default=False,
-        help="Don't use Hadolint when running `./pants lint`.",
-    )
-    args = Option["tuple[str, ...]"](
-        "--args",
-        type=list,
-        member_type=shell_str,
-        converter=tuple,
-        help=("Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"),
-    )
-    config = Option["str | None"](
-        "--config",
-        type=file_option,
-        default=None,
-        advanced=True,
-        help=(
-            "Path to an YAML config file understood by Hadolint "
-            "(https://github.com/hadolint/hadolint#configure).\n\n"
-            f"Setting this option will disable `[{options_scope}].config_discovery`. Use "
-            "this option if the config is located in a non-standard location."
-        ),
-    )
-    config_discovery = Option[bool](
-        "--config-discovery",
-        default=True,
-        advanced=True,
-        help=(
-            "If true, Pants will include all relevant config files during runs "
-            "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
-            f"Use `[{options_scope}].config` instead if your config is in a "
-            "non-standard location."
-        ),
-    )
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--skip",
+            type=bool,
+            default=False,
+            help="Don't use Hadolint when running `./pants lint`.",
+        )
+        register(
+            "--args",
+            type=list,
+            member_type=shell_str,
+            help=(
+                "Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"
+            ),
+        )
+        register(
+            "--config",
+            type=file_option,
+            default=None,
+            advanced=True,
+            help=(
+                "Path to an YAML config file understood by Hadolint "
+                "(https://github.com/hadolint/hadolint#configure).\n\n"
+                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+                "this option if the config is located in a non-standard location."
+            ),
+        )
+        register(
+            "--config-discovery",
+            type=bool,
+            default=True,
+            advanced=True,
+            help=(
+                "If true, Pants will include all relevant config files during runs "
+                "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
+                f"Use `[{cls.options_scope}].config` instead if your config is in a "
+                "non-standard location."
+            ),
+        )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def config(self) -> str | None:
+        return cast("str | None", self.options.config)
 
     def config_request(self) -> ConfigFilesRequest:
         # Refer to https://github.com/hadolint/hadolint#configure for how config files are

@@ -41,7 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
-from pants.option.subsystem import Option, Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list
 
@@ -64,66 +64,105 @@ class PythonInferSubsystem(Subsystem):
     options_scope = "python-infer"
     help = "Options controlling which dependencies will be inferred for Python targets."
 
-    imports = Option[bool](
-        "--imports",
-        default=True,
-        help="Infer a target's imported dependencies by parsing import statements from sources.",
-    )
-    string_imports = Option[bool](
-        "--string-imports",
-        default=False,
-        help=(
-            "Infer a target's dependencies based on strings that look like dynamic "
-            "dependencies, such as Django settings files expressing dependencies as strings. "
-            "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
-            "of your target."
-        ),
-    )
-    string_imports_min_dots = Option[int](
-        "--string-imports-min-dots",
-        default=2,
-        help=(
-            "If --string-imports is True, treat valid-looking strings with at least this many "
-            "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
-            "treated as a potential dependency if this option is set to 2 but not if set to 3."
-        ),
-    )
-    inits = Option[bool](
-        "--inits",
-        default=False,
-        help=(
-            "Infer a target's dependencies on any `__init__.py` files in the packages "
-            "it is located in (recursively upward in the directory structure).\n\nEven if this "
-            "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
-            "will not be 'proper' dependencies, e.g. they will not show up in "
-            "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
-            "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
-            "you should enable this option."
-        ),
-    )
-    conftests = Option[bool](
-        "--conftests",
-        default=True,
-        type=bool,
-        help=(
-            "Infer a test target's dependencies on any conftest.py files in the current "
-            "directory and ancestor directories."
-        ),
-    )
-    entry_points = Option[bool](
-        "--entry-points",
-        default=True,
-        help=(
-            "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
-            "`entry_point` field, `python_awslambda`'s `handler` field and "
-            "`python_distribution`'s `entry_points` field."
-        ),
-    )
-    unowned_dependency_behavior = Option[UnownedDependencyUsage](
-        "--unowned-dependency-behavior",
-        default=UnownedDependencyUsage.DoNothing,
-        help=("How to handle inferred dependencies that don't have any owner."),
-    )
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--imports",
+            default=True,
+            type=bool,
+            help=(
+                "Infer a target's imported dependencies by parsing import statements from sources."
+            ),
+        )
+        register(
+            "--string-imports",
+            default=False,
+            type=bool,
+            help=(
+                "Infer a target's dependencies based on strings that look like dynamic "
+                "dependencies, such as Django settings files expressing dependencies as strings. "
+                "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
+                "of your target."
+            ),
+        )
+        register(
+            "--string-imports-min-dots",
+            default=2,
+            type=int,
+            help=(
+                "If --string-imports is True, treat valid-looking strings with at least this many "
+                "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
+                "treated as a potential dependency if this option is set to 2 but not if set to 3."
+            ),
+        )
+        register(
+            "--inits",
+            default=False,
+            type=bool,
+            help=(
+                "Infer a target's dependencies on any `__init__.py` files in the packages "
+                "it is located in (recursively upward in the directory structure).\n\nEven if this "
+                "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
+                "will not be 'proper' dependencies, e.g. they will not show up in "
+                "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
+                "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
+                "you should enable this option."
+            ),
+        )
+        register(
+            "--conftests",
+            default=True,
+            type=bool,
+            help=(
+                "Infer a test target's dependencies on any conftest.py files in the current "
+                "directory and ancestor directories."
+            ),
+        )
+        register(
+            "--entry-points",
+            default=True,
+            type=bool,
+            help=(
+                "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
+                "`entry_point` field, `python_awslambda`'s `handler` field and "
+                "`python_distribution`'s `entry_points` field."
+            ),
+        )
+        register(
+            "--unowned-dependency-behavior",
+            type=UnownedDependencyUsage,
+            default=UnownedDependencyUsage.DoNothing,
+            help=("How to handle inferred dependencies that don't have any owner."),
+        )
+
+    @property
+    def imports(self) -> bool:
+        return cast(bool, self.options.imports)
+
+    @property
+    def string_imports(self) -> bool:
+        return cast(bool, self.options.string_imports)
+
+    @property
+    def string_imports_min_dots(self) -> int:
+        return cast(int, self.options.string_imports_min_dots)
+
+    @property
+    def inits(self) -> bool:
+        return cast(bool, self.options.inits)
+
+    @property
+    def conftests(self) -> bool:
+        return cast(bool, self.options.conftests)
+
+    @property
+    def entry_points(self) -> bool:
+        return cast(bool, self.options.entry_points)
+
+    @property
+    def unowned_dependency_behavior(self) -> UnownedDependencyUsage:
+        return cast(UnownedDependencyUsage, self.options.unowned_dependency_behavior)
 
 
 class InferPythonImportDependencies(InferDependenciesRequest):
