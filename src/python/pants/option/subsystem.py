@@ -128,10 +128,11 @@ _T = TypeVar("_T")
 
 
 class Option(Generic[_T]):
-    """Data-descriptor for subsystem options.
+    """Descriptor for subsystem options.
 
-    This class exists to help eliminate the repetition of declaring options in `register_options`
-    and having to declare properties for mypy's sake.
+    This class serves two purposes:
+        - Register your subsystem's options
+        - Provide a typed property for Python usage
 
     Usage:
         class Engine(Subsystem):
@@ -160,23 +161,24 @@ class Option(Generic[_T]):
         **kwargs: Any,
     ):
         self.args = args
-        self.converter = converter
         self.kwargs = kwargs
+        self._converter = converter
 
     @overload
-    def __get__(self, obj: None, *args: Any) -> Option:
+    def __get__(self, obj: None, objtype: type[_SubsystemT]) -> Option:
         ...
 
     @overload
-    def __get__(self, obj: _SubsystemT, *args: Any) -> _T:
+    def __get__(self, obj: _SubsystemT, objtype: type[_SubsystemT]) -> _T:
         ...
 
-    def __get__(self, obj: _SubsystemT | None, *args: Any) -> Option | _T:
+    def __get__(self, obj: _SubsystemT | None, objtype: type[_SubsystemT]) -> Option | _T:
+        assert issubclass(objtype, Subsystem), "Option should only be used as attributes of a Subsystem"
         if obj is None:
             return self
         long_name = self.args[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
-        return self.converter(option_value)
+        return self._converter(option_value)
 
 
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
