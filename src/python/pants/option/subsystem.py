@@ -7,9 +7,10 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import Any, ClassVar, TypeVar
+from typing import Any, Callable, ClassVar, Generic, TypeVar, overload
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.option.custom_types import shell_str
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -100,6 +101,10 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses may override and call register(*args, **kwargs).
         """
+        for attrname in dir(cls):
+            attr = getattr(cls, attrname)
+            if isinstance(attr, Option):
+                register(*attr.args, **attr.kwargs)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -119,9 +124,80 @@ class Subsystem(metaclass=ABCMeta):
         return bool(self.options == other.options)
 
 
-_T = TypeVar("_T", bound=Subsystem)
+_SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
+_T = TypeVar("_T")
 
 
-async def _construct_subsytem(subsystem_typ: type[_T]) -> _T:
+class Option(Generic[_T]):
+    """Descriptor for subsystem options.
+
+    This class serves two purposes:
+        - Register your subsystem's options
+        - Provide a typed property for Python usage
+
+    Usage:
+        class Engine(Subsystem):
+            ...
+
+            cylinders = Option[int]("--cylinders", default=6, help="...")
+
+        ...
+
+        engine: Engine = ...
+        engine.cylinders  # mypy knows this is an int
+
+    Under-the-hood:
+        - You can pass a `converter` function to convert the option value into the property value
+            E.g. `converter=tuple`
+    """
+
+    # NB: We have to ignore type because we can't `cast(_T, x)` as `_T` is purely a type-checking
+    # construct and `cast()` is a runtime function.
+    DEFAULT_CONVERTER: Callable[[Any], _T] = lambda x: x  # type: ignore
+
+    def __init__(
+        self,
+        *args: str,
+        converter: Callable[[Any], _T] = DEFAULT_CONVERTER,
+        **kwargs: Any,
+    ):
+        self.args = args
+        self.kwargs = kwargs
+        self._converter = converter
+
+    @overload
+    def __get__(self, obj: None, objtype: type[_SubsystemT]) -> Option:
+        ...
+
+    @overload
+    def __get__(self, obj: _SubsystemT, objtype: type[_SubsystemT]) -> _T:
+        ...
+
+    def __get__(self, obj: _SubsystemT | None, objtype: type[_SubsystemT]) -> Option | _T:
+        assert issubclass(
+            objtype, Subsystem
+        ), "Option should only be used as attributes of a Subsystem"
+        if obj is None:
+            return self
+        long_name = self.args[-1]
+        option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
+        return self._converter(option_value)
+
+
+BoolOption: functools.partial[Option[bool]] = functools.partial(Option, type=bool)
+StrOption: functools.partial[Option[str]] = functools.partial(Option, type=str)
+IntOption: functools.partial[Option[int]] = functools.partial(Option, type=int)
+# NB: You'll still need to prive help=""
+ArgsOption: functools.partial[Option["tuple[str, ...]"]] = functools.partial(
+    Option,
+    "--args",
+    type=list,
+    member_type=shell_str,
+    passthrough=True,
+    converter=tuple,
+)
+
+
+async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
