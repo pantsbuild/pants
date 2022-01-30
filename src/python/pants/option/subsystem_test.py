@@ -8,9 +8,10 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from pants.option.custom_types import shell_str
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.subsystem import Option, Subsystem
+from pants.option.subsystem import ArgsOption, BoolOption, IntOption, Option, StrOption, Subsystem
 
 
 def test_scope_existence() -> None:
@@ -87,9 +88,9 @@ def test_option() -> None:
     assert who_im_gonna_call.cast3 == ("HOLDIN!", "SMOKIN!", "READY!")
 
     # This "tests" (through mypy) that the property types are what we expect
-    s1: str = who_im_gonna_call.cast1  # noqa: F841
-    int1: int = who_im_gonna_call.cast2  # noqa: F841
-    tuple1: tuple[str, ...] = who_im_gonna_call.cast3  # noqa: F841
+    var1: str = who_im_gonna_call.cast1  # noqa: F841
+    var2: int = who_im_gonna_call.cast2  # noqa: F841
+    var3: tuple[str, ...] = who_im_gonna_call.cast3  # noqa: F841
 
 
 def test_option_in_subsystem() -> None:
@@ -110,5 +111,48 @@ def test_option_in_subsystem() -> None:
             call("-p", "--peter-venkman", actor_name="Bill Murray"),
             call("--egon-spengler", actor_name="Harold Ramis"),
             call("--raymond-stantz", actor_name="Dan Aykroyd"),
-        ]
+        ],
+        any_order=True,
     )
+
+
+def test_option_typeclasses() -> None:
+    # NB: Option is only valid on Subsystem subclasses, but we won't use any Subsystem machinery for
+    # this test.
+    class SubmarineSystems(Subsystem):
+        def __init__(self):
+            self.options = SimpleNamespace()
+            self.options.propulsion = False
+            self.options.hydraulic = ""
+            self.options.radar = 0
+            self.options.args = ["looky"]
+
+        bool_opt = BoolOption("--propulsion", help="propulsion")
+        str_opt = StrOption("--hydraulic", help="hydraulic")
+        int_opt = IntOption("--radar", help="radar")
+        args_opt = ArgsOption(help="periscope")
+
+    register = Mock()
+    SubmarineSystems.register_options(register)
+
+    register.assert_has_calls(
+        [
+            call("--propulsion", type=bool, help="propulsion"),
+            call("--hydraulic", type=str, help="hydraulic"),
+            call("--radar", type=int, help="radar"),
+            call("--args", type=list, member_type=shell_str, passthrough=True, help="periscope"),
+        ],
+        any_order=True,
+    )
+
+    systems = SubmarineSystems()
+    assert not systems.bool_opt
+    assert systems.str_opt == ""
+    assert systems.int_opt == 0
+    assert systems.args_opt == ("looky",)
+
+    # This "tests" (through mypy) that the property types are what we expect
+    var1: bool = systems.bool_opt  # noqa: F841
+    var2: str = systems.str_opt  # noqa: F841
+    var3: int = systems.int_opt  # noqa: F841
+    var4: tuple[str, ...] = systems.args_opt  # noqa: F841

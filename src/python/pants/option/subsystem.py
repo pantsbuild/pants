@@ -10,6 +10,7 @@ from abc import ABCMeta
 from typing import Any, Callable, ClassVar, Generic, TypeVar, overload
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.option.custom_types import shell_str
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -173,12 +174,28 @@ class Option(Generic[_T]):
         ...
 
     def __get__(self, obj: _SubsystemT | None, objtype: type[_SubsystemT]) -> Option | _T:
-        assert issubclass(objtype, Subsystem), "Option should only be used as attributes of a Subsystem"
+        assert issubclass(
+            objtype, Subsystem
+        ), "Option should only be used as attributes of a Subsystem"
         if obj is None:
             return self
         long_name = self.args[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
         return self._converter(option_value)
+
+
+BoolOption: functools.partial[Option[bool]] = functools.partial(Option, type=bool)
+StrOption: functools.partial[Option[str]] = functools.partial(Option, type=str)
+IntOption: functools.partial[Option[int]] = functools.partial(Option, type=int)
+# NB: You'll still need to prive help=""
+ArgsOption: functools.partial[Option["tuple[str, ...]"]] = functools.partial(
+    Option,
+    "--args",
+    type=list,
+    member_type=shell_str,
+    passthrough=True,
+    converter=tuple,
+)
 
 
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
