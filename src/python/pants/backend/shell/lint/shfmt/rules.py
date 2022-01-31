@@ -7,7 +7,7 @@ from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -32,8 +32,9 @@ class ShfmtFieldSet(FieldSet):
         return tgt.get(SkipShfmtField).value
 
 
-class ShfmtRequest(FmtRequest, LintRequest):
+class ShfmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ShfmtFieldSet
+    name = "shfmt"
 
 
 @dataclass(frozen=True)
@@ -97,26 +98,26 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
     if shfmt.skip:
-        return FmtResult.skip(formatter_name="shfmt")
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="shfmt"
+        result, original_digest=setup.original_digest, formatter_name=request.name
     )
 
 
 @rule(desc="Lint with shfmt", level=LogLevel.DEBUG)
 async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
     if shfmt.skip:
-        return LintResults([], linter_name="shfmt")
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults([LintResult.from_fallible_process_result(result)], linter_name="shfmt")
+    return LintResults([LintResult.from_fallible_process_result(result)], linter_name=request.name)
 
 
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, ShfmtRequest),
-        UnionRule(LintRequest, ShfmtRequest),
+        UnionRule(LintTargetsRequest, ShfmtRequest),
     ]

@@ -60,6 +60,7 @@ class MyPyPartition:
 
 class MyPyRequest(CheckRequest):
     field_set_type = MyPyFieldSet
+    name = "MyPy"
 
 
 def generate_argv(
@@ -255,7 +256,7 @@ async def mypy_typecheck(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
 ) -> CheckResults:
     if mypy.skip:
-        return CheckResults([], checker_name="MyPy")
+        return CheckResults([], checker_name=request.name)
 
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
@@ -295,7 +296,7 @@ async def mypy_typecheck(
     partitioned_results = await MultiGet(
         Get(CheckResult, MyPyPartition, partition) for partition in partitions
     )
-    return CheckResults(partitioned_results, checker_name="MyPy")
+    return CheckResults(partitioned_results, checker_name=request.name)
 
 
 def rules():

@@ -92,7 +92,7 @@ def test_help_goals() -> None:
 def test_help_goals_only_show_implemented() -> None:
     # Some core goals, such as `./pants test`, require downstream implementations to work
     # properly. We should only show those goals when an implementation is provided.
-    goals_that_need_implementation = ["binary", "fmt", "lint", "run", "test"]
+    goals_that_need_implementation = ["fmt", "test"]
     command = ["--pants-config-files=[]", "help", "goals"]
 
     not_implemented_run = run_pants(["--backend-packages=[]", *command])

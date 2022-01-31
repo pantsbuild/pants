@@ -38,7 +38,7 @@ use std::pin::Pin;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use terminal_size::terminal_size;
+use terminal_size::terminal_size_using_fd;
 
 use prodash::progress::Step;
 use prodash::render::line;
@@ -181,7 +181,8 @@ impl Instance {
     local_parallelism: usize,
     executor: Executor,
   ) -> Result<Instance, String> {
-    let (terminal_width, terminal_height) = terminal_size()
+    let stderr_fd = stdio::get_destination().stderr_as_raw_fd()?;
+    let (terminal_width, terminal_height) = terminal_size_using_fd(stderr_fd)
       .map(|terminal_dimensions| (terminal_dimensions.0 .0, terminal_dimensions.1 .0 - 1))
       .unwrap_or((50, local_parallelism.try_into().unwrap()));
 

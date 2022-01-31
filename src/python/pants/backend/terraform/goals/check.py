@@ -37,6 +37,7 @@ class TerraformValidateSubsystem(Subsystem):
 
 class TerraformCheckRequest(CheckRequest):
     field_set_type = TerraformFieldSet
+    name = "terraform validate"
 
 
 @rule
@@ -44,7 +45,7 @@ async def terraform_check(
     request: TerraformCheckRequest, subsystem: TerraformValidateSubsystem
 ) -> CheckResults:
     if subsystem.options.skip:
-        return CheckResults([], checker_name="terraform validate")
+        return CheckResults([], checker_name=request.name)
 
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("validate",)))
     results = await MultiGet(
@@ -60,7 +61,7 @@ async def terraform_check(
             )
         )
 
-    return CheckResults(check_results, checker_name="terraform validate")
+    return CheckResults(check_results, checker_name=request.name)
 
 
 def rules():

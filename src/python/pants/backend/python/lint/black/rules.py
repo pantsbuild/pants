@@ -12,7 +12,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -36,8 +36,9 @@ class BlackFieldSet(FieldSet):
         return tgt.get(SkipBlackField).value
 
 
-class BlackRequest(FmtRequest, LintRequest):
+class BlackRequest(FmtRequest, LintTargetsRequest):
     field_set_type = BlackFieldSet
+    name = "Black"
 
 
 @dataclass(frozen=True)
@@ -134,28 +135,28 @@ async def setup_black(
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
+async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
-        return FmtResult.skip(formatter_name="Black")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
+        return FmtResult.skip(formatter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="Black",
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
 
 @rule(desc="Lint with Black", level=LogLevel.DEBUG)
-async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
+async def black_lint(request: BlackRequest, black: Black) -> LintResults:
     if black.skip:
-        return LintResults([], linter_name="Black")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
+        return LintResults([], linter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name="Black",
+        linter_name=request.name,
     )
 
 
@@ -163,6 +164,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, BlackRequest),
-        UnionRule(LintRequest, BlackRequest),
+        UnionRule(LintTargetsRequest, BlackRequest),
         *pex.rules(),
     ]

@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -69,8 +69,9 @@ class PylintPartition:
         self.interpreter_constraints = interpreter_constraints
 
 
-class PylintRequest(LintRequest):
+class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
+    name = "Pylint"
 
 
 def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
@@ -201,7 +202,7 @@ async def pylint_lint(
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResults:
     if pylint.skip:
-        return LintResults([], linter_name="Pylint")
+        return LintResults([], linter_name=request.name)
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
@@ -247,12 +248,12 @@ async def pylint_lint(
     partitioned_results = await MultiGet(
         Get(LintResult, PylintPartition, partition) for partition in partitions
     )
-    return LintResults(partitioned_results, linter_name="Pylint")
+    return LintResults(partitioned_results, linter_name=request.name)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintRequest, PylintRequest),
+        UnionRule(LintTargetsRequest, PylintRequest),
         *pex_from_targets.rules(),
     ]

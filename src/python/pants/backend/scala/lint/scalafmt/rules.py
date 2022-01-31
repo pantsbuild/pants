@@ -13,7 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -51,8 +51,9 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(FmtRequest, LintRequest):
+class ScalafmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ScalafmtFieldSet
+    name = "scalafmt"
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -248,10 +249,10 @@ async def setup_scalafmt(
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
-async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
+async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
     if tool.skip:
-        return FmtResult.skip(formatter_name="scalafmt")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
+        return FmtResult.skip(formatter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
     results = await MultiGet(
         Get(ProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
@@ -282,16 +283,16 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
         output=output_digest,
         stdout=stdout_content,
         stderr=stderr_content,
-        formatter_name="scalafmt",
+        formatter_name=request.name,
     )
     return fmt_result
 
 
 @rule(desc="Lint with scalafmt", level=LogLevel.DEBUG)
-async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
+async def scalafmt_lint(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
     if tool.skip:
-        return LintResults([], linter_name="scalafmt")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
+        return LintResults([], linter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
     results = await MultiGet(
         Get(FallibleProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
@@ -299,7 +300,7 @@ async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) ->
         LintResult.from_fallible_process_result(result, partition_description=partition.description)
         for result, partition in zip(results, setup.partitions)
     ]
-    return LintResults(lint_results, linter_name="scalafmt")
+    return LintResults(lint_results, linter_name=request.name)
 
 
 @rule
@@ -314,6 +315,6 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(FmtRequest, ScalafmtRequest),
-        UnionRule(LintRequest, ScalafmtRequest),
+        UnionRule(LintTargetsRequest, ScalafmtRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

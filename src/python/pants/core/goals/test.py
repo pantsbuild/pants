@@ -438,6 +438,8 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
+        if result.skipped:
+            continue
         if result.exit_code != 0:
             exit_code = cast(int, result.exit_code)
 
@@ -515,29 +517,26 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    if result.result_metadata:
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-
-        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-        source_print = f" ({source})" if source else ""
-
-        elapsed_print = ""
-        total_elapsed_ms = result.result_metadata.total_elapsed_ms
-        if total_elapsed_ms is not None:
-            elapsed_secs = total_elapsed_ms / 1000
-            elapsed_print = f"in {elapsed_secs:.2f}s"
-
-        suffix = f" {elapsed_print}{source_print}"
+    assert (
+        result.result_metadata is not None
+    ), "Skipped test results should not be outputted in the test summary"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
     else:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        suffix = ""
+        sigil = console.sigil_failed()
+        status = "failed"
 
+    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+    source_print = f" ({source})" if source else ""
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_print}"
     return f"{sigil} {result.address} {status}{suffix}."
 
 

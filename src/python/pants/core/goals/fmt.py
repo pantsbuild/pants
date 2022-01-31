@@ -255,8 +255,7 @@ async def fmt(
             sigil = console.sigil_succeeded_with_edits()
             status = "made changes"
         elif all(result.skipped for result in results):
-            sigil = console.sigil_skipped()
-            status = "skipped"
+            continue
         else:
             sigil = console.sigil_succeeded()
             status = "made no changes"
