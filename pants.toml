@@ -17,6 +17,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shfmt",
   "pants.backend.docker",
   "pants.backend.experimental.docker.lint.hadolint",
+  "pants.backend.experimental.explorer",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
@@ -126,6 +127,11 @@ extra_requirements.add = [
   "flake8-no-implicit-concat",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
+
+[mypy]
+interpreter_constraints = [">=3.7,<3.10"]
+extra_requirements.add = ["strawberry-graphql>=0.95.1,<0.96"]
+lockfile = "3rdparty/python/lockfiles/mypy.txt"
 
 [shellcheck]
 args = ["--external-sources"]

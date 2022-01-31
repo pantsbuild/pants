@@ -28,3 +28,9 @@ types-requests==2.27.5
 types-setuptools==57.4.7
 types-toml==0.10.3
 typing-extensions==4.0.1
+
+
+# TODO: break this out into own dist
+strawberry-graphql[fastapi]
+fastapi
+uvicorn[standard]

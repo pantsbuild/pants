@@ -30,6 +30,7 @@ omit = ["src/python/pants/__init__.py"]
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "src/python:tests/python:testprojects/src/python"
+plugins = "strawberry.ext.mypy_plugin"
 
 no_implicit_optional = true
 implicit_reexport = false
