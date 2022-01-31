@@ -9,9 +9,7 @@ import pytest
 
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
-from pants.backend.java.package.deploy_jar import DeployJarFieldSet
-from pants.backend.java.package.deploy_jar import rules as deploy_jar_rules
-from pants.backend.java.target_types import DeployJarTarget, JavaSourcesGeneratorTarget
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
@@ -19,9 +17,11 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
-from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
