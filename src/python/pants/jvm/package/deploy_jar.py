@@ -7,7 +7,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.java.target_types import JvmMainClassNameField
+from pants.jvm.target_types import JvmMainClassNameField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,

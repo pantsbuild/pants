@@ -6,9 +6,11 @@ from __future__ import annotations
 from abc import ABCMeta
 from typing import Optional
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    Dependencies,
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
@@ -211,3 +213,33 @@ class JvmArtifactTarget(Target):
 
 class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
+
+
+# -----------------------------------------------------------------------------------------------
+# JAR support fields
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmMainClassNameField(StringField):
+    alias = "main"
+    required = True
+    help = (
+        "`.`-separated name of the JVM class containing the `main()` method to be called when "
+        "executing this JAR."
+    )
+
+
+class DeployJarTarget(Target):
+    alias = "deploy_jar"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        OutputPathField,
+        JvmMainClassNameField,
+        JvmResolveField,
+    )
+    help = (
+        "A `jar` file with first and third-party code bundled for deploys.\n\n"
+        "The JAR will contain class files for both first-party code and "
+        "third-party dependencies, all in a common directory structure."
+    )
