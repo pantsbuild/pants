@@ -88,7 +88,7 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     def from_artifact_requirements(
         cls, requirements: Iterable[ArtifactRequirement]
     ) -> JVMLockfileMetadataV1:
-        return cls(FrozenOrderedSet(i.to_metadata_str() for i in requirements))
+        return cls(FrozenOrderedSet(sorted(i.to_metadata_str() for i in requirements)))
 
     @classmethod
     def _from_json_dict(
@@ -124,7 +124,7 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
         """Returns a truthy object if the request requirements match the metadata requirements."""
 
         failure_reasons: set[InvalidJVMLockfileReason] = set()
-        req_strings = FrozenOrderedSet(i.to_metadata_str() for i in requirements or [])
+        req_strings = FrozenOrderedSet(sorted(i.to_metadata_str() for i in requirements or []))
 
         if (context == LockfileContext.USER and not self.requirements.issuperset(req_strings)) or (
             context == LockfileContext.TOOL and self.requirements != req_strings
