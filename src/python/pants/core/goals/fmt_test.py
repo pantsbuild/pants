@@ -100,14 +100,14 @@ def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
     return FmtResult.skip(formatter_name=request.name)
 
 
-class SmalltalkFixerRequest(FmtRequest):
+class SmalltalkSemanticChangerRequest(FmtRequest):
     field_set_type = SmalltalkFieldSet
-    name = "SmalltalkFixer"
-    fixer = True
+    name = "SmalltalkSemanticChanger"
+    makes_semantic_changes = True
 
 
 @rule
-async def smalltalk_fixer(request: SmalltalkFixerRequest) -> FmtResult:
+async def smalltalk_fixer(request: SmalltalkSemanticChangerRequest) -> FmtResult:
     result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
     return FmtResult(
         input=EMPTY_DIGEST,
@@ -148,13 +148,13 @@ def run_fmt(
     *,
     target_specs: List[str],
     per_file_caching: bool = False,
-    fixers: bool = True,
+    style_only: bool = False,
 ) -> str:
     result = rule_runner.run_goal_rule(
         Fmt,
         args=[
             f"--fmt-per-file-caching={per_file_caching!r}",
-            f"--fmt-fixers={fixers!r}",
+            f"--fmt-style-only={style_only!r}",
             *target_specs,
         ],
     )
@@ -212,10 +212,10 @@ def test_summary(per_file_caching: bool) -> None:
     assert not smalltalk_file.is_file()
 
 
-def test_fixers_toggle() -> None:
+def test_style_only_toggle() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[SmalltalkTarget],
-        fmt_request_types=[SmalltalkNoopRequest, SmalltalkFixerRequest],
+        fmt_request_types=[SmalltalkNoopRequest, SmalltalkSemanticChangerRequest],
     )
     rule_runner.write_files({"BUILD": "smalltalk(name='s')"})
 
@@ -224,11 +224,11 @@ def test_fixers_toggle() -> None:
         """\
 
         ✓ SmalltalkDidNotChange made no changes.
-        + SmalltalkFixer made changes.
+        + SmalltalkSemanticChanger made changes.
         """
     )
 
-    stderr = run_fmt(rule_runner, target_specs=["//:s"], fixers=False)
+    stderr = run_fmt(rule_runner, target_specs=["//:s"], style_only=True)
     assert stderr == dedent(
         """\
 

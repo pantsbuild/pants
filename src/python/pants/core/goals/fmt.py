@@ -101,8 +101,7 @@ class FmtResult(EngineAwareReturnType):
 
 @union
 class FmtRequest(StyleRequest):
-    # Set to `True` if this formatter makes semantic changes to the code.
-    fixer: ClassVar[bool] = False
+    makes_semantic_changes: ClassVar[bool] = False
 
 
 @dataclass(frozen=True)
@@ -133,13 +132,12 @@ class FmtSubsystem(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--fixers",
+            "--style-only",
             type=bool,
             default=True,
             help=(
-                "If True, run formatters that make semantic changes, such as removing imports "
-                "or upgrading to more modern syntax. Otherwise, only run formatters that make "
-                "no semantic changes."
+                "If True, only run formatters that do not make any semantic changes (such as "
+                "removing imports or upgrading to more modern syntax.)"
             ),
         )
         register(
@@ -175,8 +173,8 @@ class FmtSubsystem(GoalSubsystem):
         )
 
     @property
-    def fixers(self) -> bool:
-        return cast(bool, self.options.fixers)
+    def style_only(self) -> bool:
+        return cast(bool, self.options.style_only)
 
     @property
     def per_file_caching(self) -> bool:
@@ -204,8 +202,8 @@ async def fmt(
     for target in targets:
         fmt_requests = []
         for fmt_request in union_membership[FmtRequest]:
-            if fmt_request.field_set_type.is_applicable(target) and (  # type: ignore[misc]
-                fmt_subsystem.fixers or not fmt_request.fixer
+            if fmt_request.field_set_type.is_applicable(target) and not (  # type: ignore[misc]
+                fmt_subsystem.style_only and fmt_request.makes_semantic_changes
             ):
                 fmt_requests.append(fmt_request)
         if fmt_requests:
