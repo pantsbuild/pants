@@ -128,10 +128,16 @@ class MyPy(PythonToolBase):
             advanced=True,
             help=(
                 "An optional list of `python_sources` target addresses to load first-party "
-                "plugins.\n\nYou must also set `plugins = path.to.module` in your `mypy.ini`, and "
-                "set the `[mypy].config` option in your `pants.toml`.\n\nTo instead load "
-                "third-party plugins, set the option `[mypy].extra_requirements` and set the "
-                "`plugins` option in `mypy.ini`."
+                "plugins.\n\n"
+                "You must also set `plugins = path.to.module` in your `mypy.ini`, and "
+                "set the `[mypy].config` option in your `pants.toml`.\n\n"
+                "To instead load third-party plugins, set the option `[mypy].extra_requirements` "
+                "and set the `plugins` option in `mypy.ini`."
+                "Tip: it's often helpful to define a dedicated 'resolve' via "
+                "`[python].experimental_resolves` for your MyPy plugins such as 'mypy-plugins' "
+                "so that the third-party requirements used by your plugin, like `mypy`, do not "
+                "mix with the rest of your project. Read that option's help message for more info "
+                "on resolves."
             ),
         )
         register(
@@ -142,7 +148,7 @@ class MyPy(PythonToolBase):
             help=(
                 "Extra type stub requirements to install when running MyPy.\n\n"
                 "Normally, type stubs can be installed as typical requirements, such as putting "
-                "them in `requirements.txt` or using a `python_requirement_library` target."
+                "them in `requirements.txt` or using a `python_requirement` target."
                 "Alternatively, you can use this option so that the dependencies are solely "
                 "used when running MyPy and are not runtime dependencies.\n\n"
                 "Expects a list of pip-style requirement strings, like "
