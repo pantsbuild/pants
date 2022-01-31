@@ -7,7 +7,6 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.jvm.target_types import JvmMainClassNameField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -29,6 +28,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
+from pants.jvm.target_types import JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
 

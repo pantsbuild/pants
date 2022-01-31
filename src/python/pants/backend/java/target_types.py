@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.core.goals.package import OutputPathField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -17,7 +16,6 @@ from pants.engine.target import (
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
-    StringField,
     Target,
     generate_file_level_targets,
 )
@@ -160,35 +158,6 @@ async def generate_targets_from_java_sources(
         union_membership,
         add_dependencies_on_all_siblings=False,
         use_source_field=True,
-    )
-
-
-# Things for JARs
-#
-
-
-class JvmMainClassNameField(StringField):
-    alias = "main"
-    required = True
-    help = (
-        "`.`-separated name of the JVM class containing the `main()` method to be called when "
-        "executing this JAR."
-    )
-
-
-class DeployJarTarget(Target):
-    alias = "deploy_jar"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        OutputPathField,
-        JvmMainClassNameField,
-        JvmResolveField,
-    )
-    help = (
-        "A `jar` file with first and third-party code bundled for deploys.\n\n"
-        "The JAR will contain class files for both first-party code and "
-        "third-party dependencies, all in a common directory structure."
     )
 
 
