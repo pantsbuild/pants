@@ -25,14 +25,13 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
 from pants.backend.python.util_rules.pex import (
-    Lockfile,
     OptionalPex,
     OptionalPexRequest,
     PexPlatforms,
     PexRequest,
-    PexRequirements,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_requirements import Lockfile, PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,

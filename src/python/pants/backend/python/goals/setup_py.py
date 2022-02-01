@@ -40,7 +40,7 @@ from pants.backend.python.util_rules.dists import (
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,

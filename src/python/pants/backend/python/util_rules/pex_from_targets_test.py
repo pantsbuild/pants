@@ -26,7 +26,7 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
     ChosenPythonResolveRequest,
@@ -34,6 +34,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     NoCompatibleResolveException,
     PexFromTargetsRequest,
 )
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.testutil.option_util import create_subsystem

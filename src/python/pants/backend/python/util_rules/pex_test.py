@@ -28,17 +28,12 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV2,
 )
 from pants.backend.python.util_rules.pex import (
-    Lockfile,
-    LockfileContent,
     Pex,
     PexDistributionInfo,
     PexPlatforms,
     PexProcess,
     PexRequest,
-    PexRequirements,
     PexResolveInfo,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -46,6 +41,13 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_requirements import (
+    Lockfile,
+    LockfileContent,
+    PexRequirements,
+    ToolCustomLockfile,
+    ToolDefaultLockfile,
+)
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
