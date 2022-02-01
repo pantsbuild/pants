@@ -39,6 +39,8 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
 )
 from pants.backend.python.util_rules.pex_requirements_test import (
+    DEFAULT,
+    FILE,
     _metadata_validation_values,
     _prepare_pex_requirements,
 )
@@ -637,10 +639,6 @@ def test_build_pex_description() -> None:
     )
 
 
-DEFAULT = "DEFAULT"
-FILE = "FILE"
-
-
 def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError):
         _run_pex_for_lockfile_test(
@@ -713,11 +711,6 @@ def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) 
 def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
     _run_pex_for_lockfile_test(rule_runner, lockfile_type=DEFAULT, behavior="warn")
     assert not caplog.text.strip()
-
-
-LOCKFILE_TYPES = (DEFAULT, FILE)
-BOOLEANS = (True, False)
-VERSIONS = (1, 2)
 
 
 def _run_pex_for_lockfile_test(

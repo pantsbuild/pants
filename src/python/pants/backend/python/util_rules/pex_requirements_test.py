@@ -22,16 +22,22 @@ from pants.backend.python.util_rules.pex_requirements import (
     ToolDefaultLockfile,
     validate_metadata,
 )
-from pants.backend.python.util_rules.pex_test import (
-    BOOLEANS,
-    DEFAULT,
-    FILE,
-    LOCKFILE_TYPES,
-    VERSIONS,
-)
 from pants.engine.fs import FileContent
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner()
+
+
+DEFAULT = "DEFAULT"
+FILE = "FILE"
+
+LOCKFILE_TYPES = (DEFAULT, FILE)
+BOOLEANS = (True, False)
+VERSIONS = (1, 2)
 
 
 @pytest.mark.parametrize(
