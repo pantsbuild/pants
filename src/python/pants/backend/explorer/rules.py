@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+from pants.backend.project_info.peek import TargetDatas
 from pants.engine.rules import QueryRule
-from pants.engine.target import AllTargets
+from pants.engine.target import AllTargets, AllUnexpandedTargets, UnexpandedTargets
 
 
 def rules():
-    return (QueryRule(AllTargets, ()),)
+    return (
+        QueryRule(AllTargets, ()),
+        QueryRule(AllUnexpandedTargets, ()),
+        QueryRule(TargetDatas, (UnexpandedTargets,)),
+    )

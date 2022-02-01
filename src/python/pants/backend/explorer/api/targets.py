@@ -10,12 +10,13 @@ import strawberry
 from strawberry.types import Info
 
 from pants.backend.explorer.request_state import RequestState
-from pants.engine.target import AllTargets
+from pants.backend.project_info.peek import TargetData, TargetDatas
+from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 
 
 @strawberry.type
-class TargetField:
+class TargetTypeField:
     alias: str
     provider: str
     description: str
@@ -30,13 +31,34 @@ class TargetType:
     provider: str
     summary: str
     description: str
-    fields: List[TargetField]
+    fields: List[TargetTypeField]
 
     @classmethod
     def from_help(cls, info: TargetTypeHelpInfo) -> TargetType:
         data = asdict(info)
-        data["fields"] = [TargetField(**target_field) for target_field in data["fields"]]
+        data["fields"] = [TargetTypeField(**target_field) for target_field in data["fields"]]
         return cls(**data)
+
+
+@strawberry.type
+class TargetField:
+    alias: str
+    value: str
+
+
+@strawberry.type
+class Target:
+    address: str
+    target_type: str
+    fields: List[TargetField]
+
+    @classmethod
+    def from_data(cls, data: TargetData) -> Target:
+        json = data.to_json()
+        address = json.pop("address")
+        target_type = json.pop("target_type")
+        fields = [TargetField(key, str(value)) for key, value in json.items()]
+        return cls(address=address, target_type=target_type, fields=fields)
 
 
 @strawberry.type
@@ -45,12 +67,15 @@ class QueryTargetsMixin:
 
     @strawberry.field
     def target_types(self, info: Info) -> List[TargetType]:
+        """Get all registered target types that may be used in BUILD files."""
         return [
             TargetType.from_help(info)
             for info in RequestState.from_info(info).all_help_info.name_to_target_type_info.values()
         ]
 
     @strawberry.field
-    async def targets(self, info: Info) -> List[str]:
-        all_targets = RequestState.from_info(info).product_request(AllTargets)
-        return sorted(str(target.address) for target in all_targets)
+    async def targets(self, info: Info) -> List[Target]:
+        """Get all targets defined in BUILD files."""
+        req = RequestState.from_info(info).product_request
+        all_data = req(TargetDatas, (UnexpandedTargets(req(AllUnexpandedTargets)),))
+        return [Target.from_data(data) for data in all_data]
