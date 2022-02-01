@@ -133,8 +133,14 @@ class Flake8(PythonToolBase):
                 "```\n\n"
                 "While your plugin's code can depend on other first-party code and third-party "
                 "requirements, all first-party dependencies of the plugin must live in the same "
-                "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
-                "option `[flake8].extra_requirements`."
+                "directory or a subdirectory.\n\n"
+                "To instead load third-party plugins, set the option "
+                "`[flake8].extra_requirements`.\n\n"
+                "Tip: it's often helpful to define a dedicated 'resolve' via "
+                "`[python].experimental_resolves` for your Flake8 plugins such as 'flake8-plugins' "
+                "so that the third-party requirements used by your plugin, like `flake8`, do not "
+                "mix with the rest of your project. Read that option's help message for more info "
+                "on resolves."
             ),
         )
 
