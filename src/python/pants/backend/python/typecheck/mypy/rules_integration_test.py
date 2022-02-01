@@ -14,15 +14,22 @@ from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.backend.python.typecheck.mypy.rules import (
     MyPyFieldSet,
+    MyPyPartition,
+    MyPyPartitions,
     MyPyRequest,
     determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.addresses import Address
@@ -50,8 +57,9 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
+            QueryRule(MyPyPartitions, (MyPyRequest,)),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, PythonSourceTarget],
     )
 
 
@@ -686,6 +694,81 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
     assert 'Argument "id" to "Person" has incompatible type "str"' in result[0].stdout
     assert result[0].exit_code == 1
+
+
+def test_partition_targets(rule_runner: RuleRunner) -> None:
+    def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
+        return {
+            f"{folder}/dep.py": "",
+            f"{folder}/root.py": "",
+            f"{folder}/BUILD": dedent(
+                f"""\
+                python_source(
+                    name='dep',
+                    source='dep.py',
+                    experimental_resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                )
+                python_source(
+                    name='root',
+                    source='root.py',
+                    experimental_resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                    dependencies=[':dep'],
+                )
+                """
+            ),
+        }
+
+    files = {
+        **create_folder("resolveA_py38", "a", "3.8"),
+        **create_folder("resolveA_py39", "a", "3.9"),
+        **create_folder("resolveB_1", "b", "3.9"),
+        **create_folder("resolveB_2", "b", "3.9"),
+    }
+    rule_runner.write_files(files)  # type: ignore[arg-type]
+    rule_runner.set_options(
+        ["--python-experimental-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+
+    resolve_a_py38_dep = rule_runner.get_target(Address("resolveA_py38", target_name="dep"))
+    resolve_a_py38_root = rule_runner.get_target(Address("resolveA_py38", target_name="root"))
+    resolve_a_py39_dep = rule_runner.get_target(Address("resolveA_py39", target_name="dep"))
+    resolve_a_py39_root = rule_runner.get_target(Address("resolveA_py39", target_name="root"))
+    resolve_b_dep1 = rule_runner.get_target(Address("resolveB_1", target_name="dep"))
+    resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
+    resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
+    resolve_b_root2 = rule_runner.get_target(Address("resolveB_2", target_name="root"))
+    request = MyPyRequest(
+        MyPyFieldSet.create(t)
+        for t in (
+            resolve_a_py38_root,
+            resolve_a_py39_root,
+            resolve_b_root1,
+            resolve_b_root2,
+        )
+    )
+
+    partitions = rule_runner.request(MyPyPartitions, [request])
+    assert len(partitions) == 3
+
+    def assert_partition(
+        partition: MyPyPartition, roots: list[Target], deps: list[Target], interpreter: str
+    ) -> None:
+        root_addresses = {t.address for t in roots}
+        assert {t.address for t in partition.root_targets} == root_addresses
+        assert {t.address for t in partition.closure} == {
+            *root_addresses,
+            *(t.address for t in deps),
+        }
+        assert partition.interpreter_constraints == InterpreterConstraints([f"=={interpreter}.*"])
+
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9")
+    assert_partition(
+        partitions[2], [resolve_b_root1, resolve_b_root2], [resolve_b_dep1, resolve_b_dep2], "3.9"
+    )
 
 
 def test_determine_python_files() -> None:
