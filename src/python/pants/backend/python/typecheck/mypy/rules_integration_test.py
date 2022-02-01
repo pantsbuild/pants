@@ -706,13 +706,13 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
                 python_source(
                     name='dep',
                     source='dep.py',
-                    experimental_resolve='{resolve}',
+                    resolve='{resolve}',
                     interpreter_constraints=['=={interpreter}.*'],
                 )
                 python_source(
                     name='root',
                     source='root.py',
-                    experimental_resolve='{resolve}',
+                    resolve='{resolve}',
                     interpreter_constraints=['=={interpreter}.*'],
                     dependencies=[':dep'],
                 )
@@ -728,7 +728,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     }
     rule_runner.write_files(files)  # type: ignore[arg-type]
     rule_runner.set_options(
-        ["--python-experimental-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
+        ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 

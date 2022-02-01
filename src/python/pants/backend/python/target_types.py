@@ -104,16 +104,15 @@ class InterpreterConstraintsField(StringSequenceField):
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):
-    alias = "experimental_resolve"
+    alias = "resolve"
     required = False
     help = (
-        "The resolve from `[python].experimental_resolves` to use.\n\n"
+        "The resolve from `[python].resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "All dependencies must share the same resolve. This means that you can only depend on "
-        "first-party targets like `python_source` that set their `experimental_resolve` field "
+        "first-party targets like `python_source` that set their `resolve` field "
         "to the same value, and on `python_requirement` targets that include the resolve in "
-        "their `experimental_compatible_resolves` field.\n\n"
-        "This field is experimental and may change without the normal deprecation policy."
+        "their `compatible_resolves` field."
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
@@ -956,16 +955,16 @@ def normalize_module_mapping(
 
 
 class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "experimental_compatible_resolves"
+    alias = "compatible_resolves"
     required = False
     help = (
-        "The resolves from `[python].experimental_resolves` that this requirement should be "
+        "The resolves from `[python].resolves` that this requirement should be "
         "included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
         "it will include all requirements that are declared compatible with that resolve. "
         "First-party targets like `python_source` and `pex_binary` then declare which resolve "
-        "they use via the `experimental_resolve` field; so, for your first-party code to use a "
+        "they use via the `resolve` field; so, for your first-party code to use a "
         "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )

@@ -61,7 +61,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_no_compatible_resolve_error() -> None:
-    python_setup = create_subsystem(PythonSetup, experimental_resolves={"a": "", "b": ""})
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""})
     targets = [
         PythonRequirementTarget(
             {
@@ -100,20 +100,20 @@ def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
     def create_build(*, req_resolves: list[str], source_resolve: str, test_resolve: str) -> str:
         return dedent(
             f"""\
-            python_source(name="dep", source="dep.py", experimental_resolve="{source_resolve}")
+            python_source(name="dep", source="dep.py", resolve="{source_resolve}")
             python_requirement(
-                name="req", requirements=[], experimental_compatible_resolves={repr(req_resolves)}
+                name="req", requirements=[], compatible_resolves={repr(req_resolves)}
             )
             python_test(
                 name="test",
                 source="tests.py",
                 dependencies=[":dep", ":req"],
-                experimental_resolve="{test_resolve}",
+                resolve="{test_resolve}",
             )
             """
         )
 
-    rule_runner.set_options(["--python-experimental-resolves={'a': '', 'b': ''}"])
+    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}"])
     rule_runner.write_files(
         {
             # Note that each of these BUILD files are entirely self-contained.

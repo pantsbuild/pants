@@ -134,7 +134,7 @@ class MyPy(PythonToolBase):
                 "To instead load third-party plugins, set the option `[mypy].extra_requirements` "
                 "and set the `plugins` option in `mypy.ini`."
                 "Tip: it's often helpful to define a dedicated 'resolve' via "
-                "`[python].experimental_resolves` for your MyPy plugins such as 'mypy-plugins' "
+                "`[python].resolves` for your MyPy plugins such as 'mypy-plugins' "
                 "so that the third-party requirements used by your plugin, like `mypy`, do not "
                 "mix with the rest of your project. Read that option's help message for more info "
                 "on resolves."

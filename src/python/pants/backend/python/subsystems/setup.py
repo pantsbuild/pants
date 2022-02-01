@@ -111,12 +111,12 @@ class PythonSetup(Subsystem):
             help="Deprecated.",
             removal_version="2.11.0.dev0",
             removal_hint=(
-                "Instead, use the improved `[python].experimental_resolves` mechanism. Read its "
+                "Instead, use the improved `[python].resolves` mechanism. Read its "
                 "help message for more information.\n\n"
                 "If you want to keep using a single resolve like before, update "
-                "`[python].experimental_resolves` with a name for the resolve and the path to "
+                "`[python].resolves` with a name for the resolve and the path to "
                 "its lockfile, or use the default. Then make sure that "
-                "`[python].experimental_default_resolve` is set to that resolve name."
+                "`[python].default_resolve` is set to that resolve name."
             ),
         )
         register(
@@ -127,12 +127,12 @@ class PythonSetup(Subsystem):
             mutually_exclusive_group="lockfile",
             help=(
                 "Set to true to enable the multiple resolves mechanism. See "
-                "`[python].experimental_resolves` for an explanation of this feature.\n\n"
+                "`[python].resolves` for an explanation of this feature.\n\n"
                 "Mutually exclusive with `[python].requirement_constraints`."
             ),
         )
         register(
-            "--experimental-resolves",
+            "--resolves",
             advanced=True,
             type=dict,
             default={"python-default": "3rdparty/python/default_lock.txt"},
@@ -154,10 +154,10 @@ class PythonSetup(Subsystem):
                 "names and their lockfile paths. The names should be meaningful to your "
                 "repository, such as `data-science` or `pants-plugins`.\n"
                 "  2. Set the default with "
-                "`[python].experimental_default_resolve`.\n"
+                "`[python].default_resolve`.\n"
                 "  3. Update your `python_requirement` targets with the "
-                "`experimental_compatible_resolves` field to declare which resolve(s) they should "
-                "be available in. They default to `[python].experimental_default_resolve`, so you "
+                "`compatible_resolves` field to declare which resolve(s) they should "
+                "be available in. They default to `[python].default_resolve`, so you "
                 "only need to update targets that you want in non-default resolves. "
                 "(Often you'll set this via the `python_requirements` or `poetry_requirements` "
                 "target generators)\n"
@@ -165,32 +165,29 @@ class PythonSetup(Subsystem):
                 "aren't what you'd expect, adjust the prior step.\n"
                 "  5. Update any targets like `python_source` / `python_sources`, "
                 "`python_test` / `python_tests`, and `pex_binary` which need to set a non-default "
-                "resolve with the `experimental_resolve` field.\n\n"
-                "Only applies if `[python].enable_resolves` is true.\n\n"
-                "This option is experimental and may change without the normal deprecation policy."
+                "resolve with the `resolve` field.\n\n"
+                "Only applies if `[python].enable_resolves` is true."
             ),
         )
         register(
-            "--experimental-default-resolve",
+            "--default-resolve",
             advanced=True,
             type=str,
             default="python-default",
             help=(
-                "The default value used for the `experimental_resolve` and "
-                "`experimental_compatible_resolves` fields.\n\n"
-                "The name must be defined as a resolve in `[python].experimental_resolves`.\n\n"
-                "This option is experimental and may change without the normal deprecation policy."
+                "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
+                "The name must be defined as a resolve in `[python].resolves`."
             ),
         )
         register(
-            "--experimental-resolves-to-interpreter-constraints",
+            "--resolves-to-interpreter-constraints",
             advanced=True,
             type=dict,
             default={},
             help=(
                 "Override the interpreter constraints to use when generating a resolve's lockfile "
                 "with the `generate-lockfiles` goal.\n\n"
-                "By default, each resolve from `[python].experimental_resolves` will use your "
+                "By default, each resolve from `[python].resolves` will use your "
                 "global interpreter constraints set in `[python].interpreter_constraints`. With "
                 "this option, you can override each resolve to use certain interpreter "
                 "constraints, such as `{'data-science': ['==3.8.*']}`.\n\n"
@@ -199,8 +196,7 @@ class PythonSetup(Subsystem):
                 "code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's "
                 "also using a resolve whose interpreter constraints are set to ['==3.7.*'], then "
                 "Pants will error explaining the incompatibility.\n\n"
-                "The keys must be defined as resolves in `[python].experimental_resolves`.\n\n"
-                "This option is experimental and may change without the normal deprecation policy."
+                "The keys must be defined as resolves in `[python].resolves`."
             ),
         )
         register(
@@ -314,21 +310,21 @@ class PythonSetup(Subsystem):
 
     @property
     def resolves(self) -> dict[str, str]:
-        return cast("dict[str, str]", self.options.experimental_resolves)
+        return cast("dict[str, str]", self.options.resolves)
 
     @property
     def default_resolve(self) -> str:
-        return cast(str, self.options.experimental_default_resolve)
+        return cast(str, self.options.default_resolve)
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
         result = {}
-        for resolve, ics in self.options.experimental_resolves_to_interpreter_constraints.items():
+        for resolve, ics in self.options.resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
                 raise KeyError(
                     "Unrecognized resolve name in the option "
-                    f"`[python].experimental_resolves_to_interpreter_constraints`: {resolve}. Each "
-                    "key must be one of the keys in `[python].experimental_resolves`: "
+                    f"`[python].resolves_to_interpreter_constraints`: {resolve}. Each "
+                    "key must be one of the keys in `[python].resolves`: "
                     f"{sorted(self.resolves.keys())}"
                 )
             result[resolve] = tuple(ics)
