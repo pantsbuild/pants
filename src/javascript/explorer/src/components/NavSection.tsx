@@ -1,6 +1,11 @@
 import { useState } from 'react';
-import { NavLink as RouterLink, matchPath, useLocation } from 'react-router-dom';
-import { Box, List, Collapse, ListItemText, ListItemIcon, ListItemButton } from '@mui/material';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
+import Collapse from '@mui/material/Collapse';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ListSubheader from '@mui/material/ListSubheader';
 
 // ----------------------------------------------------------------------
 
@@ -20,9 +25,10 @@ type NavItemProps = {
 };
 
 function NavItem({ item, active }: NavItemProps) {
-  const isActiveRoot = active(item.path);
+  const isActive = active(item.path);
+  const navigate = useNavigate();
   const { title, path, icon, info, children } = item;
-  const [open, setOpen] = useState(isActiveRoot);
+  const [open, setOpen] = useState(isActive);
 
   const handleOpen = () => {
     setOpen((prev) => !prev);
@@ -31,28 +37,14 @@ function NavItem({ item, active }: NavItemProps) {
   if (children) {
     return (
       <>
-        <div
-          onClick={handleOpen}
-        >
-          {icon && icon}
-          <ListItemText disableTypography primary={title} />
-          {info && info}
-        </div>
-
+        <ListItem button onClick={handleOpen} selected={isActive}>
+          <ListItemIcon>{icon && icon}</ListItemIcon>
+          <ListItemText primary={title} secondary={info} />
+        </ListItem>
         <Collapse in={open} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
             {children.map((item) => {
-              const { title, path } = item;
-              const isActiveSub = active(path);
-
-              return (
-                <RouterLink
-                  key={title}
-                  to={path}
-                >
-                  <ListItemText disableTypography primary={title} />
-                </RouterLink>
-              );
+              return <NavItem key={item.title} item={item} active={active} />;
             })}
           </List>
         </Collapse>
@@ -61,13 +53,10 @@ function NavItem({ item, active }: NavItemProps) {
   }
 
   return (
-    <RouterLink
-      to={path}
-    >
-      <div>{icon && icon}</div>
-      <ListItemText disableTypography primary={title} />
-      {info && info}
-    </RouterLink>
+    <ListItem button selected={isActive} onClick={() => navigate(path)}>
+      <ListItemIcon>{icon && icon}</ListItemIcon>
+      <ListItemText primary={title} secondary={info}/>
+    </ListItem>
   );
 }
 
@@ -80,12 +69,10 @@ export default function NavSection({ navConfig, ...other } : NavSectionProps) {
   const match = (path: string) => (path ? !!matchPath({ path, end: false }, pathname) : false);
 
   return (
-    <Box {...other}>
-      <List disablePadding>
-        {navConfig.map((item) => (
-          <NavItem key={item.title} item={item} active={match} />
-        ))}
-      </List>
-    </Box>
+    <List disablePadding component="nav" {...other}>
+      {navConfig.map((item) => (
+        <NavItem key={item.title} item={item} active={match} />
+      ))}
+    </List>
   );
 }

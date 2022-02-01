@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Navigate, useRoutes } from "react-router-dom";
 import ExplorerLayout from "./layouts/explorer";
 import ExplorerHome from "./pages/ExplorerHome";
