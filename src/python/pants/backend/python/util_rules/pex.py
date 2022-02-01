@@ -17,17 +17,13 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import (
-    InvalidPythonLockfileReason,
-    PythonLockfileMetadata,
-)
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
@@ -39,8 +35,11 @@ from pants.backend.python.util_rules.pex_requirements import Lockfile, LockfileC
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import ToolCustomLockfile, ToolDefaultLockfile
-from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
+from pants.backend.python.util_rules.pex_requirements import (
+    ToolCustomLockfile,
+    ToolDefaultLockfile,
+    validate_metadata,
+)
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -57,7 +56,6 @@ from pants.engine.fs import (
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -373,7 +371,7 @@ async def build_pex(
                 request.requirements.file_path,
                 resolve_name,
             )
-            _validate_metadata(
+            validate_metadata(
                 metadata, request.interpreter_constraints, request.requirements, python_setup
             )
 
@@ -390,7 +388,7 @@ async def build_pex(
             metadata = PythonLockfileMetadata.from_lockfile(
                 file_content.content, resolve_name=resolve_name
             )
-            _validate_metadata(
+            validate_metadata(
                 metadata, request.interpreter_constraints, request.requirements, python_setup
             )
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
@@ -478,123 +476,6 @@ async def build_pex(
     return BuildPexResult(
         result=result, pex_filename=request.output_filename, digest=digest, python=python
     )
-
-
-def _validate_metadata(
-    metadata: PythonLockfileMetadata,
-    interpreter_constraints: InterpreterConstraints,
-    requirements: (Lockfile | LockfileContent),
-    python_setup: PythonSetup,
-) -> None:
-
-    # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
-    # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
-    req_strings = (
-        {PipRequirement.parse(i) for i in requirements.req_strings}
-        if requirements.req_strings is not None
-        else None
-    )
-
-    validation = metadata.is_valid_for(
-        requirements.lockfile_hex_digest,
-        interpreter_constraints,
-        python_setup.interpreter_universe,
-        req_strings,
-    )
-
-    if validation:
-        return
-
-    def tool_message_parts(
-        requirements: (ToolCustomLockfile | ToolDefaultLockfile),
-    ) -> Iterator[str]:
-
-        tool_name = requirements.options_scope_name
-        uses_source_plugins = requirements.uses_source_plugins
-        uses_project_interpreter_constraints = requirements.uses_project_interpreter_constraints
-
-        yield "You are using "
-
-        if isinstance(requirements, ToolDefaultLockfile):
-            yield "the `<default>` lockfile provided by Pants "
-        elif isinstance(requirements, ToolCustomLockfile):
-            yield f"the lockfile at {requirements.file_path} "
-
-        yield (
-            f"to install the tool `{tool_name}`, but it is not compatible with your "
-            "configuration: "
-            "\n\n"
-        )
-
-        if any(
-            i == InvalidPythonLockfileReason.INVALIDATION_DIGEST_MISMATCH
-            or i == InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH
-            for i in validation.failure_reasons
-        ):
-            # TODO(12314): Add message showing _which_ requirements diverged.
-
-            yield (
-                "- You have set different requirements than those used to generate the lockfile. "
-                f"You can fix this by not setting `[{tool_name}].version`, "
-            )
-
-            if uses_source_plugins:
-                yield f"`[{tool_name}].source_plugins`, "
-
-            yield (
-                f"and `[{tool_name}].extra_requirements`, or by using a new "
-                "custom lockfile."
-                "\n"
-            )
-
-        if (
-            InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH
-            in validation.failure_reasons
-        ):
-            yield (
-                f"- You have set interpreter constraints (`{interpreter_constraints}`) that "
-                "are not compatible with those used to generate the lockfile "
-                f"(`{metadata.valid_for_interpreter_constraints}`). "
-            )
-            if not uses_project_interpreter_constraints:
-                yield (
-                    f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
-                    "or by using a new custom lockfile. "
-                )
-            else:
-                yield (
-                    f"`{tool_name}` determines its interpreter constraints based on your code's own "
-                    "constraints. To fix this error, you can either change your code's constraints "
-                    f"(see {doc_url('python-interpreter-compatibility')}) or by generating a new "
-                    "custom lockfile. "
-                )
-            yield "\n"
-
-        yield "\n"
-
-        if not isinstance(requirements, ToolCustomLockfile):
-            yield (
-                "To generate a custom lockfile based on your current configuration, set "
-                f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-                f"`./pants generate-lockfiles --resolve={tool_name}`. "
-            )
-        else:
-            yield (
-                "To regenerate your lockfile based on your current configuration, run "
-                f"`./pants generate-lockfiles --resolve={tool_name}`. "
-            )
-
-    message: str
-    if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)):
-        message = "".join(tool_message_parts(requirements)).strip()
-    else:
-        # TODO(12314): Improve this message
-        raise InvalidLockfileError(f"{validation.failure_reasons}")
-
-    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
-        raise ValueError(message)
-    else:
-        logger.warning("%s", message)
 
 
 def _build_pex_description(request: PexRequest) -> str:
