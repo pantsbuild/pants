@@ -52,6 +52,8 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
+  # Ignore installed javascript 3rdparty modules
+  "node_modules/",
 ]
 
 build_ignore.add = [
