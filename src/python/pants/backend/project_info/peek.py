@@ -49,6 +49,12 @@ class Peek(Goal):
     subsystem_cls = PeekSubsystem
 
 
+def _normalize_value(val: Any) -> Any:
+    if isinstance(val, collections.abc.Mapping):
+        return {str(k): _normalize_value(v) for k, v in val.items()}
+    return val
+
+
 @dataclass(frozen=True)
 class TargetData:
     target: Target
@@ -56,40 +62,34 @@ class TargetData:
     expanded_sources: tuple[str, ...] | None
     expanded_dependencies: tuple[str, ...] | None
 
+    def to_json(self, exclude_defaults: bool = False) -> dict:
+        nothing = object()
+        fields = {
+            (
+                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
+            ): _normalize_value(v.value)
+            for k, v in self.target.field_values.items()
+            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
+        }
+
+        if self.expanded_dependencies is not None:
+            fields["dependencies"] = self.expanded_dependencies
+        if self.expanded_sources is not None:
+            fields["sources"] = self.expanded_sources
+
+        return {
+            "address": self.target.address.spec,
+            "target_type": self.target.alias,
+            **dict(sorted(fields.items())),
+        }
+
 
 class TargetDatas(Collection[TargetData]):
     pass
 
 
 def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
-    nothing = object()
-
-    def normalize_value(val: Any) -> Any:
-        if isinstance(val, collections.abc.Mapping):
-            return {str(k): normalize_value(v) for k, v in val.items()}
-        return val
-
-    def to_json(td: TargetData) -> dict:
-        fields = {
-            (
-                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
-            ): normalize_value(v.value)
-            for k, v in td.target.field_values.items()
-            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
-        }
-
-        if td.expanded_dependencies is not None:
-            fields["dependencies"] = td.expanded_dependencies
-        if td.expanded_sources is not None:
-            fields["sources"] = td.expanded_sources
-
-        return {
-            "address": td.target.address.spec,
-            "target_type": td.target.alias,
-            **dict(sorted(fields.items())),
-        }
-
-    return f"{json.dumps([to_json(td) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
+    return f"{json.dumps([td.to_json(exclude_defaults) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
