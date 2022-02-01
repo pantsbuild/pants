@@ -13,8 +13,8 @@ def test_resolves_to_interpreter_constraints_validation() -> None:
     def create(resolves_to_ics: dict[str, list[str]]) -> dict[str, tuple[str, ...]]:
         return create_subsystem(
             PythonSetup,
-            experimental_resolves={"a": "a.lock"},
-            experimental_resolves_to_interpreter_constraints=resolves_to_ics,
+            resolves={"a": "a.lock"},
+            resolves_to_interpreter_constraints=resolves_to_ics,
         ).resolves_to_interpreter_constraints
 
     assert create({"a": ["==3.7.*"]}) == {"a": ("==3.7.*",)}

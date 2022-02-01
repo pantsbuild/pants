@@ -255,7 +255,7 @@ def determine_python_user_resolves(
 ) -> KnownUserResolveNames:
     return KnownUserResolveNames(
         names=tuple(python_setup.resolves.keys()),
-        option_name="[python].experimental_resolves",
+        option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
 

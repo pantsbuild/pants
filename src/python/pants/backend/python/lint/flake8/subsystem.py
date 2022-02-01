@@ -137,7 +137,7 @@ class Flake8(PythonToolBase):
                 "To instead load third-party plugins, set the option "
                 "`[flake8].extra_requirements`.\n\n"
                 "Tip: it's often helpful to define a dedicated 'resolve' via "
-                "`[python].experimental_resolves` for your Flake8 plugins such as 'flake8-plugins' "
+                "`[python].resolves` for your Flake8 plugins such as 'flake8-plugins' "
                 "so that the third-party requirements used by your plugin, like `flake8`, do not "
                 "mix with the rest of your project. Read that option's help message for more info "
                 "on resolves."

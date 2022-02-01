@@ -228,8 +228,8 @@ class NoCompatibleResolveException(Exception):
             f"{msg_prefix}:\n\n"
             f"{formatted_resolve_lists}\n\n"
             "Targets which will be used together must all have the same resolve (from the "
-            f"[resolve]({doc_url('reference-python_test#codeexperimental_resolvecode')}) or "
-            f"[compatible_resolves]({doc_url('reference-python_requirement#codeexperimental_compatible_resolvescode')}) "
+            f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) or "
+            f"[compatible_resolves]({doc_url('reference-python_requirement#codecompatible_resolvescode')}) "
             "fields) in common."
         )
 
@@ -506,7 +506,7 @@ async def get_repository_pex(
             requirements=Lockfile(
                 file_path=chosen_resolve.lockfile_path,
                 file_path_description_of_origin=(
-                    f"the resolve `{chosen_resolve.name}` (from `[python].experimental_resolves`)"
+                    f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
                 ),
                 # TODO(#12314): Hook up lockfile staleness check.
                 lockfile_hex_digest=None,

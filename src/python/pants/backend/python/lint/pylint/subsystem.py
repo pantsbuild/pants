@@ -140,7 +140,7 @@ class Pylint(PythonToolBase):
                 "option `[pylint].extra_requirements` and set the `load-plugins` option in your "
                 "Pylint config.\n\n"
                 "Tip: it's often helpful to define a dedicated 'resolve' via "
-                "`[python].experimental_resolves` for your Pylint plugins such as 'pylint-plugins' "
+                "`[python].resolves` for your Pylint plugins such as 'pylint-plugins' "
                 "so that the third-party requirements used by your plugin, like `pylint`, do not "
                 "mix with the rest of your project. Read that option's help message for more info "
                 "on resolves."

@@ -112,7 +112,7 @@ venv_use_symlinks = true
 [python]
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-experimental_resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
+resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
 enable_resolves = true
 
 [docformatter]
