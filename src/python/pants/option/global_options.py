@@ -1427,7 +1427,7 @@ class GlobalOptions(Subsystem):
         register(
             "--loop-max",
             type=int,
-            default=2 ** 32,
+            default=2**32,
             advanced=True,
             help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
         )

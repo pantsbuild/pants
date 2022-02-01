@@ -27,7 +27,7 @@ class Black(PythonToolBase):
     options_scope = "black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==21.12b0"
+    default_version = "black==22.1.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
