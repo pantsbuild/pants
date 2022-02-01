@@ -37,6 +37,7 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     @classmethod
     def register_options(cls, register):

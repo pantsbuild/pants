@@ -9,7 +9,8 @@
 #     "CPython>=3.6.2"
 #   ],
 #   "generated_with_requirements": [
-#     "black==22.1.0"
+#     "black==22.1.0",
+#     "typing-extensions>=3.10.0.0; python_version < \"3.10\""
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -87,7 +88,7 @@ typed-ast==1.5.2; python_version < "3.8" and implementation_name == "cpython" an
     --hash=sha256:f290617f74a610849bd8f5514e34ae3d09eafd521dceaa6cf68b3f4414266d4e \
     --hash=sha256:df05aa5b241e2e8045f5f4367a9f6187b09c4cdf8578bb219861c4e27c443db5 \
     --hash=sha256:525a2d4088e70a9f75b08b3f87a51acc9cde640e19cc523c7e41aa355564ae27
-typing-extensions==4.0.1; python_version < "3.8" and python_full_version >= "3.6.2" and python_version >= "3.6" \
+typing-extensions==4.0.1; python_version < "3.8" and python_full_version >= "3.6.2" and python_version >= "3.6" or python_version < "3.10" \
     --hash=sha256:7f001e5ac290a0c0401508864c7ec868be4e701886d5b573a9528ed3973d9d3b \
     --hash=sha256:4ca091dea149f945ec56afb48dae714f21e8692ef22a395223bcd328961b6a0e
 zipp==3.6.0; python_version >= "3.6" and python_full_version >= "3.6.2" and python_version < "3.8" \
