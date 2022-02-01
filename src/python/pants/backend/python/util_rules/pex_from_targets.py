@@ -205,7 +205,11 @@ class NoCompatibleResolveException(Exception):
     """No compatible resolve could be found for a set of targets."""
 
     def __init__(
-        self, python_setup: PythonSetup, msg_prefix: str, relevant_targets: Iterable[Target]
+        self,
+        python_setup: PythonSetup,
+        msg_prefix: str,
+        relevant_targets: Iterable[Target],
+        msg_suffix: str = "",
     ) -> None:
         resolves_to_addresses = defaultdict(list)
         for tgt in relevant_targets:
@@ -229,7 +233,7 @@ class NoCompatibleResolveException(Exception):
             "Targets which will be used together must all have the same resolve (from the "
             f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) or "
             f"[compatible_resolves]({doc_url('reference-python_requirement#codecompatible_resolvescode')}) "
-            "fields) in common."
+            "fields) in common." + (f"\n\n{msg_suffix}" if msg_suffix else "")
         )
 
 
@@ -237,14 +241,6 @@ class NoCompatibleResolveException(Exception):
 async def choose_python_resolve(
     request: ChosenPythonResolveRequest, python_setup: PythonSetup
 ) -> ChosenPythonResolve:
-    # If there are no targets, we fall back to the default resolve. This is relevant,
-    # for example, when running `./pants repl` with no specs.
-    if not request.addresses:
-        return ChosenPythonResolve(
-            name=python_setup.default_resolve,
-            lockfile_path=python_setup.resolves[python_setup.default_resolve],
-        )
-
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
 
     # First, choose the resolve by inspecting the root targets.
@@ -254,17 +250,14 @@ async def choose_python_resolve(
         if root.has_field(PythonResolveField)
     }
     if not root_resolves:
-        root_targets = bullet_list(
-            f"{tgt.address.spec} ({tgt.alias})" for tgt in transitive_targets.roots
+        # If there are no targets, we fall back to the default resolve. This is relevant,
+        # for example, when running `./pants repl` with no specs or directly on
+        # python_requirement targets.
+        return ChosenPythonResolve(
+            name=python_setup.default_resolve,
+            lockfile_path=python_setup.resolves[python_setup.default_resolve],
         )
-        raise AssertionError(
-            "Used `ChosenPythonResolveRequest` with input addresses that don't have the "
-            f"`PythonResolveField` field registered:\n\n{root_targets}\n\n"
-            "If you encountered this bug while using core Pants functionality, please open a "
-            "bug at https://github.com/pantsbuild/pants/issues/new with this error message when "
-            "`--print-stacktrace` is enabled. If this is from your own plugin, register "
-            "`PythonResolveField` on the relevant target types."
-        )
+
     if len(root_resolves) > 1:
         raise NoCompatibleResolveException(
             python_setup,
