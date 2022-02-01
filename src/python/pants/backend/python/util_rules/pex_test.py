@@ -860,16 +860,14 @@ def test_validate_metadata(
         uses_project_ic,
     )
 
-    request = MagicMock(
-        options_scope_name=options_scope_name,
-        interpreter_constraints=InterpreterConstraints([actual_constraints]),
-    )
     python_setup = MagicMock(
         invalid_lockfile_behavior=InvalidLockfileBehavior.warn,
         interpreter_universe=["3.4", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
     )
 
-    _validate_metadata(metadata, request, requirements, python_setup)
+    _validate_metadata(
+        metadata, InterpreterConstraints([actual_constraints]), requirements, python_setup
+    )
 
     txt = caplog.text.strip()
 

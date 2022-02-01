@@ -373,7 +373,9 @@ async def build_pex(
                 request.requirements.file_path,
                 resolve_name,
             )
-            _validate_metadata(metadata, request, request.requirements, python_setup)
+            _validate_metadata(
+                metadata, request.interpreter_constraints, request.requirements, python_setup
+            )
 
     elif isinstance(request.requirements, LockfileContent):
         is_monolithic_resolve = True
@@ -388,7 +390,9 @@ async def build_pex(
             metadata = PythonLockfileMetadata.from_lockfile(
                 file_content.content, resolve_name=resolve_name
             )
-            _validate_metadata(metadata, request, request.requirements, python_setup)
+            _validate_metadata(
+                metadata, request.interpreter_constraints, request.requirements, python_setup
+            )
         requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
     else:
         assert isinstance(request.requirements, PexRequirements)
@@ -478,7 +482,7 @@ async def build_pex(
 
 def _validate_metadata(
     metadata: PythonLockfileMetadata,
-    request: PexRequest,
+    interpreter_constraints: InterpreterConstraints,
     requirements: (Lockfile | LockfileContent),
     python_setup: PythonSetup,
 ) -> None:
@@ -493,7 +497,7 @@ def _validate_metadata(
 
     validation = metadata.is_valid_for(
         requirements.lockfile_hex_digest,
-        request.interpreter_constraints,
+        interpreter_constraints,
         python_setup.interpreter_universe,
         req_strings,
     )
@@ -548,7 +552,7 @@ def _validate_metadata(
             in validation.failure_reasons
         ):
             yield (
-                f"- You have set interpreter constraints (`{request.interpreter_constraints}`) that "
+                f"- You have set interpreter constraints (`{interpreter_constraints}`) that "
                 "are not compatible with those used to generate the lockfile "
                 f"(`{metadata.valid_for_interpreter_constraints}`). "
             )
