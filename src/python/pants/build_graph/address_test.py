@@ -15,7 +15,7 @@ def test_address_input_parse_spec() -> None:
         path_component: str,
         target_component: str | None = None,
         generated_component: str | None = None,
-        relative_to: str | None = None
+        relative_to: str | None = None,
     ) -> None:
         ai = AddressInput.parse(spec, relative_to=relative_to)
         assert ai.path_component == path_component

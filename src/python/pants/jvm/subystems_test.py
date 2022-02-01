@@ -24,15 +24,12 @@ def test_resolves_for_targets() -> None:
         JvmSubsystem, resolves={"a": "", "b": "", "c": "", "default": ""}, default_resolve="default"
     )
 
-    assert (
-        jvm.resolves_for_target(
-            JavaSourceTarget(
-                {JavaSourceField.alias: "foo", JvmCompatibleResolvesField.alias: ["a", "b"]},
-                Address("dir"),
-            )
+    assert jvm.resolves_for_target(
+        JavaSourceTarget(
+            {JavaSourceField.alias: "foo", JvmCompatibleResolvesField.alias: ["a", "b"]},
+            Address("dir"),
         )
-        == ("a", "b")
-    )
+    ) == ("a", "b")
     assert jvm.resolves_for_target(
         JavaSourceTarget({JavaSourceField.alias: "foo"}, Address("dir"))
     ) == ("default",)

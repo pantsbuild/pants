@@ -82,21 +82,15 @@ def test_infer_scala_imports_same_target(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.scala"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.scala"))
 
-    assert (
-        rule_runner.request(
-            InferredDependencies,
-            [InferScalaSourceDependencies(target_a[ScalaSourceField])],
-        )
-        == InferredDependencies(dependencies=[])
-    )
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferScalaSourceDependencies(target_a[ScalaSourceField])],
+    ) == InferredDependencies(dependencies=[])
 
-    assert (
-        rule_runner.request(
-            InferredDependencies,
-            [InferScalaSourceDependencies(target_b[ScalaSourceField])],
-        )
-        == InferredDependencies(dependencies=[])
-    )
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferScalaSourceDependencies(target_b[ScalaSourceField])],
+    ) == InferredDependencies(dependencies=[])
 
 
 @maybe_skip_jdk_test

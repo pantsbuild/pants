@@ -471,17 +471,14 @@ def test_specs_to_dirs() -> None:
     assert specs_to_dirs(
         Specs(AddressSpecs([]), FilesystemSpecs([DirLiteralSpec("src/python/foo")]))
     ) == ("src/python/foo",)
-    assert (
-        specs_to_dirs(
-            Specs(
-                AddressSpecs(
-                    [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
-                ),
-                FilesystemSpecs([]),
-            )
+    assert specs_to_dirs(
+        Specs(
+            AddressSpecs(
+                [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
+            ),
+            FilesystemSpecs([]),
         )
-        == ("src/python/foo", "src/python/bar")
-    )
+    ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
         specs_to_dirs(
