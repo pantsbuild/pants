@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import strawberry
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from strawberry.fastapi import GraphQLRouter
 from uvicorn import Config, Server  # type: ignore
 
@@ -15,8 +16,11 @@ from pants.backend.explorer.request_state import RequestState
 def create_app(request_state: RequestState):
     schema = strawberry.Schema(query=Query)
     graphql_app = GraphQLRouter(schema, context_getter=request_state.context_getter)
+
     app = FastAPI()
     app.include_router(graphql_app, prefix="/graphql")
+    app.mount("/", StaticFiles(directory="src/javascript/explorer/dist", html=True), name="root")
+
     return app
 
 
