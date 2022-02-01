@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import strawberry
-import uvicorn  # type: ignore
 from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
+from uvicorn import Config, Server  # type: ignore
 
 from pants.backend.explorer.api.query import Query
 from pants.backend.explorer.request_state import RequestState
@@ -22,5 +22,15 @@ def create_app(request_state: RequestState):
 
 def run(request_state: RequestState):
     print("Starting the Explorer Web UI server...")
+    server: Server | None = None
+
+    async def on_tick() -> None:
+        nonlocal server
+        if server and request_state.scheduler_session.is_cancelled:
+            print(" => Exiting...")
+            server.should_exit = True
+
     app = create_app(request_state)
-    uvicorn.run(app)
+    config = Config(app, callback_notify=on_tick, timeout_notify=0.25, log_config=None)
+    server = Server(config=config)
+    server.run()

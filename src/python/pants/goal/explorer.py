@@ -26,14 +26,6 @@ class ExplorerBuiltinGoal(BuiltinGoal):
         specs: Specs,
         union_membership: UnionMembership,
     ) -> ExitCode:
-        global_options = options.for_global_scope()
-        if global_options.pantsd:
-            print(
-                "The Explorer Web UI does not work well when using `pantsd`. Please use "
-                f"`{global_options.pants_bin_name} --no-pantsd {self.name} ...`."
-            )
-            return 1
-
         server.run(
             RequestState(
                 build_configuration=build_config,
