@@ -8,9 +8,9 @@ from typing import List
 import strawberry
 from strawberry.types import Info
 
+from pants.backend.explorer.api.targets import QueryTargetsMixin
 from pants.backend.explorer.request_state import RequestState
 from pants.engine.rules import TaskRule
-from pants.engine.target import AllTargets
 
 
 @strawberry.type
@@ -19,7 +19,7 @@ class RuleInfo:
 
 
 @strawberry.type
-class Query:
+class Query(QueryTargetsMixin):
     """Access to Pantsbuild data."""
 
     @strawberry.field
@@ -33,8 +33,3 @@ class Query:
                 if isinstance(rule, TaskRule)
             )
         )
-
-    @strawberry.field
-    async def targets(self, info: Info) -> List[str]:
-        all_targets = RequestState.from_info(info).product_request(AllTargets)
-        return sorted(str(target.address) for target in all_targets)

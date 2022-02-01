@@ -11,12 +11,14 @@ from strawberry.types import Info
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.help.help_info_extracter import AllHelpInfo
 
 T = TypeVar("T")
 
 
 @dataclass(frozen=True)
 class RequestState:
+    all_help_info: AllHelpInfo
     build_configuration: BuildConfiguration
     scheduler_session: SchedulerSession
 

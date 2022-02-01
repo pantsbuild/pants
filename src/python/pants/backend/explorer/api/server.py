@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import strawberry
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from strawberry.fastapi import GraphQLRouter
 from uvicorn import Config, Server  # type: ignore
@@ -16,10 +16,18 @@ from pants.backend.explorer.request_state import RequestState
 def create_app(request_state: RequestState):
     schema = strawberry.Schema(query=Query)
     graphql_app = GraphQLRouter(schema, context_getter=request_state.context_getter)
+    static_files = StaticFiles(directory="src/javascript/explorer/dist", html=True)
 
     app = FastAPI()
     app.include_router(graphql_app, prefix="/graphql")
-    app.mount("/", StaticFiles(directory="src/javascript/explorer/dist", html=True), name="root")
+    app.mount("/", static_files, name="root")
+
+    @app.middleware("http")
+    async def default_fallback(request: Request, call_next):
+        response = await call_next(request)
+        if response.status_code == 404:
+            response = await static_files.get_response("index.html", request.scope)
+        return response
 
     return app
 
