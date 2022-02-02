@@ -53,6 +53,8 @@ class BuildTargetCapabilities:
         )
 
 
+# Note: The BSP "build target" concept is _not_ the same as a Pants "target". They are similar but
+# should be not be conflated with one another.
 @dataclass(frozen=True)
 class BuildTarget:
     """Build target contains metadata about an artifact (for example library, test, or binary
