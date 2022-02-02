@@ -15,7 +15,7 @@ async-oncecell = "0.2"
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
 futures = "0.3"
-glob = "0.2.11"
+glob = "0.3.0"
 hashing = { path = "../../hashing" }
 http = "0.2"
 http-body = "0.4"
