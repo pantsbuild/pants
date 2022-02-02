@@ -9,6 +9,10 @@ from pathlib import PurePath
 from typing import Any, Sequence
 
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import (  # noqa: F401
+    AddressParseException as AddressParseException,
+)
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -127,22 +131,7 @@ class AddressInput:
                 return os.path.join(subproject, spec_path)
             return os.path.normpath(subproject)
 
-        spec_parts = spec.split(":", maxsplit=1)
-        path_component = spec_parts[0]
-        if len(spec_parts) == 1:
-            target_component = None
-            generated_parts = path_component.split("#", maxsplit=1)
-            if len(generated_parts) == 1:
-                generated_component = None
-            else:
-                path_component, generated_component = generated_parts
-        else:
-            generated_parts = spec_parts[1].split("#", maxsplit=1)
-            if len(generated_parts) == 1:
-                target_component = generated_parts[0]
-                generated_component = None
-            else:
-                target_component, generated_component = generated_parts
+        path_component, target_component, generated_component = native_engine.address_parse(spec)
 
         normalized_relative_to = None
         if relative_to:
