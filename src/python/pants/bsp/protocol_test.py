@@ -93,6 +93,7 @@ class TestBSPConnection(SchedulerTestBase):
                 data=None,
             )
             response_fut = endpoint.request("build/initialize", init_request.to_json_dict())
-            response: InitializeBuildResult = response_fut.result(timeout=15)
+            raw_response = response_fut.result(timeout=15)
+            response = InitializeBuildResult.from_json_dict(raw_response)
             assert response.display_name == "Pants"
             assert response.bsp_version == "0.0.1"

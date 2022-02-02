@@ -421,6 +421,16 @@ class InitializeBuildResult:
     # Additional metadata about the server
     data: Any | None
 
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            display_name=d["displayName"],
+            version=d["version"],
+            bsp_version=d["bspVersion"],
+            capabilities=BuildServerCapabilities.from_json_dict(d["capabilities"]),
+            data=d.get("data"),
+        )
+
     def to_json_dict(self):
         result = {
             "displayName": self.display_name,
