@@ -85,8 +85,8 @@ class BSPConnection:
             )
 
     # Called by `Endpoint` to dispatch requests and notifications.
-    # TODO: Should probably vendor `Endpoint` so we can detect notifications vs method calls and also not
-    # handle
+    # TODO: Should probably vendor `Endpoint` so we can detect notifications versus method calls, which
+    # matters when ignoring unknown notifications versus erroring for unknown methods.
     def __getitem__(self, method_name):
         def handler(params):
             return self._handle_inbound_message(method_name=method_name, params=params)
