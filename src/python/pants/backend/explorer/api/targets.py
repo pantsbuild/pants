@@ -9,9 +9,10 @@ from typing import List, Optional
 import strawberry
 from strawberry.types import Info
 
+from pants.backend.explorer.api.field_types import JSONScalar
 from pants.backend.explorer.request_state import RequestState
 from pants.backend.project_info.peek import TargetData, TargetDatas
-from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
+from pants.engine.target import AllTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 
 
@@ -41,23 +42,17 @@ class TargetType:
 
 
 @strawberry.type
-class TargetField:
-    alias: str
-    value: str
-
-
-@strawberry.type
 class Target:
     address: str
     target_type: str
-    fields: List[TargetField]
+    fields: JSONScalar
 
     @classmethod
     def from_data(cls, data: TargetData) -> Target:
         json = data.to_json()
         address = json.pop("address")
         target_type = json.pop("target_type")
-        fields = [TargetField(key, str(value)) for key, value in json.items()]
+        fields = json
         return cls(address=address, target_type=target_type, fields=fields)
 
 
@@ -77,5 +72,7 @@ class QueryTargetsMixin:
     async def targets(self, info: Info) -> List[Target]:
         """Get all targets defined in BUILD files."""
         req = RequestState.from_info(info).product_request
-        all_data = req(TargetDatas, (UnexpandedTargets(req(AllUnexpandedTargets)),))
+        # Peek expects to work with unexpanded targets, but we want to present the expanded set of
+        # targets.
+        all_data = req(TargetDatas, (UnexpandedTargets(req(AllTargets)),))
         return [Target.from_data(data) for data in all_data]

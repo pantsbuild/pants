@@ -3,14 +3,34 @@
 
 from __future__ import annotations
 
+import json
+
 import strawberry
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import JSONResponse
 from strawberry.fastapi import GraphQLRouter
 from uvicorn import Config, Server  # type: ignore
 
 from pants.backend.explorer.api.query import Query
 from pants.backend.explorer.request_state import RequestState
+from pants.backend.project_info.peek import _PeekJsonEncoder
+
+
+class ExplorerJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            cls=_PeekJsonEncoder,
+        ).encode("utf-8")
+
+
+# Monkey patch, due to limitations in configurability.
+strawberry.fastapi.router.JSONResponse = ExplorerJSONResponse  # type: ignore[attr-defined]
 
 
 def create_app(request_state: RequestState):
