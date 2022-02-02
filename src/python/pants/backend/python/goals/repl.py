@@ -1,5 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
 from typing import Iterable
 
@@ -28,6 +31,11 @@ from pants.util.logging import LogLevel
 
 
 def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: PythonSetup) -> None:
+    """Eagerly validate that all roots are compatible.
+
+    We already end up checking this in pex_from_targets.py, but this is a more eager check so that
+    we have a better error message.
+    """
     root_resolves = {
         root[PythonResolveField].normalized_value(python_setup)
         for root in root_targets
@@ -38,7 +46,14 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
             python_setup,
             "The input targets did not have a resolve in common",
             root_targets,
-            ("To work around this, choose which resolve you want to use, then run `./pants ..."),
+            (
+                "To work around this, choose which resolve you want to use from above. "
+                'Then, run `./pants peek :: | jq -r \'.[] | select(.resolve == "example") | '
+                '.["address"]\' | xargs ./pants repl`, where you replace "example" with the '
+                "resolve name, and possibly replace the specs `::` with what you were using "
+                "before. This will result in opening a REPL with only targets using the desired "
+                "resolve."
+            ),
         )
 
 
