@@ -6,7 +6,7 @@ from textwrap import dedent
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
-    SingleSourceField,
+    OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -44,7 +44,7 @@ class PyOxidizerUnclassifiedResources(StringSequenceField):
 
 # TODO: I think this should be automatically picked up, like isort or black configs - just not sure how to access the source root from the pyoxidizer_binary target
 # In fact, should there even be a way to run this without a PyOxidizer config? The config can get complicated, so the default probably runs into many edge cases.
-class PyOxidizerConfigSourceField(SingleSourceField):
+class PyOxidizerConfigSourceField(OptionalSingleSourceField):
     alias = "template"
     default = None
     required = False

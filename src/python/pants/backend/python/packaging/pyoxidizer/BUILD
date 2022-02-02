@@ -12,7 +12,6 @@ python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
     timeout=240,
-    interpreter_constraints=[">=3.9"]
 )
 
 python_tests(
