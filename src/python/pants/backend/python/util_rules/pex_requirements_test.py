@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LockfileContent,
     ToolCustomLockfile,
     ToolDefaultLockfile,
-    validate_metadata,
+    maybe_validate_metadata,
 )
 from pants.engine.fs import FileContent
 from pants.testutil.rule_runner import RuleRunner
@@ -123,8 +123,8 @@ def test_validate_metadata(
         interpreter_universe=["3.4", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
     )
 
-    validate_metadata(
-        metadata, InterpreterConstraints([actual_constraints]), requirements, python_setup
+    maybe_validate_metadata(
+        lambda: metadata, InterpreterConstraints([actual_constraints]), requirements, python_setup
     )
 
     txt = caplog.text.strip()

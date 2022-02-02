@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Callable, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
@@ -109,12 +109,15 @@ class PexRequirements:
         return bool(self.req_strings)
 
 
-def validate_metadata(
-    metadata: PythonLockfileMetadata,
+def maybe_validate_metadata(
+    parse_metadata: Callable[[], PythonLockfileMetadata],
     interpreter_constraints: InterpreterConstraints,
     requirements: (Lockfile | LockfileContent),
     python_setup: PythonSetup,
 ) -> None:
+    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
+        return
+
     # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
     # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
     req_strings = (
@@ -123,6 +126,7 @@ def validate_metadata(
         else None
     )
 
+    metadata = parse_metadata()
     validation = metadata.is_valid_for(
         requirements.lockfile_hex_digest,
         interpreter_constraints,
