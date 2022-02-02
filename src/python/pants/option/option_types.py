@@ -108,15 +108,15 @@ class OptionBase(Generic[PropType]):
         self.kwargs["fromfile"] = True
         return self
 
-    def metavar(self, metavar: str, /) -> OptionBase[PropType]:
+    def metavar(self, metavar: str) -> OptionBase[PropType]:
         self.kwargs["metavar"] = metavar
         return self
 
-    def mutually_exclusive_group(self, mutually_exclusive_group: str, /) -> OptionBase[PropType]:
+    def mutually_exclusive_group(self, mutually_exclusive_group: str) -> OptionBase[PropType]:
         self.kwargs["mutually_exclusive_group"] = mutually_exclusive_group
         return self
 
-    def default_help_repr(self, default_help_repr: str, /) -> OptionBase[PropType]:
+    def default_help_repr(self, default_help_repr: str) -> OptionBase[PropType]:
         self.kwargs["default_help_repr"] = default_help_repr
         return self
 
