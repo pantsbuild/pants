@@ -8,7 +8,7 @@ from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
+from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     LockfileContent,
     PexRequirements,

@@ -13,8 +13,9 @@ from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
