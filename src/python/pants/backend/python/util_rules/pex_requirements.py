@@ -162,8 +162,6 @@ def _invalid_tool_lockfile_error(
     lockfile_interpreter_constraints: InterpreterConstraints,
 ) -> Iterator[str]:
     tool_name = requirements.options_scope_name
-    uses_source_plugins = requirements.uses_source_plugins
-    uses_project_interpreter_constraints = requirements.uses_project_interpreter_constraints
 
     yield "You are using "
     yield "the `<default>` lockfile provided by Pants " if isinstance(
@@ -188,7 +186,7 @@ def _invalid_tool_lockfile_error(
             "- You have set different requirements than those used to generate the lockfile. "
             f"You can fix this by not setting `[{tool_name}].version`, "
         )
-        if uses_source_plugins:
+        if requirements.uses_source_plugins:
             yield f"`[{tool_name}].source_plugins`, "
         yield f"and `[{tool_name}].extra_requirements`, or by using a new custom lockfile.\n"
 
@@ -201,7 +199,7 @@ def _invalid_tool_lockfile_error(
         yield (
             f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
             "or by using a new custom lockfile. "
-        ) if not uses_project_interpreter_constraints else (
+        ) if not requirements.uses_project_interpreter_constraints else (
             f"`{tool_name}` determines its interpreter constraints based on your code's own "
             "constraints. To fix this error, you can either change your code's constraints "
             f"(see {doc_url('python-interpreter-compatibility')}) or generat a new "
