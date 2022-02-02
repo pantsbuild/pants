@@ -18,7 +18,7 @@ import packaging.version
 from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.repos import PythonRepos
-from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.util_rules import pex_cli
@@ -38,7 +38,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.pex_requirements import (
     ToolCustomLockfile,
     ToolDefaultLockfile,
-    validate_metadata,
+    maybe_validate_metadata,
 )
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -341,57 +341,45 @@ async def build_pex(
     requirements_file_digest = EMPTY_DIGEST
     requirement_count: int
 
-    # TODO(#12314): Capture the resolve name for multiple user lockfiles.
-    resolve_name = (
-        request.requirements.options_scope_name
-        if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
-        else None
-    )
-
-    if isinstance(request.requirements, Lockfile):
-        is_monolithic_resolve = True
-        argv.extend(["--requirement", request.requirements.file_path])
-        argv.append("--no-transitive")
-        globs = PathGlobs(
-            [request.requirements.file_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=request.requirements.file_path_description_of_origin,
+    if isinstance(request.requirements, (Lockfile, LockfileContent)):
+        # TODO(#12314): Capture the resolve name for multiple user lockfiles.
+        resolve_name = (
+            request.requirements.options_scope_name
+            if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
+            else None
         )
-        requirements_file_digest = await Get(Digest, PathGlobs, globs)
-        requirements_file_digest_contents = await Get(
-            DigestContents, Digest, requirements_file_digest
-        )
-        requirement_count = len(requirements_file_digest_contents[0].content.decode().splitlines())
-        if python_setup.invalid_lockfile_behavior in {
-            InvalidLockfileBehavior.warn,
-            InvalidLockfileBehavior.error,
-        }:
-            metadata = PythonLockfileMetadata.from_lockfile(
-                requirements_file_digest_contents[0].content,
-                request.requirements.file_path,
-                resolve_name,
-            )
-            validate_metadata(
-                metadata, request.interpreter_constraints, request.requirements, python_setup
-            )
 
-    elif isinstance(request.requirements, LockfileContent):
+        if isinstance(request.requirements, Lockfile):
+            lock_path = request.requirements.file_path
+            requirements_file_digest = await Get(
+                Digest,
+                PathGlobs(
+                    [lock_path],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=request.requirements.file_path_description_of_origin,
+                ),
+            )
+            _digest_contents = await Get(DigestContents, Digest, requirements_file_digest)
+            lock_bytes = _digest_contents[0].content
+
+            def parse_metadata() -> PythonLockfileMetadata:
+                return PythonLockfileMetadata.from_lockfile(lock_bytes, lock_path, resolve_name)
+
+        else:
+            _fc = request.requirements.file_content
+            lock_path, lock_bytes = (_fc.path, _fc.content)
+            requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
+
+            def parse_metadata() -> PythonLockfileMetadata:
+                return PythonLockfileMetadata.from_lockfile(lock_bytes, resolve_name=resolve_name)
+
         is_monolithic_resolve = True
-        file_content = request.requirements.file_content
-        requirement_count = len(file_content.content.decode().splitlines())
-        argv.extend(["--requirement", file_content.path])
-        argv.append("--no-transitive")
-        if python_setup.invalid_lockfile_behavior in {
-            InvalidLockfileBehavior.warn,
-            InvalidLockfileBehavior.error,
-        }:
-            metadata = PythonLockfileMetadata.from_lockfile(
-                file_content.content, resolve_name=resolve_name
-            )
-            validate_metadata(
-                metadata, request.interpreter_constraints, request.requirements, python_setup
-            )
-        requirements_file_digest = await Get(Digest, CreateDigest([file_content]))
+        argv.extend(["--requirement", lock_path, "--no-transitive"])
+        requirement_count = len(lock_bytes.decode().splitlines())
+        maybe_validate_metadata(
+            parse_metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
+        )
+
     else:
         assert isinstance(request.requirements, PexRequirements)
         is_monolithic_resolve = request.requirements.is_all_constraints_resolve

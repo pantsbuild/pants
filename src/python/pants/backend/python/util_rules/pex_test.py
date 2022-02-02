@@ -20,6 +20,7 @@ from pkg_resources import Requirement
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexDistributionInfo,
@@ -38,17 +39,12 @@ from pants.backend.python.util_rules.pex_requirements import (
     LockfileContent,
     PexRequirements,
 )
-from pants.backend.python.util_rules.pex_requirements_test import (
-    DEFAULT,
-    FILE,
-    _metadata_validation_values,
-    _prepare_pex_requirements,
-)
+from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.dirutil import safe_rmtree
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -639,130 +635,33 @@ def test_build_pex_description() -> None:
     )
 
 
-def test_error_on_invalid_lockfile_with_path(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(
-            rule_runner,
-            lockfile_type=FILE,
-            behavior="error",
-            invalid_reqs=True,
-        )
+def test_lockfile_validation(rule_runner: RuleRunner) -> None:
+    """Check that we properly load and validate lockfile metadata for both types of locks.
 
+    Note that we don't exhaustively test every source of lockfile failure nor the different options
+    for `--invalid-lockfile-behavior`, as those are already tested in pex_requirements_test.py.
+    """
 
-def test_warn_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, lockfile_type=FILE, behavior="warn", invalid_reqs=True)
-    assert "but it is not compatible with your configuration" in caplog.text
+    # We create a lockfile that claims it works with no requirements. It should fail when we try
+    # to build a PEX with a requirement.
+    lock_content = PythonLockfileMetadata.new(
+        InterpreterConstraints(), set()
+    ).add_header_to_lockfile(b"", regenerate_command="regen")
+    rule_runner.write_files({"lock.txt": lock_content.decode()})
 
-
-def test_warn_on_requirements_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, lockfile_type=FILE, behavior="warn", invalid_reqs=True)
-    assert "You have set different requirements" in caplog.text
-    assert "You have set interpreter constraints" not in caplog.text
-
-
-def test_warn_on_interpreter_constraints_mismatch(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, lockfile_type=FILE, behavior="warn", invalid_constraints=True
+    lockfile = Lockfile(
+        "lock.txt",
+        file_path_description_of_origin="a test",
+        lockfile_hex_digest=None,
+        req_strings=FrozenOrderedSet("ansicolors"),
     )
-    assert "You have set different requirements" not in caplog.text
-    assert "You have set interpreter constraints" in caplog.text
+    with engine_error(InvalidLockfileError):
+        create_pex_and_get_all_data(rule_runner, requirements=lockfile)
 
-
-def test_warn_on_mismatched_requirements_and_interpreter_constraints(
-    rule_runner: RuleRunner, caplog
-) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner,
-        lockfile_type=FILE,
-        behavior="warn",
-        invalid_reqs=True,
-        invalid_constraints=True,
+    lockfile_content = LockfileContent(
+        FileContent("lock.txt", lock_content),
+        lockfile_hex_digest=None,
+        req_strings=FrozenOrderedSet("ansicolors"),
     )
-    assert "You have set different requirements" in caplog.text
-    assert "You have set interpreter constraints" in caplog.text
-
-
-def test_ignore_on_invalid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, lockfile_type=FILE, behavior="ignore", invalid_reqs=True
-    )
-    assert not caplog.text.strip()
-
-
-def test_no_warning_on_valid_lockfile_with_path(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, lockfile_type=FILE, behavior="warn")
-    assert not caplog.text.strip()
-
-
-def test_error_on_invalid_lockfile_with_content(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError):
-        _run_pex_for_lockfile_test(
-            rule_runner, lockfile_type=DEFAULT, behavior="error", invalid_reqs=True
-        )
-
-
-def test_warn_on_invalid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(
-        rule_runner, lockfile_type=DEFAULT, behavior="warn", invalid_reqs=True
-    )
-    assert "but it is not compatible with your configuration" in caplog.text
-
-
-def test_no_warning_on_valid_lockfile_with_content(rule_runner: RuleRunner, caplog) -> None:
-    _run_pex_for_lockfile_test(rule_runner, lockfile_type=DEFAULT, behavior="warn")
-    assert not caplog.text.strip()
-
-
-def _run_pex_for_lockfile_test(
-    rule_runner,
-    *,
-    lockfile_type: str,
-    behavior,
-    invalid_reqs=False,
-    invalid_constraints=False,
-    uses_source_plugins=False,
-    uses_project_ic=False,
-) -> None:
-
-    (
-        actual_digest,
-        expected_digest,
-        actual_constraints,
-        expected_constraints,
-        actual_requirements,
-        expected_requirements,
-        options_scope_name,
-    ) = _metadata_validation_values(
-        invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
-    )
-
-    lockfile = f"""
-# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
-# {{
-#   "version": 1,
-#   "requirements_invalidation_digest": "{actual_digest}",
-#   "valid_for_interpreter_constraints": [
-#     "{ actual_constraints }"
-#   ]
-# }}
-# --- END PANTS LOCKFILE METADATA ---
-ansicolors==1.1.8
-"""
-
-    requirements = _prepare_pex_requirements(
-        rule_runner,
-        lockfile_type,
-        lockfile,
-        expected_digest,
-        expected_requirements,
-        options_scope_name,
-        uses_source_plugins,
-        uses_project_ic,
-    )
-
-    create_pex_and_get_all_data(
-        rule_runner,
-        interpreter_constraints=InterpreterConstraints([expected_constraints]),
-        requirements=requirements,
-        additional_pants_args=(f"--python-invalid-lockfile-behavior={behavior}",),
-    )
+    with engine_error(InvalidLockfileError):
+        create_pex_and_get_all_data(rule_runner, requirements=lockfile_content)
