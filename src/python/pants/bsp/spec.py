@@ -213,6 +213,11 @@ class BuildClientCapabilities:
     def from_json_dict(cls, d):
         return cls(language_ids=tuple(d.get("languageIds", [])))
 
+    def to_json_dict(self):
+        return {
+            "languageIds": self.language_ids,
+        }
+
 
 @dataclass(frozen=True)
 class InitializeBuildParams:
@@ -245,6 +250,18 @@ class InitializeBuildParams:
             data=d.get("data"),
         )
 
+    def to_json_dict(self):
+        result = {
+            "displayName": self.display_name,
+            "version": self.version,
+            "bspVersion": self.bsp_version,
+            "rootUri": self.root_uri,
+            "capabilities": self.capabilities.to_json_dict(),
+        }
+        if self.data is not None:
+            result["data"] = self.data
+        return result
+
 
 @dataclass(frozen=True)
 class CompileProvider:
@@ -253,6 +270,11 @@ class CompileProvider:
     @classmethod
     def from_json_dict(cls, d):
         return cls(language_ids=tuple(d.get("languageIds", [])))
+
+    def to_json_dict(self):
+        return {
+            "languageIds": self.language_ids,
+        }
 
 
 @dataclass(frozen=True)
@@ -263,6 +285,11 @@ class RunProvider:
     def from_json_dict(cls, d):
         return cls(language_ids=tuple(d.get("languageIds", [])))
 
+    def to_json_dict(self):
+        return {
+            "languageIds": self.language_ids,
+        }
+
 
 @dataclass(frozen=True)
 class DebugProvider:
@@ -272,6 +299,11 @@ class DebugProvider:
     def from_json_dict(cls, d):
         return cls(language_ids=tuple(d.get("languageIds", [])))
 
+    def to_json_dict(self):
+        return {
+            "languageIds": self.language_ids,
+        }
+
 
 @dataclass(frozen=True)
 class TestProvider:
@@ -280,6 +312,11 @@ class TestProvider:
     @classmethod
     def from_json_dict(cls, d):
         return cls(language_ids=tuple(d.get("languageIds", [])))
+
+    def to_json_dict(self):
+        return {
+            "languageIds": self.language_ids,
+        }
 
 
 @dataclass(frozen=True)
@@ -342,6 +379,30 @@ class BuildServerCapabilities:
             build_target_changed_provider=d.get("buildTargetChangedProvider"),
         )
 
+    def to_json_dict(self):
+        result = {}
+        if self.compile_provider is not None:
+            result["compileProvider"] = self.compile_provider.to_json_dict()
+        if self.test_provider is not None:
+            result["testProvider"] = self.test_provider.to_json_dict()
+        if self.run_provider is not None:
+            result["runProvider"] = self.run_provider.to_json_dict()
+        if self.debug_provider is not None:
+            result["debugProvider"] = self.debug_provider.to_json_dict()
+        if self.inverse_sources_provider is not None:
+            result["inverseSourcesProvider"] = self.inverse_sources_provider
+        if self.dependency_sources_provider is not None:
+            result["dependencySourcesProvider"] = self.dependency_sources_provider
+        if self.dependency_modules_provider is not None:
+            result["dependencyModulesProvider"] = self.dependency_modules_provider
+        if self.resources_provider is not None:
+            result["resourcesProvider"] = self.resources_provider
+        if self.can_reload is not None:
+            result["canReload"] = self.can_reload
+        if self.build_target_changed_provider is not None:
+            result["buildTargetChangedProvider"] = self.build_target_changed_provider
+        return result
+
 
 @dataclass(frozen=True)
 class InitializeBuildResult:
@@ -359,3 +420,15 @@ class InitializeBuildResult:
 
     # Additional metadata about the server
     data: Any | None
+
+    def to_json_dict(self):
+        result = {
+            "displayName": self.display_name,
+            "version": self.version,
+            "bspVersion": self.bsp_version,
+            "capabilities": self.capabilities.to_json_dict(),
+        }
+        if self.data is not None:
+            # TODO: Figure out whether to encode/decode data in a generic manner.
+            result["data"] = self.data
+        return result

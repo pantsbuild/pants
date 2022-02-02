@@ -9,11 +9,12 @@ from typing import BinaryIO
 
 import pytest
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.exceptions import JsonRpcException, JsonRpcMethodNotFound  # type: ignore[import]
+from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.rules import rules as bsp_rules
+from pants.bsp.spec import BuildClientCapabilities, InitializeBuildParams, InitializeBuildResult
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 
 
@@ -83,8 +84,15 @@ class TestBSPConnection(SchedulerTestBase):
             assert exc_info.value.code == -32002
             assert exc_info.value.message == "Client must first call `build/initialize`."
 
-            response_fut = endpoint.request("build/initialize")
-            with pytest.raises(JsonRpcMethodNotFound) as exc_info:
-                response_fut.result(timeout=15)
-            assert exc_info.value.code == -32601
-            assert exc_info.value.message == "Method Not Found: build/initialize"
+            init_request = InitializeBuildParams(
+                display_name="test",
+                version="0.0.0",
+                bsp_version="0.0.0",
+                root_uri="https://example.com",
+                capabilities=BuildClientCapabilities(language_ids=()),
+                data=None,
+            )
+            response_fut = endpoint.request("build/initialize", init_request.to_json_dict())
+            response: InitializeBuildResult = response_fut.result(timeout=15)
+            assert response.display_name == "Pants"
+            assert response.bsp_version == "0.0.1"

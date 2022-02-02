@@ -5,12 +5,17 @@ from __future__ import annotations
 import logging
 from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Callable, Type
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
-from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
+from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
+    JsonRpcException,
+    JsonRpcInvalidRequest,
+    JsonRpcMethodNotFound,
+)
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
+from pants.bsp.spec import InitializeBuildParams, InitializeBuildResult
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.util.frozendict import FrozenDict
 
@@ -18,15 +23,23 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class BSPRequest:
-    method_name: str
-    params: Any
+class _HandlerMapping:
+    request_decoder: Callable[[dict], Any] | None
+    response_type: Type
+    is_notification: bool = False
 
 
-@dataclass(frozen=True)
-class BSPResponse:
-    response: Any | None
-    error: JsonRpcException | None
+BSP_HANDLER_MAPPING = {
+    "build/initialize": _HandlerMapping(
+        InitializeBuildParams.from_json_dict, InitializeBuildResult
+    ),
+}
+
+
+def _make_error_future(exc: Exception) -> Future:
+    fut: Future = Future()
+    fut.set_exception(exc)
+    return fut
 
 
 class BSPConnection:
@@ -58,25 +71,33 @@ class BSPConnection:
         _logger.info(f"_send_outbound_message: msg={msg}")
         self._outbound.write(msg)
 
+    # TODO: Figure out how to run this on the `Endpoint`'s thread pool by returing a callable. For now, we
+    # need to return errors as futures given that `Endpoint` only handles exceptions returned that way versus using a try ... except block.
     def _handle_inbound_message(self, *, method_name: str, params: Any):
         if not self._initialized and method_name != self._INITIALIZE_METHOD_NAME:
-            fut: Future = Future()
-            fut.set_exception(
+            return _make_error_future(
                 JsonRpcException(
                     code=-32002, message=f"Client must first call `{self._INITIALIZE_METHOD_NAME}`."
                 )
             )
-            return fut
-        request = BSPRequest(
-            method_name=method_name,
-            params=_freeze(params),
-        )
+
+        method_mapping = BSP_HANDLER_MAPPING.get(method_name)
+        if not method_mapping:
+            return _make_error_future(JsonRpcMethodNotFound.of(method_name))
+
+        request: Any | None = None
+        try:
+            if method_mapping.request_decoder is not None:
+                request = method_mapping.request_decoder(params)
+        except Exception:
+            return _make_error_future(JsonRpcInvalidRequest())
+
         execution_request = self._scheduler_session.execution_request(
-            products=[BSPResponse], subjects=[request]
+            products=[method_mapping.response_type], subjects=[request]
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:
-            return returns[0][1].value
+            return returns[0][1].value.to_json_dict()
         elif len(returns) == 0 and len(throws) == 1:
             raise throws[0][1].exc
         else:
