@@ -176,8 +176,11 @@ def _invalid_tool_lockfile_error(
     )
 
     if any(
-        i == InvalidPythonLockfileReason.INVALIDATION_DIGEST_MISMATCH
-        or i == InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH
+        i
+        in (
+            InvalidPythonLockfileReason.INVALIDATION_DIGEST_MISMATCH,
+            InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH,
+        )
         for i in validation.failure_reasons
     ):
         # TODO(12314): Add message showing _which_ requirements diverged.
@@ -195,30 +198,23 @@ def _invalid_tool_lockfile_error(
             "are not compatible with those used to generate the lockfile "
             f"(`{lockfile_interpreter_constraints}`). "
         )
-        if not uses_project_interpreter_constraints:
-            yield (
-                f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
-                "or by using a new custom lockfile. "
-            )
-        else:
-            yield (
-                f"`{tool_name}` determines its interpreter constraints based on your code's own "
-                "constraints. To fix this error, you can either change your code's constraints "
-                f"(see {doc_url('python-interpreter-compatibility')}) or generat a new "
-                "custom lockfile. "
-            )
+        yield (
+            f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
+            "or by using a new custom lockfile. "
+        ) if not uses_project_interpreter_constraints else (
+            f"`{tool_name}` determines its interpreter constraints based on your code's own "
+            "constraints. To fix this error, you can either change your code's constraints "
+            f"(see {doc_url('python-interpreter-compatibility')}) or generat a new "
+            "custom lockfile. "
+        )
         yield "\n"
 
     yield "\n"
-
-    if not isinstance(requirements, ToolCustomLockfile):
-        yield (
-            "To generate a custom lockfile based on your current configuration, set "
-            f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-            f"`./pants generate-lockfiles --resolve={tool_name}`. "
-        )
-    else:
-        yield (
-            "To regenerate your lockfile based on your current configuration, run "
-            f"`./pants generate-lockfiles --resolve={tool_name}`. "
-        )
+    yield (
+        "To regenerate your lockfile based on your current configuration, run "
+        f"`./pants generate-lockfiles --resolve={tool_name}`. "
+    ) if isinstance(requirements, ToolCustomLockfile) else (
+        "To generate a custom lockfile based on your current configuration, set "
+        f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
+        f"`./pants generate-lockfiles --resolve={tool_name}`. "
+    )
