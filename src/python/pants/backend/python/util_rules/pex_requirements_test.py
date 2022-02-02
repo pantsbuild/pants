@@ -39,10 +39,10 @@ def create_tool_lock(
         uses_project_interpreter_constraints=uses_project_interpreter_constraints,
     )
     return (
-        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)
+        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)  # type: ignore[arg-type]
         if default_lock
         else ToolCustomLockfile(
-            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs
+            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs  # type: ignore[arg-type]
         )
     )
 
