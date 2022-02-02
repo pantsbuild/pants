@@ -10,11 +10,7 @@ import pytest
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import (
-    PythonLockfileMetadata,
-    PythonLockfileMetadataV1,
-    PythonLockfileMetadataV2,
-)
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV2
 from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     LockfileContent,
@@ -23,44 +19,30 @@ from pants.backend.python.util_rules.pex_requirements import (
     maybe_validate_metadata,
 )
 from pants.engine.fs import FileContent
-from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
-
-
-@pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner()
-
 
 DEFAULT = "DEFAULT"
 FILE = "FILE"
 
-LOCKFILE_TYPES = (DEFAULT, FILE)
-BOOLEANS = (True, False)
-VERSIONS = (1, 2)
-
 
 @pytest.mark.parametrize(
-    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic,version",
+    "lockfile_type,invalid_reqs,invalid_constraints,uses_source_plugins,uses_project_ic",
     [
-        (lft, ir, ic, usp, upi, v)
-        for lft in LOCKFILE_TYPES
-        for ir in BOOLEANS
-        for ic in BOOLEANS
-        for usp in BOOLEANS
-        for upi in BOOLEANS
-        for v in VERSIONS
-        if (ir or ic)
+        (lockfile_type, invalid_reqs, invalid_constraints, source_plugins, project_ics)
+        for lockfile_type in (DEFAULT, FILE)
+        for invalid_reqs in (True, False)
+        for invalid_constraints in (True, False)
+        for source_plugins in (True, False)
+        for project_ics in (True, False)
+        if (invalid_reqs or invalid_constraints)
     ],
 )
 def test_validate_metadata(
-    rule_runner,
     lockfile_type: str,
     invalid_reqs,
     invalid_constraints,
     uses_source_plugins,
     uses_project_ic,
-    version,
     caplog,
 ) -> None:
     class M:
@@ -86,34 +68,18 @@ def test_validate_metadata(
         closing_file = "To regenerate your lockfile based on your current configuration"
 
     (
-        actual_digest,
-        expected_digest,
         actual_constraints,
         expected_constraints,
         actual_requirements,
-        expected_requirements_,
-        options_scope_name,
-    ) = _metadata_validation_values(
-        invalid_reqs, invalid_constraints, uses_source_plugins, uses_project_ic
-    )
+        expected_requirements,
+    ) = _metadata_validation_values(invalid_reqs, invalid_constraints)
 
-    metadata: PythonLockfileMetadata
-    if version == 1:
-        metadata = PythonLockfileMetadataV1(
-            InterpreterConstraints([expected_constraints]), expected_digest
-        )
-    elif version == 2:
-        expected_requirements = {PipRequirement.parse(i) for i in expected_requirements_}
-        metadata = PythonLockfileMetadataV2(
-            InterpreterConstraints([expected_constraints]), expected_requirements
-        )
+    metadata = PythonLockfileMetadataV2(
+        InterpreterConstraints([expected_constraints]), expected_requirements
+    )
     requirements = _prepare_pex_requirements(
-        rule_runner,
         lockfile_type,
-        "lockfile_data_goes_here",
-        actual_digest,
         actual_requirements,
-        options_scope_name,
         uses_source_plugins,
         uses_project_ic,
     )
@@ -163,72 +129,42 @@ def test_validate_metadata(
 
 
 def _metadata_validation_values(
-    invalid_reqs: bool, invalid_constraints: bool, uses_source_plugins: bool, uses_project_ic: bool
-) -> tuple[str, str, str, str, set[str], set[str], str]:
-
-    actual_digest = "900d"
-    expected_digest = actual_digest
+    invalid_reqs: bool, invalid_constraints: bool
+) -> tuple[str, str, set[str], set[str]]:
     actual_reqs = {"ansicolors==0.1.0"}
-    expected_reqs = actual_reqs
-    if invalid_reqs:
-        expected_digest = "baad"
-        expected_reqs = {"requests==3.0.0"}
-
+    expected_reqs = {"requests==3.0.0"} if invalid_reqs else actual_reqs
     actual_constraints = "CPython>=3.6,<3.10"
-    expected_constraints = actual_constraints
-    if invalid_constraints:
-        expected_constraints = "CPython>=3.9"
-
-    options_scope_name: str
-    if uses_source_plugins and uses_project_ic:
-        options_scope_name = "pylint"
-    elif uses_source_plugins:
-        options_scope_name = "mypy"
-    elif uses_project_ic:
-        options_scope_name = "bandit"
-    else:
-        options_scope_name = "kevin"
-
+    expected_constraints = "CPython>=3.9" if invalid_constraints else actual_constraints
     return (
-        actual_digest,
-        expected_digest,
         actual_constraints,
         expected_constraints,
         actual_reqs,
-        expected_reqs,
-        options_scope_name,
+        {PipRequirement.parse(r) for r in expected_reqs},
     )
 
 
 def _prepare_pex_requirements(
-    rule_runner: RuleRunner,
     lockfile_type: str,
-    lockfile: str,
-    expected_digest: str,
     expected_requirements: set[str],
-    options_scope_name: str,
     uses_source_plugins: bool,
     uses_project_interpreter_constraints: bool,
 ) -> Lockfile | LockfileContent:
     if lockfile_type == FILE:
-        file_path = "lockfile.txt"
-        rule_runner.write_files({file_path: lockfile})
         return ToolCustomLockfile(
-            file_path=file_path,
-            file_path_description_of_origin="iceland",
-            lockfile_hex_digest=expected_digest,
+            file_path="lock.txt",
+            file_path_description_of_origin="",
+            lockfile_hex_digest=None,
             req_strings=FrozenOrderedSet(expected_requirements),
-            options_scope_name=options_scope_name,
+            options_scope_name="my_tool",
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
         )
     elif lockfile_type == DEFAULT:
-        content = FileContent("lockfile.txt", lockfile.encode("utf-8"))
         return ToolDefaultLockfile(
-            file_content=content,
-            lockfile_hex_digest=expected_digest,
+            file_content=FileContent("", b""),
+            lockfile_hex_digest=None,
             req_strings=FrozenOrderedSet(expected_requirements),
-            options_scope_name=options_scope_name,
+            options_scope_name="my_tool",
             uses_source_plugins=uses_source_plugins,
             uses_project_interpreter_constraints=uses_project_interpreter_constraints,
         )
