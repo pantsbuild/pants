@@ -130,7 +130,7 @@ def test_validate_metadata(
 
 def _metadata_validation_values(
     invalid_reqs: bool, invalid_constraints: bool
-) -> tuple[str, str, set[str], set[str]]:
+) -> tuple[str, str, set[str], set[PipRequirement]]:
     actual_reqs = {"ansicolors==0.1.0"}
     expected_reqs = {"requests==3.0.0"} if invalid_reqs else actual_reqs
     actual_constraints = "CPython>=3.6,<3.10"
