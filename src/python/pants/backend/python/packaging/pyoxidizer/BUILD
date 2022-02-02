@@ -11,7 +11,7 @@ python_tests(
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],
-    timeout=240,
+    timeout=480,
 )
 
 python_tests(
