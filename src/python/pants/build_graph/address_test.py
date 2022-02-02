@@ -12,6 +12,7 @@ from pants.build_graph.address import (
     InvalidSpecPath,
     InvalidTargetName,
 )
+from pants.util.frozendict import FrozenDict
 
 
 def test_address_input_parse_spec() -> None:
@@ -20,6 +21,7 @@ def test_address_input_parse_spec() -> None:
         *,
         path_component: str,
         target_component: str | None = None,
+        parameters: dict[str, str] | None = None,
         generated_component: str | None = None,
         relative_to: str | None = None,
     ) -> None:
@@ -29,6 +31,7 @@ def test_address_input_parse_spec() -> None:
             assert ai.target_component is None
         else:
             assert ai.target_component == target_component
+        assert ai.parameters == FrozenDict(parameters or {})
         if generated_component is None:
             assert ai.generated_component is None
         else:
@@ -62,6 +65,10 @@ def test_address_input_parse_spec() -> None:
         target_component="c",
         generated_component="gen",
     )
+
+    # Parameters
+    assert_parsed("a@k=v", path_component="a", parameters={"k": "v"})
+    assert_parsed("a@k1=v1,k2=v2", path_component="a", parameters={"k1": "v1", "k2": "v2"})
 
     # Absolute spec
     assert_parsed("//a/b/c", path_component="a/b/c")
@@ -100,8 +107,12 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
     "spec,expected",
     [
         ("a:", "non-empty target name"),
-        ("//:", "non-empty target name"),
-        ("//:@t", "non-empty target name"),
+        ("a@t", "one or more key=value pairs"),
+        ("a@=", "one or more key=value pairs"),
+        ("a@t=", "one or more key=value pairs"),
+        ("a@t,y", "one or more key=value pairs"),
+        ("a@t=,y", "one or more key=value pairs"),
+        ("a#", "non-empty generated target name"),
     ],
 )
 def test_address_input_parse(spec: str, expected: str) -> None:
@@ -278,6 +289,10 @@ def test_address_spec() -> None:
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
 
     assert_spec(
+        Address("a/b", parameters={"k": "v"}), expected="a/b:b@k=v", expected_path_spec="a.b@@k=v"
+    )
+
+    assert_spec(
         Address("a/b", generated_name="generated"),
         expected="a/b#generated",
         expected_path_spec="a.b@generated",
@@ -437,6 +452,14 @@ def test_address_create_generated() -> None:
         (
             Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
             AddressInput("a/b/c/subdir/f.txt", "../tgt"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": "v"}),
+            AddressInput("", "t", parameters=FrozenDict({"k": "v"})),
+        ),
+        (
+            Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),
+            AddressInput("", "t", parameters=FrozenDict({"k1": "v1", "k2": "v2"})),
         ),
     ],
 )

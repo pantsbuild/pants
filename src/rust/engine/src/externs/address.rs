@@ -18,13 +18,28 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   Ok(())
 }
 
+// TODO: If more of `pants.build_graph.address.AddressInput` is ported to Rust, it might be worth
+// moving the definition into the `address` crate. But for now, this is a tuple.
+type ParsedAddress<'a> = (
+  &'a str,
+  Option<&'a str>,
+  Vec<(&'a str, &'a str)>,
+  Option<&'a str>,
+);
+
 /// Parses an Address spec into:
 /// 1. a path component
 /// 2. a target component
-/// 3. a generated component
+/// 3. a sequence of key/value parameters
+/// 4. a generated component
 ///
 #[pyfunction]
-fn address_parse(spec: &str) -> PyResult<(&str, Option<&str>, Option<&str>)> {
+fn address_parse(spec: &str) -> PyResult<ParsedAddress> {
   let address = parse_address(spec).map_err(AddressParseException::new_err)?;
-  Ok((address.path, address.target, address.generated))
+  Ok((
+    address.path,
+    address.target,
+    address.parameters,
+    address.generated,
+  ))
 }

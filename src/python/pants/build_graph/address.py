@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import native_engine
@@ -14,6 +14,7 @@ from pants.engine.internals.native_engine import (  # noqa: F401
     AddressParseException as AddressParseException,
 )
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_prefix
 
 # `:` and `#` used as delimiters already. Others are reserved for possible future needs.
@@ -38,12 +39,13 @@ class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
 
     An AddressInput must be resolved into an Address using the engine (which involves inspecting
-    disk to determine the types of its components).
+    disk to determine the types of its path component).
     """
 
     path_component: str
     target_component: str | None = None
     generated_component: str | None = None
+    parameters: FrozenDict[str, str] = FrozenDict()
 
     def __post_init__(self):
         if self.target_component is not None or self.path_component == "":
@@ -131,7 +133,12 @@ class AddressInput:
                 return os.path.join(subproject, spec_path)
             return os.path.normpath(subproject)
 
-        path_component, target_component, generated_component = native_engine.address_parse(spec)
+        (
+            path_component,
+            target_component,
+            parameters,
+            generated_component,
+        ) = native_engine.address_parse(spec)
 
         normalized_relative_to = None
         if relative_to:
@@ -145,7 +152,9 @@ class AddressInput:
 
         path_component = prefix_subproject(strip_prefix(path_component, "//"))
 
-        return cls(path_component, target_component, generated_component)
+        return cls(
+            path_component, target_component, generated_component, FrozenDict(sorted(parameters))
+        )
 
     def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
@@ -218,6 +227,7 @@ class Address(EngineAwareParameter):
         spec_path: str,
         *,
         target_name: str | None = None,
+        parameters: Mapping[str, str] | None = None,
         generated_name: str | None = None,
         relative_file_path: str | None = None,
     ) -> None:
@@ -226,6 +236,8 @@ class Address(EngineAwareParameter):
           for the target. If the target is generated, this is the path to the generator target.
         :param target_name: The name of the target. For generated targets, this is the name of
             its target generator. If the `name` is left off (i.e. the default), set to `None`.
+        :param parameters: A series of key-value pairs which are incorporated into the identity of
+            the Address.
         :param generated_name: The name of what is generated. You can use a file path if the
             generated target represents an entity from the file system, such as `a/b/c` or
             `subdir/f.ext`.
@@ -234,6 +246,7 @@ class Address(EngineAwareParameter):
           them, this will always be relative.
         """
         self.spec_path = spec_path
+        self.parameters = FrozenDict(parameters) if parameters else FrozenDict()
         self.generated_name = generated_name
         self._relative_file_path = relative_file_path
         if generated_name:
@@ -325,6 +338,12 @@ class Address(EngineAwareParameter):
                 else f"{parent_prefix}{self.target_name}"
             )
         target_sep = ":" if target else ""
+        if self.parameters:
+            params_sep = "@"
+            params = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+        else:
+            params_sep = ""
+            params = ""
         if self.generated_name is None:
             generated_sep = ""
             generated = ""
@@ -332,17 +351,21 @@ class Address(EngineAwareParameter):
             generated_sep = "#"
             generated = self.generated_name
 
-        return f"{prefix}{path}{target_sep}{target}{generated_sep}{generated}"
+        return f"{prefix}{path}{target_sep}{target}{params_sep}{params}{generated_sep}{generated}"
 
     @property
     def path_safe_spec(self) -> str:
         """
         :API: public
         """
+
+        def sanitize(s: str) -> str:
+            return s.replace(os.path.sep, ".")
+
         if self._relative_file_path:
             parent_count = self._relative_file_path.count(os.path.sep)
             parent_prefix = "@" * parent_count if parent_count else "."
-            path = f".{self._relative_file_path.replace(os.path.sep, '.')}"
+            path = f".{sanitize(self._relative_file_path)}"
         else:
             parent_prefix = "."
             path = ""
@@ -350,11 +373,16 @@ class Address(EngineAwareParameter):
             target = f"{parent_prefix}{self._target_name}" if self._target_name else ""
         else:
             target = f"{parent_prefix}{self.target_name}"
-        generated = (
-            f"@{self.generated_name.replace(os.path.sep, '.')}" if self.generated_name else ""
-        )
-        prefix = self.spec_path.replace(os.path.sep, ".")
-        return f"{prefix}{path}{target}{generated}"
+        if self.parameters:
+            key_value_strs = ",".join(
+                f"{sanitize(k)}={sanitize(v)}" for k, v in self.parameters.items()
+            )
+            params = f"@@{key_value_strs}"
+        else:
+            params = ""
+        generated = f"@{sanitize(self.generated_name)}" if self.generated_name else ""
+        prefix = sanitize(self.spec_path)
+        return f"{prefix}{path}{target}{params}{generated}"
 
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated, convert it to its generator target.
@@ -362,7 +390,9 @@ class Address(EngineAwareParameter):
         Otherwise, return itself unmodified.
         """
         if self.is_generated_target:
-            return self.__class__(self.spec_path, target_name=self._target_name)
+            return self.__class__(
+                self.spec_path, target_name=self._target_name, parameters=self.parameters
+            )
         return self
 
     def maybe_convert_to_generated_target(self) -> Address:
@@ -375,15 +405,19 @@ class Address(EngineAwareParameter):
             return self.__class__(
                 self.spec_path,
                 target_name=self._target_name,
+                parameters=self.parameters,
                 generated_name=self._relative_file_path,
             )
         return self
 
     def create_generated(self, generated_name: str) -> Address:
         if self.is_generated_target:
-            raise AssertionError("Cannot call ")
+            raise AssertionError("Cannot call `create_generated` on `{self}`.")
         return self.__class__(
-            self.spec_path, target_name=self._target_name, generated_name=generated_name
+            self.spec_path,
+            target_name=self._target_name,
+            parameters=self.parameters,
+            generated_name=generated_name,
         )
 
     def __eq__(self, other):
@@ -392,6 +426,7 @@ class Address(EngineAwareParameter):
         return (
             self.spec_path == other.spec_path
             and self._target_name == other._target_name
+            and self.parameters == other.parameters
             and self.generated_name == other.generated_name
             and self._relative_file_path == other._relative_file_path
         )
@@ -412,11 +447,13 @@ class Address(EngineAwareParameter):
             self.spec_path,
             self._relative_file_path or "",
             self._target_name or "",
+            self.parameters,
             self.generated_name or "",
         ) < (
             other.spec_path,
             other._relative_file_path or "",
             other._target_name or "",
+            self.parameters,
             other.generated_name or "",
         )
 
