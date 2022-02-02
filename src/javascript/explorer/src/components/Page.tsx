@@ -31,7 +31,7 @@ export default React.forwardRef(({ children, title = '', ...other }: Props, ref)
     <Toolbar /> {/* Empty toolbar for padding, so page content doesn't "hide" beneath the nav bar. */}
     <Container sx={{ mt: 4, mb: 4 }} maxWidth={false}>
       <Helmet>
-        <title>Explorer | {title}</title>
+        <title>{title} | Explorer</title>
       </Helmet>
       {children}
       <Copyright sx={{ pt: 4 }} />
