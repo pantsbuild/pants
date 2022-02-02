@@ -17,6 +17,7 @@ packaging==21.3
 pex==2.1.65
 psutil==5.9.0
 pytest>=6.2.4,<6.3  # This should be kept in sync with `pytest.py`.
+python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.25.1
 setproctitle==1.2.2

@@ -5,7 +5,7 @@
 
 These are always activated and cannot be disabled.
 """
-
+from pants.bsp.rules import rules as bsp_rules
 from pants.core.goals import (
     check,
     export,
@@ -60,6 +60,7 @@ def rules():
         *run.rules(),
         *tailor.rules(),
         *test.rules(),
+        *bsp_rules(),
         # util_rules
         *anonymous_telemetry.rules(),
         *archive.rules(),

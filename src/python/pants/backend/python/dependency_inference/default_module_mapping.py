@@ -79,6 +79,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-dotenv": ("dotenv",),
     "python-hcl2": ("hcl2",),
     "python-jose": ("jose",),
+    "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
     "python-pptx": ("pptx",),
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs", "pymongo"),
