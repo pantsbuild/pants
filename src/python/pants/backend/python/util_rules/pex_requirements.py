@@ -136,9 +136,9 @@ def maybe_validate_metadata(
         user_requirements=user_requirements,
     )
     msg_iter = (
-        _invalid_tool_lockfile_error(**error_msg_kwargs)
+        _invalid_tool_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
         if isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
-        else _invalid_user_lockfile_error(**error_msg_kwargs)
+        else _invalid_user_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
     )
     msg = "".join(msg_iter).strip()
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:

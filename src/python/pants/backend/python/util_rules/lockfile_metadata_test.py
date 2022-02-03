@@ -33,7 +33,7 @@ def test_metadata_header_round_trip() -> None:
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock"
     )
-    output_metadata = PythonLockfileMetadata.from_lockfile(serialized_lockfile)
+    output_metadata = PythonLockfileMetadata.from_lockfile("a", serialized_lockfile)
     assert input_metadata == output_metadata
 
 
