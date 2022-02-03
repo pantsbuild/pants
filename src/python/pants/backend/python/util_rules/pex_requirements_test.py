@@ -20,7 +20,8 @@ from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 METADATA = PythonLockfileMetadataV2(
-    InterpreterConstraints(["==3.8.*"]), {PipRequirement.parse("ansicolors")}
+    InterpreterConstraints(["==3.8.*"]),
+    {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
 )
 
 
@@ -104,7 +105,7 @@ def test_validate_tool_lockfiles(
         else METADATA.valid_for_interpreter_constraints
     )
     requirements = create_tool_lock(
-        ["bad-req" if invalid_reqs else "ansicolors"],
+        ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements],
         default_lock=is_default_lock,
         uses_source_plugins=uses_source_plugins,
         uses_project_interpreter_constraints=uses_project_ic,
@@ -123,6 +124,11 @@ def test_validate_tool_lockfiles(
     contains("You are using the lockfile at lock.txt", if_=not is_default_lock)
 
     contains("You have set different requirements", if_=invalid_reqs)
+    contains("In the input requirements, but not in the lockfile: ['bad-req']", if_=invalid_reqs)
+    contains(
+        "In the lockfile, but not in the input requirements: ['ansicolors', 'requests']",
+        if_=invalid_reqs,
+    )
     contains(".source_plugins`, and", if_=invalid_reqs and uses_source_plugins)
 
     contains("You have set interpreter constraints", if_=invalid_constraints)

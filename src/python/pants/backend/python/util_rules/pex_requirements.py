@@ -14,6 +14,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
     PythonLockfileMetadata,
+    PythonLockfileMetadataV2,
 )
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError, LockfileMetadataValidation
 from pants.engine.fs import FileContent
@@ -108,20 +109,21 @@ class PexRequirements:
 def maybe_validate_metadata(
     parse_metadata: Callable[[], PythonLockfileMetadata],
     interpreter_constraints: InterpreterConstraints,
-    requirements: (Lockfile | LockfileContent),
+    lockfile: Lockfile | LockfileContent,
     python_setup: PythonSetup,
 ) -> None:
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
         return
 
+    # TODO(#12314): Improve the exception if invalid strings
+    user_requirements = {PipRequirement.parse(i) for i in lockfile.req_strings}
     metadata = parse_metadata()
     validation = metadata.is_valid_for(
-        is_tool=isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)),
-        expected_invalidation_digest=requirements.lockfile_hex_digest,
+        is_tool=isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile)),
+        expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_universe,
-        # TODO(#12314): Improve the exception if invalid strings
-        user_requirements={PipRequirement.parse(i) for i in requirements.req_strings},
+        user_requirements=user_requirements,
     )
     if validation:
         return
@@ -129,13 +131,14 @@ def maybe_validate_metadata(
     message = (
         "".join(
             _invalid_tool_lockfile_error(
+                metadata,
                 validation,
-                requirements,
-                actual_interpreter_constraints=interpreter_constraints,
-                lockfile_interpreter_constraints=metadata.valid_for_interpreter_constraints,
+                lockfile,
+                user_interpreter_constraints=interpreter_constraints,
+                user_requirements=user_requirements,
             )
         ).strip()
-        if isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile))
+        if isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
         else str(validation.failure_reasons)
     )
 
@@ -145,18 +148,19 @@ def maybe_validate_metadata(
 
 
 def _invalid_tool_lockfile_error(
+    metadata: PythonLockfileMetadata,
     validation: LockfileMetadataValidation,
-    requirements: ToolCustomLockfile | ToolDefaultLockfile,
+    lockfile: ToolCustomLockfile | ToolDefaultLockfile,
     *,
-    actual_interpreter_constraints: InterpreterConstraints,
-    lockfile_interpreter_constraints: InterpreterConstraints,
+    user_requirements: set[PipRequirement],
+    user_interpreter_constraints: InterpreterConstraints,
 ) -> Iterator[str]:
-    tool_name = requirements.resolve_name
+    tool_name = lockfile.resolve_name
 
     yield "You are using "
     yield "the `<default>` lockfile provided by Pants " if isinstance(
-        requirements, ToolDefaultLockfile
-    ) else f"the lockfile at {requirements.file_path} "
+        lockfile, ToolDefaultLockfile
+    ) else f"the lockfile at {lockfile.file_path} "
     yield (
         f"to install the tool `{tool_name}`, but it is not compatible with your "
         "configuration: "
@@ -171,28 +175,41 @@ def _invalid_tool_lockfile_error(
         )
         for i in validation.failure_reasons
     ):
-        # TODO(12314): Add message showing _which_ requirements diverged.
         yield (
             "- You have set different requirements than those used to generate the lockfile. "
-            f"You can fix this by not setting `[{tool_name}].version`, "
+            f"You can fix this by updating `[{tool_name}].version`"
         )
-        if requirements.uses_source_plugins:
-            yield f"`[{tool_name}].source_plugins`, "
-        yield f"and `[{tool_name}].extra_requirements`, or by using a new custom lockfile.\n"
+        if lockfile.uses_source_plugins:
+            yield f", `[{tool_name}].source_plugins`,"
+        yield f" and/or `[{tool_name}].extra_requirements`, or by using a new custom lockfile.\n"
+        if isinstance(metadata, PythonLockfileMetadataV2):
+            not_in_user_reqs = metadata.requirements - user_requirements
+            not_in_lock = user_requirements - metadata.requirements
+            if not_in_lock:
+                yield (
+                    "In the input requirements, but not in the lockfile: "
+                    f"{sorted(str(r) for r in not_in_lock)}\n"
+                )
+            if not_in_user_reqs:
+                yield (
+                    "In the lockfile, but not in the input requirements: "
+                    f"{sorted(str(r) for r in not_in_user_reqs)}\n"
+                )
+            yield "\n"
 
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
         yield (
-            f"- You have set interpreter constraints (`{actual_interpreter_constraints}`) that "
+            f"- You have set interpreter constraints (`{user_interpreter_constraints}`) that "
             "are not compatible with those used to generate the lockfile "
-            f"(`{lockfile_interpreter_constraints}`). "
+            f"(`{metadata.valid_for_interpreter_constraints}`). "
         )
         yield (
             f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
             "or by using a new custom lockfile. "
-        ) if not requirements.uses_project_interpreter_constraints else (
+        ) if not lockfile.uses_project_interpreter_constraints else (
             f"`{tool_name}` determines its interpreter constraints based on your code's own "
             "constraints. To fix this error, you can either change your code's constraints "
-            f"(see {doc_url('python-interpreter-compatibility')}) or generat a new "
+            f"(see {doc_url('python-interpreter-compatibility')}) or generate a new "
             "custom lockfile. "
         )
         yield "\n"
@@ -201,7 +218,7 @@ def _invalid_tool_lockfile_error(
     yield (
         "To regenerate your lockfile based on your current configuration, run "
         f"`./pants generate-lockfiles --resolve={tool_name}`. "
-    ) if isinstance(requirements, ToolCustomLockfile) else (
+    ) if isinstance(lockfile, ToolCustomLockfile) else (
         "To generate a custom lockfile based on your current configuration, set "
         f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
         f"`./pants generate-lockfiles --resolve={tool_name}`. "
