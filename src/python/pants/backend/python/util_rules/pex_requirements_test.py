@@ -10,6 +10,7 @@ from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, Pytho
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV2
 from pants.backend.python.util_rules.pex_requirements import (
+    Lockfile,
     ToolCustomLockfile,
     ToolDefaultLockfile,
     maybe_validate_metadata,
@@ -147,3 +148,48 @@ def test_validate_tool_lockfiles(
     contains(
         "To regenerate your lockfile based on your current configuration", if_=not is_default_lock
     )
+
+
+@pytest.mark.parametrize(
+    "invalid_reqs,invalid_constraints",
+    [
+        (invalid_reqs, invalid_constraints)
+        for invalid_reqs in (True, False)
+        for invalid_constraints in (True, False)
+        if (invalid_reqs or invalid_constraints)
+    ],
+)
+def test_validate_user_lockfiles(
+    invalid_reqs: bool,
+    invalid_constraints: bool,
+    caplog,
+) -> None:
+    runtime_interpreter_constraints = (
+        InterpreterConstraints(["==2.7.*"])
+        if invalid_constraints
+        else METADATA.valid_for_interpreter_constraints
+    )
+    lockfile = Lockfile(
+        file_path="lock.txt",
+        file_path_description_of_origin="foo",
+        resolve_name="a",
+        req_strings=FrozenOrderedSet(
+            ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
+        ),
+    )
+    maybe_validate_metadata(
+        lambda: METADATA,
+        runtime_interpreter_constraints,
+        lockfile,
+        create_python_setup(InvalidLockfileBehavior.warn),
+    )
+
+    def contains(msg: str, if_: bool = True) -> None:
+        assert (msg in caplog.text) is if_
+
+    contains("You are using the lockfile at lock.txt to install the resolve `a`")
+    contains(
+        "The targets use requirements that are not in the lockfile: ['bad-req']", if_=invalid_reqs
+    )
+    contains("The targets use interpreter constraints", if_=invalid_constraints)
+    contains("./pants generate-lockfiles --resolve=a`")
