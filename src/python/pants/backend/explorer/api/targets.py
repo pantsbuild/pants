@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict
-from typing import List, Optional
+from typing import Iterable, Iterator, List, Optional
 
 import strawberry
 from strawberry.types import Info
@@ -56,17 +57,50 @@ class Target:
         return cls(address=address, target_type=target_type, fields=fields)
 
 
+@strawberry.input
+class TargetTypesQuery:
+    alias: Optional[str] = None
+    limit: Optional[int] = None
+
+    @staticmethod
+    def filter(
+        query: TargetTypesQuery | None, target_types: Iterable[TargetType]
+    ) -> Iterator[TargetType]:
+        if not query or (query.alias is None and query.limit is None):
+            yield from target_types
+            return
+
+        alias_pattern = query.alias and re.compile(query.alias)
+        count = 0
+        for info in target_types:
+            if alias_pattern and not re.match(alias_pattern, info.alias):
+                continue
+            yield info
+            count += 1
+            if query.limit and count >= query.limit:
+                return
+
+
 @strawberry.type
 class QueryTargetsMixin:
     """Get targets related info."""
 
     @strawberry.field
-    def target_types(self, info: Info) -> List[TargetType]:
+    def target_types(
+        self, info: Info, query: Optional[TargetTypesQuery] = None
+    ) -> List[TargetType]:
         """Get all registered target types that may be used in BUILD files."""
-        return [
-            TargetType.from_help(info)
-            for info in RequestState.from_info(info).all_help_info.name_to_target_type_info.values()
-        ]
+        return list(
+            TargetTypesQuery.filter(
+                query,
+                (
+                    TargetType.from_help(info)
+                    for info in RequestState.from_info(
+                        info
+                    ).all_help_info.name_to_target_type_info.values()
+                ),
+            )
+        )
 
     @strawberry.field
     async def targets(self, info: Info) -> List[Target]:
