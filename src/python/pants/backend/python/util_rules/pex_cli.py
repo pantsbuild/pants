@@ -34,10 +34,13 @@ from pants.util.meta import classproperty, frozen_after_init
 from pants.util.strutil import create_path_env_var
 
 
-class PexBinary(TemplatedExternalTool):
-    options_scope = "download-pex-bin"
+class PexCli(TemplatedExternalTool):
+    options_scope = "pex-cli"
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
+
+    deprecated_options_scope = "download-pex-bin"
+    deprecated_options_scope_removal_version = "2.11.0.dev0"
 
     default_version = "v2.1.65"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
@@ -114,9 +117,9 @@ class PexPEX(DownloadedExternalTool):
 
 
 @rule
-async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
+async def download_pex_pex(pex_cli: PexCli) -> PexPEX:
     pex_pex = await Get(
-        DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(Platform.current)
     )
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
@@ -124,7 +127,7 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
-    pex_binary: PexPEX,
+    pex_pex: PexPEX,
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
@@ -148,7 +151,7 @@ async def setup_pex_cli_process(
         )
         cert_args = ["--cert", chrooted_ca_certs_path]
 
-    digests_to_merge = [pex_binary.digest]
+    digests_to_merge = [pex_pex.digest]
     digests_to_merge.extend(await MultiGet(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
@@ -189,7 +192,7 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_binary.exe, *args, python=request.python)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
