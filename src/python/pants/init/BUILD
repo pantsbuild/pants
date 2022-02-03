@@ -29,6 +29,7 @@ target(
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
+        "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
