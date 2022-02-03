@@ -50,7 +50,7 @@ class PythonLockfileMetadata(LockfileMetadata):
 
     @classmethod
     def from_lockfile(
-        cls, lockfile: bytes, lockfile_path: str | None = None, resolve_name: str | None = None
+        cls, resolve_name: str, lockfile: bytes, lockfile_path: str | None = None
     ) -> PythonLockfileMetadata:
         return cast(
             PythonLockfileMetadata,
