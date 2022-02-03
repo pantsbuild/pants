@@ -113,7 +113,7 @@ dependencies = [
 name = "async_latch"
 version = "0.0.1"
 dependencies = [
- "parking_lot",
+ "parking_lot 0.12.0",
  "tokio",
 ]
 
@@ -200,7 +200,7 @@ dependencies = [
  "hashing",
  "libc",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "protobuf",
  "protos",
  "store",
@@ -645,7 +645,7 @@ dependencies = [
  "mock",
  "nailgun",
  "num_enum",
- "parking_lot",
+ "parking_lot 0.12.0",
  "petgraph 0.5.1",
  "process_execution",
  "protos",
@@ -786,7 +786,7 @@ dependencies = [
  "ignore",
  "lazy_static",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "rlimit",
  "serde",
  "task_executor",
@@ -806,7 +806,7 @@ dependencies = [
  "futures",
  "grpc_util",
  "hashing",
- "parking_lot",
+ "parking_lot 0.12.0",
  "prost",
  "protos",
  "rand 0.8.2",
@@ -1039,7 +1039,7 @@ dependencies = [
  "fnv",
  "futures",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "petgraph 0.5.1",
  "rand 0.8.2",
  "task_executor",
@@ -1057,7 +1057,7 @@ dependencies = [
  "http",
  "hyper",
  "itertools",
- "parking_lot",
+ "parking_lot 0.11.2",
  "prost",
  "prost-build",
  "prost-types",
@@ -1487,9 +1487,9 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "712a4d093c9976e24e7dbca41db895dabcbac38eb5f4045393d17a95bdfb1109"
+checksum = "88943dd7ef4a2e5a4bfa2753aaab3013e34ce2533d1996fb18ef591e315e2b3b"
 dependencies = [
  "scopeguard",
 ]
@@ -1514,7 +1514,7 @@ dependencies = [
  "lazy_static",
  "log",
  "num_enum",
- "parking_lot",
+ "parking_lot 0.12.0",
  "regex",
  "stdio",
  "tokio",
@@ -1665,7 +1665,7 @@ dependencies = [
  "hashing",
  "hyper",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "prost",
  "prost-types",
  "protos",
@@ -1956,7 +1956,17 @@ checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
 dependencies = [
  "instant",
  "lock_api",
- "parking_lot_core",
+ "parking_lot_core 0.8.5",
+]
+
+[[package]]
+name = "parking_lot"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
+dependencies = [
+ "lock_api",
+ "parking_lot_core 0.9.0",
 ]
 
 [[package]]
@@ -1971,6 +1981,19 @@ dependencies = [
  "redox_syscall 0.2.10",
  "smallvec 1.7.0",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2f4f894f3865f6c0e02810fc597300f34dc2510f66400da262d8ae10e75767d"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "redox_syscall 0.2.10",
+ "smallvec 1.7.0",
+ "windows-sys",
 ]
 
 [[package]]
@@ -2219,7 +2242,7 @@ dependencies = [
  "mock",
  "nails",
  "nix",
- "parking_lot",
+ "parking_lot 0.12.0",
  "prost",
  "prost-types",
  "protos",
@@ -2278,7 +2301,7 @@ dependencies = [
  "crosstermion",
  "dashmap",
  "humantime 2.1.0",
- "parking_lot",
+ "parking_lot 0.11.2",
  "unicode-width",
  "vte",
 ]
@@ -2367,7 +2390,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "indoc",
  "libc",
- "parking_lot",
+ "parking_lot 0.11.2",
  "paste",
  "pyo3-build-config",
  "pyo3-macros",
@@ -2923,7 +2946,7 @@ dependencies = [
  "hashing",
  "lmdb-rkv",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "task_executor",
  "tempfile",
  "tokio",
@@ -3016,7 +3039,7 @@ name = "stdio"
 version = "0.0.1"
 dependencies = [
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "tokio",
 ]
 
@@ -3045,7 +3068,7 @@ dependencies = [
  "memmap",
  "mock",
  "num_cpus",
- "parking_lot",
+ "parking_lot 0.12.0",
  "prost",
  "prost-types",
  "protos",
@@ -3357,7 +3380,7 @@ dependencies = [
  "mio 0.7.13",
  "num_cpus",
  "once_cell",
- "parking_lot",
+ "parking_lot 0.11.2",
  "pin-project-lite",
  "signal-hook-registry",
  "tokio-macros",
@@ -3589,7 +3612,7 @@ dependencies = [
  "indexmap",
  "indicatif",
  "logging",
- "parking_lot",
+ "parking_lot 0.12.0",
  "prodash",
  "stdio",
  "task_executor",
@@ -3840,7 +3863,7 @@ dependencies = [
  "hashing",
  "log",
  "notify",
- "parking_lot",
+ "parking_lot 0.12.0",
  "task_executor",
  "tempfile",
  "testutil",
@@ -3940,6 +3963,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
+name = "windows-sys"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ceb069ac8b2117d36924190469735767f0990833935ab430155e71a44bafe148"
+dependencies = [
+ "windows_aarch64_msvc",
+ "windows_i686_gnu",
+ "windows_i686_msvc",
+ "windows_x86_64_gnu",
+ "windows_x86_64_msvc",
+]
+
+[[package]]
+name = "windows_aarch64_msvc"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d027175d00b01e0cbeb97d6ab6ebe03b12330a35786cbaca5252b1c4bf5d9b"
+
+[[package]]
+name = "windows_i686_gnu"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8793f59f7b8e8b01eda1a652b2697d87b93097198ae85f823b969ca5b89bba58"
+
+[[package]]
+name = "windows_i686_msvc"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8602f6c418b67024be2996c512f5f995de3ba417f4c75af68401ab8756796ae4"
+
+[[package]]
+name = "windows_x86_64_gnu"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3d615f419543e0bd7d2b3323af0d86ff19cbc4f816e6453f36a2c2ce889c354"
+
+[[package]]
+name = "windows_x86_64_msvc"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d95421d9ed3672c280884da53201a5c46b7b2765ca6faf34b0d71cf34a3561"
+
+[[package]]
 name = "winreg"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3957,7 +4023,7 @@ dependencies = [
  "hashing",
  "hdrhistogram",
  "log",
- "parking_lot",
+ "parking_lot 0.12.0",
  "petgraph 0.5.1",
  "rand 0.8.2",
  "strum",
