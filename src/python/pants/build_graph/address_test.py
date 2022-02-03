@@ -5,7 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    AddressParseException,
+    InvalidSpecPath,
+    InvalidTargetName,
+)
 
 
 def test_address_input_parse_spec() -> None:
@@ -91,14 +97,25 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "spec,expected",
+    [
+        ("a:", "non-empty target name"),
+        ("//:", "non-empty target name"),
+        ("//:@t", "non-empty target name"),
+    ],
+)
+def test_address_input_parse(spec: str, expected: str) -> None:
+    with pytest.raises(AddressParseException) as e:
+        AddressInput.parse(spec)
+    assert expected in str(e.value)
+
+
+@pytest.mark.parametrize(
     "spec",
     [
         "",
-        "a:",
         "a::",
         "//",
-        "//:",
-        "//:@t",
         "//:!t",
         "//:?",
         "//:=",

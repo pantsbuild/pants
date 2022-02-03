@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "address"
+version = "0.0.1"
+dependencies = [
+ "peg",
+]
+
+[[package]]
 name = "adler"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -619,6 +626,7 @@ dependencies = [
 name = "engine"
 version = "0.0.1"
 dependencies = [
+ "address",
  "async-oncecell",
  "async-trait",
  "async_latch",

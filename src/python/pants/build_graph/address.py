@@ -9,6 +9,10 @@ from pathlib import PurePath
 from typing import Any, Sequence
 
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import (  # noqa: F401
+    AddressParseException as AddressParseException,
+)
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -127,22 +131,7 @@ class AddressInput:
                 return os.path.join(subproject, spec_path)
             return os.path.normpath(subproject)
 
-        spec_parts = spec.split(":", maxsplit=1)
-        path_component = spec_parts[0]
-        if len(spec_parts) == 1:
-            target_component = None
-            generated_parts = path_component.split("#", maxsplit=1)
-            if len(generated_parts) == 1:
-                generated_component = None
-            else:
-                path_component, generated_component = generated_parts
-        else:
-            generated_parts = spec_parts[1].split("#", maxsplit=1)
-            if len(generated_parts) == 1:
-                target_component = generated_parts[0]
-                generated_component = None
-            else:
-                target_component, generated_component = generated_parts
+        path_component, target_component, generated_component = native_engine.address_parse(spec)
 
         normalized_relative_to = None
         if relative_to:
@@ -324,18 +313,26 @@ class Address(EngineAwareParameter):
         :API: public
         """
         prefix = "//" if not self.spec_path else ""
-        if self._relative_file_path is not None:
-            file_portion = f"{prefix}{self.filename}"
+        if self._relative_file_path is None:
+            path = self.spec_path
+            target = "" if self._target_name is None and self.generated_name else self.target_name
+        else:
+            path = self.filename
             parent_prefix = "../" * self._relative_file_path.count(os.path.sep)
-            return (
-                file_portion
+            target = (
+                ""
                 if self._target_name is None and not parent_prefix
-                else f"{file_portion}:{parent_prefix}{self.target_name}"
+                else f"{parent_prefix}{self.target_name}"
             )
-        if self.generated_name is not None:
-            target_portion = f":{self._target_name}" if self._target_name is not None else ""
-            return f"{prefix}{self.spec_path}{target_portion}#{self.generated_name}"
-        return f"{prefix}{self.spec_path}:{self.target_name}"
+        target_sep = ":" if target else ""
+        if self.generated_name is None:
+            generated_sep = ""
+            generated = ""
+        else:
+            generated_sep = "#"
+            generated = self.generated_name
+
+        return f"{prefix}{path}{target_sep}{target}{generated_sep}{generated}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -345,18 +342,19 @@ class Address(EngineAwareParameter):
         if self._relative_file_path:
             parent_count = self._relative_file_path.count(os.path.sep)
             parent_prefix = "@" * parent_count if parent_count else "."
-            file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
+            path = f".{self._relative_file_path.replace(os.path.sep, '.')}"
         else:
             parent_prefix = "."
-            file_portion = ""
+            path = ""
         if parent_prefix == ".":
-            target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
+            target = f"{parent_prefix}{self._target_name}" if self._target_name else ""
         else:
-            target_portion = f"{parent_prefix}{self.target_name}"
-        generated_portion = (
+            target = f"{parent_prefix}{self.target_name}"
+        generated = (
             f"@{self.generated_name.replace(os.path.sep, '.')}" if self.generated_name else ""
         )
-        return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}{generated_portion}"
+        prefix = self.spec_path.replace(os.path.sep, ".")
+        return f"{prefix}{path}{target}{generated}"
 
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated, convert it to its generator target.

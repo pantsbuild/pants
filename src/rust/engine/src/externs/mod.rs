@@ -20,6 +20,7 @@ use logging::PythonLogLevel;
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
+mod address;
 pub mod engine_aware;
 pub mod fs;
 mod interface;
