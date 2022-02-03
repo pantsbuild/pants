@@ -26,12 +26,6 @@ STRING_IMPORT_REGEX = re.compile(
     re.UNICODE,
 )
 
-def _consume_until(predicate, iterable):
-    """Returns the first element in iterable where predicate is True."""
-    for element in iterable:
-        if predicate(element):
-            return element
-
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -56,8 +50,11 @@ class AstVisitor(ast.NodeVisitor):
 
     def _is_pragma_ignored(self, line_index):
         """Return if the line at `line_index` (0-based) is pragma ignored."""
-        line = _consume_until(lambda line: not line.endswith("\\"), itertools.islice(self._contents_lines, line_index, None))
-        return "# pants: no-infer-dep" in line
+        line_iter = itertools.dropwhile(
+            lambda line: line.endswith("\\"),
+            itertools.islice(self._contents_lines, line_index, None),
+        )
+        return "# pants: no-infer-dep" in next(line_iter)
 
     def _visit_import_stmt(self, node, import_prefix):
         # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
@@ -68,7 +65,7 @@ class AstVisitor(ast.NodeVisitor):
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
         def find_token(string):
-            return _consume_until(lambda token: token[1] == string, token_iter)
+            return next(itertools.dropwhile(lambda token: token[1] != string, token_iter))
 
         find_token("import")
 
