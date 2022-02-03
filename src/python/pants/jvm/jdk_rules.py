@@ -93,7 +93,22 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         coursier_jdk_option = shlex.quote(f"--jvm={jvm.jdk}")
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
-    java_home_command = " ".join(("set +e;", *coursier.args(["java-home", coursier_jdk_option])))
+
+    def prefixed(arg: str) -> str:
+        if arg.startswith("__"):
+            return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{arg}"
+        else:
+            return arg
+
+    optionally_prefixed_coursier_args = [
+        prefixed(arg) for arg in coursier.args(["java-home", coursier_jdk_option])
+    ]
+    java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
+
+    env = {
+        "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
+        **coursier.env,
+    }
 
     java_version_result = await Get(
         FallibleProcessResult,
@@ -105,7 +120,7 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
             ),
             append_only_caches=coursier.append_only_caches,
             immutable_input_digests=coursier.immutable_input_digests,
-            env=coursier.env,
+            env=env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
             level=LogLevel.DEBUG,
@@ -135,7 +150,7 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         {version_comment}
         set -eu
 
-        /bin/ln -s "$({java_home_command})" "{JdkSetup.java_home}"
+        /bin/ln -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkSetup.java_home}"
         exec "$@"
         """
     )
@@ -232,7 +247,11 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
         **jdk_setup.immutable_input_digests,
         **request.extra_immutable_input_digests,
     }
-    env = {**jdk_setup.env, **request.extra_env}
+    env = {
+        "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
+        **jdk_setup.env,
+        **request.extra_env,
+    }
 
     use_nailgun = []
     if request.use_nailgun:

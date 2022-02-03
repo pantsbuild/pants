@@ -2,14 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import shlex
-import textwrap
 
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunFieldSet, RunRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import JvmProcess
@@ -22,7 +20,6 @@ logger = logging.getLogger(__name__)
 @rule(level=LogLevel.DEBUG)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
-    bash: BashBinary,
 ) -> RunRequest:
 
     main_class = field_set.main_class.value
@@ -36,7 +33,7 @@ async def create_deploy_jar_run_request(
     proc = await Get(
         Process,
         JvmProcess(
-            classpath_entries=[jar_path],
+            classpath_entries=[f"{{chroot}}/{jar_path}"],
             argv=(main_class,),
             input_digest=package.digest,
             description=f"Run {main_class}.main(String[])",
@@ -49,19 +46,23 @@ async def create_deploy_jar_run_request(
         for prefix, digest in proc.immutable_input_digests.items()
     )
 
-    bloop = textwrap.dedent(
-        f"""\
-    set -x
-    echo `dirname $0`
-    cd `dirname $0`
-    ls -r
-    {shlex.join(proc.argv)}
-    """
-    )
+    def prefixed(arg: str, needle: str = "__") -> str:
+        if arg.startswith(needle):
+            return f"{{chroot}}/{arg}"
+        else:
+            return arg
 
-    logger.warning("%s", bloop)
-    relapath = "pingle.sh"
-    relativizer = await Get(Digest, CreateDigest([FileContent(relapath, bloop.encode("utf-8"))]))
+    args = [prefixed(arg) for arg in proc.argv]
+
+    env = {
+        **proc.env,
+        "PANTS_INTERNAL_ABSOLUTE_PREFIX": "{chroot}/",
+    }
+
+    # absolutify coursier cache envvars
+    for key in env:
+        if key.startswith("COURSIER"):
+            env[key] = prefixed(env[key], ".cache")
 
     request_digest = await Get(
         Digest,
@@ -69,19 +70,14 @@ async def create_deploy_jar_run_request(
             [
                 proc.input_digest,
                 *support_digests,
-                relativizer,
             ]
         ),
     )
 
-    args = [bash.path, f"{{chroot}}/{relapath}"]
-    logger.warning("%s", f"{args=}")
-
     return RunRequest(
         digest=request_digest,
         args=args,
-        extra_env=proc.env,
-        append_only_caches=proc.append_only_caches,
+        extra_env=env,
     )
 
 

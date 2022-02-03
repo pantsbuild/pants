@@ -53,7 +53,6 @@ class RunRequest:
     # be substituted with the (absolute) chroot path.
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
-    append_only_caches: FrozenDict[str, str]
 
     def __init__(
         self,
@@ -61,12 +60,10 @@ class RunRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
-        append_only_caches: Mapping[str, str] = {},
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
-        self.append_only_caches = FrozenDict(append_only_caches)
 
 
 class RunSubsystem(GoalSubsystem):
