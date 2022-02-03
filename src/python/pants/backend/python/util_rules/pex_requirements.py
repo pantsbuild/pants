@@ -96,14 +96,9 @@ class PexRequirements:
         cls,
         fields: Iterable[PythonRequirementsField],
         constraints_strings: Iterable[str],
-        *,
-        additional_requirements: Iterable[str] = (),
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
-        return PexRequirements(
-            {*field_requirements, *additional_requirements},
-            constraints_strings=constraints_strings,
-        )
+        return PexRequirements(field_requirements, constraints_strings=constraints_strings)
 
     def __bool__(self) -> bool:
         return bool(self.req_strings)

@@ -62,7 +62,6 @@ class PexFromTargetsRequest:
     platforms: PexPlatforms
     additional_args: tuple[str, ...]
     additional_lockfile_args: tuple[str, ...]
-    additional_requirements: tuple[str, ...]
     include_source_files: bool
     include_requirements: bool
     include_local_dists: bool
@@ -84,7 +83,6 @@ class PexFromTargetsRequest:
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_lockfile_args: Iterable[str] = (),
-        additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
         include_requirements: bool = True,
         include_local_dists: bool = False,
@@ -114,8 +112,6 @@ class PexFromTargetsRequest:
             lockfile.pex. Many Pex args like `--emit-warnings` do not impact the lockfile, and
             setting them would reduce reuse with other call sites. Generally, these should only be
             flags that impact lockfile resolution like `--manylinux`.
-        :param additional_requirements: Additional requirements to install, in addition to any
-            requirements used by the transitive closure of the given addresses.
         :param include_source_files: Whether to include source files in the built Pex or not.
             Setting this to `False` and loading the source files by instead populating the chroot
             and setting the environment variable `PEX_EXTRA_SYS_PATH` will result in substantially
@@ -138,7 +134,6 @@ class PexFromTargetsRequest:
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
         self.additional_lockfile_args = tuple(additional_lockfile_args)
-        self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
         self.include_requirements = include_requirements
         self.include_local_dists = include_local_dists
@@ -340,7 +335,6 @@ class _RepositoryPexRequest:
     platforms: PexPlatforms
     internal_only: bool
     additional_lockfile_args: tuple[str, ...]
-    additional_requirements: tuple[str, ...]
 
     def __init__(
         self,
@@ -350,14 +344,12 @@ class _RepositoryPexRequest:
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_lockfile_args: tuple[str, ...] = (),
-        additional_requirements: tuple[str, ...] = (),
     ) -> None:
         self.addresses = Addresses(addresses)
         self.internal_only = internal_only
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.platforms = platforms
         self.additional_lockfile_args = additional_lockfile_args
-        self.additional_requirements = additional_requirements
 
     def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
         return InterpreterConstraintsRequest(
@@ -431,7 +423,6 @@ async def pex_from_targets(
                 for tgt in transitive_targets.closure
                 if tgt.has_field(PythonRequirementsField)
             ),
-            additional_requirements=request.additional_requirements,
             constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
         )
     else:
@@ -446,7 +437,6 @@ async def pex_from_targets(
                 platforms=request.platforms,
                 internal_only=request.internal_only,
                 additional_lockfile_args=request.additional_lockfile_args,
-                additional_requirements=request.additional_requirements,
             ),
         )
         requirements = dataclasses.replace(requirements, repository_pex=repository_pex.maybe_pex)
@@ -541,7 +531,6 @@ async def _setup_constraints_repository_pex(
             for tgt in transitive_targets.closure
             if tgt.has_field(PythonRequirementsField)
         ),
-        additional_requirements=request.additional_requirements,
         constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
     )
 
