@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from itertools import groupby
-from typing import Any, Callable, Iterable, Tuple, Type, Union, cast, get_type_hints
+from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -99,7 +99,9 @@ class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
     scope: The scope of the described options.
-    provider: Which backend or plugin that registered this scope.
+    provider: Which backend or plugin registered this scope.
+    deprecated_scope: A deprecated scope name for this scope. A scope that has a deprecated scope
+      will be represented by two objects - one of which will have scope==deprecated_scope.
     basic|advanced|deprecated: A list of OptionHelpInfo for the options in that group.
     """
 
@@ -107,9 +109,18 @@ class OptionScopeHelpInfo:
     description: str
     provider: str
     is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
+    deprecated_scope: Optional[str]
     basic: tuple[OptionHelpInfo, ...]
     advanced: tuple[OptionHelpInfo, ...]
     deprecated: tuple[OptionHelpInfo, ...]
+
+    def is_deprecated_scope(self):
+        """Returns True iff this scope is deprecated.
+
+        We may choose not to show deprecated scopes when enumerating scopes, but still want to show
+        help for individual deprecated scopes when explicitly requested.
+        """
+        return self.scope == self.deprecated_scope
 
     def collect_unscoped_flags(self) -> list[str]:
         flags: list[str] = []
@@ -253,6 +264,11 @@ class AllHelpInfo:
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     rule_output_type_to_rule_infos: LazyFrozenDict[str, tuple[RuleInfo, ...]]
 
+    def non_deprecated_option_scope_help_infos(self):
+        for oshi in self.scope_to_help_info.values():
+            if not oshi.is_deprecated_scope():
+                yield oshi
+
     def asdict(self) -> dict[str, Any]:
         return {
             field: {
@@ -308,6 +324,7 @@ class HelpInfoExtracter:
                     options.get_parser(scope_info.scope),
                     scope_info.is_goal,
                     provider,
+                    scope_info.deprecated_scope,
                 )
 
             return load
@@ -517,7 +534,12 @@ class HelpInfoExtracter:
         self._scope_prefix = scope.replace(".", "-")
 
     def get_option_scope_help_info(
-        self, description: str, parser: Parser, is_goal: bool, provider: str = ""
+        self,
+        description: str,
+        parser: Parser,
+        is_goal: bool,
+        provider: str = "",
+        deprecated_scope: Optional[str] = None,
     ) -> OptionScopeHelpInfo:
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 
@@ -540,6 +562,7 @@ class HelpInfoExtracter:
             description=description,
             provider=provider,
             is_goal=is_goal,
+            deprecated_scope=deprecated_scope,
             basic=tuple(basic_options),
             advanced=tuple(advanced_options),
             deprecated=tuple(deprecated_options),

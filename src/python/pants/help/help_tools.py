@@ -34,7 +34,7 @@ class ToolHelpInfo:
 
     @classmethod
     def iter(cls, all_help_info: AllHelpInfo) -> Generator[ToolHelpInfo, None, None]:
-        for oshi in all_help_info.scope_to_help_info.values():
+        for oshi in all_help_info.non_deprecated_option_scope_help_infos():
             tool_info = cls.from_option_scope_help_info(oshi)
             if tool_info:
                 yield tool_info
