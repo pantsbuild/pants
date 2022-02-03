@@ -123,10 +123,11 @@ def maybe_validate_metadata(
 
     metadata = parse_metadata()
     validation = metadata.is_valid_for(
-        requirements.lockfile_hex_digest,
-        interpreter_constraints,
-        python_setup.interpreter_universe,
-        req_strings,
+        is_tool=isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)),
+        expected_invalidation_digest=requirements.lockfile_hex_digest,
+        user_interpreter_constraints=interpreter_constraints,
+        interpreter_universe=python_setup.interpreter_universe,
+        user_requirements=req_strings,
     )
     if validation:
         return
