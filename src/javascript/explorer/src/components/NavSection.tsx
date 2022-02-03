@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import Collapse from '@mui/material/Collapse';
 import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 // ----------------------------------------------------------------------
 
@@ -22,9 +24,10 @@ export interface NavConfig {
 type NavItemProps = {
   active: (path: string) => boolean;
   item: NavConfig;
+  indent?: number;
 };
 
-function NavItem({ item, active }: NavItemProps) {
+function NavItem({ item, active, indent = 0 }: NavItemProps) {
   const isActive = active(item.path);
   const navigate = useNavigate();
   const { title, path, icon, info, children } = item;
@@ -37,14 +40,15 @@ function NavItem({ item, active }: NavItemProps) {
   if (children) {
     return (
       <>
-        <ListItem button onClick={handleOpen} selected={isActive}>
+        <ListItemButton onClick={handleOpen} selected={isActive} sx={indent ? { pl: indent * 4 } : undefined}>
           <ListItemIcon>{icon && icon}</ListItemIcon>
           <ListItemText primary={title} secondary={info} />
-        </ListItem>
+          {open ? <ExpandLess /> : <ExpandMore />}
+        </ListItemButton>
         <Collapse in={open} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
             {children.map((item) => {
-              return <NavItem key={item.title} item={item} active={active} />;
+              return <NavItem key={item.title} item={item} active={active} indent={indent + 1} />;
             })}
           </List>
         </Collapse>
@@ -53,10 +57,10 @@ function NavItem({ item, active }: NavItemProps) {
   }
 
   return (
-    <ListItem button selected={isActive} onClick={() => navigate(path)}>
+    <ListItemButton selected={isActive} onClick={() => navigate(path)} sx={indent ? { pl: indent * 4 } : undefined}>
       <ListItemIcon>{icon && icon}</ListItemIcon>
       <ListItemText primary={title} secondary={info}/>
-    </ListItem>
+    </ListItemButton>
   );
 }
 

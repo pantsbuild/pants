@@ -1,24 +1,24 @@
 import { Box, Grid, Typography } from '@mui/material';
 
 import Page from '../components/Page';
-import Targets from '../components/Targets';
+import TargetTypes from '../components/docs/Targets';
 
 // ----------------------------------------------------------------------
 
 export default function ExplorerTargets() {
   return (
-    <Page title="Targets">
+    <Page title="Targets Reference Docs">
       <Box sx={{ pb: 5 }}>
         <Typography variant="h4">
-          Explore targets defined in your <code>BUILD</code> files.
+          Explore targets documentation.
         </Typography>
         <Typography variant="subtitle1">
-          Use the search feature to refine the list of targets presented.
+          Much to learn you still have, my young padawan.
         </Typography>
       </Box>
       <Grid container spacing={3}>
         <Grid item xs={12}>
-          <Targets />
+          <TargetTypes />
         </Grid>
       </Grid>
     </Page>

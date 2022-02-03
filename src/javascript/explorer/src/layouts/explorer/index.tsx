@@ -7,7 +7,7 @@ import ExplorerSidebar from './ExplorerSidebar';
 
 // ----------------------------------------------------------------------
 
-const drawerWidth: number = 240;
+const drawerWidth: number = 300;
 
 export default function ExplorerLayout() {
   const [open, setOpen] = useState(false);
