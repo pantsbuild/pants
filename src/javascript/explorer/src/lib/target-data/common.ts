@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { request, gql } from "graphql-request";
-import { fields2query } from '../gql-utils';
+import { fields2query, query2args, Query } from '../gql-utils';
+
+
+export type QueryProps = {
+  query?: Query;
+  fields: string[];
+}
 
 
 export function createUseFunction<T>(queryType: string) {
-  function useData(fields: string[]): [(T|undefined)[], boolean, any, () => void] {
-    const query = gql`{ ${queryType} ${fields2query(fields)} }`;
+  function useData({ query, fields }: QueryProps): [(T|undefined)[], boolean, any, () => void] {
+    const q = gql`{ ${queryType}${query2args(query)} ${fields2query(fields)} }`;
     const [data, setData] = useState([]);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -19,7 +25,7 @@ export function createUseFunction<T>(queryType: string) {
 
       setShouldFetchData(false);
       setLoading(true);
-      request("/graphql", query).then(
+      request("/graphql", q).then(
         (result) => {
           setData(result[queryType]);
           setLoading(false);
@@ -31,7 +37,7 @@ export function createUseFunction<T>(queryType: string) {
           setLoading(false);
         }
       );
-    }, [loading, shouldFetchData, query]);
+    }, [loading, shouldFetchData, q]);
 
     return [data, loading, error, refetch];
   }

@@ -11,9 +11,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import AnnouncementIcon from '@mui/icons-material/Announcement';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 
+import ContextHelp from "../ContextHelp";
+import { TargetTypeDocs } from "../docs/Targets";
 import { TargetData, getTargetFieldValue } from "../../lib/target-data";
 import Address from "./Address";
 
@@ -87,9 +90,20 @@ export const Target = ({target, ...props}: TargetProps) => {
       <CardContent>
         <Stack direction="row" justifyContent="space-between">
           <Address tooltip>{target.address}</Address>
-          <Typography color="text.secondary">
-            {target.targetType}
-          </Typography>
+          <ContextHelp
+            maxWidth="lg"
+            title={(
+              <div>
+                <AnnouncementIcon color="primary" sx={{ mr: 2 }} />
+                <code>{target.targetType}</code> reference documenation
+              </div>
+            )}
+            help={<TargetTypeDocs alias={target.targetType} />}
+          >
+            <Typography color="text.secondary">
+              {target.targetType}
+            </Typography>
+          </ContextHelp>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ my: 1 }}>
           {tags && tags.map((tag, index) => (
