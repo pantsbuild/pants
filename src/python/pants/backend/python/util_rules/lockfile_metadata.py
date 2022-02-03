@@ -75,7 +75,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[PipRequirement] | None,
+        user_requirements: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -117,7 +117,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[PipRequirement] | None,  # User requirements are not used by V1
+        user_requirements: Iterable[PipRequirement],  # User requirements are not used by V1
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -186,12 +186,9 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         expected_invalidation_digest: str | None,  # Validation digests are not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[PipRequirement] | None,
+        user_requirements: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
-        failure_reasons: set[InvalidPythonLockfileReason] = set()
-
-        if user_requirements is None:
-            return LockfileMetadataValidation(failure_reasons)
+        failure_reasons = set()
 
         invalid_reqs = (
             self.requirements != set(user_requirements)

@@ -32,15 +32,15 @@ logger = logging.getLogger(__name__)
 class Lockfile:
     file_path: str
     file_path_description_of_origin: str
-    lockfile_hex_digest: str | None
-    req_strings: FrozenOrderedSet[str] | None
+    req_strings: FrozenOrderedSet[str]
+    lockfile_hex_digest: str | None = None
 
 
 @dataclass(frozen=True)
 class LockfileContent:
     file_content: FileContent
-    lockfile_hex_digest: str | None
-    req_strings: FrozenOrderedSet[str] | None
+    req_strings: FrozenOrderedSet[str]
+    lockfile_hex_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -113,21 +113,14 @@ def maybe_validate_metadata(
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
         return
 
-    # TODO(#12314): Improve this message: `Requirement.parse` raises `InvalidRequirement`, which
-    # doesn't have mypy stubs at the moment; it may be hard to catch this exception and typecheck.
-    req_strings = (
-        {PipRequirement.parse(i) for i in requirements.req_strings}
-        if requirements.req_strings is not None
-        else None
-    )
-
     metadata = parse_metadata()
     validation = metadata.is_valid_for(
         is_tool=isinstance(requirements, (ToolCustomLockfile, ToolDefaultLockfile)),
         expected_invalidation_digest=requirements.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_universe,
-        user_requirements=req_strings,
+        # TODO(#12314): Improve the exception if invalid strings
+        user_requirements={PipRequirement.parse(i) for i in requirements.req_strings},
     )
     if validation:
         return

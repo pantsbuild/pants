@@ -32,7 +32,6 @@ def create_tool_lock(
     uses_project_interpreter_constraints: bool = False,
 ) -> ToolDefaultLockfile | ToolCustomLockfile:
     common_kwargs = dict(
-        lockfile_hex_digest=None,
         req_strings=FrozenOrderedSet(req_strings),
         options_scope_name="my_tool",
         uses_source_plugins=uses_source_plugins,
