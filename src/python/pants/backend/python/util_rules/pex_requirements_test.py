@@ -33,7 +33,7 @@ def create_tool_lock(
 ) -> ToolDefaultLockfile | ToolCustomLockfile:
     common_kwargs = dict(
         req_strings=FrozenOrderedSet(req_strings),
-        options_scope_name="my_tool",
+        resolve_name="my_tool",
         uses_source_plugins=uses_source_plugins,
         uses_project_interpreter_constraints=uses_project_interpreter_constraints,
     )

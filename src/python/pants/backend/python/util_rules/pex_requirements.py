@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 class Lockfile:
     file_path: str
     file_path_description_of_origin: str
+    resolve_name: str
     req_strings: FrozenOrderedSet[str]
     lockfile_hex_digest: str | None = None
 
@@ -39,13 +40,13 @@ class Lockfile:
 @dataclass(frozen=True)
 class LockfileContent:
     file_content: FileContent
+    resolve_name: str
     req_strings: FrozenOrderedSet[str]
     lockfile_hex_digest: str | None = None
 
 
 @dataclass(frozen=True)
 class _ToolLockfileMixin:
-    options_scope_name: str
     uses_source_plugins: bool
     uses_project_interpreter_constraints: bool
 
@@ -150,7 +151,7 @@ def _invalid_tool_lockfile_error(
     actual_interpreter_constraints: InterpreterConstraints,
     lockfile_interpreter_constraints: InterpreterConstraints,
 ) -> Iterator[str]:
-    tool_name = requirements.options_scope_name
+    tool_name = requirements.resolve_name
 
     yield "You are using "
     yield "the `<default>` lockfile provided by Pants " if isinstance(

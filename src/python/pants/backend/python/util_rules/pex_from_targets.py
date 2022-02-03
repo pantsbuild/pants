@@ -517,6 +517,7 @@ async def get_repository_pex(
                 file_path_description_of_origin=(
                     f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
                 ),
+                resolve_name=chosen_resolve.name,
                 req_strings=request.requirements.req_strings,
             ),
             interpreter_constraints=interpreter_constraints,
