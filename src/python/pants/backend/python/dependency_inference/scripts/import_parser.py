@@ -26,6 +26,12 @@ STRING_IMPORT_REGEX = re.compile(
     re.UNICODE,
 )
 
+def _consume_until(predicate, iterable):
+    """Returns the first element in iterable where predicate is True."""
+    for element in iterable:
+        if predicate(element):
+            return element
+
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -48,8 +54,9 @@ class AstVisitor(ast.NodeVisitor):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
         imports.setdefault(name, lineno)
 
-    @staticmethod
-    def _is_pragma_ignored(line):
+    def _is_pragma_ignored(self, line_index):
+        """Return if the line at `line_index` (0-based) is pragma ignored."""
+        line = _consume_until(lambda line: not line.endswith("\\"), itertools.islice(self._contents_lines, line_index, None))
         return "# pants: no-infer-dep" in line
 
     def _visit_import_stmt(self, node, import_prefix):
@@ -60,26 +67,20 @@ class AstVisitor(ast.NodeVisitor):
         node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
-        def consume_until(string):
-            for token in token_iter:
-                if token[1] == string:
-                    return token
+        def find_token(string):
+            return _consume_until(lambda token: token[1] == string, token_iter)
 
-        consume_until("import")
+        find_token("import")
 
         # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
-            token = consume_until(alias.name.split(".")[-1])
+            token = find_token(alias.name.split(".")[-1])
+            lineno = token[3][0] + node.lineno - 1
 
-            # N.B. Keep consuming lines while they end in a line-continuation
-            #   (unfortunately `tokenize` doesn't capture this)
-            while token[4].endswith("\\"):
-                token = next(token_iter)
-
-            if not self._is_pragma_ignored(token[4]):
-                self.add_strong_import(import_prefix + alias.name, token[3][0] + node.lineno - 1)
+            if not self._is_pragma_ignored(lineno - 1):
+                self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
-                consume_until(alias.asname)
+                find_token(alias.asname)
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
@@ -139,7 +140,7 @@ class AstVisitor(ast.NodeVisitor):
 
             if name is not None:
                 lineno = node.args[0].lineno
-                if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
+                if not self._is_pragma_ignored(lineno - 1):
                     self.add_strong_import(name, lineno)
                 return
 
