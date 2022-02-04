@@ -4,6 +4,7 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunFieldSet, RunRequest
@@ -36,6 +37,7 @@ class __RuntimeJvm:
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
     runtime_jvm: __RuntimeJvm,
+    jdk_setup: JdkSetup,
 ) -> RunRequest:
 
     main_class = field_set.main_class.value
@@ -64,13 +66,14 @@ async def create_deploy_jar_run_request(
 
     support_digests += (runtime_jvm.digest,)
 
-    def prefixed(arg: str, needle: str = "__") -> str:
-        if arg.startswith(needle):
+    def prefixed(arg: str, prefixes: Iterable[str]) -> str:
+        if any(arg.startswith(prefix) for prefix in prefixes):
             return f"{{chroot}}/{arg}"
         else:
             return arg
 
-    args = [prefixed(arg) for arg in proc.argv]
+    prefixes = (jdk_setup.bin_dir, jdk_setup.jdk_preparation_script, jdk_setup.java_home)
+    args = [prefixed(arg, prefixes) for arg in proc.argv]
 
     env = {
         **proc.env,
@@ -80,7 +83,7 @@ async def create_deploy_jar_run_request(
     # absolutify coursier cache envvars
     for key in env:
         if key.startswith("COURSIER"):
-            env[key] = prefixed(env[key], ".cache")
+            env[key] = prefixed(env[key], (jdk_setup.coursier.cache_dir,))
 
     request_digest = await Get(
         Digest,
