@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
@@ -39,6 +40,11 @@ class CompileScalaSourceRequest(ClasspathEntryRequest):
     field_sets_consume_only = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
+@dataclass(frozen=True)
+class ScalaLibraryRequest:
+    version: str
+
+
 @rule(desc="Compile with scalac")
 async def compile_scala_source(
     scala: ScalaSubsystem,
@@ -67,6 +73,17 @@ async def compile_scala_source(
             output=None,
             exit_code=1,
         )
+
+    all_dependency_jars = [
+        filename
+        for dependency in direct_dependency_classpath_entries
+        for filename in dependency.filenames
+    ]
+    if not any(
+        filename.startswith("org.scala-lang_scala-library_") for filename in all_dependency_jars
+    ):
+        scala_library = await Get(ClasspathEntry, ScalaLibraryRequest(scala.version))
+        direct_dependency_classpath_entries += (scala_library,)
 
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
@@ -187,6 +204,26 @@ async def compile_scala_source(
         process_result,
         output,
     )
+
+
+@rule
+async def fetch_scala_library(request: ScalaLibraryRequest) -> ClasspathEntry:
+    tcp = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=request.version,
+                    ),
+                ]
+            ),
+        ),
+    )
+
+    return ClasspathEntry(tcp.digest, tcp.content.files)
 
 
 def rules():
