@@ -1,9 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pathlib import PurePath
 
-from pants.backend.codegen.thrift.apache.python import additional_fields, subsystem
-from pants.backend.codegen.thrift.apache.python.additional_fields import PythonSourceRootField
+from pants.backend.codegen.thrift.apache.python import subsystem
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
@@ -48,16 +46,9 @@ async def generate_python_from_thrift(
 
     # We must do some path manipulation on the output digest for it to look like normal sources,
     # including adding back a source root.
-    py_source_root = request.protocol_target.get(PythonSourceRootField).value
-    if py_source_root:
-        # Verify that the python source root specified by the target is in fact a source root.
-        source_root_request = SourceRootRequest(PurePath(py_source_root))
-    else:
-        # The target didn't specify a python source root, so use the thrift_source's source root.
-        source_root_request = SourceRootRequest.for_target(request.protocol_target)
-
-    source_root = await Get(SourceRoot, SourceRootRequest, source_root_request)
-
+    source_root = await Get(
+        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
+    )
     source_root_restored = (
         await Get(Snapshot, AddPrefix(result.snapshot.digest, source_root.path))
         if source_root.path != "."
@@ -81,7 +72,6 @@ async def inject_apache_thrift_java_dependencies(
 def rules():
     return (
         *collect_rules(),
-        *additional_fields.rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromThriftRequest),
         UnionRule(InjectDependenciesRequest, InjectApacheThriftPythonDependencies),
