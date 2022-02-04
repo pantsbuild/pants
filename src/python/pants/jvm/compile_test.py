@@ -216,16 +216,19 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
     rendered_classpath = rule_runner.request(
         RenderedClasspath, [Addresses([Address(spec_path="", target_name="main")])]
     )
-    assert rendered_classpath.content == {
-        ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
-            "org/pantsbuild/example/Main$.class",
-            "org/pantsbuild/example/Main.class",
-        },
-        "lib.C.java.javac.jar": {
-            "org/pantsbuild/example/lib/C.class",
-        },
+
+    assert rendered_classpath.content[".Example.scala.main.scalac.jar"] == {
+        "META-INF/MANIFEST.MF",
+        "org/pantsbuild/example/Main$.class",
+        "org/pantsbuild/example/Main.class",
     }
+    assert rendered_classpath.content["lib.C.java.javac.jar"] == {
+        "org/pantsbuild/example/lib/C.class",
+    }
+    assert any(
+        key.startswith("org.scala-lang_scala-library_") for key in rendered_classpath.content.keys()
+    )
+    assert len(rendered_classpath.content.keys()) == 3
 
 
 @maybe_skip_jdk_test
