@@ -1,25 +1,41 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import logging
+from dataclasses import dataclass
 
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunFieldSet, RunRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class __RuntimeJvm:
+    """Allows Coursier to download a JDK into a Digest, rather than an append-only cache for use
+    with `pants run`.
+
+    This is a hideous stop-gap, which will no longer be necessary once `InteractiveProcess` supports
+    append-only caches.
+    """
+
+    digest: Digest
+
+
 @rule(level=LogLevel.DEBUG)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
+    runtime_jvm: __RuntimeJvm,
 ) -> RunRequest:
 
     main_class = field_set.main_class.value
@@ -45,6 +61,8 @@ async def create_deploy_jar_run_request(
         Get(Digest, AddPrefix(digest, prefix))
         for prefix, digest in proc.immutable_input_digests.items()
     )
+
+    support_digests += (runtime_jvm.digest,)
 
     def prefixed(arg: str, needle: str = "__") -> str:
         if arg.startswith(needle):
@@ -79,6 +97,36 @@ async def create_deploy_jar_run_request(
         args=args,
         extra_env=env,
     )
+
+
+@rule
+async def ensure_jdk_for_pants_run(jdk_setup: JdkSetup) -> __RuntimeJvm:
+    # `tools.jar` is distributed with the JDK, so we can rely on it existing.
+    ensure_jvm_process = await Get(
+        Process,
+        JvmProcess(
+            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
+            argv=["com.sun.tools.javac.Main", "--version"],
+            input_digest=EMPTY_DIGEST,
+            description="Ensure download of JDK for `pants run` use",
+        ),
+    )
+
+    # Do not treat the coursier JDK digest an append-only cache, so that we can capture the
+    # downloaded JDK in a `Digest`
+    new_append_only_caches = {
+        "coursier_archive": ".cache/arc",
+        "coursier_jvm": ".cache/jvm",
+    }
+
+    ensure_jvm_process = dataclasses.replace(
+        ensure_jvm_process,
+        append_only_caches=FrozenDict(new_append_only_caches),
+        output_directories=(".cache/jdk",),
+    )
+    ensure_jvm = await Get(ProcessResult, Process, ensure_jvm_process)
+
+    return __RuntimeJvm(ensure_jvm.output_digest)
 
 
 def rules():
