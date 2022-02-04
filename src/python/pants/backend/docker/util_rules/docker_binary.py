@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -19,15 +20,37 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
+# The base class is decorated with `frozen_after_init`.
+@dataclass
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
+
+    extra_env: Mapping[str, str]
+
+    def __init__(
+        self, path: str, fingerprint: str | None = None, extra_env: Mapping[str, str] | None = None
+    ) -> None:
+        self.extra_env = {} if extra_env is None else extra_env
+        super().__init__(path, fingerprint)
+
+    def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
+        if not self.extra_env:
+            return env
+
+        res = {**self.extra_env, **env}
+
+        # Merge the PATH entries, in case they are present in both `env` and `self.extra_env`.
+        res["PATH"] = os.pathsep.join(
+            p for p in (m.get("PATH") for m in (self.extra_env, env)) if p
+        )
+        return res
 
     def build_image(
         self,
@@ -58,7 +81,7 @@ class DockerBinary(BinaryPath):
                 f"Building docker image {tags[0]}"
                 + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
             ),
-            env=env,
+            env=self._get_process_environment(env),
             input_digest=digest,
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
@@ -71,7 +94,7 @@ class DockerBinary(BinaryPath):
                 argv=(self.path, "push", tag),
                 cache_scope=ProcessCacheScope.PER_SESSION,
                 description=f"Pushing docker image {tag}",
-                env=env,
+                env=self._get_process_environment(env or {}),
             )
             for tag in tags
         )
@@ -88,7 +111,7 @@ class DockerBinary(BinaryPath):
             argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Running docker image {tag}",
-            env=env,
+            env=self._get_process_environment(env or {}),
         )
 
 
@@ -97,22 +120,43 @@ class DockerBinaryRequest:
     search_path: SearchPath = DockerBinary.DEFAULT_SEARCH_PATH
 
 
-@rule(desc="Finding the `docker` binary", level=LogLevel.DEBUG)
+@rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
 async def find_docker(
     docker_request: DockerBinaryRequest, docker_options: DockerOptions
 ) -> DockerBinary:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_path = docker_options.executable_search_path(env)
-    request = BinaryPathRequest(
-        binary_name="docker",
-        search_path=search_path or docker_request.search_path,
-        test=BinaryPathTest(args=["-v"]),
+    search_path = docker_options.executable_search_path(env) or docker_request.search_path
+    requests = [
+        BinaryPathRequest(
+            binary_name=tool,
+            search_path=search_path,
+            test=BinaryPathTest(args=["-v"]) if tool == "docker" else None,
+        )
+        for tool in {"docker", *docker_options.tools}
+    ]
+    binary_paths = await MultiGet(
+        Get(BinaryPaths, BinaryPathRequest, request) for request in requests
     )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(request, rationale="interact with the docker daemon")
-    return DockerBinary(first_path.path, first_path.fingerprint)
+
+    found_paths = []
+    for binary, request in zip(binary_paths, requests):
+        if binary.first_path:
+            found_paths.append(binary.first_path)
+        else:
+            raise BinaryNotFoundError.from_request(
+                request,
+                rationale="interact with the docker daemon",
+            )
+
+    return DockerBinary(
+        found_paths[0].path,
+        found_paths[0].fingerprint,
+        extra_env=(
+            {"PATH": os.pathsep.join({os.path.dirname(found.path) for found in found_paths[1:]})}
+            if len(found_paths) > 1
+            else None
+        ),
+    )
 
 
 @rule

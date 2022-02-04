@@ -165,6 +165,18 @@ class DockerOptions(Subsystem):
         metavar="<binary-paths>",
     )
 
+        register(
+            "--tools",
+            advanced=True,
+            type=list,
+            default=[],
+            help=(
+                "List any additional executable tools required for Docker to work. The paths to "
+                "these tools will be included in the PATH used in the execution sandbox, so that "
+                "they may be used by the Docker client."
+            ),
+        )
+
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._build_args)))
@@ -172,6 +184,10 @@ class DockerOptions(Subsystem):
     @property
     def env_vars(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._env_vars)))
+
+    @property
+    def tools(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.options.tools)))
 
     @memoized_method
     def registries(self) -> DockerRegistries:
