@@ -93,7 +93,17 @@ class SourceRootConfig(Subsystem):
     options_scope = "source"
     help = "Configuration for roots of source trees."
 
-    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
+    DEFAULT_ROOT_PATTERNS = [
+        "/",
+        "src",
+        "src/python",
+        "src/py",
+        "src/thrift",
+        "src/protobuf",
+        "src/protos",
+        "src/scala",
+        "src/java",
+    ]
 
     @classmethod
     def register_options(cls, register):
