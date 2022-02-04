@@ -137,10 +137,10 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
     if not all_thrift_binary_paths.paths:
         raise BinaryNotFoundError(
             "Cannot find any `thrift` binaries using the option "
-            f"`[thrift].thrift_search_paths`: {list(search_paths)}\n\n"
+            f"`[apache-thrift].thrift_search_paths`: {list(search_paths)}\n\n"
             "To fix, please install Apache Thrift (https://thrift.apache.org/) with the version "
-            f"{apache_thrift.expected_version} (set by `[thrift].expected_version`) and ensure "
-            "that it is discoverable via `[thrift].thrift_search_paths`."
+            f"{apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure "
+            "that it is discoverable via `[apache-thrift].thrift_search_paths`."
         )
 
     version_results = await MultiGet(
