@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, Mapping, TypeVar, Union
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address
 from pants.util.frozendict import FrozenDict
 
@@ -34,6 +35,19 @@ class DockerInterpolationValue(FrozenDict[str, str]):
         if attribute not in self:
             raise self._attribute_error_type.attribute_error(self, attribute)
         return self[attribute]
+
+
+class DeprecatedDockerInterpolationValue(DockerInterpolationValue):
+    _removal_version: ClassVar[str]
+    _hint: ClassVar[str | None]
+
+    def __getattr__(self, attribute: str) -> str:
+        warn_or_error(
+            self._removal_version,
+            f"Docker interpolation context type {type(self).__name__!r}",
+            self._hint,
+        )
+        return super().__getattr__(attribute)
 
 
 class DockerBuildArgInterpolationError(DockerInterpolationError):
