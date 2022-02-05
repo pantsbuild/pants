@@ -21,7 +21,7 @@ class Scalac(Subsystem):
     )
 
     args = ArgsListOption(
-        help="Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
+        help=f"Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
     )
     plugins_global = StrListOption(
         "--plugins-global",
