@@ -28,8 +28,8 @@ def test_determine_specified_tool_names() -> None:
             extra_valid_names=["extra-tool"],
         )
     assert (
-        f"Unrecognized name with the option `--fake-goal-only`: 'bad'\n\n"
-        f"All valid names: ['extra-tool', 'my-tool']"
+        "Unrecognized name with the option `--fake-goal-only`: 'bad'\n\n"
+        "All valid names: ['extra-tool', 'my-tool']"
     ) in str(exc.value)
 
 
