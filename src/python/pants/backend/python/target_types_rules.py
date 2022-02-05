@@ -32,13 +32,9 @@ from pants.backend.python.target_types import (
     PythonDistributionDependenciesField,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
+    PythonFilesGeneratorSettingsRequest,
     PythonProvidesField,
     PythonResolveField,
-    PythonSourcesGeneratingSourcesField,
-    PythonSourcesGeneratorTarget,
-    PythonSourceTarget,
-    PythonTestUtilsGeneratingSourcesField,
-    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
@@ -57,14 +53,12 @@ from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     OverridesField,
-    SourcesPaths,
-    SourcesPathsRequest,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
     Targets,
     WrappedTarget,
-    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -74,84 +68,21 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-# -----------------------------------------------------------------------------------------------
-# `python_sources`, `python_tests`, and `python_test_utils` target generation rules
-# -----------------------------------------------------------------------------------------------
-
-
-class GenerateTargetsFromPythonSources(GenerateTargetsRequest):
-    generate_from = PythonSourcesGeneratorTarget
-
-
 @rule
-async def generate_targets_from_python_sources(
-    request: GenerateTargetsFromPythonSources,
+def python_files_generator_settings(
+    _: PythonFilesGeneratorSettingsRequest,
     python_infer: PythonInferSubsystem,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonSourcesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(add_dependencies_on_all_siblings=not python_infer.imports)
 
 
-class GenerateTargetsFromPythonTestUtils(GenerateTargetsRequest):
-    generate_from = PythonTestUtilsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_python_test_utils(
-    request: GenerateTargetsFromPythonTestUtils,
-    python_infer: PythonInferSubsystem,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestUtilsGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
+# -----------------------------------------------------------------------------------------------
+# `pex_binary` target generation rules
+# -----------------------------------------------------------------------------------------------
 
 
 class GenerateTargetsFromPexBinaries(GenerateTargetsRequest):
+    # TODO: This can be deprecated in favor of `parametrize`.
     generate_from = PexBinariesGeneratorTarget
 
 
@@ -513,8 +444,7 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
+        UnionRule(TargetFilesGeneratorSettingsRequest, PythonFilesGeneratorSettingsRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
