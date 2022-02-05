@@ -40,6 +40,7 @@ from pants.option.errors import (
     ParseError,
 )
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import StrOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
@@ -425,22 +426,16 @@ def test_scope_deprecation(caplog) -> None:
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        @classmethod
-        def register_options(cls, register):
-            super().register_options(register)
-            register("--foo")
-            register("--bar")
-            register("--baz")
+        foo = StrOption("--foo", help="")
+        bar = StrOption("--bar", help="")
+        baz = StrOption("--baz", help="")
 
     class Subsystem2(Subsystem):
         options_scope = "new2"
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        @classmethod
-        def register_options(cls, register):
-            super().register_options(register)
-            register("--qux")
+        qux = StrOption("--qux", help="")
 
     def register(opts: Options) -> None:
         opts.register(Subsystem1.options_scope, "--foo")

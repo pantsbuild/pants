@@ -14,6 +14,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
@@ -93,26 +94,19 @@ class Changed(Subsystem):
         f"See {doc_url('advanced-target-selection')}."
     )
 
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--since",
-            type=str,
-            default=None,
-            help="Calculate changes since this Git spec (commit range/SHA/ref).",
-        )
-        register(
-            "--diffspec",
-            type=str,
-            default=None,
-            help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
-        )
-        register(
-            "--dependees",
-            type=DependeesOption,
-            default=DependeesOption.NONE,
-            help="Include direct or transitive dependees of changed targets.",
-        )
+    since = StrOption(
+        "--since",
+        help="Calculate changes since this Git spec (commit range/SHA/ref).",
+    )
+    diffspec = StrOption(
+        "--diffspec",
+        help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
+    )
+    dependees = EnumOption(
+        "--dependees",
+        default=DependeesOption.NONE,
+        help="Include direct or transitive dependees of changed targets.",
+    )
 
 
 def rules():
