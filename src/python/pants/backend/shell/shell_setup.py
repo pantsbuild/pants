@@ -32,7 +32,7 @@ class ShellSetup(Subsystem):
     dependency_inference = BoolOption(
         "--dependency-inference",
         default=True,
-        help=("Infer Shell dependencies on other Shell files by analyzing `source` statements."),
+        help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
     ).advanced()
 
     @memoized_method
