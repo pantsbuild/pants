@@ -2,17 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Dict, Tuple
+from typing import Dict
 
 from pants.engine.rules import collect_rules
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
-from pants.option.option_types import BoolOption, StrListOption
+
 
 class PythonNativeCode(Subsystem):
     options_scope = "python-native-code"
     help = "Options for building native code using Python, e.g. when resolving distributions."
-
 
     # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
     cpp_flags = StrListOption(

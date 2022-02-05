@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Mapping, cast
+from typing import Mapping
 
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -16,6 +16,7 @@ from pants.engine.environment import Environment
 from pants.engine.process import BinaryPath
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.python import binaries as python_binaries
 from pants.python.binaries import PythonBinary, PythonBootstrap
@@ -24,7 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
-from pants.option.option_types import BoolOption, IntOption, StrListOption
+
 
 class PexRuntimeEnvironment(Subsystem):
     options_scope = "pex"
@@ -32,34 +33,35 @@ class PexRuntimeEnvironment(Subsystem):
 
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
-    _executable_search_paths = StrListOption(
+    _executable_search_paths = (
+        StrListOption(
             "--executable-search-paths",
-            advanced=True,
             default=["<PATH>"],
             help=(
                 "The PATH value that will be used by the PEX subprocess and any subprocesses it "
                 'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
                 "env var."
             ),
-        ).advanced().metavar("<binary-paths>")
+        )
+        .advanced()
+        .metavar("<binary-paths>")
+    )
     _verbosity = IntOption(
-            "--verbosity",
-            default=0,
-            help=(
-                "Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."
-            ),
-        ).advanced()
+        "--verbosity",
+        default=0,
+        help=("Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."),
+    ).advanced()
     venv_use_symlinks = BoolOption(
-            "--venv-use-symlinks",
-            default=False,
-            help=(
-                "When possible, use venvs whose site-packages directories are populated with"
-                "symlinks.\n\nEnabling this can save space in the `--named-caches-dir` directory "
-                "and lead to slightly faster execution times for Pants Python goals. Some "
-                "distributions do not work with symlinked venvs though, so you may not be able to "
-                "enable this optimization as a result."
-            ),
-        ).advanced()
+        "--venv-use-symlinks",
+        default=False,
+        help=(
+            "When possible, use venvs whose site-packages directories are populated with"
+            "symlinks.\n\nEnabling this can save space in the `--named-caches-dir` directory "
+            "and lead to slightly faster execution times for Pants Python goals. Some "
+            "distributions do not work with symlinked venvs though, so you may not be able to "
+            "enable this optimization as a result."
+        ),
+    ).advanced()
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:
@@ -76,7 +78,7 @@ class PexRuntimeEnvironment(Subsystem):
 
     @property
     def verbosity(self) -> int:
-        level = cast(int, self._verbosity)
+        level = self._verbosity
         if level < 0 or level > 9:
             raise ValueError("verbosity level must be between 0 and 9")
         return level

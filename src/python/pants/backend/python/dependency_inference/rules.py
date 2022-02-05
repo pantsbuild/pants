@@ -41,8 +41,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
-from pants.option.subsystem import Subsystem
 from pants.option.option_types import BoolOption, EnumOption, IntOption
+from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list
 
@@ -66,66 +66,64 @@ class PythonInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Python targets."
 
     imports = BoolOption(
-            "--imports",
-            type=bool,
-            help=(
-                "Infer a target's imported dependencies by parsing import statements from sources."
-            ),
-        )
+        "--imports",
+        default=True,
+        help=("Infer a target's imported dependencies by parsing import statements from sources."),
+    )
     string_imports = BoolOption(
-            "--string-imports",
-            type=bool,
-            help=(
-                "Infer a target's dependencies based on strings that look like dynamic "
-                "dependencies, such as Django settings files expressing dependencies as strings. "
-                "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
-                "of your target."
-            ),
-        )
+        "--string-imports",
+        default=False,
+        help=(
+            "Infer a target's dependencies based on strings that look like dynamic "
+            "dependencies, such as Django settings files expressing dependencies as strings. "
+            "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
+            "of your target."
+        ),
+    )
     string_imports_min_dots = IntOption(
-            "--string-imports-min-dots",
-            default=2,
-            help=(
-                "If --string-imports is True, treat valid-looking strings with at least this many "
-                "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
-                "treated as a potential dependency if this option is set to 2 but not if set to 3."
-            ),
-        )
+        "--string-imports-min-dots",
+        default=2,
+        help=(
+            "If --string-imports is True, treat valid-looking strings with at least this many "
+            "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
+            "treated as a potential dependency if this option is set to 2 but not if set to 3."
+        ),
+    )
     inits = BoolOption(
-            "--inits",
-            type=bool,
-            help=(
-                "Infer a target's dependencies on any `__init__.py` files in the packages "
-                "it is located in (recursively upward in the directory structure).\n\nEven if this "
-                "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
-                "will not be 'proper' dependencies, e.g. they will not show up in "
-                "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
-                "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
-                "you should enable this option."
-            ),
-        )
+        "--inits",
+        default=False,
+        help=(
+            "Infer a target's dependencies on any `__init__.py` files in the packages "
+            "it is located in (recursively upward in the directory structure).\n\nEven if this "
+            "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
+            "will not be 'proper' dependencies, e.g. they will not show up in "
+            "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
+            "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
+            "you should enable this option."
+        ),
+    )
     conftests = BoolOption(
-            "--conftests",
-            type=bool,
-            help=(
-                "Infer a test target's dependencies on any conftest.py files in the current "
-                "directory and ancestor directories."
-            ),
-        )
+        "--conftests",
+        default=True,
+        help=(
+            "Infer a test target's dependencies on any conftest.py files in the current "
+            "directory and ancestor directories."
+        ),
+    )
     entry_points = BoolOption(
-            "--entry-points",
-            type=bool,
-            help=(
-                "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
-                "`entry_point` field, `python_awslambda`'s `handler` field and "
-                "`python_distribution`'s `entry_points` field."
-            ),
-        )
+        "--entry-points",
+        default=True,
+        help=(
+            "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
+            "`entry_point` field, `python_awslambda`'s `handler` field and "
+            "`python_distribution`'s `entry_points` field."
+        ),
+    )
     unowned_dependency_behavior = EnumOption(
-            "--unowned-dependency-behavior",
-            default=UnownedDependencyUsage.DoNothing,
-            help=("How to handle inferred dependencies that don't have any owner."),
-        )
+        "--unowned-dependency-behavior",
+        default=UnownedDependencyUsage.DoNothing,
+        help=("How to handle inferred dependencies that don't have any owner."),
+    )
 
 
 class InferPythonImportDependencies(InferDependenciesRequest):

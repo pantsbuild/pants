@@ -57,8 +57,8 @@ from pants.engine.target import (
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
-from pants.option.subsystem import Subsystem
 from pants.option.option_types import BoolOption
+from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
 from pants.util.docutil import doc_url, git_url
 from pants.util.frozendict import FrozenDict
@@ -462,7 +462,6 @@ class PexIncludeToolsField(BoolField):
     )
 
 
-
 _PEX_BINARY_COMMON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     InterpreterConstraintsField,
@@ -564,30 +563,33 @@ class PexBinariesGeneratorTarget(Target):
         "is a first-party file, like `app.py` or `app.py:main`."
     )
 
+
 class PexBinaryDefaults(Subsystem):
     options_scope = "pex-binary-defaults"
     help = "Default settings for creating PEX executables."
 
     emit_warnings = BoolOption(
-            "--emit-warnings",
-            help=(
-                "Whether built PEX binaries should emit PEX warnings at runtime by default."
-                "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
-                "`pex_binary` targets"
-            ),
-        ).advanced()
+        "--emit-warnings",
+        default=True,
+        help=(
+            "Whether built PEX binaries should emit PEX warnings at runtime by default."
+            "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
+            "`pex_binary` targets"
+        ),
+    ).advanced()
     resolve_local_platforms = BoolOption(
-            "--resolve-local-platforms",
-            advanced=True,
-            help=(
-                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
-                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
-                "interpreter is found, use the interpreter to resolve distributions and build any "
-                "that are only available in source distribution form. If no matching interpreter "
-                "is found (or if this option is `False`), resolve for the platform by accepting "
-                "only pre-built binary distributions (wheels)."
-            ),
-        ).advanced()
+        "--resolve-local-platforms",
+        default=False,
+        help=(
+            f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+            "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+            "interpreter is found, use the interpreter to resolve distributions and build any "
+            "that are only available in source distribution form. If no matching interpreter "
+            "is found (or if this option is `False`), resolve for the platform by accepting "
+            "only pre-built binary distributions (wheels)."
+        ),
+    ).advanced()
+
 
 # -----------------------------------------------------------------------------------------------
 # `python_test` and `python_tests` targets

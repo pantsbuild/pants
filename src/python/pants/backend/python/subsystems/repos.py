@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Iterator, cast
+from typing import Iterator
 
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.option.option_types import BoolOption, StrListOption
+
 
 class PythonRepos(Subsystem):
     options_scope = "python-repos"
@@ -18,22 +19,21 @@ class PythonRepos(Subsystem):
     pypi_index = "https://pypi.org/simple/"
 
     repos = StrListOption(
-            "--repos",
-            help=(
-                "URLs of code repositories to look for requirements. In Pip and Pex, this option "
-                "corresponds to the `--find-links` option."
-            ),
-        ).advanced()
-    indexes  =StrListOption(
-            "--indexes",
-            default=[pypi_index],
-            help=(
-                "URLs of code repository indexes to look for requirements. If set to an empty "
-                "list, then Pex will use no indices (meaning it will not use PyPI). The values "
-                "should be compliant with PEP 503."
-            ),
-        ).advanced()
-
+        "--repos",
+        help=(
+            "URLs of code repositories to look for requirements. In Pip and Pex, this option "
+            "corresponds to the `--find-links` option."
+        ),
+    ).advanced()
+    indexes = StrListOption(
+        "--indexes",
+        default=[pypi_index],
+        help=(
+            "URLs of code repository indexes to look for requirements. If set to an empty "
+            "list, then Pex will use no indices (meaning it will not use PyPI). The values "
+            "should be compliant with PEP 503."
+        ),
+    ).advanced()
 
     @property
     def pex_args(self) -> Iterator[str]:
