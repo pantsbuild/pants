@@ -125,7 +125,7 @@ def maybe_warn_python_repos(
 
     if python_repos.repos:
         warn_python_repos("repos")
-    if python_repos.indexes != [python_repos.pypi_index]:
+    if python_repos.indexes != (python_repos.pypi_index,):
         warn_python_repos("indexes")
     return MaybeWarnPythonRepos()
 

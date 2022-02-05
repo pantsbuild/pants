@@ -57,6 +57,7 @@ from pants.engine.target import (
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
 from pants.util.docutil import doc_url, git_url
@@ -140,49 +141,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
-
-
-class PexBinaryDefaults(Subsystem):
-    options_scope = "pex-binary-defaults"
-    help = "Default settings for creating PEX executables."
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--emit-warnings",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "Whether built PEX binaries should emit PEX warnings at runtime by default."
-                "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
-                "`pex_binary` targets"
-            ),
-        )
-        register(
-            "--resolve-local-platforms",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
-                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
-                "interpreter is found, use the interpreter to resolve distributions and build any "
-                "that are only available in source distribution form. If no matching interpreter "
-                "is found (or if this option is `False`), resolve for the platform by accepting "
-                "only pre-built binary distributions (wheels)."
-            ),
-        )
-
-    @property
-    def emit_warnings(self) -> bool:
-        return cast(bool, self.options.emit_warnings)
-
-    @property
-    def resolve_local_platforms(self) -> bool:
-        return cast(bool, self.options.resolve_local_platforms)
-
 
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
@@ -604,6 +562,33 @@ class PexBinariesGeneratorTarget(Target):
         "`pex_binary` target in that case. This target generator works best when the entry point "
         "is a first-party file, like `app.py` or `app.py:main`."
     )
+
+
+class PexBinaryDefaults(Subsystem):
+    options_scope = "pex-binary-defaults"
+    help = "Default settings for creating PEX executables."
+
+    emit_warnings = BoolOption(
+        "--emit-warnings",
+        default=True,
+        help=(
+            "Whether built PEX binaries should emit PEX warnings at runtime by default."
+            "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
+            "`pex_binary` targets"
+        ),
+    ).advanced()
+    resolve_local_platforms = BoolOption(
+        "--resolve-local-platforms",
+        default=False,
+        help=(
+            f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+            "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+            "interpreter is found, use the interpreter to resolve distributions and build any "
+            "that are only available in source distribution form. If no matching interpreter "
+            "is found (or if this option is `False`), resolve for the platform by accepting "
+            "only pre-built binary distributions (wheels)."
+        ),
+    ).advanced()
 
 
 # -----------------------------------------------------------------------------------------------
