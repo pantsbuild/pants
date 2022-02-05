@@ -244,6 +244,8 @@ def test_get_all_help_info():
     class Bar(GoalSubsystem):
         name = "bar"
         help = "The bar goal."
+        deprecated_options_scope = "bar-old"
+        deprecated_options_scope_removal_version = "9.9.999"
 
     class QuxField(StringField):
         alias = "qux"
@@ -300,6 +302,7 @@ def test_get_all_help_info():
                 "description": "Global options.",
                 "provider": "",
                 "is_goal": False,
+                "deprecated_scope": None,
                 "basic": (
                     {
                         "display_args": ("-o=<int>", "--opt1=<int>"),
@@ -333,6 +336,7 @@ def test_get_all_help_info():
                 "provider": "help_info_extracter_test",
                 "description": "A foo.",
                 "is_goal": False,
+                "deprecated_scope": None,
                 "basic": (
                     {
                         "display_args": ("--[no-]foo-opt2",),
@@ -387,6 +391,17 @@ def test_get_all_help_info():
                 "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "is_goal": True,
+                "deprecated_scope": "bar-old",
+                "basic": tuple(),
+                "advanced": tuple(),
+                "deprecated": tuple(),
+            },
+            "bar-old": {
+                "scope": "bar-old",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "is_goal": True,
+                "deprecated_scope": "bar-old",
                 "basic": tuple(),
                 "advanced": tuple(),
                 "deprecated": tuple(),
@@ -431,7 +446,14 @@ def test_get_all_help_info():
                 "description": "The bar goal.",
                 "consumed_scopes": ("somescope", "used_by_bar"),
                 "is_implemented": True,
-            }
+            },
+            "bar-old": {
+                "name": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "consumed_scopes": ("somescope", "used_by_bar-old"),
+                "is_implemented": True,
+            },
         },
         "name_to_target_type_info": {
             "baz_library": {
