@@ -37,9 +37,6 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratingSourcesField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
-    PythonTestsGeneratingSourcesField,
-    PythonTestsGeneratorTarget,
-    PythonTestTarget,
     PythonTestUtilsGeneratingSourcesField,
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
@@ -80,42 +77,6 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # `python_sources`, `python_tests`, and `python_test_utils` target generation rules
 # -----------------------------------------------------------------------------------------------
-
-
-class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
-    generate_from = PythonTestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_python_tests(
-    request: GenerateTargetsFromPythonTests,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    python_infer: PythonInferSubsystem,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonTestTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
 
 
 class GenerateTargetsFromPythonSources(GenerateTargetsRequest):
@@ -201,7 +162,7 @@ async def generate_targets_from_pex_binaries(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     entry_points_field = request.generator[PexEntryPointsField].value or []
-    overrides = request.generator[OverridesField].flatten()
+    overrides = request.overrides
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()
@@ -552,7 +513,6 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),

@@ -26,7 +26,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
@@ -219,7 +219,7 @@ class EngineInitializer:
         build_root_path = build_root or get_buildroot()
 
         rules = build_configuration.rules
-        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
+        union_membership: UnionMembership
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
@@ -278,6 +278,12 @@ class EngineInitializer:
                     for goal_type in goal_map.values()
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
+            )
+        )
+        union_membership = UnionMembership.from_rules(
+            (
+                *build_configuration.union_rules,
+                *(r for r in rules if isinstance(r, UnionRule)),
             )
         )
 

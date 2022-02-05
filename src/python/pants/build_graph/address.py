@@ -303,6 +303,10 @@ class Address(EngineAwareParameter):
         return self._target_name is None
 
     @property
+    def is_parametrized(self) -> bool:
+        return bool(self.parameters)
+
+    @property
     def filename(self) -> str:
         if self._relative_file_path is None:
             raise AssertionError(
@@ -385,14 +389,12 @@ class Address(EngineAwareParameter):
         return f"{prefix}{path}{target}{params}{generated}"
 
     def maybe_convert_to_target_generator(self) -> Address:
-        """If this address is generated, convert it to its generator target.
+        """If this address is generated or parametrized, convert it to its generator target.
 
-        Otherwise, return itself unmodified.
+        Otherwise, return self unmodified.
         """
-        if self.is_generated_target:
-            return self.__class__(
-                self.spec_path, target_name=self._target_name, parameters=self.parameters
-            )
+        if self.is_generated_target or self.is_parametrized:
+            return self.__class__(self.spec_path, target_name=self._target_name)
         return self
 
     def maybe_convert_to_generated_target(self) -> Address:
@@ -412,12 +414,22 @@ class Address(EngineAwareParameter):
 
     def create_generated(self, generated_name: str) -> Address:
         if self.is_generated_target:
-            raise AssertionError("Cannot call `create_generated` on `{self}`.")
+            raise AssertionError(f"Cannot call `create_generated` on `{self}`.")
         return self.__class__(
             self.spec_path,
             target_name=self._target_name,
             parameters=self.parameters,
             generated_name=generated_name,
+        )
+
+    def create_file(self, relative_file_path: str) -> Address:
+        if self.is_generated_target:
+            raise AssertionError(f"Cannot call `create_file` on `{self}`.")
+        return self.__class__(
+            self.spec_path,
+            target_name=self._target_name,
+            parameters=self.parameters,
+            relative_file_path=relative_file_path,
         )
 
     def __eq__(self, other):
