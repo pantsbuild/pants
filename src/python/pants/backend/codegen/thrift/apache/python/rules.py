@@ -44,8 +44,9 @@ async def generate_python_from_thrift(
         ),
     )
 
-    # We must do some path manipulation on the output digest for it to look like normal sources,
-    # including adding back a source root.
+    # We must add back the source root for Python imports to work properly. Note that the file
+    # paths will be different depending on whether `namespace py` was used. See the tests for
+    # examples.
     source_root = await Get(
         SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
     )

@@ -66,14 +66,15 @@ def assert_files_generated(
 
 def test_generates_python(rule_runner: RuleRunner) -> None:
     # This tests a few things:
-    #  * We generate the correct file names, keeping into account `namespace`.
+    #  * We generate the correct file names, keeping into account `namespace`. Note that if
+    #    `namespace` is not set, then Thrift will drop all parent directories, all we do is
+    #    restore the source root.
     #  * Thrift files can import other thrift files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
     rule_runner.write_files(
         {
             "src/thrift/dir1/f.thrift": "",
-            "src/thrift/dir1/f2.thrift": "",
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/f.thrift": dedent(
                 """\
@@ -106,15 +107,6 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         ],
     )
     assert_gen(
-        Address("src/thrift/dir1", relative_file_path="f2.thrift"),
-        [
-            "src/thrift/__init__.py",
-            "src/thrift/f2/__init__.py",
-            "src/thrift/f2/constants.py",
-            "src/thrift/f2/ttypes.py",
-        ],
-    )
-    assert_gen(
         Address("src/thrift/dir2", relative_file_path="f.thrift"),
         [
             "src/thrift/__init__.py",
@@ -131,5 +123,38 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             "tests/thrift/f/__init__.py",
             "tests/thrift/f/constants.py",
             "tests/thrift/f/ttypes.py",
+        ],
+    )
+
+
+def test_top_level_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "codegen/dir/f.thrift": "",
+            "codegen/dir/f2.thrift": "namespace py custom_namespace.module",
+            "codegen/dir/BUILD": "thrift_sources()",
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("codegen/dir", relative_file_path="f.thrift"),
+        source_roots=["/"],
+        expected_files=[
+            "__init__.py",
+            "f/__init__.py",
+            "f/constants.py",
+            "f/ttypes.py",
+        ],
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("codegen/dir", relative_file_path="f2.thrift"),
+        source_roots=["/"],
+        expected_files=[
+            "__init__.py",
+            "custom_namespace/__init__.py",
+            "custom_namespace/module/__init__.py",
+            "custom_namespace/module/constants.py",
+            "custom_namespace/module/ttypes.py",
         ],
     )
