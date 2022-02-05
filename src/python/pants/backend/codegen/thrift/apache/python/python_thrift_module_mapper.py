@@ -14,14 +14,13 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ModuleProvider,
     ModuleProviderType,
 )
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-def thrift_path_to_py_modules(stripped_path: str, *, namespace: str | None) -> tuple[str, str]:
-    prefix = namespace if namespace else PurePath(stripped_path).stem
+def thrift_path_to_py_modules(source_path: str, *, namespace: str | None) -> tuple[str, str]:
+    prefix = namespace if namespace else PurePath(source_path).stem
     return f"{prefix}.ttypes", f"{prefix}.constants"
 
 
@@ -34,16 +33,13 @@ async def map_thrift_to_python_modules(
     thrift_targets: AllThriftTargets,
     _: PythonThriftMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    stripped_file_per_target = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(tgt[ThriftSourceField].file_path))
-        for tgt in thrift_targets
-    )
-
     modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
-    for tgt, stripped_file in zip(thrift_targets, stripped_file_per_target):
+    for tgt in thrift_targets:
         provider = ModuleProvider(tgt.address, ModuleProviderType.IMPL)
         # TODO: parse the namespace.
-        m1, m2 = thrift_path_to_py_modules(stripped_file.value, namespace=None)
+        m1, m2 = thrift_path_to_py_modules(
+            source_path=tgt[ThriftSourceField].file_path, namespace=None
+        )
         modules_to_providers[m1].append(provider)
         modules_to_providers[m2].append(provider)
     return FirstPartyPythonMappingImpl(

@@ -16,7 +16,6 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ModuleProvider,
     ModuleProviderType,
 )
-from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -25,7 +24,6 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *stripped_source_files.rules(),
             *python_thrift_module_mapper.rules(),
             *thrift_target_types_rules(),
             QueryRule(FirstPartyPythonMappingImpl, [PythonThriftMappingMarker]),
