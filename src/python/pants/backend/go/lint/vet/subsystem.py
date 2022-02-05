@@ -12,5 +12,6 @@ class GoVetSubsystem(Subsystem):
 
     skip = BoolOption(
         "--skip",
+        default=False,
         help=("Don't use gofmt when running `./pants fmt` and `./pants lint`."),
     )
