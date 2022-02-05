@@ -24,42 +24,33 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
-
+from pants.option.option_types import BoolOption, IntOption, StrListOption
 
 class PexRuntimeEnvironment(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
-        #  per-process override.
-        register(
+    # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
+    #  per-process override.
+    _executable_search_paths = StrListOption(
             "--executable-search-paths",
             advanced=True,
-            type=list,
             default=["<PATH>"],
-            metavar="<binary-paths>",
             help=(
                 "The PATH value that will be used by the PEX subprocess and any subprocesses it "
                 'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
                 "env var."
             ),
-        )
-        register(
+        ).advanced().metavar("<binary-paths>")
+    _verbosity = IntOption(
             "--verbosity",
-            advanced=True,
-            type=int,
             default=0,
             help=(
                 "Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."
             ),
-        )
-        register(
+        ).advanced()
+    venv_use_symlinks = BoolOption(
             "--venv-use-symlinks",
-            advanced=True,
-            type=bool,
             default=False,
             help=(
                 "When possible, use venvs whose site-packages directories are populated with"
@@ -68,12 +59,12 @@ class PexRuntimeEnvironment(Subsystem):
                 "distributions do not work with symlinked venvs though, so you may not be able to "
                 "enable this optimization as a result."
             ),
-        )
+        ).advanced()
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
-            for entry in self.options.executable_search_paths:
+            for entry in self._executable_search_paths:
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
@@ -85,14 +76,10 @@ class PexRuntimeEnvironment(Subsystem):
 
     @property
     def verbosity(self) -> int:
-        level = cast(int, self.options.verbosity)
+        level = cast(int, self._verbosity)
         if level < 0 or level > 9:
             raise ValueError("verbosity level must be between 0 and 9")
         return level
-
-    @property
-    def venv_use_symlinks(self) -> bool:
-        return cast(bool, self.options.venv_use_symlinks)
 
 
 class PythonExecutable(BinaryPath, EngineAwareReturnType):

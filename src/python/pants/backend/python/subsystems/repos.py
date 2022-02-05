@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Iterator, cast
 
 from pants.option.subsystem import Subsystem
-
+from pants.option.option_types import BoolOption, StrListOption
 
 class PythonRepos(Subsystem):
     options_scope = "python-repos"
@@ -17,38 +17,23 @@ class PythonRepos(Subsystem):
 
     pypi_index = "https://pypi.org/simple/"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
+    repos = StrListOption(
             "--repos",
-            advanced=True,
-            type=list,
-            default=[],
             help=(
                 "URLs of code repositories to look for requirements. In Pip and Pex, this option "
                 "corresponds to the `--find-links` option."
             ),
-        )
-        register(
+        ).advanced()
+    indexes  =StrListOption(
             "--indexes",
-            advanced=True,
-            type=list,
-            default=[cls.pypi_index],
+            default=[pypi_index],
             help=(
                 "URLs of code repository indexes to look for requirements. If set to an empty "
                 "list, then Pex will use no indices (meaning it will not use PyPI). The values "
                 "should be compliant with PEP 503."
             ),
-        )
+        ).advanced()
 
-    @property
-    def repos(self) -> list[str]:
-        return cast("list[str]", self.options.repos)
-
-    @property
-    def indexes(self) -> list[str]:
-        return cast("list[str]", self.options.indexes)
 
     @property
     def pex_args(self) -> Iterator[str]:

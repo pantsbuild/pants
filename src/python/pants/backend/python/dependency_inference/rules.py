@@ -42,6 +42,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.subsystem import Subsystem
+from pants.option.option_types import BoolOption, EnumOption, IntOption
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list
 
@@ -64,20 +65,15 @@ class PythonInferSubsystem(Subsystem):
     options_scope = "python-infer"
     help = "Options controlling which dependencies will be inferred for Python targets."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
+    imports = BoolOption(
             "--imports",
-            default=True,
             type=bool,
             help=(
                 "Infer a target's imported dependencies by parsing import statements from sources."
             ),
         )
-        register(
+    string_imports = BoolOption(
             "--string-imports",
-            default=False,
             type=bool,
             help=(
                 "Infer a target's dependencies based on strings that look like dynamic "
@@ -86,19 +82,17 @@ class PythonInferSubsystem(Subsystem):
                 "of your target."
             ),
         )
-        register(
+    string_imports_min_dots = IntOption(
             "--string-imports-min-dots",
             default=2,
-            type=int,
             help=(
                 "If --string-imports is True, treat valid-looking strings with at least this many "
                 "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
                 "treated as a potential dependency if this option is set to 2 but not if set to 3."
             ),
         )
-        register(
+    inits = BoolOption(
             "--inits",
-            default=False,
             type=bool,
             help=(
                 "Infer a target's dependencies on any `__init__.py` files in the packages "
@@ -110,18 +104,16 @@ class PythonInferSubsystem(Subsystem):
                 "you should enable this option."
             ),
         )
-        register(
+    conftests = BoolOption(
             "--conftests",
-            default=True,
             type=bool,
             help=(
                 "Infer a test target's dependencies on any conftest.py files in the current "
                 "directory and ancestor directories."
             ),
         )
-        register(
+    entry_points = BoolOption(
             "--entry-points",
-            default=True,
             type=bool,
             help=(
                 "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
@@ -129,40 +121,11 @@ class PythonInferSubsystem(Subsystem):
                 "`python_distribution`'s `entry_points` field."
             ),
         )
-        register(
+    unowned_dependency_behavior = EnumOption(
             "--unowned-dependency-behavior",
-            type=UnownedDependencyUsage,
             default=UnownedDependencyUsage.DoNothing,
             help=("How to handle inferred dependencies that don't have any owner."),
         )
-
-    @property
-    def imports(self) -> bool:
-        return cast(bool, self.options.imports)
-
-    @property
-    def string_imports(self) -> bool:
-        return cast(bool, self.options.string_imports)
-
-    @property
-    def string_imports_min_dots(self) -> int:
-        return cast(int, self.options.string_imports_min_dots)
-
-    @property
-    def inits(self) -> bool:
-        return cast(bool, self.options.inits)
-
-    @property
-    def conftests(self) -> bool:
-        return cast(bool, self.options.conftests)
-
-    @property
-    def entry_points(self) -> bool:
-        return cast(bool, self.options.entry_points)
-
-    @property
-    def unowned_dependency_behavior(self) -> UnownedDependencyUsage:
-        return cast(UnownedDependencyUsage, self.options.unowned_dependency_behavior)
 
 
 class InferPythonImportDependencies(InferDependenciesRequest):
