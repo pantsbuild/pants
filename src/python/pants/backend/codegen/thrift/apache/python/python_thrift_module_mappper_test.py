@@ -51,31 +51,29 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
         return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
 
-    assert result == FirstPartyPythonMappingImpl(
-        {
-            "no_namespace.constants": providers(
-                [Address("root1/thrift", relative_file_path="no_namespace.thrift")]
-            ),
-            "no_namespace.ttypes": providers(
-                [Address("root1/thrift", relative_file_path="no_namespace.thrift")]
-            ),
-            "custom_namespace.module.constants": providers(
-                [Address("root1/thrift", relative_file_path="custom_namespace.thrift")]
-            ),
-            "custom_namespace.module.ttypes": providers(
-                [Address("root1/thrift", relative_file_path="custom_namespace.thrift")]
-            ),
-            "two_owners.constants": providers(
-                [
-                    Address("root1/two_owners", relative_file_path="f.thrift"),
-                    Address("root2/two_owners", relative_file_path="f.thrift"),
-                ]
-            ),
-            "two_owners.ttypes": providers(
-                [
-                    Address("root1/two_owners", relative_file_path="f.thrift"),
-                    Address("root2/two_owners", relative_file_path="f.thrift"),
-                ]
-            ),
-        }
-    )
+    assert dict(result) == {
+        "no_namespace.constants": providers(
+            [Address("root1/thrift", relative_file_path="no_namespace.thrift")]
+        ),
+        "no_namespace.ttypes": providers(
+            [Address("root1/thrift", relative_file_path="no_namespace.thrift")]
+        ),
+        "custom_namespace.module.constants": providers(
+            [Address("root1/thrift", relative_file_path="namespace.thrift")]
+        ),
+        "custom_namespace.module.ttypes": providers(
+            [Address("root1/thrift", relative_file_path="namespace.thrift")]
+        ),
+        "two_owners.constants": providers(
+            [
+                Address("root1/foo", relative_file_path="two_owners.thrift"),
+                Address("root2/bar", relative_file_path="two_owners.thrift"),
+            ]
+        ),
+        "two_owners.ttypes": providers(
+            [
+                Address("root1/foo", relative_file_path="two_owners.thrift"),
+                Address("root2/bar", relative_file_path="two_owners.thrift"),
+            ]
+        ),
+    }
