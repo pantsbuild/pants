@@ -20,10 +20,8 @@ class Scalac(Subsystem):
         "scalac_plugins.default.lockfile.txt",
     )
 
-    args = (
-        ArgsListOption(
-            help="Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
-        ),
+    args = ArgsListOption(
+        help="Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
     )
     plugins_global = StrListOption(
         "--plugins-global",
