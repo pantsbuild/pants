@@ -87,7 +87,7 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
-    generate_file_level_targets,
+    _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
@@ -1357,7 +1357,7 @@ async def generate_file_targets(
         )
         add_dependencies_on_all_siblings = generator_settings.add_dependencies_on_all_siblings
 
-    return generate_file_level_targets(
+    return _generate_file_level_targets(
         type(request.generator).generated_target_cls,
         request.generator,
         sources_paths.files,

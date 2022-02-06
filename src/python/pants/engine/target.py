@@ -932,7 +932,7 @@ class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[Generat
         return self.get(tgt_cls)
 
 
-def generate_file_level_targets(
+def _generate_file_level_targets(
     generated_target_cls: type[Target],
     generator: Target,
     paths: Sequence[str],
