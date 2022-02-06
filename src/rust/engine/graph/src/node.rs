@@ -53,6 +53,12 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   fn cacheable_item(&self, _item: &Self::Item) -> bool {
     self.cacheable()
   }
+
+  ///
+  /// Creates an error instance that represents that a Node dependency was cyclic along the given
+  /// path.
+  ///
+  fn cyclic_error(path: &[&Self]) -> Self::Error;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send + Sync {
@@ -61,11 +67,6 @@ pub trait NodeError: Clone + Debug + Eq + Send + Sync {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
-
-  ///
-  /// Creates an instance that represents that a Node dependency was cyclic along the given path.
-  ///
-  fn cyclic(path: Vec<String>) -> Self;
 }
 
 ///
