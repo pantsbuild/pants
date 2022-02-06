@@ -15,7 +15,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    SearchPath,
 )
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest
@@ -29,8 +28,6 @@ from pants.util.strutil import pluralize
 @dataclass
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
-
-    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
     extra_env: Mapping[str, str]
 
@@ -117,7 +114,7 @@ class DockerBinary(BinaryPath):
 
 @dataclass(frozen=True)
 class DockerBinaryRequest:
-    search_path: SearchPath = DockerBinary.DEFAULT_SEARCH_PATH
+    pass
 
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
@@ -125,7 +122,7 @@ async def find_docker(
     docker_request: DockerBinaryRequest, docker_options: DockerOptions
 ) -> DockerBinary:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_path = docker_options.executable_search_path(env) or docker_request.search_path
+    search_path = docker_options.executable_search_path(env)
     requests = [
         BinaryPathRequest(
             binary_name=tool,
