@@ -10,10 +10,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
+
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
-from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
-from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
@@ -116,9 +114,6 @@ AllTools = (
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
     DefaultTool.jvm(ScalafmtSubsystem),
     DefaultTool.jvm(Scalatest),
-    DefaultTool.jvm(
-        ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
-    ),
     DefaultTool(
         "scalac-plugins",
         (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
