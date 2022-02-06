@@ -10,7 +10,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
