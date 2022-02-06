@@ -9,9 +9,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
+    FormatWithYapfRequest,
     RenameDeprecatedFieldsRequest,
     RenameDeprecatedTargetsRequest,
     RenamedFieldTypes,
@@ -21,6 +23,7 @@ from pants.core.goals.update_build_files import (
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
     format_build_file_with_black,
+    format_build_file_with_yapf,
     maybe_rename_deprecated_fields,
     maybe_rename_deprecated_targets,
     update_build_files,
@@ -182,6 +185,58 @@ def test_black_config(black_rule_runner: RuleRunner) -> None:
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+
+
+# ------------------------------------------------------------------------------------------
+# Yapf formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def yapf_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=(
+            format_build_file_with_yapf,
+            update_build_files,
+            *pants_bin.rules(),
+            *config_files.rules(),
+            *pex.rules(),
+            SubsystemRule(Yapf),
+            SubsystemRule(UpdateBuildFilesSubsystem),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
+        )
+    )
+
+
+def test_yapf_fixer_fixes(yapf_rule_runner: RuleRunner) -> None:
+    yapf_rule_runner.write_files({"BUILD": "tgt( name =  't' )"})
+    result = yapf_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        """\
+        Updated BUILD:
+          - Format with Yapf
+        """
+    )
+    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+
+
+def test_yapf_fixer_noops(yapf_rule_runner: RuleRunner) -> None:
+    yapf_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
+    result = yapf_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    assert result.exit_code == 0
+    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+
+
+def test_yapf_fixer_args(yapf_rule_runner: RuleRunner) -> None:
+    yapf_rule_runner.write_files({"BUILD": "tgt(name='t')\n"})
+    result = yapf_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal,
+        global_args=["--yapf-args=--style='{indent_width: 2}'"],
+        env_inherit=BLACK_ENV_INHERIT,
+    )
+    assert result.exit_code == 0
+    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
 
 
 # ------------------------------------------------------------------------------------------
