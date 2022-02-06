@@ -174,8 +174,8 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         return cast(bool, self.options.fmt)
 
     @property
-    def formatter(self) -> str:
-        return cast(str, self.options.formatter)
+    def formatter(self) -> Formatter:
+        return cast(Formatter, self.options.formatter)
 
     @property
     def fix_safe_deprecations(self) -> bool:
