@@ -115,12 +115,10 @@ AllTools = (
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
     DefaultTool.jvm(ScalafmtSubsystem),
-    DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
     DefaultTool.jvm(Scalatest),
     DefaultTool.jvm(
         ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
-    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool(
         "scalac-plugins",
         (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
