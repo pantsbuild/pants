@@ -289,6 +289,7 @@ async def update_build_files(
 # Yapf formatter fixer
 # ------------------------------------------------------------------------------------------
 
+
 class FormatWithYapfRequest(RewrittenBuildFileRequest):
     pass
 
@@ -343,9 +344,7 @@ async def format_build_file_with_yapf(
     result_contents = await Get(DigestContents, Digest, yapf_result.output_digest)
     assert len(result_contents) == 1
     result_lines = tuple(result_contents[0].content.decode("utf-8").splitlines())
-    return RewrittenBuildFile(
-        request.path, result_lines, change_descriptions=("Format with Yapf",)
-    )
+    return RewrittenBuildFile(request.path, result_lines, change_descriptions=("Format with Yapf",))
 
 
 # ------------------------------------------------------------------------------------------
