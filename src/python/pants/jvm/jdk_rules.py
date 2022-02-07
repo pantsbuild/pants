@@ -32,6 +32,14 @@ class Nailgun:
 
 
 @dataclass(frozen=True)
+class JdkRequest:
+    """Request for a JDK with a specific major version."""
+
+    is_system: bool
+    major_version: str
+
+
+@dataclass(frozen=True)
 class JdkSetup:
     _digest: Digest
     nailgun_jar: str
@@ -96,15 +104,30 @@ async def fetch_nailgun() -> Nailgun:
 
 
 @rule
+async def global_jdk(jvm: JvmSubsystem) -> JdkRequest:
+    """Creates a `JdkRequest` object based on the JVM subsystem options.
+
+    This is effectively a singleton for now, but by the time we complete multiple JVM support, it
+    won't be.
+    """
+
+    if jvm.jdk == "system":
+        return JdkRequest(major_version="", is_system=True)
+    else:
+        return JdkRequest(major_version=jvm.jdk, is_system=False)
+
+
+@rule
 async def setup_jdk(
-    coursier: Coursier, jvm: JvmSubsystem, nailgun_: Nailgun, bash: BashBinary
+    coursier: Coursier, jdk: JdkRequest, nailgun_: Nailgun, bash: BashBinary
 ) -> JdkSetup:
     nailgun = nailgun_.classpath_entry
 
-    if jvm.jdk == "system":
+    # TODO: add support for system JDKs with specific version
+    if jdk.is_system:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={jvm.jdk}")
+        coursier_jdk_option = shlex.quote(f"--jvm={jdk.major_version}")
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *coursier.args(["java-home", coursier_jdk_option])))
@@ -128,7 +151,7 @@ async def setup_jdk(
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{jvm.jdk}`:\n"
+            f"Failed to locate Java for JDK `{jdk}`:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
@@ -136,9 +159,10 @@ async def setup_jdk(
     jre_major_version = parse_jre_major_version(java_version)
     if not jre_major_version:
         raise ValueError(
-            f"Pants was unable to parse the output of `java -version` for JDK `{jvm.jdk}`. "
-            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
-            f"with the following output:\n\n{java_version}"
+            "Pants was unable to parse the output of `java -version` for JDK "
+            f"`{jdk.major_version}`. Please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose with the following output:\n\n"
+            f"{java_version}"
         )
 
     # TODO: Locate `ln`.
