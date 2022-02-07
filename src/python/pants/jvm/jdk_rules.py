@@ -91,9 +91,9 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         coursier_jdk_option = "--system-jvm"
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={jvm.jdk}")
-    # NB: We `set +e` in the subshell to ensure that it exits as well.
-    #  see https://unix.stackexchange.com/a/23099
 
+    # TODO(#14386) This argument re-writing code should be done in a more standardised way.
+    # See also `run_deploy_jar` for other argument re-writing code.
     def prefixed(arg: str) -> str:
         if arg.startswith("__"):
             return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{arg}"
@@ -103,6 +103,8 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
     optionally_prefixed_coursier_args = [
         prefixed(arg) for arg in coursier.args(["java-home", coursier_jdk_option])
     ]
+    # NB: We `set +e` in the subshell to ensure that it exits as well.
+    #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
 
     env = {

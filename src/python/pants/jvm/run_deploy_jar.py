@@ -27,7 +27,7 @@ class __RuntimeJvm:
     with `pants run`.
 
     This is a hideous stop-gap, which will no longer be necessary once `InteractiveProcess` supports
-    append-only caches.
+    append-only caches. (See #13852 for details on how to do this.)
     """
 
     digest: Digest
@@ -66,6 +66,8 @@ async def create_deploy_jar_run_request(
 
     support_digests += (runtime_jvm.digest,)
 
+    # TODO(#14386) This argument re-writing code should be done in a more standardised way.
+    # See also `jdk_rules.py` for other argument re-writing code.
     def prefixed(arg: str, prefixes: Iterable[str]) -> str:
         if any(arg.startswith(prefix) for prefix in prefixes):
             return f"{{chroot}}/{arg}"

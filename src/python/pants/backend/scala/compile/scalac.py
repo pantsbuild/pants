@@ -79,6 +79,9 @@ async def compile_scala_source(
         for dependency in direct_dependency_classpath_entries
         for filename in dependency.filenames
     ]
+
+    # TODO(14171): Stop-gap for making sure that scala supplies all of its dependencies to
+    # deploy targets.
     if not any(
         filename.startswith("org.scala-lang_scala-library_") for filename in all_dependency_jars
     ):
