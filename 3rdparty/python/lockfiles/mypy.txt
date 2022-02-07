@@ -71,9 +71,9 @@ sentinel==0.3.0; python_version >= "3.7" and python_version < "4.0" \
 six==1.16.0; python_version >= "3.7" and python_full_version < "3.0.0" and python_version < "4.0" or python_version >= "3.7" and python_version < "4.0" and python_full_version >= "3.3.0" \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926
-strawberry-graphql==0.95.1; python_version >= "3.7" and python_version < "4.0" \
-    --hash=sha256:10e20215c563d41999e30d0b02f520981a1505b2063c7a8de157f4680edf3ad4 \
-    --hash=sha256:7092c26114475b814c605833f3a6b0b06a78cb60b5f0c802f2b26b633df00ff5
+strawberry-graphql==0.95.5; python_version >= "3.7" and python_version < "4.0" \
+    --hash=sha256:82ce6c6a6bb6a3e181a46384c5aed52e1ae3bc861ac223979254f994ceba471c \
+    --hash=sha256:a92920ea484f69bd3d3b5417e79d0961bc9ea62fc8e77290fc9628abbecf1085
 toml==0.10.2; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.5" \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

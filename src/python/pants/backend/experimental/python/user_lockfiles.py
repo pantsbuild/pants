@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class GenerateUserLockfileSubsystem(GoalSubsystem):
     name = "generate-user-lockfile"
     help = (
-        "Deprecated: use the option `[python].experimental_resolves` and the "
+        "Deprecated: use the option `[python].resolves` and the "
         "`generate-lockfiles` goal instead"
     )
 
@@ -30,7 +30,7 @@ async def generate_user_lockfile_goal() -> GenerateUserLockfileGoal:
         "2.11.0.dev0",
         "the `generate-user-lockfile` goal",
         (
-            "Instead, configure the option `[python].experimental_resolves`, then use the "
+            "Instead, configure the option `[python].resolves`, then use the "
             "`generate-lockfiles` goal. Read the deprecation message on "
             "`[python].experimental_lockfile` for more information."
         ),

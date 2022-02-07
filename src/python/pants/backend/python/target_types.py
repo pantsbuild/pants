@@ -57,6 +57,7 @@ from pants.engine.target import (
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
 from pants.util.docutil import doc_url, git_url
@@ -104,16 +105,15 @@ class InterpreterConstraintsField(StringSequenceField):
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):
-    alias = "experimental_resolve"
+    alias = "resolve"
     required = False
     help = (
-        "The resolve from `[python].experimental_resolves` to use.\n\n"
+        "The resolve from `[python].resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "All dependencies must share the same resolve. This means that you can only depend on "
-        "first-party targets like `python_source` that set their `experimental_resolve` field "
+        "first-party targets like `python_source` that set their `resolve` field "
         "to the same value, and on `python_requirement` targets that include the resolve in "
-        "their `experimental_compatible_resolves` field.\n\n"
-        "This field is experimental and may change without the normal deprecation policy."
+        "their `compatible_resolves` field."
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
@@ -141,49 +141,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
-
-
-class PexBinaryDefaults(Subsystem):
-    options_scope = "pex-binary-defaults"
-    help = "Default settings for creating PEX executables."
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--emit-warnings",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "Whether built PEX binaries should emit PEX warnings at runtime by default."
-                "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
-                "`pex_binary` targets"
-            ),
-        )
-        register(
-            "--resolve-local-platforms",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
-                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
-                "interpreter is found, use the interpreter to resolve distributions and build any "
-                "that are only available in source distribution form. If no matching interpreter "
-                "is found (or if this option is `False`), resolve for the platform by accepting "
-                "only pre-built binary distributions (wheels)."
-            ),
-        )
-
-    @property
-    def emit_warnings(self) -> bool:
-        return cast(bool, self.options.emit_warnings)
-
-    @property
-    def resolve_local_platforms(self) -> bool:
-        return cast(bool, self.options.resolve_local_platforms)
-
 
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
@@ -607,6 +564,33 @@ class PexBinariesGeneratorTarget(Target):
     )
 
 
+class PexBinaryDefaults(Subsystem):
+    options_scope = "pex-binary-defaults"
+    help = "Default settings for creating PEX executables."
+
+    emit_warnings = BoolOption(
+        "--emit-warnings",
+        default=True,
+        help=(
+            "Whether built PEX binaries should emit PEX warnings at runtime by default."
+            "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
+            "`pex_binary` targets"
+        ),
+    ).advanced()
+    resolve_local_platforms = BoolOption(
+        "--resolve-local-platforms",
+        default=False,
+        help=(
+            f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+            "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+            "interpreter is found, use the interpreter to resolve distributions and build any "
+            "that are only available in source distribution form. If no matching interpreter "
+            "is found (or if this option is `False`), resolve for the platform by accepting "
+            "only pre-built binary distributions (wheels)."
+        ),
+    ).advanced()
+
+
 # -----------------------------------------------------------------------------------------------
 # `python_test` and `python_tests` targets
 # -----------------------------------------------------------------------------------------------
@@ -956,16 +940,16 @@ def normalize_module_mapping(
 
 
 class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "experimental_compatible_resolves"
+    alias = "compatible_resolves"
     required = False
     help = (
-        "The resolves from `[python].experimental_resolves` that this requirement should be "
+        "The resolves from `[python].resolves` that this requirement should be "
         "included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
         "it will include all requirements that are declared compatible with that resolve. "
         "First-party targets like `python_source` and `pex_binary` then declare which resolve "
-        "they use via the `experimental_resolve` field; so, for your first-party code to use a "
+        "they use via the `resolve` field; so, for your first-party code to use a "
         "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )

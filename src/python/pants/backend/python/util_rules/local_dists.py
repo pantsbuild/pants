@@ -11,8 +11,9 @@ from typing import Iterable
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet

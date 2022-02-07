@@ -51,7 +51,7 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.util_rules import ExtractFileDigest
@@ -449,7 +449,9 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
 
     requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
 
-    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(
+        [requirement], LockfileContext.USER
+    ):
         raise ValueError(
             f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
             f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
@@ -739,7 +741,9 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 lockfile_req.artifact_inputs, lockfile_req.artifact_option_name
             ),
         )
-        if resolution.metadata and not resolution.metadata.is_valid_for(lockfile_inputs):
+        if resolution.metadata and not resolution.metadata.is_valid_for(
+            lockfile_inputs, LockfileContext.TOOL
+        ):
             raise ValueError(
                 f"The lockfile {lockfile_req.lockfile_dest} (configured by the option "
                 f"{lockfile_req.lockfile_option_name}) was generated with different requirements "

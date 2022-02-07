@@ -305,7 +305,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"modules={modules or []},"
             f"type_stub_modules={stub_modules or []},"
-            f"experimental_compatible_resolves={resolves or ['default']})"
+            f"compatible_resolves={resolves or ['default']})"
         )
 
     build_file = "\n\n".join(
@@ -330,7 +330,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
-    rule_runner.set_options(["--python-experimental-resolves={'default': '', 'another': ''}"])
+    rule_runner.set_options(["--python-resolves={'default': '', 'another': ''}"])
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
         {
@@ -592,22 +592,20 @@ def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
                 # result in ambiguity.
                 python_requirement(
                     name="dep1",
-                    experimental_compatible_resolves=["a"],
+                    compatible_resolves=["a"],
                     requirements=["dep"],
                 )
 
                 python_requirement(
                     name="dep2",
-                    experimental_compatible_resolves=["b"],
+                    compatible_resolves=["b"],
                     requirements=["dep"],
                 )
                 """
             )
         }
     )
-    rule_runner.set_options(
-        ["--python-experimental-resolves={'a': '', 'b': ''}", "--python-enable-resolves"]
-    )
+    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"])
 
     def get_owners(resolve: str | None) -> PythonModuleOwners:
         return rule_runner.request(PythonModuleOwners, [PythonModuleOwnersRequest("dep", resolve)])

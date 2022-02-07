@@ -8,7 +8,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, cast
 
-from pants.core.goals.style_request import StyleRequest, style_batch_size_help, write_reports
+from pants.core.goals.style_request import (
+    StyleRequest,
+    determine_specified_tool_names,
+    only_option_help,
+    style_batch_size_help,
+    write_reports,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -160,6 +166,13 @@ class LintSubsystem(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
+            "--only",
+            type=list,
+            member_type=str,
+            default=[],
+            help=only_option_help("lint", "linter", "flake8", "shellcheck"),
+        )
+        register(
             "--per-file-caching",
             advanced=True,
             type=bool,
@@ -192,6 +205,10 @@ class LintSubsystem(GoalSubsystem):
         )
 
     @property
+    def only(self) -> tuple[str, ...]:
+        return tuple(self.options.only)
+
+    @property
     def per_file_caching(self) -> bool:
         return cast(bool, self.options.per_file_caching)
 
@@ -217,17 +234,28 @@ async def lint(
     target_request_types = cast(
         "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
     )
+    file_request_types = union_membership[LintFilesRequest]
+    specified_names = determine_specified_tool_names(
+        "lint",
+        lint_subsystem.only,
+        target_request_types,
+        extra_valid_names={request.name for request in file_request_types},
+    )
     target_requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
-            if request_type.field_set_type.is_applicable(target)
+            if (
+                request_type.name in specified_names
+                and request_type.field_set_type.is_applicable(target)
+            )
         )
         for request_type in target_request_types
     )
     file_requests = tuple(
         request_type(specs_snapshot.snapshot.files)
-        for request_type in union_membership[LintFilesRequest]
+        for request_type in file_request_types
+        if request_type.name in specified_names
     )
 
     if lint_subsystem.per_file_caching:

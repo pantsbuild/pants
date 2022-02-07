@@ -21,7 +21,7 @@ sha2 = "0.9"
 strum = "0.20"
 strum_macros = "0.23"
 sysinfo = "0.20.0"
-tokio = { version = "1.4", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
+tokio = { version = "1.16", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
 uname = "0.1"
 
 [dev-dependencies]

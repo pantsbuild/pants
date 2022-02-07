@@ -12,7 +12,6 @@ from textwrap import dedent
 from typing import Any, Dict, Iterable, List, cast
 
 import pytest
-from _pytest.tmpdir import TempPathFactory
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -26,7 +25,7 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
     ChosenPythonResolveRequest,
@@ -34,6 +33,7 @@ from pants.backend.python.util_rules.pex_from_targets import (
     NoCompatibleResolveException,
     PexFromTargetsRequest,
 )
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.testutil.option_util import create_subsystem
@@ -61,7 +61,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_no_compatible_resolve_error() -> None:
-    python_setup = create_subsystem(PythonSetup, experimental_resolves={"a": "", "b": ""})
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""})
     targets = [
         PythonRequirementTarget(
             {
@@ -100,20 +100,20 @@ def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
     def create_build(*, req_resolves: list[str], source_resolve: str, test_resolve: str) -> str:
         return dedent(
             f"""\
-            python_source(name="dep", source="dep.py", experimental_resolve="{source_resolve}")
+            python_source(name="dep", source="dep.py", resolve="{source_resolve}")
             python_requirement(
-                name="req", requirements=[], experimental_compatible_resolves={repr(req_resolves)}
+                name="req", requirements=[], compatible_resolves={repr(req_resolves)}
             )
             python_test(
                 name="test",
                 source="tests.py",
                 dependencies=[":dep", ":req"],
-                experimental_resolve="{test_resolve}",
+                resolve="{test_resolve}",
             )
             """
         )
 
-    rule_runner.set_options(["--python-experimental-resolves={'a': '', 'b': ''}"])
+    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}"])
     rule_runner.write_files(
         {
             # Note that each of these BUILD files are entirely self-contained.
@@ -243,9 +243,11 @@ def requirements(rule_runner: RuleRunner, pex: Pex) -> list[str]:
     return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
-def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
+def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None:
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
     find_links = create_dists(
-        tmp_path_factory.mktemp("sdists"),
+        sdists,
         Project("Foo-Bar", "1.0.0"),
         Project("Bar", "5.5.5"),
         Project("baz", "2.2.2"),
@@ -253,7 +255,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     # Turn the project dir into a git repo, so it can be cloned.
-    foorl_dir = create_project_dir(tmp_path_factory.mktemp("git"), Project("foorl", "9.8.7"))
+    gitdir = tmp_path / "git"
+    gitdir.mkdir()
+    foorl_dir = create_project_dir(gitdir, Project("foorl", "9.8.7"))
     with pushd(str(foorl_dir)):
         subprocess.check_call(["git", "init"])
         subprocess.check_call(["git", "config", "user.name", "dummy"])
@@ -366,9 +370,11 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
 
 @pytest.mark.parametrize("include_requirements", [False, True])
 def test_exclude_requirements(
-    include_requirements: bool, tmp_path_factory: TempPathFactory, rule_runner: RuleRunner
+    include_requirements: bool, tmp_path: Path, rule_runner: RuleRunner
 ) -> None:
-    find_links = create_dists(tmp_path_factory.mktemp("sdists"), Project("baz", "2.2.2"))
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
+    find_links = create_dists(sdists, Project("baz", "2.2.2"))
 
     rule_runner.write_files(
         {

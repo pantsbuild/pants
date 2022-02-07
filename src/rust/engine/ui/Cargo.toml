@@ -13,7 +13,7 @@ futures = "0.3"
 indexmap = "1.8"
 indicatif = "0.16.2"
 logging = { path = "../logging" }
-parking_lot = "0.11"
+parking_lot = "0.12"
 # TODO: See https://github.com/Byron/prodash/pull/9.
 prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messages-draft', version = "16", default-features = false, features = ["progress-tree", "render-line", "render-line-termion"] }
 stdio = { path = "../stdio" }
