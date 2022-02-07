@@ -35,8 +35,7 @@ class Nailgun:
 class JdkRequest:
     """Request for a JDK with a specific major version."""
 
-    is_system: bool
-    major_version: str
+    version: str
 
 
 @dataclass(frozen=True)
@@ -111,10 +110,7 @@ async def global_jdk(jvm: JvmSubsystem) -> JdkRequest:
     won't be.
     """
 
-    if jvm.jdk == "system":
-        return JdkRequest(major_version="", is_system=True)
-    else:
-        return JdkRequest(major_version=jvm.jdk, is_system=False)
+    return JdkRequest(jvm.jdk)
 
 
 @rule
@@ -124,10 +120,10 @@ async def setup_jdk(
     nailgun = nailgun_.classpath_entry
 
     # TODO: add support for system JDKs with specific version
-    if jdk.is_system:
+    if jdk.version == "system":
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={jdk.major_version}")
+        coursier_jdk_option = shlex.quote(f"--jvm={jdk.version}")
 
     # TODO(#14386) This argument re-writing code should be done in a more standardised way.
     # See also `run_deploy_jar` for other argument re-writing code.
@@ -177,7 +173,7 @@ async def setup_jdk(
     if not jre_major_version:
         raise ValueError(
             "Pants was unable to parse the output of `java -version` for JDK "
-            f"`{jdk.major_version}`. Please open an issue at "
+            f"`{jdk.version}`. Please open an issue at "
             "https://github.com/pantsbuild/pants/issues/new/choose with the following output:\n\n"
             f"{java_version}"
         )
