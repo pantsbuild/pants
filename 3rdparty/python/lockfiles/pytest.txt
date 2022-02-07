@@ -11,10 +11,10 @@
 #   "generated_with_requirements": [
 #     "ipdb",
 #     "pygments",
-#     "pytest-cov!=2.12.1,<3.1,>=2.12",
+#     "pytest-cov<3.1,>=3",
 #     "pytest-html",
 #     "pytest-icdiff",
-#     "pytest<8,>=6.2.4"
+#     "pytest<8,>=7"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -116,9 +116,9 @@ pluggy==1.0.0; python_version >= "3.6" \
 pprintpp==0.4.0; python_version >= "3.6" \
     --hash=sha256:b6b4dcdd0c0c0d75e4d7b2f21a9e933e5b2ce62b26e1a54537f9651ae5a5c01d \
     --hash=sha256:ea826108e2c7f49dc6d66c752973c3fc9749142a798d6b254e1e301cfdbc6403
-prompt-toolkit==3.0.26; python_full_version >= "3.6.2" and python_version >= "3.7" \
-    --hash=sha256:4bcf119be2200c17ed0d518872ef922f1de336eb6d1ddbd1e089ceb6447d97c6 \
-    --hash=sha256:a51d41a6a45fd9def54365bca8f0402c8f182f2b6f7e29c74d55faeb9fb38ac4
+prompt-toolkit==3.0.27; python_full_version >= "3.6.2" and python_version >= "3.7" \
+    --hash=sha256:cb7dae7d2c59188c85a1d6c944fad19aded6a26bd9c8ae115a4e1c20eb90b713 \
+    --hash=sha256:f2b6a8067a4fb959d3677d1ed764cc4e63e0f6f565b9a4fc7edc2b18bf80217b
 ptyprocess==0.7.0; sys_platform != "win32" and python_version >= "3.7" \
     --hash=sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35 \
     --hash=sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220
