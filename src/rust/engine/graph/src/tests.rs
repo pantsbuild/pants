@@ -624,7 +624,7 @@ async fn cyclic_failure() {
 
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
-    Err(TError::Cyclic)
+    Err(TError::Cyclic(vec![0, 2, 1]))
   );
 }
 
@@ -739,6 +739,10 @@ impl Node for TNode {
 
   fn cacheable(&self) -> bool {
     self.cacheable
+  }
+
+  fn cyclic_error(path: &[&Self]) -> Self::Error {
+    TError::Cyclic(path.iter().map(|n| n.id).collect())
   }
 }
 
@@ -991,15 +995,11 @@ impl Drop for AbortGuard {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
-  Cyclic,
+  Cyclic(Vec<usize>),
   Invalidated,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
-  }
-
-  fn cyclic(_path: Vec<String>) -> Self {
-    TError::Cyclic
   }
 }
