@@ -22,7 +22,7 @@ _IMPORT_REGEX = re.compile(rf"include\s+{_QUOTE_CHAR}{_FILE_NAME}{_QUOTE_CHAR}\s
 
 # NB: We don't specify what a valid namespace looks like to avoid accidentally breaking unicode,
 # but we do limit the namespace language because that is provided by Thrift.
-_NAMESPACE_REGEX = re.compile(r"namespace\s+([a-z]+)\s(.+)\s*")
+_NAMESPACE_REGEX = re.compile(r"namespace\s+([a-z]+)\s+(.+)\s*")
 
 
 @dataclass(frozen=True)
