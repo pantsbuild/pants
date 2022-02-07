@@ -22,6 +22,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
+    JvmCompatibleJdkVersionField,
     JvmCompatibleResolvesField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -67,6 +68,7 @@ class JunitTestTarget(Target):
         Dependencies,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmCompatibleJdkVersionField,
     )
     help = "A single Java test, run with JUnit."
 
@@ -83,6 +85,7 @@ class JunitTestsGeneratorTarget(Target):
         Dependencies,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmCompatibleJdkVersionField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
 
@@ -120,6 +123,7 @@ class JavaSourceTarget(Target):
         JavaSourceField,
         JvmCompatibleResolvesField,
         JvmProvidesTypesField,
+        JvmCompatibleJdkVersionField,
     )
     help = "A single Java source file containing application or library code."
 
@@ -136,6 +140,7 @@ class JavaSourcesGeneratorTarget(Target):
         JavaSourcesGeneratorSourcesField,
         JvmCompatibleResolvesField,
         JvmProvidesTypesField,
+        JvmCompatibleJdkVersionField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 

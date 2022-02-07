@@ -16,11 +16,13 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmCompatibleJdkVersionField
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -318,6 +320,24 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
+
+
+@rule
+async def acceptable_jdk_request(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkRequest:
+
+    # TODO: verify that we're requesting the same JDK version for all members?
+    t = ct.representative
+
+    if not t.has_field(JvmCompatibleJdkVersionField):
+        raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
+
+    version = t[JvmCompatibleJdkVersionField].value
+
+    if version is None:
+        # Return the default
+        return JdkRequest(jvm.jdk)
+
+    return JdkRequest(version)
 
 
 def rules():
