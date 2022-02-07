@@ -27,6 +27,11 @@ from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
+class Nailgun:
+    classpath_entry: ClasspathEntry
+
+
+@dataclass(frozen=True)
 class JdkSetup:
     _digest: Digest
     nailgun_jar: str
@@ -72,7 +77,7 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 
 @rule
-async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> JdkSetup:
+async def fetch_nailgun() -> Nailgun:
     nailgun = await Get(
         ClasspathEntry,
         CoursierLockfileEntry(
@@ -86,6 +91,15 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
             ),
         ),
     )
+
+    return Nailgun(nailgun)
+
+
+@rule
+async def setup_jdk(
+    coursier: Coursier, jvm: JvmSubsystem, nailgun_: Nailgun, bash: BashBinary
+) -> JdkSetup:
+    nailgun = nailgun_.classpath_entry
 
     if jvm.jdk == "system":
         coursier_jdk_option = "--system-jvm"
