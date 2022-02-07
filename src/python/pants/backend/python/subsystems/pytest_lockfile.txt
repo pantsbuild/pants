@@ -9,7 +9,7 @@
 #     "CPython<4,>=3.6"
 #   ],
 #   "generated_with_requirements": [
-#     "pytest-cov<3.1,>=3",
+#     "pytest-cov!=2.12.1,<3.1,>=2.12",
 #     "pytest<8,>=7"
 #   ]
 # }

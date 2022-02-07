@@ -64,7 +64,7 @@ class PyTest(PythonToolBase):
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
     default_version = "pytest>=7,<8"
-    default_extra_requirements = ["pytest-cov>=3,<3.1"]
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
 
