@@ -35,11 +35,7 @@ from pants.backend.python.util_rules.pex_requirements import Lockfile, LockfileC
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import (
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
-    maybe_validate_metadata,
-)
+from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -342,13 +338,7 @@ async def build_pex(
     requirement_count: int
 
     if isinstance(request.requirements, (Lockfile, LockfileContent)):
-        # TODO(#12314): Capture the resolve name for multiple user lockfiles.
-        resolve_name = (
-            request.requirements.options_scope_name
-            if isinstance(request.requirements, (ToolDefaultLockfile, ToolCustomLockfile))
-            else None
-        )
-
+        resolve_name = request.requirements.resolve_name
         if isinstance(request.requirements, Lockfile):
             lock_path = request.requirements.file_path
             requirements_file_digest = await Get(
@@ -363,7 +353,7 @@ async def build_pex(
             lock_bytes = _digest_contents[0].content
 
             def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(lock_bytes, lock_path, resolve_name)
+                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes, lock_path)
 
         else:
             _fc = request.requirements.file_content
@@ -371,7 +361,7 @@ async def build_pex(
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
 
             def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(lock_bytes, resolve_name=resolve_name)
+                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes)
 
         is_monolithic_resolve = True
         argv.extend(["--requirement", lock_path, "--no-transitive"])
