@@ -126,7 +126,7 @@ def memory_size(s: str | int | float) -> int:
 
     def convert_to_bytes(power_of_2) -> int:
         try:
-            return int(float(s[:-3]) * (2 ** power_of_2))  # type: ignore[index]
+            return int(float(s[:-3]) * (2**power_of_2))  # type: ignore[index]
         except TypeError:
             raise invalid
 

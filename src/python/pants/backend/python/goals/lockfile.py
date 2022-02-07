@@ -25,8 +25,9 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -124,7 +125,7 @@ def maybe_warn_python_repos(
 
     if python_repos.repos:
         warn_python_repos("repos")
-    if python_repos.indexes != [python_repos.pypi_index]:
+    if python_repos.indexes != (python_repos.pypi_index,):
         warn_python_repos("indexes")
     return MaybeWarnPythonRepos()
 
@@ -255,7 +256,7 @@ def determine_python_user_resolves(
 ) -> KnownUserResolveNames:
     return KnownUserResolveNames(
         names=tuple(python_setup.resolves.keys()),
-        option_name="[python].experimental_resolves",
+        option_name="[python].resolves",
         requested_resolve_names_cls=RequestedPythonUserResolveNames,
     )
 

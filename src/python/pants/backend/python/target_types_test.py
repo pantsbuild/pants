@@ -9,7 +9,6 @@ from textwrap import dedent
 from typing import Iterable
 
 import pytest
-from _pytest.logging import LogCaptureFixture
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
@@ -120,7 +119,7 @@ def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> N
     assert field.filespec == {"includes": expected}
 
 
-def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
+def test_entry_point_validation(caplog) -> None:
     addr = Address("src/python/project")
 
     with pytest.raises(InvalidFieldException):

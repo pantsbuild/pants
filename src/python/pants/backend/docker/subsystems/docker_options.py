@@ -3,15 +3,18 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from textwrap import dedent
 from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
+from pants.engine.environment import Environment
 from pants.option.custom_types import shell_str
 from pants.option.errors import ParseError
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
 
 doc_links = {
@@ -171,6 +174,19 @@ class DockerOptions(Subsystem):
             ),
         )
 
+        register(
+            "--executable-search-paths",
+            advanced=True,
+            type=list,
+            default=["<PATH>"],
+            metavar="<binary-paths>",
+            help=(
+                "The PATH value that will be used to find the Docker client and any tools required."
+                "\n\n"
+                'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
+            ),
+        )
+
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self.options.build_args)))
@@ -198,3 +214,16 @@ class DockerOptions(Subsystem):
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self.options.registries)
+
+    @memoized_method
+    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
+        def iter_path_entries():
+            for entry in self.options.executable_search_paths:
+                if entry == "<PATH>":
+                    path = env.get("PATH")
+                    if path:
+                        yield from path.split(os.pathsep)
+                else:
+                    yield entry
+
+        return tuple(OrderedSet(iter_path_entries()))

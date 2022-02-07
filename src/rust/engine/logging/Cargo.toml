@@ -12,10 +12,10 @@ chrono = "0.4.10"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.5"
-parking_lot = "0.11"
+parking_lot = "0.12"
 regex = "1"
 stdio = { path = "../stdio" }
-tokio = { version = "1.4" }
+tokio = { version = "1.16" }
 uuid = { version = "0.8", features = ["v4"] }
 
 [build-dependencies]

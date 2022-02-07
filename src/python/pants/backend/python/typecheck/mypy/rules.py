@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonSourceField
+from pants.backend.python.target_types import PythonResolveField, PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -16,20 +16,16 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    PexRequirements,
-    VenvPex,
-    VenvPexProcess,
-)
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -56,6 +52,10 @@ class MyPyPartition:
     root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
     interpreter_constraints: InterpreterConstraints
+
+
+class MyPyPartitions(Collection[MyPyPartition]):
+    pass
 
 
 class MyPyRequest(CheckRequest):
@@ -250,35 +250,35 @@ async def mypy_typecheck_partition(
     )
 
 
-# TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.
-@rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
-async def mypy_typecheck(
+# TODO(#10863): Improve the performance of this, especially by not needing to calculate transitive
+#  targets per field set. Doing that would require changing how we calculate interpreter
+#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
+#  (and later validating the closure is compatible).
+@rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
+async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
-) -> CheckResults:
-    if mypy.skip:
-        return CheckResults([], checker_name=request.name)
-
+) -> MyPyPartitions:
     # When determining how to batch by interpreter constraints, we must consider the entire
     # transitive closure to get the final resulting constraints.
-    # TODO(#10863): Improve the performance of this.
     transitive_targets_per_field_set = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
         for field_set in request.field_sets
     )
 
-    interpreter_constraints_to_transitive_targets = defaultdict(set)
+    resolve_and_interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
+        resolve = transitive_targets.roots[0][PythonResolveField].normalized_value(python_setup)
         interpreter_constraints = (
             InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
             or mypy.interpreter_constraints
         )
-        interpreter_constraints_to_transitive_targets[interpreter_constraints].add(
-            transitive_targets
-        )
+        resolve_and_interpreter_constraints_to_transitive_targets[
+            (resolve, interpreter_constraints)
+        ].add(transitive_targets)
 
     partitions = []
-    for interpreter_constraints, all_transitive_targets in sorted(
-        interpreter_constraints_to_transitive_targets.items()
+    for (_resolve, interpreter_constraints), all_transitive_targets in sorted(
+        resolve_and_interpreter_constraints_to_transitive_targets.items()
     ):
         combined_roots: OrderedSet[Target] = OrderedSet()
         combined_closure: OrderedSet[Target] = OrderedSet()
@@ -286,13 +286,24 @@ async def mypy_typecheck(
             combined_roots.update(transitive_targets.roots)
             combined_closure.update(transitive_targets.closure)
         partitions.append(
+            # Note that we don't need to pass the resolve. pex_from_targets.py will already
+            # calculate it by inspecting the roots & validating that all dependees are valid.
             MyPyPartition(
                 FrozenOrderedSet(combined_roots),
                 FrozenOrderedSet(combined_closure),
                 interpreter_constraints,
             )
         )
+    return MyPyPartitions(partitions)
 
+
+# TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.
+@rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
+async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> CheckResults:
+    if mypy.skip:
+        return CheckResults([], checker_name=request.name)
+
+    partitions = await Get(MyPyPartitions, MyPyRequest, request)
     partitioned_results = await MultiGet(
         Get(CheckResult, MyPyPartition, partition) for partition in partitions
     )

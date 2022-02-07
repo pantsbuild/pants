@@ -299,7 +299,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for the different lockfiles used in your project. "
                 "For your own code's dependencies, these come from the option "
-                "`[python].experimental_resolves`. For tool lockfiles, resolve "
+                "`[python].resolves`. For tool lockfiles, resolve "
                 "names are the options scope for that tool such as `black`, `pytest`, and "
                 "`mypy-protobuf`.\n\n"
                 "For example, you can run `./pants generate-lockfiles --resolve=black "

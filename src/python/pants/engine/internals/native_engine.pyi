@@ -18,6 +18,15 @@ from pants.engine.process import InteractiveProcessResult
 # flake8: noqa: E302
 
 # ------------------------------------------------------------------------------
+# Address (parsing)
+# ------------------------------------------------------------------------------
+
+class AddressParseException(Exception):
+    pass
+
+def address_parse(spec: str) -> tuple[str, str | None, tuple[tuple[str, str], ...], str | None]: ...
+
+# ------------------------------------------------------------------------------
 # Scheduler
 # ------------------------------------------------------------------------------
 

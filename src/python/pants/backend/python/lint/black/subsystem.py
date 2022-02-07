@@ -27,7 +27,7 @@ class Black(PythonToolBase):
     options_scope = "black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==21.12b0"
+    default_version = "black==22.1.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
@@ -37,6 +37,7 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     @classmethod
     def register_options(cls, register):

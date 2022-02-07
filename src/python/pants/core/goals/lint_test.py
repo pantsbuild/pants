@@ -1,10 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, List, Optional, Tuple, Type
+from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
@@ -125,11 +127,12 @@ def make_target(address: Optional[Address] = None) -> Target:
 def run_lint_rule(
     rule_runner: RuleRunner,
     *,
-    lint_request_types: List[Type[LintTargetsRequest]],
-    targets: List[Target],
+    lint_request_types: Sequence[Type[LintTargetsRequest]],
+    targets: list[Target],
     run_files_linter: bool = False,
     per_file_caching: bool = False,
     batch_size: int = 128,
+    only: list[str] | None = None,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
@@ -141,6 +144,7 @@ def run_lint_rule(
         LintSubsystem,
         per_file_caching=per_file_caching,
         batch_size=batch_size,
+        only=only or [],
     )
     specs_snapshot = SpecsSnapshot(rule_runner.make_snapshot_of_empty_files(["f.txt"]))
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
@@ -196,15 +200,18 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
 
+    request_types = [
+        ConditionallySucceedsRequest,
+        FailingRequest,
+        SkippedRequest,
+        SuccessfulRequest,
+    ]
+    targets = [make_target(good_address), make_target(bad_address)]
+
     exit_code, stderr = run_lint_rule(
         rule_runner,
-        lint_request_types=[
-            ConditionallySucceedsRequest,
-            FailingRequest,
-            SkippedRequest,
-            SuccessfulRequest,
-        ],
-        targets=[make_target(good_address), make_target(bad_address)],
+        lint_request_types=request_types,
+        targets=targets,
         per_file_caching=per_file_caching,
         run_files_linter=True,
     )
@@ -216,6 +223,22 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
         𐄂 FailingLinter failed.
         ✓ FilesLinter succeeded.
         ✓ SuccessfulLinter succeeded.
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        per_file_caching=per_file_caching,
+        run_files_linter=True,
+        only=[FailingRequest.name, MockFilesRequest.name],
+    )
+    assert stderr == dedent(
+        """\
+
+        𐄂 FailingLinter failed.
+        ✓ FilesLinter succeeded.
         """
     )
 
