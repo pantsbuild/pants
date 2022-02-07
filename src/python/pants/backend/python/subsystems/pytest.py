@@ -60,7 +60,7 @@ class PyTest(PythonToolBase):
     options_scope = "pytest"
     help = "The pytest Python test framework (https://docs.pytest.org/)."
 
-    # This should be kept in sync with `requirements.txt`.
+    # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
     default_version = "pytest>=7,<8"
