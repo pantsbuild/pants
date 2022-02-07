@@ -10,6 +10,7 @@ from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, Pytho
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV2
 from pants.backend.python.util_rules.pex_requirements import (
+    Lockfile,
     ToolCustomLockfile,
     ToolDefaultLockfile,
     maybe_validate_metadata,
@@ -20,7 +21,8 @@ from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 METADATA = PythonLockfileMetadataV2(
-    InterpreterConstraints(["==3.8.*"]), {PipRequirement.parse("ansicolors")}
+    InterpreterConstraints(["==3.8.*"]),
+    {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
 )
 
 
@@ -32,9 +34,8 @@ def create_tool_lock(
     uses_project_interpreter_constraints: bool = False,
 ) -> ToolDefaultLockfile | ToolCustomLockfile:
     common_kwargs = dict(
-        lockfile_hex_digest=None,
         req_strings=FrozenOrderedSet(req_strings),
-        options_scope_name="my_tool",
+        resolve_name="my_tool",
         uses_source_plugins=uses_source_plugins,
         uses_project_interpreter_constraints=uses_project_interpreter_constraints,
     )
@@ -105,7 +106,7 @@ def test_validate_tool_lockfiles(
         else METADATA.valid_for_interpreter_constraints
     )
     requirements = create_tool_lock(
-        ["bad-req" if invalid_reqs else "ansicolors"],
+        ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements],
         default_lock=is_default_lock,
         uses_source_plugins=uses_source_plugins,
         uses_project_interpreter_constraints=uses_project_ic,
@@ -124,6 +125,11 @@ def test_validate_tool_lockfiles(
     contains("You are using the lockfile at lock.txt", if_=not is_default_lock)
 
     contains("You have set different requirements", if_=invalid_reqs)
+    contains("In the input requirements, but not in the lockfile: ['bad-req']", if_=invalid_reqs)
+    contains(
+        "In the lockfile, but not in the input requirements: ['ansicolors', 'requests']",
+        if_=invalid_reqs,
+    )
     contains(".source_plugins`, and", if_=invalid_reqs and uses_source_plugins)
 
     contains("You have set interpreter constraints", if_=invalid_constraints)
@@ -142,3 +148,48 @@ def test_validate_tool_lockfiles(
     contains(
         "To regenerate your lockfile based on your current configuration", if_=not is_default_lock
     )
+
+
+@pytest.mark.parametrize(
+    "invalid_reqs,invalid_constraints",
+    [
+        (invalid_reqs, invalid_constraints)
+        for invalid_reqs in (True, False)
+        for invalid_constraints in (True, False)
+        if (invalid_reqs or invalid_constraints)
+    ],
+)
+def test_validate_user_lockfiles(
+    invalid_reqs: bool,
+    invalid_constraints: bool,
+    caplog,
+) -> None:
+    runtime_interpreter_constraints = (
+        InterpreterConstraints(["==2.7.*"])
+        if invalid_constraints
+        else METADATA.valid_for_interpreter_constraints
+    )
+    lockfile = Lockfile(
+        file_path="lock.txt",
+        file_path_description_of_origin="foo",
+        resolve_name="a",
+        req_strings=FrozenOrderedSet(
+            ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
+        ),
+    )
+    maybe_validate_metadata(
+        lambda: METADATA,
+        runtime_interpreter_constraints,
+        lockfile,
+        create_python_setup(InvalidLockfileBehavior.warn),
+    )
+
+    def contains(msg: str, if_: bool = True) -> None:
+        assert (msg in caplog.text) is if_
+
+    contains("You are using the lockfile at lock.txt to install the resolve `a`")
+    contains(
+        "The targets use requirements that are not in the lockfile: ['bad-req']", if_=invalid_reqs
+    )
+    contains("The targets use interpreter constraints", if_=invalid_constraints)
+    contains("./pants generate-lockfiles --resolve=a`")
