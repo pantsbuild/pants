@@ -53,7 +53,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    name = "scalafmt"
+    name = ScalafmtSubsystem.options_scope
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):

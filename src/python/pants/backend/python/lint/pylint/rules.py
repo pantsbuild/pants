@@ -3,7 +3,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, List, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -11,7 +11,11 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonResolveField,
+    PythonSourceField,
+)
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -29,49 +33,31 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Addresses
+from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PylintTargetSetup:
-    field_set: PylintFieldSet
-    target_with_dependencies: Targets
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class PylintPartition:
-    field_sets: Tuple[PylintFieldSet, ...]
-    targets_with_dependencies: Targets
+    root_targets: FrozenOrderedSet[Target]
+    closure: FrozenOrderedSet[Target]
     interpreter_constraints: InterpreterConstraints
 
-    def __init__(
-        self,
-        target_setups: Iterable[PylintTargetSetup],
-        interpreter_constraints: InterpreterConstraints,
-    ) -> None:
-        field_sets = []
-        targets_with_deps: List[Target] = []
-        for target_setup in target_setups:
-            field_sets.append(target_setup.field_set)
-            targets_with_deps.extend(target_setup.target_with_dependencies)
 
-        self.field_sets = tuple(field_sets)
-        self.targets_with_dependencies = Targets(targets_with_deps)
-        self.interpreter_constraints = interpreter_constraints
+class PylintPartitions(Collection[PylintPartition]):
+    pass
 
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    name = "Pylint"
+    name = Pylint.options_scope
 
 
 def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
@@ -91,7 +77,7 @@ async def pylint_lint_partition(
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (field_set.address for field_set in partition.field_sets),
+            (t.address for t in partition.root_targets),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -112,11 +98,9 @@ async def pylint_lint_partition(
         ),
     )
 
-    prepare_python_sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies)
-    )
+    prepare_python_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
+        SourceFiles, SourceFilesRequest(t[PythonSourceField] for t in partition.root_targets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -181,8 +165,8 @@ async def pylint_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            concurrency_available=len(partition.field_sets),
-            description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",
+            concurrency_available=len(partition.root_targets),
+            description=f"Run Pylint on {pluralize(len(partition.root_targets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -194,57 +178,70 @@ async def pylint_lint_partition(
     )
 
 
-@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
-async def pylint_lint(
-    request: PylintRequest,
-    pylint: Pylint,
-    python_setup: PythonSetup,
-    first_party_plugins: PylintFirstPartyPlugins,
-) -> LintResults:
-    if pylint.skip:
-        return LintResults([], linter_name=request.name)
-
-    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
-    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    linted_targets = await Get(
-        Targets, Addresses(field_set.address for field_set in request.field_sets)
-    )
+# TODO(#10863): Improve the performance of this, especially by not needing to calculate transitive
+#  targets per field set. Doing that would require changing how we calculate interpreter
+#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
+#  (and later validating the closure is compatible).
+@rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
+async def pylint_determine_partitions(
+    request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
+) -> PylintPartitions:
+    # We batch targets by their interpreter constraints + resolve to ensure, for example, that all
+    # Python targets run together and all Python 3 targets run together.
+    #
+    # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
+    # targets in this interpreter constraints calculation. However, we don't have to consider the
+    # resolve of the plugin targets, per https://github.com/pantsbuild/pants/issues/14320.
     transitive_targets_per_field_set = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
         for field_set in request.field_sets
     )
 
-    # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
-    # targets run together and all Python 3 targets run together.
-    # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
-    # targets in this interpreter constraints calculation.
-    interpreter_constraints_to_target_setup = defaultdict(set)
-    for field_set, tgt, transitive_targets in zip(
-        request.field_sets, linted_targets, transitive_targets_per_field_set
-    ):
-        target_setup = PylintTargetSetup(field_set, Targets([tgt, *transitive_targets.closure]))
+    resolve_and_interpreter_constraints_to_transitive_targets = defaultdict(set)
+    for transitive_targets in transitive_targets_per_field_set:
+        resolve = transitive_targets.roots[0][PythonResolveField].normalized_value(python_setup)
         interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
             (
                 *(
                     tgt[InterpreterConstraintsField]
-                    for tgt in [tgt, *transitive_targets.closure]
+                    for tgt in transitive_targets.closure
                     if tgt.has_field(InterpreterConstraintsField)
                 ),
                 *first_party_plugins.interpreter_constraints_fields,
             ),
             python_setup,
         )
-        interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
+        resolve_and_interpreter_constraints_to_transitive_targets[
+            (resolve, interpreter_constraints)
+        ].add(transitive_targets)
 
-    partitions = (
-        PylintPartition(
-            tuple(sorted(target_setups, key=lambda tgt_setup: tgt_setup.field_set.address)),
-            interpreter_constraints,
+    partitions = []
+    for (_resolve, interpreter_constraints), all_transitive_targets in sorted(
+        resolve_and_interpreter_constraints_to_transitive_targets.items()
+    ):
+        combined_roots: OrderedSet[Target] = OrderedSet()
+        combined_closure: OrderedSet[Target] = OrderedSet()
+        for transitive_targets in all_transitive_targets:
+            combined_roots.update(transitive_targets.roots)
+            combined_closure.update(transitive_targets.closure)
+        partitions.append(
+            # Note that we don't need to pass the resolve. pex_from_targets.py will already
+            # calculate it by inspecting the roots & validating that all dependees are valid.
+            PylintPartition(
+                FrozenOrderedSet(combined_roots),
+                FrozenOrderedSet(combined_closure),
+                interpreter_constraints,
+            )
         )
-        for interpreter_constraints, target_setups in sorted(
-            interpreter_constraints_to_target_setup.items()
-        )
-    )
+    return PylintPartitions(partitions)
+
+
+@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
+async def pylint_lint(request: PylintRequest, pylint: Pylint) -> LintResults:
+    if pylint.skip:
+        return LintResults([], linter_name=request.name)
+
+    partitions = await Get(PylintPartitions, PylintRequest, request)
     partitioned_results = await MultiGet(
         Get(LintResult, PylintPartition, partition) for partition in partitions
     )

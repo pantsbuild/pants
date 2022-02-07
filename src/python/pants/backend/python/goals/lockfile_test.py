@@ -91,17 +91,17 @@ def test_multiple_resolves() -> None:
                 python_requirement(
                     name='both',
                     requirements=['both1', 'both2'],
-                    experimental_compatible_resolves=['a', 'b'],
+                    compatible_resolves=['a', 'b'],
                 )
                 python_requirement(
                     name='a',
                     requirements=['a'],
-                    experimental_compatible_resolves=['a'],
+                    compatible_resolves=['a'],
                 )
                 python_requirement(
                     name='b',
                     requirements=['b'],
-                    experimental_compatible_resolves=['b'],
+                    compatible_resolves=['b'],
                 )
                 """
             ),
@@ -109,9 +109,9 @@ def test_multiple_resolves() -> None:
     )
     rule_runner.set_options(
         [
-            "--python-experimental-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
             # Override interpreter constraints for 'b', but use default for 'a'.
-            "--python-experimental-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
+            "--python-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
             "--python-enable-resolves",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,

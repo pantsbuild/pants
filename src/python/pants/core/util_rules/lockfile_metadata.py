@@ -98,7 +98,7 @@ class LockfileMetadata:
             "`./pants generate-lockfiles"
         )
         if resolve_name:
-            error_suffix += " --resolve={tool_name}"
+            error_suffix += f" --resolve={resolve_name}"
         error_suffix += "`."
 
         if lockfile_path is not None and resolve_name is not None:

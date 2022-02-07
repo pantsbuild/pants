@@ -396,7 +396,7 @@ async def validate_goal(
 
 
 class RegexLintRequest(LintFilesRequest):
-    name = "regex-lint"
+    name = RegexLintSubsystem.options_scope
 
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)

@@ -157,9 +157,9 @@ class HelpPrinter(MaybeColor):
         self._print_title("Subsystems")
 
         subsystem_description: Dict[str, str] = {}
-        for alias, help_info in self._all_help_info.scope_to_help_info.items():
-            if not help_info.is_goal and alias:
-                subsystem_description[alias] = first_paragraph(help_info.description)
+        for help_info in self._all_help_info.non_deprecated_option_scope_help_infos():
+            if not help_info.is_goal and help_info.scope:
+                subsystem_description[help_info.scope] = first_paragraph(help_info.description)
 
         longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
         chars_before_description = longest_subsystem_alias + 2

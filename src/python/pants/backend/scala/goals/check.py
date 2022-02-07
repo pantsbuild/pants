@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ScalacCheckRequest(CheckRequest):
     field_set_type = ScalaFieldSet
-    name = "scalac"
+    name = Scalac.options_scope
 
 
 @rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)

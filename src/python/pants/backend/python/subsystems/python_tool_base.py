@@ -8,9 +8,7 @@ from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Lockfile,
-    LockfileContent,
+from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ToolCustomLockfile,
     ToolDefaultLockfile,
@@ -137,7 +135,7 @@ class PythonToolRequirementsBase(Subsystem):
         self,
         *,
         extra_requirements: Iterable[str] = (),
-    ) -> PexRequirements | Lockfile | LockfileContent:
+    ) -> PexRequirements | ToolDefaultLockfile | ToolCustomLockfile:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
@@ -160,7 +158,7 @@ class PythonToolRequirementsBase(Subsystem):
                 ),
                 lockfile_hex_digest=hex_digest,
                 req_strings=FrozenOrderedSet(requirements),
-                options_scope_name=self.options_scope,
+                resolve_name=self.options_scope,
                 uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
                 uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
@@ -169,7 +167,7 @@ class PythonToolRequirementsBase(Subsystem):
             file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
             lockfile_hex_digest=hex_digest,
             req_strings=FrozenOrderedSet(requirements),
-            options_scope_name=self.options_scope,
+            resolve_name=self.options_scope,
             uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
             uses_source_plugins=self.uses_requirements_from_source_plugins,
         )

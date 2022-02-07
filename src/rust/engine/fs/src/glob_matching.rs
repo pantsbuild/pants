@@ -344,7 +344,7 @@ impl PreparedPathGlobs {
     self
       .patterns
       .iter()
-      .any(|pattern| pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS))
+      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS))
       && !self.exclude.is_ignored_path(path, false)
   }
 }
