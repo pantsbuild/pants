@@ -212,7 +212,11 @@ async def update_build_files(
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
         if issubclass(request, (FormatWithBlackRequest, FormatWithYapfRequest)):
-            if update_build_files_subsystem.fmt:
+            is_chosen_formatter = issubclass(request, FormatWithBlackRequest) ^ (
+                update_build_files_subsystem.formatter == Formatter.YAPF
+            )
+
+            if update_build_files_subsystem.fmt and is_chosen_formatter:
                 rewrite_request_classes.append(request)
             else:
                 continue
@@ -324,6 +328,7 @@ async def format_build_file_with_yapf(
     if yapf.config:
         argv.extend(["--config", yapf.config])
     argv.extend(yapf.args)
+    argv.append("--in-place")  # modify files in place
     argv.append(request.path)
 
     yapf_result = await Get(
