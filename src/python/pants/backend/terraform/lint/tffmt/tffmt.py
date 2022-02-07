@@ -41,7 +41,7 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtRequest):
     field_set_type = TerraformFieldSet
-    name = "tffmt"
+    name = TfFmtSubsystem.options_scope
 
 
 @rule(desc="Format with `terraform fmt`")

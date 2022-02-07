@@ -40,7 +40,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtRequest, LintTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    name = "Google Java Format"
+    name = GoogleJavaFormatSubsystem.options_scope
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):

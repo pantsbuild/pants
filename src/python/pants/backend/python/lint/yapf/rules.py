@@ -35,7 +35,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtRequest, LintTargetsRequest):
     field_set_type = YapfFieldSet
-    name = "yapf"
+    name = Yapf.options_scope
 
 
 @dataclass(frozen=True)

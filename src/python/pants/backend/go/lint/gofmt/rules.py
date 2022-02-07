@@ -38,7 +38,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtRequest):
     field_set_type = GofmtFieldSet
-    name = "gofmt"
+    name = GofmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
