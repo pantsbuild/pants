@@ -12,7 +12,6 @@ from textwrap import dedent
 from typing import Any, Dict, Iterable, List, cast
 
 import pytest
-from _pytest.tmpdir import TempPathFactory
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -244,9 +243,11 @@ def requirements(rule_runner: RuleRunner, pex: Pex) -> list[str]:
     return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
-def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
+def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None:
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
     find_links = create_dists(
-        tmp_path_factory.mktemp("sdists"),
+        sdists,
         Project("Foo-Bar", "1.0.0"),
         Project("Bar", "5.5.5"),
         Project("baz", "2.2.2"),
@@ -254,7 +255,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     # Turn the project dir into a git repo, so it can be cloned.
-    foorl_dir = create_project_dir(tmp_path_factory.mktemp("git"), Project("foorl", "9.8.7"))
+    gitdir = tmp_path / "git"
+    gitdir.mkdir()
+    foorl_dir = create_project_dir(gitdir, Project("foorl", "9.8.7"))
     with pushd(str(foorl_dir)):
         subprocess.check_call(["git", "init"])
         subprocess.check_call(["git", "config", "user.name", "dummy"])
@@ -367,9 +370,11 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
 
 @pytest.mark.parametrize("include_requirements", [False, True])
 def test_exclude_requirements(
-    include_requirements: bool, tmp_path_factory: TempPathFactory, rule_runner: RuleRunner
+    include_requirements: bool, tmp_path: Path, rule_runner: RuleRunner
 ) -> None:
-    find_links = create_dists(tmp_path_factory.mktemp("sdists"), Project("baz", "2.2.2"))
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
+    find_links = create_dists(sdists, Project("baz", "2.2.2"))
 
     rule_runner.write_files(
         {

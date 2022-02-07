@@ -34,7 +34,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FmtRequest, LintTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    name = "pyupgrade"
+    name = PyUpgrade.options_scope
 
 
 @dataclass(frozen=True)

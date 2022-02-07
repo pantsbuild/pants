@@ -9,9 +9,9 @@ target(
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
+        "src/python/pants/backend/codegen/thrift/apache/python",
         "src/python/pants/backend/docker",
         "src/python/pants/backend/docker/lint/hadolint",
-        "src/python/pants/backend/experimental/codegen/thrift/apache/python",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
         "src/python/pants/backend/experimental/docker/lint/hadolint",
