@@ -145,6 +145,34 @@ async def determine_macro_changes(all_targets: AllTargets, _: MacroRenamesReques
     return MacroRenames(tuple(sorted(generators)), FrozenDict(sorted(generated.items())))
 
 
+def maybe_address(val: str, renames: MacroRenames, *, relative_to: str | None) -> Address | None:
+    # All macros generate targets with a `name`, so we know they must have `:`. We know they
+    # also can't have `#` because they're not generated targets syntax.
+    if ":" not in val or "#" in val:
+        return None
+
+    try:
+        # We assume that all addresses are normal addresses, rather than file addresses, as
+        # we know that none of the generated targets will be file addresses. That is, we can
+        # ignore file addresses.
+        addr = AddressInput.parse(val, relative_to=relative_to).dir_to_address()
+    except InvalidAddress:
+        return None
+
+    return addr if addr in renames.generated else None
+
+
+def new_addr_spec(original_val: str, new_addr: Address) -> str:
+    # Preserve relative addresses (`:tgt`), else use the normalized spec.
+    if original_val.startswith(":"):
+        return (
+            f"#{new_addr.generated_name}"
+            if new_addr.is_default_target
+            else f":{new_addr.target_name}#{new_addr.generated_name}"
+        )
+    return new_addr.spec
+
+
 class UpdatePythonMacrosRequest(DeprecationFixerRequest):
     pass
 
@@ -184,22 +212,8 @@ async def maybe_update_macros_references(
             val = line[token.start[1] + 1 : token.end[1] - 1]
             suffix = line[token.end[1] - 1 :]
 
-            # All macros generate targets with a `name`, so we know they must have `:`. We know they
-            # also can't have `#` because they're not generated targets syntax.
-            if ":" not in val or "#" in val:
-                continue
-
-            try:
-                # We assume that all addresses are normal addresses, rather than file addresses, as
-                # we know that none of the generated targets will be file addresses. That is, we can
-                # ignore file addresses.
-                addr = AddressInput.parse(
-                    val, relative_to=os.path.dirname(request.path)
-                ).dir_to_address()
-            except InvalidAddress:
-                continue
-
-            if addr not in renames.generated:
+            addr = maybe_address(val, renames, relative_to=os.path.dirname(request.path))
+            if addr is None:
                 continue
 
             # If this line has already been changed, we need to re-tokenize it before we can
@@ -208,16 +222,7 @@ async def maybe_update_macros_references(
                 return maybe_update(tuple(updated_text_lines))
 
             new_addr, generator_alias = renames.generated[addr]
-
-            # Preserve relative addresses (`:tgt`), else use the normalized spec.
-            if val.startswith(":"):
-                new_val = (
-                    f"#{new_addr.generated_name}"
-                    if new_addr.is_default_target
-                    else f":{new_addr.target_name}#{new_addr.generated_name}"
-                )
-            else:
-                new_val = new_addr.spec
+            new_val = new_addr_spec(val, new_addr)
 
             updated_text_lines[line_index] = f"{prefix}{new_val}{suffix}"
             changed_line_indexes.add(line_index)
