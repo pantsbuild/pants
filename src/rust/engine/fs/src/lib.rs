@@ -570,7 +570,7 @@ impl PosixFS {
               ))
             } else {
               link_parent
-                .map(|parent| parent.join(path_buf))
+                .map(|parent| parent.join(&path_buf))
                 .ok_or_else(|| {
                   io::Error::new(
                     io::ErrorKind::InvalidData,
