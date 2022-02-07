@@ -2,16 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import Set
 
 import pytest
 
 from pants.backend.codegen.thrift import dependency_inference
-from pants.backend.codegen.thrift.dependency_inference import (
-    InferThriftDependencies,
-    ThriftMapping,
-    parse_thrift_imports,
-)
+from pants.backend.codegen.thrift.dependency_inference import InferThriftDependencies, ThriftMapping
 from pants.backend.codegen.thrift.target_types import (
     ThriftSourceField,
     ThriftSourcesGeneratorTarget,
@@ -22,43 +17,6 @@ from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
-
-
-@pytest.mark.parametrize(
-    "file_content,expected",
-    [
-        ("include 'foo.thrift'", {"foo.thrift"}),
-        ("include'foo.thrift'", {"foo.thrift"}),
-        ("include\t   'foo.thrift'   \t", {"foo.thrift"}),
-        ('include "foo.thrift"', {"foo.thrift"}),
-        # We don't worry about matching opening and closing ' vs. " quotes; Thrift will error if
-        # invalid.
-        ("include 'foo.thrift\"", {"foo.thrift"}),
-        ("include \"foo.thrift'", {"foo.thrift"}),
-        # More complex file names.
-        ("include 'path/to_dir/f.thrift'", {"path/to_dir/f.thrift"}),
-        ("include 'path\\to-dir\\f.thrift'", {"path\\to-dir\\f.thrift"}),
-        ("include 'âčĘï.thrift'", {"âčĘï.thrift"}),
-        ("include '123.thrift'", {"123.thrift"}),
-        # Invalid includes.
-        ("include foo.thrift", set()),
-        ("inlude 'foo.thrift'", set()),
-        # Multiple includes in a file.
-        ("include 'foo.thrift'; include \"bar.thrift\";", {"foo.thrift", "bar.thrift"}),
-        (
-            dedent(
-                """\
-                include 'dir/foo.thrift'
-                some random thrift code;
-                include 'ábč.thrift';
-                """
-            ),
-            {"dir/foo.thrift", "ábč.thrift"},
-        ),
-    ],
-)
-def test_parse_thrift_imports(file_content: str, expected: Set[str]) -> None:
-    assert set(parse_thrift_imports(file_content)) == expected
 
 
 @pytest.fixture
