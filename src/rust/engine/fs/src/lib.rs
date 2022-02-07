@@ -566,7 +566,7 @@ impl PosixFS {
             if path_buf.is_absolute() {
               Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
+                format!("Absolute symlink: {:?}", path_buf),
               ))
             } else {
               link_parent
@@ -574,7 +574,7 @@ impl PosixFS {
                 .ok_or_else(|| {
                   io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
+                    format!("Symlink without a parent?: {:?}", path_buf),
                   )
                 })
             }
