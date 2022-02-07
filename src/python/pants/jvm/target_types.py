@@ -7,6 +7,7 @@ from abc import ABCMeta
 from typing import Optional
 
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -237,6 +238,7 @@ class DeployJarTarget(Target):
         OutputPathField,
         JvmMainClassNameField,
         JvmResolveField,
+        RestartableField,
     )
     help = (
         "A `jar` file with first and third-party code bundled for deploys.\n\n"
