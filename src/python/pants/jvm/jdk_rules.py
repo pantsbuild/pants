@@ -227,6 +227,7 @@ async def prepare_jdk_environment(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class JvmProcess:
+    jdk: JdkEnvironment
     argv: tuple[str, ...]
     classpath_entries: tuple[str, ...]
     input_digest: Digest
@@ -244,6 +245,7 @@ class JvmProcess:
 
     def __init__(
         self,
+        jdk: JdkEnvironment,
         argv: Iterable[str],
         classpath_entries: Iterable[str],
         input_digest: Digest,
@@ -259,7 +261,7 @@ class JvmProcess:
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
     ):
-
+        self.jdk = jdk
         self.argv = tuple(argv)
         self.classpath_entries = tuple(classpath_entries)
         self.input_digest = input_digest
@@ -283,9 +285,9 @@ class JvmProcess:
 
 
 @rule
-async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess) -> Process:
+async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
-    jdk = jdk_setup.jdk
+    jdk = request.jdk
 
     immutable_input_digests = {
         **jdk.immutable_input_digests,

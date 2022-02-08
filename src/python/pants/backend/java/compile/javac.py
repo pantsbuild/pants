@@ -41,7 +41,7 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
 @rule(desc="Compile with javac")
 async def compile_java_source(
     bash: BashBinary,
-    jdk_setup: JdkSetup,  # TODO: Stop injecting this
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
     union_membership: UnionMembership,
@@ -157,6 +157,7 @@ async def compile_java_source(
     compile_result = await Get(
         FallibleProcessResult,
         JvmProcess(
+            jdk=jdk_setup.jdk,
             classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",

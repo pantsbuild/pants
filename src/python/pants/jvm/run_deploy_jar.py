@@ -36,7 +36,7 @@ class __RuntimeJvm:
 @rule(level=LogLevel.DEBUG)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
-    jdk_setup: JdkSetup,
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
 ) -> RunRequest:
     jdk = jdk_setup.jdk
 
@@ -53,6 +53,7 @@ async def create_deploy_jar_run_request(
     proc = await Get(
         Process,
         JvmProcess(
+            jdk=jdk_setup.jdk,
             classpath_entries=[f"{{chroot}}/{jar_path}"],
             argv=(main_class,),
             input_digest=package.digest,
@@ -112,6 +113,7 @@ async def ensure_jdk_for_pants_run(jdk: JdkEnvironment) -> __RuntimeJvm:
     ensure_jvm_process = await Get(
         Process,
         JvmProcess(
+            jdk=jdk,
             classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=["com.sun.tools.javac.Main", "--version"],
             input_digest=EMPTY_DIGEST,

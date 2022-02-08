@@ -92,6 +92,7 @@ async def build_processors(jdk_setup: JdkSetup) -> JavaParserCompiledClassfiles:
     process_result = await Get(
         ProcessResult,
         JvmProcess(
+            jdk=jdk,
             classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",
