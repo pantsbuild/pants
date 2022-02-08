@@ -23,7 +23,6 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1291,17 +1290,35 @@ class GlobalOptions(Subsystem):
             "--use-deprecated-python-macros",
             advanced=True,
             type=bool,
-            default=True,
+            default=False,
             help=(
-                "If true, continue using Pants's deprecated macro system for "
+                "If true, use Pants's deprecated macro system for "
                 "`python_requirements`, `poetry_requirements`, and `pipenv_requirements` "
                 "rather than target generation.\n\n"
-                "The address for target generation is different. Rather than "
-                "`3rdparty/python:Django`, the address will look like `3rdparty/python#Django`. "
-                "The target generator (`python_requirements` et al) is a "
-                "target itself now, meaning you can give it a `name`. If the target generator "
+                "The address for macros is different. Rather than "
+                "`3rdparty/python#Django`, the address will look like `3rdparty/python:Django`. "
+                "The macro (`python_requirements` et al) also was not a proper target, meaning "
+                "that you could not give it a `name`. In contrast, if the target generator "
                 "sets its `name`, e.g. to `reqs`, generated targets will have an address like "
                 "`3rdparty/python:reqs#Django`."
+            ),
+            removal_version="2.12.0.dev0",
+            removal_hint=(
+                "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
+                "replaced with improved target generators, which are now enabled by "
+                "default.\n\n"
+                "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
+                "delete the option.\n\n"
+                "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
+                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                "  2. Check the logs for an ERROR log to see if you have to manually add "
+                "`name=` anywhere.\n"
+                "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
+                "pants.toml.\n\n"
+                "You can ignore this warning with `[GLOBAL].ignore_warnings`."
+                "(Why upgrade from the old macro mechanism to target generation? Among other "
+                "benefits, it makes sure that the Pants daemon is properly invalidated when you "
+                "change `requirements.txt` and `pyproject.toml`.)"
             ),
         )
 
@@ -1624,28 +1641,3 @@ class ProcessCleanupOption:
     """
 
     val: bool
-
-
-def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer) -> None:
-    if (
-        bootstrap_options.is_default("use_deprecated_python_macros")
-        and "pants.backend.python" in bootstrap_options.backend_packages
-    ):
-        warn_or_error(
-            "2.11.0.dev0",
-            "the option `--use-deprecated-python-macros` defaulting to true",
-            (
-                "In Pants 2.11, the default for the global option "
-                "`--use-deprecated-python-macros` will change to false.\n\n"
-                "To fix this deprecation, explicitly set `use_deprecated_python_macros = true` in "
-                "the `[GLOBAL]` section of `pants.toml`. Or, when you are ready to upgrade to "
-                "the improved target generation mechanism, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
-                "  2. Check the logs for an ERROR log to see if you have to manually add "
-                "`name=` anywhere.\n"
-                "  3. Set `use_deprecated_python_macros = false` in `[GLOBAL]` in pants.toml.\n\n"
-                "(Why upgrade from the old macro mechanism to target generation? Among other "
-                "benefits, it makes sure that the Pants daemon is properly invalidated when you "
-                "change `requirements.txt` and `pyproject.toml`.)"
-            ),
-        )
