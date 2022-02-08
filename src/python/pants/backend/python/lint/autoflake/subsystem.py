@@ -38,7 +38,7 @@ class Autoflake(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=(f"Don't use Autoflake when running `{bin_name()} fmt` and `{bin_name()} lint`"),
+            help=f"Don't use Autoflake when running `{bin_name()} fmt` and `{bin_name()} lint`",
         )
         register(
             "--args",
