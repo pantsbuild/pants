@@ -130,7 +130,6 @@ def run_lint_rule(
     lint_request_types: Sequence[Type[LintTargetsRequest]],
     targets: list[Target],
     run_files_linter: bool = False,
-    per_file_caching: bool = False,
     batch_size: int = 128,
     only: list[str] | None = None,
 ) -> Tuple[int, str]:
@@ -142,7 +141,6 @@ def run_lint_rule(
     )
     lint_subsystem = create_goal_subsystem(
         LintSubsystem,
-        per_file_caching=per_file_caching,
         batch_size=batch_size,
         only=only or [],
     )
@@ -177,20 +175,15 @@ def run_lint_rule(
         return result.exit_code, stdio_reader.get_stderr()
 
 
-@pytest.mark.parametrize("per_file_caching", [True, False])
-def test_invalid_target_noops(rule_runner: RuleRunner, per_file_caching: bool) -> None:
+def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_lint_rule(
-        rule_runner,
-        lint_request_types=[InvalidRequest],
-        targets=[make_target()],
-        per_file_caching=per_file_caching,
+        rule_runner, lint_request_types=[InvalidRequest], targets=[make_target()]
     )
     assert exit_code == 0
     assert stderr == ""
 
 
-@pytest.mark.parametrize("per_file_caching", [True, False])
-def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
+def test_summary(rule_runner: RuleRunner) -> None:
     """Test that we render the summary correctly.
 
     This tests that we:
@@ -212,7 +205,6 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
         rule_runner,
         lint_request_types=request_types,
         targets=targets,
-        per_file_caching=per_file_caching,
         run_files_linter=True,
     )
     assert exit_code == FailingRequest.exit_code([bad_address])
@@ -230,7 +222,6 @@ def test_summary(rule_runner: RuleRunner, per_file_caching: bool) -> None:
         rule_runner,
         lint_request_types=request_types,
         targets=targets,
-        per_file_caching=per_file_caching,
         run_files_linter=True,
         only=[FailingRequest.name, MockFilesRequest.name],
     )
