@@ -35,7 +35,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtRequest, LintTargetsRequest):
     field_set_type = IsortFieldSet
-    name = "isort"
+    name = Isort.options_scope
 
 
 @dataclass(frozen=True)

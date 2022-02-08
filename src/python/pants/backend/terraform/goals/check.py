@@ -37,7 +37,7 @@ class TerraformValidateSubsystem(Subsystem):
 
 class TerraformCheckRequest(CheckRequest):
     field_set_type = TerraformFieldSet
-    name = "terraform validate"
+    name = TerraformValidateSubsystem.options_scope
 
 
 @rule

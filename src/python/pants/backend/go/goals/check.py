@@ -24,7 +24,7 @@ class GoCheckFieldSet(FieldSet):
 
 class GoCheckRequest(CheckRequest):
     field_set_type = GoCheckFieldSet
-    name = "go compile"
+    name = "go-compile"
 
 
 @rule(desc="Check Go compilation", level=LogLevel.DEBUG)

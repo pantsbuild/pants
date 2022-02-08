@@ -34,7 +34,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ShfmtFieldSet
-    name = "shfmt"
+    name = Shfmt.options_scope
 
 
 @dataclass(frozen=True)

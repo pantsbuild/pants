@@ -34,7 +34,7 @@ class DocformatterFieldSet(FieldSet):
 
 class DocformatterRequest(FmtRequest, LintTargetsRequest):
     field_set_type = DocformatterFieldSet
-    name = "Docformatter"
+    name = Docformatter.options_scope
 
 
 @dataclass(frozen=True)

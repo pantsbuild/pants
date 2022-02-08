@@ -11,7 +11,6 @@ from textwrap import dedent
 from typing import Iterator
 
 import pytest
-from _pytest.tmpdir import TempPathFactory
 
 from pants.util.contextutil import environment_as, pushd
 from pants.vcs.git import Git, GitException
@@ -26,21 +25,26 @@ def init_repo(remote_name: str, remote: PurePath) -> None:
 
 
 @pytest.fixture
-def origin(tmp_path_factory: TempPathFactory) -> PurePath:
-    origin = tmp_path_factory.mktemp("origin")
-    with pushd(str(origin)):
+def origin(tmp_path: Path) -> Path:
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    with pushd(origin.as_posix()):
         subprocess.check_call(["git", "init", "--bare", "--initial-branch=main"])
     return origin
 
 
 @pytest.fixture
-def gitdir(tmp_path_factory: TempPathFactory) -> PurePath:
-    return tmp_path_factory.mktemp("gitdir")
+def gitdir(tmp_path: Path) -> Path:
+    gitdir = tmp_path / "gitdir"
+    gitdir.mkdir()
+    return gitdir
 
 
 @pytest.fixture
-def worktree(tmp_path_factory: TempPathFactory) -> Path:
-    return tmp_path_factory.mktemp("worktree")
+def worktree(tmp_path: Path) -> Path:
+    wt = tmp_path / "worktree"
+    wt.mkdir()
+    return wt
 
 
 @pytest.fixture
@@ -102,9 +106,10 @@ def test_integration(worktree: Path, readme_file: Path, git: Git) -> None:
     assert set() == git.changed_files(relative_to="non-existent")
 
 
-def test_detect_worktree(tmp_path_factory: TempPathFactory, origin: PurePath, git: Git) -> None:
-    clone = tmp_path_factory.mktemp("clone").resolve()
-    with pushd(str(clone)):
+def test_detect_worktree(tmp_path: Path, origin: PurePath, git: Git) -> None:
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    with pushd(clone.as_posix()):
         init_repo("origin", origin)
         subprocess.check_call(["git", "pull", "--tags", "origin", "main:main"])
 
@@ -125,11 +130,10 @@ def test_detect_worktree(tmp_path_factory: TempPathFactory, origin: PurePath, gi
         worktree_relative_to("is/a/dir", clone)
 
 
-def test_detect_worktree_no_cwd(
-    tmp_path_factory: TempPathFactory, origin: PurePath, git: Git
-) -> None:
-    clone = tmp_path_factory.mktemp("clone").resolve()
-    with pushd(str(clone)):
+def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: Git) -> None:
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    with pushd(clone.as_posix()):
         init_repo("origin", origin)
         subprocess.check_call(["git", "pull", "--tags", "origin", "main:main"])
 
@@ -234,10 +238,11 @@ def test_bad_ref_stderr_issues_13396(git: Git) -> None:
 
 
 @pytest.fixture
-def empty_path(tmp_path_factory: TempPathFactory) -> Iterator[Path]:
-    path = tmp_path_factory.mktemp(basename="bin")
-    with environment_as(PATH=str(path)):
-        yield path
+def empty_path(tmp_path: Path) -> Iterator[Path]:
+    bin = tmp_path / "bin"
+    bin.mkdir()
+    with environment_as(PATH=bin.as_posix()):
+        yield bin
 
 
 @pytest.fixture
