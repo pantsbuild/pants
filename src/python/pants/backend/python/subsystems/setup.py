@@ -12,7 +12,6 @@ from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.memo import memoized_property
-from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
 

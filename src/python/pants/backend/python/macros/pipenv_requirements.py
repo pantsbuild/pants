@@ -33,7 +33,6 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    StringField,
     Target,
 )
 from pants.engine.unions import UnionRule
