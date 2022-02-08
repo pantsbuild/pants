@@ -102,9 +102,11 @@ async def package_pyoxidizer_binary(
         entry_point=field_set.entry_point.value,
         wheels=wheels,
         template=config_template,
-        unclassified_resources=None
-        if not field_set.unclassified_resources.value
-        else list(field_set.unclassified_resources.value),
+        unclassified_resources=(
+            None
+            if not field_set.unclassified_resources.value
+            else list(field_set.unclassified_resources.value)
+        ),
     )
 
     rendered_config = config.render()
