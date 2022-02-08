@@ -54,9 +54,22 @@ logger = logging.getLogger(__name__)
 class DockerfileImageTagsDeprecation(DeprecatedDockerInterpolationValue):
     _removal_version = "2.11.0.dev0"
     _hint = (
-        "The `<stage>.tag` version values are deprecated in favour of `tags.<stage>`.\n\n"
+        "The `<stage>.tag` version values are deprecated in favour of `tags.<stage>`.\n"
         "See https://github.com/pantsbuild/pants/issues/14023 for more details."
     )
+
+    @classmethod
+    def for_tag(cls, tag: str, address: Address) -> type[DockerfileImageTagsDeprecation]:
+        return type(
+            f"{cls.__name__}_{tag}",
+            (cls,),
+            {
+                "_hint": (
+                    f"Interpolation in {address} uses the deprecated placeholder '{tag}.{{key}}', "
+                    f"instead use 'tags.{tag}'.\n\n" + cls._hint
+                )
+            },
+        )
 
 
 class DockerBuildContextError(Exception):
@@ -138,11 +151,14 @@ class DockerBuildContext:
 
             # The remaining part of this for loop is deprecated.
             # TODO: remove in 2.11.0.dev0
-            value = DockerfileImageTagsDeprecation({"tag": tag})
             if idx == 0:
                 # Expose the first (stage0) FROM directive as the "baseimage".
-                interpolation_context["baseimage"] = value
-            interpolation_context[stage] = value
+                interpolation_context["baseimage"] = DockerfileImageTagsDeprecation.for_tag(
+                    "baseimage", dockerfile_info.address
+                )({"tag": tag})
+            interpolation_context[stage] = DockerfileImageTagsDeprecation.for_tag(
+                stage, dockerfile_info.address
+            )({"tag": tag})
 
         if build_args:
             # Extract default arg values from the parsed Dockerfile.

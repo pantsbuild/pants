@@ -45,7 +45,7 @@ class DeprecatedDockerInterpolationValue(DockerInterpolationValue):
         warn_or_error(
             self._removal_version,
             f"Docker interpolation context type {type(self).__name__!r}",
-            self._hint,
+            self._hint.format(key=attribute) if self._hint else None,
         )
         return super().__getattr__(attribute)
 

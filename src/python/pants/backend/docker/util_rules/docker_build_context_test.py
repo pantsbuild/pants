@@ -121,8 +121,9 @@ def assert_build_context(
         if "pants" not in expected_interpolation_context:
             expected_interpolation_context["pants"] = context.interpolation_context["pants"]
 
-        assert context.interpolation_context == DockerInterpolationContext.from_dict(
-            expected_interpolation_context
+        # Converting to `dict` to avoid the fact that FrozenDict is sensitive to the order of the keys.
+        assert dict(context.interpolation_context) == dict(
+            DockerInterpolationContext.from_dict(expected_interpolation_context)
         )
 
     return context
