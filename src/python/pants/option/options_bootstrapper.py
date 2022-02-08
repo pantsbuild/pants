@@ -21,6 +21,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
+from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
@@ -192,7 +193,7 @@ class OptionsBootstrapper:
         # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
         # Stop before '--' since args after that are pass-through and may have duplicate names to our
         # bootstrap options.
-        bargs = ("./pants",) + tuple(  # noqa: PANTSBIN
+        bargs = (bin_name(),) + tuple(
             filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
         )
         return bargs
