@@ -31,7 +31,7 @@ from pants.core.goals.update_build_files import (
 from pants.core.util_rules import config_files, pants_bin
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
@@ -192,9 +192,11 @@ def test_black_config(black_rule_runner: RuleRunner) -> None:
 # ------------------------------------------------------------------------------------------
 
 
-@pytest.fixture
-def yapf_rule_runner() -> RuleRunner:
-    return RuleRunner(
+def run_yapf(
+    build_content: str, *, extra_args: list[str] | None = None
+) -> tuple[GoalRuleResult, str]:
+    """Returns the Goal's result and contents of the BUILD file after execution."""
+    rule_runner = RuleRunner(
         rules=(
             format_build_file_with_yapf,
             update_build_files,
@@ -206,11 +208,19 @@ def yapf_rule_runner() -> RuleRunner:
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         )
     )
+    rule_runner.write_files({"BUILD": build_content})
+    goal_result = rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal,
+        args=["--update-build-files-formatter=yapf"],
+        global_args=extra_args or (),
+        env_inherit=BLACK_ENV_INHERIT,
+    )
+    rewritten_build = Path(rule_runner.build_root, "BUILD").read_text()
+    return goal_result, rewritten_build
 
 
-def test_yapf_fixer_fixes(yapf_rule_runner: RuleRunner) -> None:
-    yapf_rule_runner.write_files({"BUILD": "tgt( name =  't' )"})
-    result = yapf_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+def test_yapf_fixer_fixes() -> None:
+    result, build = run_yapf("tgt( name =  't' )")
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -218,25 +228,14 @@ def test_yapf_fixer_fixes(yapf_rule_runner: RuleRunner) -> None:
           - Format with Yapf
         """
     )
-    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+    assert build == "tgt(name='t')\n"
 
 
-def test_yapf_fixer_noops(yapf_rule_runner: RuleRunner) -> None:
-    yapf_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
-    result = yapf_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+def test_yapf_fixer_noops() -> None:
+    result, build = run_yapf('tgt(name="t")\n')
     assert result.exit_code == 0
-    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
-
-
-def test_yapf_fixer_args(yapf_rule_runner: RuleRunner) -> None:
-    yapf_rule_runner.write_files({"BUILD": "tgt(name='t')\n"})
-    result = yapf_rule_runner.run_goal_rule(
-        UpdateBuildFilesGoal,
-        global_args=["--yapf-args=--style='{indent_width: 2}'"],
-        env_inherit=BLACK_ENV_INHERIT,
-    )
-    assert result.exit_code == 0
-    assert Path(yapf_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+    assert not result.stdout
+    assert build == 'tgt(name="t")\n'
 
 
 # ------------------------------------------------------------------------------------------
