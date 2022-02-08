@@ -268,16 +268,26 @@ class HelpPrinter(MaybeColor):
 
         Assumes that self._help_request is an instance of OptionsHelp.
         """
+        oshi = self._all_help_info.scope_to_help_info.get(scope)
+        if not oshi:
+            return
+
+        # getting name of the entity for which the help needs to be shown
+        goal_info = self._all_help_info.name_to_goal_info.get(scope)
+        if goal_info:
+            entity = goal_info.name
+        else:
+            subsystem = self._all_help_info.scope_to_help_info.get(scope)
+            if subsystem:
+                entity = subsystem.scope
+
         help_formatter = HelpFormatter(
             show_advanced=show_advanced_and_deprecated,
             show_deprecated=show_advanced_and_deprecated,
             color=self.color,
+            entity=entity,
         )
-        oshi = self._all_help_info.scope_to_help_info.get(scope)
-        if not oshi:
-            return
         formatted_lines = help_formatter.format_options(oshi)
-        goal_info = self._all_help_info.name_to_goal_info.get(scope)
         if goal_info:
             related_scopes = sorted(set(goal_info.consumed_scopes) - {GLOBAL_SCOPE, goal_info.name})
             if related_scopes:

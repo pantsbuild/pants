@@ -14,8 +14,11 @@ from pants.util.strutil import hard_wrap
 
 
 class HelpFormatter(MaybeColor):
-    def __init__(self, *, show_advanced: bool, show_deprecated: bool, color: bool) -> None:
+    def __init__(
+        self, *, show_advanced: bool, show_deprecated: bool, color: bool, entity: str
+    ) -> None:
         super().__init__(color=color)
+        self.entity = entity
         self._show_advanced = show_advanced
         self._show_deprecated = show_deprecated
         self._width = terminal_width()
@@ -49,6 +52,13 @@ class HelpFormatter(MaybeColor):
                 lines.extend([*self.format_option(ohi), ""])
 
         add_option(oshi.basic)
+        if oshi.advanced and not self._show_advanced:
+            lines.append(
+                self.maybe_green(
+                    f"There are advanced options which you can list by running "
+                    f"`./pants help-advanced {self.entity}`"
+                )
+            )
         if self._show_advanced:
             add_option(oshi.advanced, category="advanced")
         if self._show_deprecated:
