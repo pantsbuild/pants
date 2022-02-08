@@ -13,7 +13,7 @@ from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkSetup, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -36,9 +36,11 @@ class __RuntimeJvm:
 @rule(level=LogLevel.DEBUG)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
-    runtime_jvm: __RuntimeJvm,
     jdk_setup: JdkSetup,
 ) -> RunRequest:
+    jdk = jdk_setup.jdk
+
+    runtime_jvm = await Get(__RuntimeJvm, JdkEnvironment, jdk)
 
     main_class = field_set.main_class.value
     assert main_class is not None
@@ -74,7 +76,7 @@ async def create_deploy_jar_run_request(
         else:
             return arg
 
-    prefixes = (jdk_setup.bin_dir, jdk_setup.jdk_preparation_script, jdk_setup.java_home)
+    prefixes = (jdk.bin_dir, jdk.jdk_preparation_script, jdk.java_home)
     args = [prefixed(arg, prefixes) for arg in proc.argv]
 
     env = {
@@ -85,7 +87,7 @@ async def create_deploy_jar_run_request(
     # absolutify coursier cache envvars
     for key in env:
         if key.startswith("COURSIER"):
-            env[key] = prefixed(env[key], (jdk_setup.coursier.cache_dir,))
+            env[key] = prefixed(env[key], (jdk.coursier.cache_dir,))
 
     request_digest = await Get(
         Digest,
@@ -105,12 +107,12 @@ async def create_deploy_jar_run_request(
 
 
 @rule
-async def ensure_jdk_for_pants_run(jdk_setup: JdkSetup) -> __RuntimeJvm:
+async def ensure_jdk_for_pants_run(jdk: JdkEnvironment) -> __RuntimeJvm:
     # `tools.jar` is distributed with the JDK, so we can rely on it existing.
     ensure_jvm_process = await Get(
         Process,
         JvmProcess(
-            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
+            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=["com.sun.tools.javac.Main", "--version"],
             input_digest=EMPTY_DIGEST,
             description="Ensure download of JDK for `pants run` use",

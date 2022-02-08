@@ -25,6 +25,7 @@ class ScalaRepl(ReplImplementation):
 async def create_scala_repl_request(
     request: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
+    jdk = jdk_setup.jdk
     user_classpath, tool_classpath = await MultiGet(
         Get(Classpath, Addresses, request.addresses),
         Get(
@@ -61,28 +62,28 @@ async def create_scala_repl_request(
 
     # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
     # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
-    jdk_setup_digests = await MultiGet(
+    jdk_digests = await MultiGet(
         Get(Digest, AddPrefix(digest, relpath))
-        for relpath, digest in jdk_setup.immutable_input_digests.items()
+        for relpath, digest in jdk.immutable_input_digests.items()
     )
 
     repl_digest = await Get(
         Digest,
-        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_setup_digests]),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_digests]),
     )
 
     return ReplRequest(
         digest=repl_digest,
         args=[
-            *jdk_setup.args(bash, tool_classpath.classpath_entries()),
+            *jdk.args(bash, tool_classpath.classpath_entries()),
             "-Dscala.usejavacp=true",
             "scala.tools.nsc.MainGenericRunner",
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
-        extra_env=jdk_setup.env,
+        extra_env=jdk.env,
         run_in_workspace=False,
-        append_only_caches=jdk_setup.append_only_caches,
+        append_only_caches=jdk.append_only_caches,
     )
 
 

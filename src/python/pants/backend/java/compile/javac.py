@@ -41,7 +41,7 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
 @rule(desc="Compile with javac")
 async def compile_java_source(
     bash: BashBinary,
-    jdk_setup: JdkSetup,
+    jdk_setup: JdkSetup,  # TODO: Stop injecting this
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
     union_membership: UnionMembership,
@@ -72,6 +72,7 @@ async def compile_java_source(
             exit_code=1,
         )
 
+    jdk = jdk_setup.jdk
     # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
     deps_to_classpath_entries = dict(
         zip(request.component.dependencies, direct_dependency_classpath_entries or ())
@@ -156,7 +157,7 @@ async def compile_java_source(
     compile_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
+            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",
                 *(("-cp", classpath_arg) if classpath_arg else ()),

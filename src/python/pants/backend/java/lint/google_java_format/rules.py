@@ -66,6 +66,8 @@ async def setup_google_java_format(
     jdk_setup: JdkSetup,
 ) -> Setup:
 
+    jdk = jdk_setup.jdk
+
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )
@@ -89,7 +91,7 @@ async def setup_google_java_format(
     }
 
     maybe_java11_or_higher_options = []
-    if jdk_setup.jre_major_version >= 11:
+    if jdk.jre_major_version >= 11:
         maybe_java11_or_higher_options = [
             "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
