@@ -20,7 +20,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
@@ -57,6 +57,7 @@ class TestSetup:
 async def setup_junit_for_target(
     request: TestSetupRequest,
     jvm: JvmSubsystem,
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     junit: JUnit,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
@@ -90,6 +91,7 @@ async def setup_junit_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     process = JvmProcess(
+        jdk=jdk_setup.jdk,
         classpath_entries=[
             *classpath.args(),
             *junit_classpath.classpath_entries(toolcp_relpath),

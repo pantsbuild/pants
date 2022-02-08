@@ -39,7 +39,7 @@ class JdkRequest:
 
 
 @dataclass(frozen=True)
-class JdkSetup:
+class JdkEnvironment:
     _digest: Digest
     nailgun_jar: str
     coursier: Coursier
@@ -69,6 +69,11 @@ class JdkSetup:
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
         return {**self.coursier.immutable_input_digests, self.bin_dir: self._digest}
+
+
+@dataclass
+class JdkSetup:
+    jdk: JdkEnvironment
 
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
@@ -103,27 +108,28 @@ async def fetch_nailgun() -> Nailgun:
 
 
 @rule
-async def global_jdk(jvm: JvmSubsystem) -> JdkRequest:
-    """Creates a `JdkRequest` object based on the JVM subsystem options.
+async def global_jdk(jvm: JvmSubsystem) -> JdkSetup:
+    """Creates a `JdkEnvironment` object based on the JVM subsystem options.
 
     This is effectively a singleton for now, but by the time we complete multiple JVM support, it
     won't be.
     """
 
-    return JdkRequest(jvm.jdk)
+    env = await Get(JdkEnvironment, JdkRequest(jvm.jdk))
+    return JdkSetup(env)
 
 
 @rule
-async def setup_jdk(
-    coursier: Coursier, jdk: JdkRequest, nailgun_: Nailgun, bash: BashBinary
-) -> JdkSetup:
+async def prepare_jdk_environment(
+    coursier: Coursier, request: JdkRequest, nailgun_: Nailgun, bash: BashBinary
+) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
     # TODO: add support for system JDKs with specific version
-    if jdk.version == "system":
+    if request.version == "system":
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={jdk.version}")
+        coursier_jdk_option = shlex.quote(f"--jvm={request.version}")
 
     # TODO(#14386) This argument re-writing code should be done in a more standardised way.
     # See also `run_deploy_jar` for other argument re-writing code.
@@ -164,7 +170,7 @@ async def setup_jdk(
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{jdk}`:\n"
+            f"Failed to locate Java for JDK `{request.version}`:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
@@ -173,7 +179,7 @@ async def setup_jdk(
     if not jre_major_version:
         raise ValueError(
             "Pants was unable to parse the output of `java -version` for JDK "
-            f"`{jdk.version}`. Please open an issue at "
+            f"`{request.version}`. Please open an issue at "
             "https://github.com/pantsbuild/pants/issues/new/choose with the following output:\n\n"
             f"{java_version}"
         )
@@ -186,7 +192,7 @@ async def setup_jdk(
         {version_comment}
         set -eu
 
-        /bin/ln -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkSetup.java_home}"
+        /bin/ln -s "$({java_home_command})" "${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{JdkEnvironment.java_home}"
         exec "$@"
         """
     )
@@ -195,14 +201,14 @@ async def setup_jdk(
         CreateDigest(
             [
                 FileContent(
-                    os.path.basename(JdkSetup.jdk_preparation_script),
+                    os.path.basename(JdkEnvironment.jdk_preparation_script),
                     jdk_preparation_script.encode("utf-8"),
                     is_executable=True,
                 ),
             ]
         ),
     )
-    return JdkSetup(
+    return JdkEnvironment(
         _digest=await Get(
             Digest,
             MergeDigests(
@@ -212,7 +218,7 @@ async def setup_jdk(
                 ]
             ),
         ),
-        nailgun_jar=os.path.join(JdkSetup.bin_dir, nailgun.filenames[0]),
+        nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
     )
@@ -221,6 +227,7 @@ async def setup_jdk(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class JvmProcess:
+    jdk: JdkEnvironment
     argv: tuple[str, ...]
     classpath_entries: tuple[str, ...]
     input_digest: Digest
@@ -238,6 +245,7 @@ class JvmProcess:
 
     def __init__(
         self,
+        jdk: JdkEnvironment,
         argv: Iterable[str],
         classpath_entries: Iterable[str],
         input_digest: Digest,
@@ -253,7 +261,7 @@ class JvmProcess:
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
     ):
-
+        self.jdk = jdk
         self.argv = tuple(argv)
         self.classpath_entries = tuple(classpath_entries)
         self.input_digest = input_digest
@@ -277,24 +285,26 @@ class JvmProcess:
 
 
 @rule
-async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess) -> Process:
+async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
+
+    jdk = request.jdk
 
     immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+        **jdk.immutable_input_digests,
         **request.extra_immutable_input_digests,
     }
     env = {
         "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
-        **jdk_setup.env,
+        **jdk.env,
         **request.extra_env,
     }
 
     use_nailgun = []
     if request.use_nailgun:
-        use_nailgun = [*jdk_setup.immutable_input_digests, *request.extra_nailgun_keys]
+        use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
     return Process(
-        [*jdk_setup.args(bash, request.classpath_entries), *request.argv],
+        [*jdk.args(bash, request.classpath_entries), *request.argv],
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         use_nailgun=use_nailgun,
@@ -304,7 +314,7 @@ async def jvm_process(bash: BashBinary, jdk_setup: JdkSetup, request: JvmProcess
         env=env,
         platform=request.platform,
         timeout_seconds=request.timeout_seconds,
-        append_only_caches=jdk_setup.append_only_caches,
+        append_only_caches=jdk.append_only_caches,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )

@@ -63,8 +63,10 @@ class Setup:
 async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
-    jdk_setup: JdkSetup,
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
 ) -> Setup:
+
+    jdk = jdk_setup.jdk
 
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
@@ -89,7 +91,7 @@ async def setup_google_java_format(
     }
 
     maybe_java11_or_higher_options = []
-    if jdk_setup.jre_major_version >= 11:
+    if jdk.jre_major_version >= 11:
         maybe_java11_or_higher_options = [
             "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
@@ -107,6 +109,7 @@ async def setup_google_java_format(
     ]
 
     process = JvmProcess(
+        jdk=jdk,
         argv=args,
         classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
         input_digest=source_files_snapshot.digest,
