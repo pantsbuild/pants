@@ -141,10 +141,6 @@ class LocalPantsRunner:
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 
-        # Set PANTS_BIN_NAME, for convenience in user-visible strings. We unconditionally assign
-        # in case the user has set this option in the env as well as at a higher rank
-        os.environ["PANTS_BIN_NAME"] = global_bootstrap_options["pants_bin_name"]
-
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
         graph_session = cls._init_graph_session(
