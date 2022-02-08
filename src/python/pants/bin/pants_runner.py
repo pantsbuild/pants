@@ -10,7 +10,6 @@ from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
-from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.engine.environment import CompleteEnvironment
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
@@ -79,6 +78,10 @@ class PantsRunner:
             stdout_fileno=stdout_fileno,
             stderr_fileno=stderr_fileno,
         ):
+            # N.B. Inlining these imports speeds up the python thin client run, and avoids importing
+            # engine types until after the runner has had a chance to set PANTS_BIN_NAME.
+            from pants.bin.local_pants_runner import LocalPantsRunner
+            from pants.bin.remote_pants_runner import RemotePantsRunner
 
             if self._should_run_with_pantsd(global_bootstrap_options):
                 try:
@@ -86,9 +89,6 @@ class PantsRunner:
                     return remote_runner.run(start_time)
                 except RemotePantsRunner.Fallback as e:
                     logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
-
-            # N.B. Inlining this import speeds up the python thin client run by about 100ms.
-            from pants.bin.local_pants_runner import LocalPantsRunner
 
             # We only install signal handling via ExceptionSink if the run will execute in this process.
             ExceptionSink.install(

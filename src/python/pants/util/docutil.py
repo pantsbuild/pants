@@ -30,4 +30,4 @@ def bin_name() -> str:
 
     (E.g. "./pants")
     """  # noqa: PANTSBIN
-    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN
+    return os.environ["PANTS_BIN_NAME"]
