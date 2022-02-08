@@ -15,6 +15,8 @@ def check_for_hardcoded_pants_bin_name(
     path = PurePath(filename)
     if (
         not filename.startswith("src/python")
+        # N.B. this file can't use `bin_name` because it'd be a chicken-and-egg problem
+        or filename == "src/python/pants/option/global_options.py"
         or path.stem.startswith("test_")
         or path.stem.endswith("_test")
     ):
