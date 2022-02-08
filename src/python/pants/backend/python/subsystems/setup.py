@@ -103,23 +103,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--experimental-lockfile",
-            advanced=True,
-            type=str,
-            metavar="<file>",
-            mutually_exclusive_group="lockfile",
-            help="Deprecated.",
-            removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Instead, use the improved `[python].resolves` mechanism. Read its "
-                "help message for more information.\n\n"
-                "If you want to keep using a single resolve like before, update "
-                "`[python].resolves` with a name for the resolve and the path to "
-                "its lockfile, or use the default. Then make sure that "
-                "`[python].default_resolve` is set to that resolve name."
-            ),
-        )
-        register(
             "--enable-resolves",
             advanced=True,
             type=bool,
@@ -237,22 +220,6 @@ class PythonSetup(Subsystem):
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
             "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
         )
-        register(
-            "--resolver-jobs",
-            type=int,
-            default=CPU_COUNT // 2,
-            default_help_repr="#cores/2",
-            removal_version="2.11.0.dev0",
-            removal_hint="Now set automatically based on the amount of concurrency available.",
-            advanced=True,
-            help=(
-                "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
-                "can run multiple subprocesses in parallel, the maximum total parallelism will be "
-                "`--process-execution-{local,remote}-parallelism x --python-resolver-jobs`. "
-                "\n\nSetting this option higher may result in better parallelism, but, if set too "
-                "high, may result in starvation and Out of Memory errors."
-            ),
-        )
 
         register(
             "--tailor-ignore-solitary-init-files",
@@ -359,10 +326,6 @@ class PythonSetup(Subsystem):
             yield self.manylinux
         else:
             yield "--no-manylinux"
-
-    @property
-    def resolver_jobs(self) -> int:
-        return cast(int, self.options.resolver_jobs)
 
     @property
     def tailor_ignore_solitary_init_files(self) -> bool:
