@@ -35,7 +35,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -91,6 +91,7 @@ async def generate_java_from_avro(
 
 @rule
 async def compile_avro_source(
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     request: CompileAvroSourceRequest,
     avro_tools: AvroSubsystem,
 ) -> CompiledAvroSource:
@@ -136,6 +137,7 @@ async def compile_avro_source(
     ) -> JvmProcess:
 
         return JvmProcess(
+            jdk=jdk_setup.jdk,
             argv=(
                 "org.apache.avro.tool.Main",
                 *args,

@@ -39,9 +39,6 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    deprecated_options_scope = "download-pex-bin"
-    deprecated_options_scope_removal_version = "2.11.0.dev0"
-
     default_version = "v2.1.65"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
     version_constraints = ">=2.1.65,<3.0"

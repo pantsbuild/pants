@@ -68,8 +68,6 @@ remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
-use_deprecated_python_macros = false
-
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"

@@ -13,6 +13,8 @@ from pants.backend.python.macros.deprecation_fixers import (
     GeneratorRename,
     MacroRenames,
     MacroRenamesRequest,
+    OptionsChecker,
+    OptionsCheckerRequest,
     UpdatePythonMacrosRequest,
 )
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
@@ -31,6 +33,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=(
             *deprecation_fixers.rules(),
+            QueryRule(OptionsChecker, [OptionsCheckerRequest]),
             QueryRule(MacroRenames, [MacroRenamesRequest]),
             QueryRule(RewrittenBuildFile, [UpdatePythonMacrosRequest]),
         ),
@@ -42,7 +45,9 @@ def rule_runner() -> RuleRunner:
         },
         use_deprecated_python_macros=True,
     )
-    rule_runner.set_options(["--update-build-files-fix-python-macros"])
+    rule_runner.set_options(
+        ["--use-deprecated-python-macros", "--update-build-files-fix-python-macros"]
+    )
     return rule_runner
 
 
@@ -257,3 +262,16 @@ def test_update_macro_references(rule_runner: RuleRunner) -> None:
         ).splitlines()
     )
     assert len(result.change_descriptions) == 3
+
+
+def test_check_options(rule_runner: RuleRunner, caplog) -> None:
+    rule_runner.write_files({"requirements.txt": "req", "BUILD": "python_requirements()"})
+    rule_runner.set_options(
+        ["--python-protobuf-runtime-dependencies=//:req", "--flake8-source-plugins=//:req"]
+    )
+    rule_runner.request(OptionsChecker, [OptionsCheckerRequest()])
+    assert "* [flake8].source_plugins: ['//:req -> //:reqs#req']" in caplog.text
+    assert "* [python-protobuf].runtime_dependencies: ['//:req -> //:reqs#req']" in caplog.text
+    assert "pylint" not in caplog.text
+    assert "mypy" not in caplog.text
+    assert "python-thrift" not in caplog.text

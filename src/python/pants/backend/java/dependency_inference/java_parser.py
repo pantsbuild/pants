@@ -18,7 +18,7 @@ from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, Digest, DigestContents
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.logging import LogLevel
@@ -68,6 +68,7 @@ async def make_analysis_request_from_source_files(
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     processor_classfiles: JavaParserCompiledClassfiles,
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
     source_files = request.source_files
@@ -102,6 +103,7 @@ async def analyze_java_source_dependencies(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
+            jdk=jdk_setup.jdk,
             classpath_entries=[
                 *tool_classpath.classpath_entries(toolcp_relpath),
                 processorcp_relpath,

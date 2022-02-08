@@ -27,7 +27,7 @@ from pants.util.strutil import pluralize
 
 class Flake8Request(LintTargetsRequest):
     field_set_type = Flake8FieldSet
-    name = "Flake8"
+    name = Flake8.options_scope
 
 
 @dataclass(frozen=True)

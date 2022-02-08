@@ -23,12 +23,12 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import dir_option, memory_size
 from pants.option.errors import OptionsError
+from pants.option.option_types import BoolOption, EnumOption, FloatOption, IntOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
@@ -1290,17 +1290,35 @@ class GlobalOptions(Subsystem):
             "--use-deprecated-python-macros",
             advanced=True,
             type=bool,
-            default=True,
+            default=False,
             help=(
-                "If true, continue using Pants's deprecated macro system for "
+                "If true, use Pants's deprecated macro system for "
                 "`python_requirements`, `poetry_requirements`, and `pipenv_requirements` "
                 "rather than target generation.\n\n"
-                "The address for target generation is different. Rather than "
-                "`3rdparty/python:Django`, the address will look like `3rdparty/python#Django`. "
-                "The target generator (`python_requirements` et al) is a "
-                "target itself now, meaning you can give it a `name`. If the target generator "
+                "The address for macros is different. Rather than "
+                "`3rdparty/python#Django`, the address will look like `3rdparty/python:Django`. "
+                "The macro (`python_requirements` et al) also was not a proper target, meaning "
+                "that you could not give it a `name`. In contrast, if the target generator "
                 "sets its `name`, e.g. to `reqs`, generated targets will have an address like "
                 "`3rdparty/python:reqs#Django`."
+            ),
+            removal_version="2.12.0.dev0",
+            removal_hint=(
+                "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
+                "replaced with improved target generators, which are now enabled by "
+                "default.\n\n"
+                "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
+                "delete the option.\n\n"
+                "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
+                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                "  2. Check the logs for an ERROR log to see if you have to manually add "
+                "`name=` anywhere.\n"
+                "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
+                "pants.toml.\n\n"
+                "You can ignore this warning with `[GLOBAL].ignore_warnings`."
+                "(Why upgrade from the old macro mechanism to target generation? Among other "
+                "benefits, it makes sure that the Pants daemon is properly invalidated when you "
+                "change `requirements.txt` and `pyproject.toml`.)"
             ),
         )
 
@@ -1311,146 +1329,116 @@ class GlobalOptions(Subsystem):
         # won't choke on them on the command line, and also so we can access their values as regular
         # global-scope options, for convenience.
         cls.register_bootstrap_options(register)
+        super().register_options(register)
 
-        register(
-            "--colors",
-            type=bool,
-            default=sys.stdout.isatty(),
-            help=(
-                "Whether Pants should use colors in output or not. This may also impact whether "
-                "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
-                "whether the output destination supports color."
-            ),
-        )
-        register(
-            "--dynamic-ui",
-            type=bool,
-            default=(("CI" not in os.environ) and sys.stderr.isatty()),
-            help="Display a dynamically-updating console UI as Pants runs. This is true by default "
-            "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
-            "Pants is running in a continuous integration environment.",
-        )
-        register(
-            "--dynamic-ui-renderer",
-            type=DynamicUIRenderer,
-            default=DynamicUIRenderer.indicatif_spinner,
-            help="If `--dynamic-ui` is enabled, selects the renderer.",
-        )
+    colors = BoolOption(
+        "--colors",
+        default=sys.stdout.isatty(),
+        help=(
+            "Whether Pants should use colors in output or not. This may also impact whether "
+            "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
+            "whether the output destination supports color."
+        ),
+    )
+    dynamic_ui = BoolOption(
+        "--dynamic-ui",
+        default=(("CI" not in os.environ) and sys.stderr.isatty()),
+        help="Display a dynamically-updating console UI as Pants runs. This is true by default "
+        "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
+        "Pants is running in a continuous integration environment.",
+    )
+    dynamic_ui_renderer = EnumOption(
+        "--dynamic-ui-renderer",
+        default=DynamicUIRenderer.indicatif_spinner,
+        help="If `--dynamic-ui` is enabled, selects the renderer.",
+    )
 
-        register(
-            "--tag",
-            type=list,
-            metavar="[+-]tag1,tag2,...",
-            help=(
-                "Include only targets with these tags (optional '+' prefix) or without these "
-                f"tags ('-' prefix). See {doc_url('advanced-target-selection')}."
-            ),
-        )
-        register(
-            "--exclude-target-regexp",
-            type=list,
-            default=[],
-            metavar="<regexp>",
-            help="Exclude targets that match these regexes. This does not impact file arguments.",
-        )
+    tag = StrListOption(
+        "--tag",
+        help=(
+            "Include only targets with these tags (optional '+' prefix) or without these "
+            f"tags ('-' prefix). See {doc_url('advanced-target-selection')}."
+        ),
+    ).metavar("[+-]tag1,tag2,...")
+    exclude_target_regexp = StrListOption(
+        "--exclude-target-regexp",
+        help="Exclude targets that match these regexes. This does not impact file arguments.",
+    ).metavar("<regexp>")
 
-        register(
-            "--files-not-found-behavior",
-            advanced=True,
-            type=FilesNotFoundBehavior,
-            default=FilesNotFoundBehavior.warn,
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
-        register(
-            "--owners-not-found-behavior",
-            advanced=True,
-            type=OwnersNotFoundBehavior,
-            default=OwnersNotFoundBehavior.error,
-            help=(
-                "What to do when file arguments do not have any owning target. This happens when "
-                "there are no targets whose `sources` fields include the file argument."
-            ),
-        )
+    files_not_found_behavior = EnumOption(
+        "--files-not-found-behavior",
+        default=FilesNotFoundBehavior.warn,
+        help="What to do when files and globs specified in BUILD files, such as in the "
+        "`sources` field, cannot be found. This happens when the files do not exist on "
+        "your machine or when they are ignored by the `--pants-ignore` option.",
+    ).advanced()
 
-        register(
-            "--build-patterns",
-            advanced=True,
-            type=list,
-            default=["BUILD", "BUILD.*"],
-            help=(
-                "The naming scheme for BUILD files, i.e. where you define targets.\n\n"
-                "This only sets the naming scheme, not the directory paths to look for. To add "
-                "ignore patterns, use the option `[GLOBAL].build_ignore`.\n\n"
-                "You may also need to update the option `[tailor].build_file_name` so that it is "
-                "compatible with this option."
-            ),
-        )
-        register(
-            "--build-ignore",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "Paths to ignore when identifying BUILD files.\n\n"
-                "This does not affect any other filesystem operations; use `--pants-ignore` for "
-                "that instead.\n\n"
-                "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
-            ),
-        )
-        register(
-            "--build-file-prelude-globs",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-                f"See {doc_url('macros')}."
-            ),
-        )
-        register(
-            "--subproject-roots",
-            type=list,
-            advanced=True,
-            default=[],
-            help="Paths that correspond with build roots for any subproject that this "
-            "project depends on.",
-        )
+    owners_not_found_behavior = EnumOption(
+        "--owners-not-found-behavior",
+        default=OwnersNotFoundBehavior.error,
+        help=(
+            "What to do when file arguments do not have any owning target. This happens when "
+            "there are no targets whose `sources` fields include the file argument."
+        ),
+    ).advanced()
 
-        loop_flag = "--loop"
-        register(
-            loop_flag,
-            type=bool,
-            help="Run goals continuously as file changes are detected.",
-        )
-        register(
-            "--loop-max",
-            type=int,
-            default=2**32,
-            advanced=True,
-            help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
-        )
+    build_patterns = StrListOption(
+        "--build-patterns",
+        default=["BUILD", "BUILD.*"],
+        help=(
+            "The naming scheme for BUILD files, i.e. where you define targets.\n\n"
+            "This only sets the naming scheme, not the directory paths to look for. To add "
+            "ignore patterns, use the option `[GLOBAL].build_ignore`.\n\n"
+            "You may also need to update the option `[tailor].build_file_name` so that it is "
+            "compatible with this option."
+        ),
+    ).advanced()
 
-        register(
-            "--streaming-workunits-report-interval",
-            type=float,
-            default=1.0,
-            advanced=True,
-            help="Interval in seconds between when streaming workunit event receivers will be polled.",
-        )
-        register(
-            "--streaming-workunits-complete-async",
-            advanced=True,
-            type=bool,
-            default=not is_in_container(),
-            help=(
-                "True if stats recording should be allowed to complete asynchronously when `pantsd` "
-                "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
-                "To reduce data loss, this flag defaults to false inside of containers, such as "
-                "when run with Docker."
-            ),
-        )
+    build_ignore = StrListOption(
+        "--build-ignore",
+        help=(
+            "Paths to ignore when identifying BUILD files.\n\n"
+            "This does not affect any other filesystem operations; use `--pants-ignore` for "
+            "that instead.\n\n"
+            "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+        ),
+    ).advanced()
+    build_file_prelude_globs = StrListOption(
+        "--build-file-prelude-globs",
+        help=(
+            "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
+            f"See {doc_url('macros')}."
+        ),
+    ).advanced()
+    subproject_roots = StrListOption(
+        "--subproject-roots",
+        help="Paths that correspond with build roots for any subproject that this "
+        "project depends on.",
+    ).advanced()
+
+    _loop_flag = "--loop"
+    loop = BoolOption(_loop_flag, help="Run goals continuously as file changes are detected.")
+    loop_max = IntOption(
+        "--loop-max",
+        default=2**32,
+        help=f"The maximum number of times to loop when `{_loop_flag}` is specified.",
+    ).advanced()
+
+    streaming_workunits_report_interval = FloatOption(
+        "--streaming-workunits-report-interval",
+        default=1.0,
+        help="Interval in seconds between when streaming workunit event receivers will be polled.",
+    ).advanced()
+    streaming_workunits_complete_async = BoolOption(
+        "--streaming-workunits-complete-async",
+        default=not is_in_container(),
+        help=(
+            "True if stats recording should be allowed to complete asynchronously when `pantsd` "
+            "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
+            "To reduce data loss, this flag defaults to false inside of containers, such as "
+            "when run with Docker."
+        ),
+    ).advanced()
 
     @classmethod
     def validate_instance(cls, opts):
@@ -1653,28 +1641,3 @@ class ProcessCleanupOption:
     """
 
     val: bool
-
-
-def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer) -> None:
-    if (
-        bootstrap_options.is_default("use_deprecated_python_macros")
-        and "pants.backend.python" in bootstrap_options.backend_packages
-    ):
-        warn_or_error(
-            "2.11.0.dev0",
-            "the option `--use-deprecated-python-macros` defaulting to true",
-            (
-                "In Pants 2.11, the default for the global option "
-                "`--use-deprecated-python-macros` will change to false.\n\n"
-                "To fix this deprecation, explicitly set `use_deprecated_python_macros = true` in "
-                "the `[GLOBAL]` section of `pants.toml`. Or, when you are ready to upgrade to "
-                "the improved target generation mechanism, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
-                "  2. Check the logs for an ERROR log to see if you have to manually add "
-                "`name=` anywhere.\n"
-                "  3. Set `use_deprecated_python_macros = false` in `[GLOBAL]` in pants.toml.\n\n"
-                "(Why upgrade from the old macro mechanism to target generation? Among other "
-                "benefits, it makes sure that the Pants daemon is properly invalidated when you "
-                "change `requirements.txt` and `pyproject.toml`.)"
-            ),
-        )

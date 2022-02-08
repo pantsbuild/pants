@@ -9,12 +9,10 @@ target(
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
+        "src/python/pants/backend/codegen/thrift/apache/python",
         "src/python/pants/backend/docker",
         "src/python/pants/backend/docker/lint/hadolint",
-        "src/python/pants/backend/experimental/codegen/thrift/apache/python",
         "src/python/pants/backend/experimental/debian",
-        "src/python/pants/backend/experimental/docker",
-        "src/python/pants/backend/experimental/docker/lint/hadolint",
         "src/python/pants/backend/experimental/explorer",
         # Do NOT include the `pants.backend.experimental.explorer.server` module, as that pulls in a
         # bunch of 3rdparty deps, it is packaged separately.

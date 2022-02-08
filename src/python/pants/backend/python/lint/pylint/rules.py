@@ -57,7 +57,7 @@ class PylintPartitions(Collection[PylintPartition]):
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    name = "Pylint"
+    name = Pylint.options_scope
 
 
 def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:

@@ -618,8 +618,8 @@ def test_build_pex_description() -> None:
     assert_description(
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
-            lockfile_hex_digest=None,
-            req_strings=None,
+            resolve_name="a",
+            req_strings=FrozenOrderedSet(),
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -628,8 +628,8 @@ def test_build_pex_description() -> None:
         Lockfile(
             file_path="lock.txt",
             file_path_description_of_origin="foo",
-            lockfile_hex_digest=None,
-            req_strings=None,
+            resolve_name="a",
+            req_strings=FrozenOrderedSet(),
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -652,7 +652,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     lockfile = Lockfile(
         "lock.txt",
         file_path_description_of_origin="a test",
-        lockfile_hex_digest=None,
+        resolve_name="a",
         req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):
@@ -660,7 +660,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
 
     lockfile_content = LockfileContent(
         FileContent("lock.txt", lock_content),
-        lockfile_hex_digest=None,
+        resolve_name="a",
         req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):
