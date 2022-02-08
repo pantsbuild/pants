@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import itertools
-import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
