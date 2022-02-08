@@ -217,6 +217,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
++ Suresh Joshi
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
