@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 from __future__ import annotations
 
+import os
 import shutil
 
 from pants.version import MAJOR_MINOR, PANTS_SEMVER
@@ -21,3 +23,11 @@ def doc_url(slug: str) -> str:
 def git_url(fp: str) -> str:
     """Link to code in pantsbuild/pants."""
     return f"https://github.com/pantsbuild/pants/blob/release_{PANTS_SEMVER}/{fp}"
+
+
+def bin_name() -> str:
+    """Return the Pants binary name.
+
+    (E.g. "./pants")
+    """  # noqa: PANTSBIN
+    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN

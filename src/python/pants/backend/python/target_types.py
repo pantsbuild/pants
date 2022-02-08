@@ -60,7 +60,7 @@ from pants.engine.target import (
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -608,7 +608,7 @@ class PythonTestSourceField(PythonSourceField):
                 f"The {repr(self.alias)} field in target {self.address} should not be set to the "
                 f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing this target ({self.address}) to autogenerate a "
+                f"`{bin_name()} tailor` after removing this target ({self.address}) to autogenerate a "
                 "`python_test_utils` target."
             )
 
@@ -697,7 +697,7 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
                 f"The {repr(self.alias)} field in target {self.address} should not include the "
                 f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
+                f"`{bin_name()} tailor` after removing the files from the {repr(self.alias)} field of "
                 f"this target ({self.address}) to autogenerate a `python_test_utils` target."
             )
 
@@ -1100,10 +1100,10 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
         "https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use "
         "`//` as a prefix for target addresses if you need to disambiguate.\n\n"
         + dedent(
-            """\
+            f"""\
             Pants will attempt to infer dependencies, which you can confirm by running:
 
-                ./pants dependencies <python_distribution target address>
+                {bin_name()} dependencies <python_distribution target address>
 
             """
         )

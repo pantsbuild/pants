@@ -20,6 +20,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -345,8 +346,8 @@ async def validate_goal(
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     if multi_matcher is None:
         logger.error(
-            "You must set the option `[sourcefile-validation].config` for the "
-            "`validate` goal to work. Run `./pants help sourcefile-validation`."
+            f"You must set the option `[sourcefile-validation].config` for the "
+            f"`validate` goal to work. Run `{bin_name()} help sourcefile-validation`."
         )
         return Validate(PANTS_FAILED_EXIT_CODE)
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass
 
@@ -139,6 +140,10 @@ class LocalPantsRunner:
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
+
+        # Set PANTS_BIN_NAME, for convenience in user-visible strings. We use `set` in case the user
+        # has set this option in the env as well as at a higher rank
+        os.environ["PANTS_BIN_NAME"] = global_bootstrap_options["pants_bin_name"]
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.

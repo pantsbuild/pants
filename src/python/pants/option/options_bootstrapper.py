@@ -192,7 +192,7 @@ class OptionsBootstrapper:
         # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
         # Stop before '--' since args after that are pass-through and may have duplicate names to our
         # bootstrap options.
-        bargs = ("./pants",) + tuple(
+        bargs = ("./pants",) + tuple(  # noqa: PANTSBIN
             filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
         )
         return bargs

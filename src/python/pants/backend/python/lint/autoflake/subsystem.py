@@ -13,7 +13,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 
 
 class Autoflake(PythonToolBase):
@@ -38,10 +38,7 @@ class Autoflake(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=(
-                f"Don't use Autoflake when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`"
-            ),
+            help=(f"Don't use Autoflake when running `{bin_name()} fmt` and `{bin_name()} lint`"),
         )
         register(
             "--args",

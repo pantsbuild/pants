@@ -27,6 +27,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 
@@ -48,8 +49,8 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
             root_targets,
             (
                 "To work around this, choose which resolve you want to use from above. "
-                'Then, run `./pants peek :: | jq -r \'.[] | select(.resolve == "example") | '
-                '.["address"]\' | xargs ./pants repl`, where you replace "example" with the '
+                f'Then, run `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") | '
+                f'.["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the '
                 "resolve name, and possibly replace the specs `::` with what you were using "
                 "before. This will result in opening a REPL with only targets using the desired "
                 "resolve."
