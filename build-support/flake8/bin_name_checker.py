@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import ast
 from pathlib import PurePath
-from typing import Iterator
+from typing import Iterator, cast
 
 
 def check_for_hardcoded_pants_bin_name(
     tree: ast.AST, filename: str
-) -> Iterator[tuple[int, int, str]]:
+) -> Iterator[tuple[int, int, str, None]]:
     path = PurePath(filename)
     if (
         not filename.startswith("src/python")
@@ -20,11 +20,11 @@ def check_for_hardcoded_pants_bin_name(
     ):
         return
 
-    violations: tuple[int, int] = []
+    violations: list[tuple[int, int]] = []
 
     class Visitor(ast.NodeVisitor):
         def __init__(self):
-            self._docstrings: list[str] = []
+            self._docstrings: list[str | None] = []
 
         def visit_docstringable(self, node: ast.AST):
             self._docstrings.append(ast.get_docstring(node, clean=False))
@@ -43,17 +43,19 @@ def check_for_hardcoded_pants_bin_name(
         def visit_Module(self, node: ast.AST):
             self.visit_docstringable(node)
 
-        def visit_Str(self, node: ast.AST) -> None:
+        # Python 3.7
+        def visit_Str(self, node: ast.Str) -> None:
             # Don't report on docstrings
-            if node.value == self._docstrings[-1]:
+            if node.s == self._docstrings[-1]:
                 return
 
-            if "./pants" in node.value:
+            if "./pants" in node.s:
                 violations.append((node.lineno, node.col_offset))
 
-        def visit_Constant(self, node: ast.AST) -> None:
+        # Python 3.8+
+        def visit_Constant(self, node: ast.Constant) -> None:
             if isinstance(node.value, str):
-                self.visit_Str(node)
+                self.visit_Str(cast(ast.Str, node))
 
     Visitor().visit(tree)
 
@@ -66,5 +68,5 @@ def check_for_hardcoded_pants_bin_name(
         )
 
 
-check_for_hardcoded_pants_bin_name.name = __name__
-check_for_hardcoded_pants_bin_name.version = "0.0.0"
+setattr(check_for_hardcoded_pants_bin_name, "name", __name__)
+setattr(check_for_hardcoded_pants_bin_name, "version", "0.0.0")

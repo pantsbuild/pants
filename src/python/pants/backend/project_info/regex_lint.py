@@ -346,7 +346,7 @@ async def validate_goal(
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     if multi_matcher is None:
         logger.error(
-            f"You must set the option `[sourcefile-validation].config` for the "
+            "You must set the option `[sourcefile-validation].config` for the "
             f"`validate` goal to work. Run `{bin_name()} help sourcefile-validation`."
         )
         return Validate(PANTS_FAILED_EXIT_CODE)
