@@ -10,8 +10,8 @@ from typing import Iterable, Iterator, List, Optional
 import strawberry
 from strawberry.types import Info
 
-from pants.backend.explorer.api.field_types import JSONScalar
 from pants.backend.explorer.request_state import RequestState
+from pants.backend.explorer.server.field_types import JSONScalar
 from pants.backend.project_info.peek import TargetData, TargetDatas
 from pants.engine.target import AllTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo

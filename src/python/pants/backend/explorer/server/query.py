@@ -8,8 +8,8 @@ from typing import List
 import strawberry
 from strawberry.types import Info
 
-from pants.backend.explorer.api.targets import QueryTargetsMixin
 from pants.backend.explorer.request_state import RequestState
+from pants.backend.explorer.server.targets import QueryTargetsMixin
 from pants.engine.rules import TaskRule
 
 

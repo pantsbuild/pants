@@ -15,6 +15,9 @@ target(
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/docker",
         "src/python/pants/backend/experimental/docker/lint/hadolint",
+        "src/python/pants/backend/experimental/explorer",
+        # Do NOT include the `pants.backend.experimental.explorer.server` module, as that pulls in a
+        # bunch of 3rdparty deps, it is packaged separately.
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
         "src/python/pants/backend/experimental/java",
