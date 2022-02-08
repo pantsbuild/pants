@@ -27,6 +27,18 @@ from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
+class Nailgun:
+    classpath_entry: ClasspathEntry
+
+
+@dataclass(frozen=True)
+class JdkRequest:
+    """Request for a JDK with a specific major version."""
+
+    version: str
+
+
+@dataclass(frozen=True)
 class JdkSetup:
     _digest: Digest
     nailgun_jar: str
@@ -72,7 +84,7 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 
 @rule
-async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> JdkSetup:
+async def fetch_nailgun() -> Nailgun:
     nailgun = await Get(
         ClasspathEntry,
         CoursierLockfileEntry(
@@ -87,10 +99,31 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
         ),
     )
 
-    if jvm.jdk == "system":
+    return Nailgun(nailgun)
+
+
+@rule
+async def global_jdk(jvm: JvmSubsystem) -> JdkRequest:
+    """Creates a `JdkRequest` object based on the JVM subsystem options.
+
+    This is effectively a singleton for now, but by the time we complete multiple JVM support, it
+    won't be.
+    """
+
+    return JdkRequest(jvm.jdk)
+
+
+@rule
+async def setup_jdk(
+    coursier: Coursier, jdk: JdkRequest, nailgun_: Nailgun, bash: BashBinary
+) -> JdkSetup:
+    nailgun = nailgun_.classpath_entry
+
+    # TODO: add support for system JDKs with specific version
+    if jdk.version == "system":
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={jvm.jdk}")
+        coursier_jdk_option = shlex.quote(f"--jvm={jdk.version}")
 
     # TODO(#14386) This argument re-writing code should be done in a more standardised way.
     # See also `run_deploy_jar` for other argument re-writing code.
@@ -131,7 +164,7 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{jvm.jdk}`:\n"
+            f"Failed to locate Java for JDK `{jdk}`:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
@@ -139,9 +172,10 @@ async def setup_jdk(coursier: Coursier, jvm: JvmSubsystem, bash: BashBinary) -> 
     jre_major_version = parse_jre_major_version(java_version)
     if not jre_major_version:
         raise ValueError(
-            f"Pants was unable to parse the output of `java -version` for JDK `{jvm.jdk}`. "
-            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose "
-            f"with the following output:\n\n{java_version}"
+            "Pants was unable to parse the output of `java -version` for JDK "
+            f"`{jdk.version}`. Please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose with the following output:\n\n"
+            f"{java_version}"
         )
 
     # TODO: Locate `ln`.
