@@ -1305,7 +1305,7 @@ class GlobalOptions(Subsystem):
             removal_version="2.12.0.dev0",
             removal_hint=(
                 "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
-                "removed in favor of the improved target generators, which are now enabled by "
+                "replaced with improved target generators, which are now enabled by "
                 "default.\n\n"
                 "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
                 "delete the option.\n\n"
