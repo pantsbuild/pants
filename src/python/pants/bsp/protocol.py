@@ -15,7 +15,12 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 )
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
-from pants.bsp.spec import InitializeBuildParams, InitializeBuildResult
+from pants.bsp.spec import (
+    InitializeBuildParams,
+    InitializeBuildResult,
+    WorkspaceBuildTargetsParams,
+    WorkspaceBuildTargetsResult,
+)
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.util.frozendict import FrozenDict
 
@@ -32,6 +37,9 @@ class _HandlerMapping:
 BSP_HANDLER_MAPPING = {
     "build/initialize": _HandlerMapping(
         InitializeBuildParams.from_json_dict, InitializeBuildResult
+    ),
+    "workspace/buildTargets": _HandlerMapping(
+        WorkspaceBuildTargetsParams.from_json_dict, WorkspaceBuildTargetsResult
     ),
 }
 
@@ -97,6 +105,8 @@ class BSPConnection:
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:
+            if method_name == self._INITIALIZE_METHOD_NAME:
+                self._initialized = True
             return returns[0][1].value.to_json_dict()
         elif len(returns) == 0 and len(throws) == 1:
             raise throws[0][1].exc

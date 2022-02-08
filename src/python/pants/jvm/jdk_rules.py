@@ -170,7 +170,7 @@ async def prepare_jdk_environment(
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{request}`:\n"
+            f"Failed to locate Java for JDK `{request.version}`:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
