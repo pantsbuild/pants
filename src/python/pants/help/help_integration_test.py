@@ -85,7 +85,7 @@ def test_help_goals() -> None:
     pants_run.assert_success()
     assert "to get help for a specific goal" in pants_run.stdout
     # Spot check a few core goals.
-    for goal in ["filedeps", "list", "roots", "validate"]:
+    for goal in ["filedeps", "list", "roots"]:
         assert goal in pants_run.stdout
 
 
