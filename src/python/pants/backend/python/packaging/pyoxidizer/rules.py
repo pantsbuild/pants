@@ -126,9 +126,9 @@ async def package_pyoxidizer_binary(
         PexProcess(
             pyoxidizer_pex,
             argv=["build", *pyoxidizer.args],
-            description="Running PyOxidizer build (...this can take a minute...)",
+            description=f"Building {field_set.address} with PyOxidizer",
             input_digest=merged_digest,
-            level=LogLevel.DEBUG,
+            level=LogLevel.INFO,
             output_directories=["build"],
         ),
     )
