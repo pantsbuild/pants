@@ -33,7 +33,6 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    StringField,
     Target,
 )
 from pants.engine.unions import UnionRule
@@ -45,13 +44,6 @@ class PipenvSourceField(SingleSourceField):
     required = False
 
 
-class PipenvPipfileTargetField(StringField):
-    alias = "pipfile_target"
-    help = "Deprecated: no longer necessary."
-    removal_version = "2.11.0.dev0"
-    removal_hint = "This field is no longer necessary."
-
-
 class PipenvRequirementsTargetGenerator(Target):
     alias = "pipenv_requirements"
     help = "Generate a `python_requirement` for each entry in `Pipenv.lock`."
@@ -61,7 +53,6 @@ class PipenvRequirementsTargetGenerator(Target):
         ModuleMappingField,
         TypeStubsModuleMappingField,
         PipenvSourceField,
-        PipenvPipfileTargetField,
         RequirementsOverrideField,
         PythonRequirementCompatibleResolvesField,
     )

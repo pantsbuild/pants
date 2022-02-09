@@ -13,8 +13,6 @@ target(
         "src/python/pants/backend/docker",
         "src/python/pants/backend/docker/lint/hadolint",
         "src/python/pants/backend/experimental/debian",
-        "src/python/pants/backend/experimental/docker",
-        "src/python/pants/backend/experimental/docker/lint/hadolint",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
         "src/python/pants/backend/experimental/java",

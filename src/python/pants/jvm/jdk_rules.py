@@ -325,7 +325,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
 
 @rule
-async def acceptable_jdk_request(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkRequest:
+async def jdk_request_for_target(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkRequest:
 
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = ct.representative

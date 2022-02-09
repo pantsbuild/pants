@@ -45,7 +45,9 @@ def rule_runner() -> RuleRunner:
         },
         use_deprecated_python_macros=True,
     )
-    rule_runner.set_options(["--update-build-files-fix-python-macros"])
+    rule_runner.set_options(
+        ["--use-deprecated-python-macros", "--update-build-files-fix-python-macros"]
+    )
     return rule_runner
 
 
