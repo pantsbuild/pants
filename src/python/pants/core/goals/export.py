@@ -9,6 +9,7 @@ from typing import Iterable, cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -26,7 +27,7 @@ class ExportError(Exception):
 
 @union
 @dataclass(frozen=True)
-class ExportableDataRequest:
+class ExportRequest:
     """A union for exportable data provided by a backend.
 
     Subclass and install a member of this type to export data.
@@ -41,7 +42,7 @@ class Symlink:
 
     source_path may be absolute, or relative to the repo root.
 
-    link_rel_path is relative to the enclosing ExportableData's reldir, and will be
+    link_rel_path is relative to the enclosing ExportResult's reldir, and will be
     absolutized when a location for that dir is chosen.
     """
 
@@ -51,7 +52,7 @@ class Symlink:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class ExportableData:
+class ExportResult:
     description: str
     # Materialize digests and create symlinks under this reldir.
     reldir: str
@@ -75,6 +76,10 @@ class ExportableData:
         self.symlinks = tuple(symlinks)
 
 
+class ExportResults(Collection[ExportResult]):
+    pass
+
+
 class ExportSubsystem(GoalSubsystem):
     name = "export"
     help = "Export Pants data for use in other tools, such as IDEs."
@@ -94,29 +99,29 @@ async def export(
     build_root: BuildRoot,
     dist_dir: DistDir,
 ) -> Export:
-    request_types = cast(
-        "Iterable[type[ExportableDataRequest]]", union_membership.get(ExportableDataRequest)
-    )
+    request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
     requests = tuple(request_type(targets) for request_type in request_types)
-    exportables = await MultiGet(
-        Get(ExportableData, ExportableDataRequest, request) for request in requests
-    )
+    all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
+    flattened_results = [res for results in all_results for res in results]
+
     prefixed_digests = await MultiGet(
-        Get(Digest, AddPrefix(exp.digest, exp.reldir)) for exp in exportables
+        Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
     )
     output_dir = os.path.join(str(dist_dir.relpath), "export")
     merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
-    for exp in exportables:
-        for symlink in exp.symlinks:
+    for result in flattened_results:
+        for symlink in result.symlinks:
             # Note that if symlink.source_path is an abspath, join returns it unchanged.
             source_abspath = os.path.join(build_root.path, symlink.source_path)
             link_abspath = os.path.abspath(
-                os.path.join(output_dir, exp.reldir, symlink.link_rel_path)
+                os.path.join(output_dir, result.reldir, symlink.link_rel_path)
             )
             absolute_symlink(source_abspath, link_abspath)
-        console.print_stdout(f"Wrote {exp.description} to {os.path.join(output_dir, exp.reldir)}")
+        console.print_stdout(
+            f"Wrote {result.description} to {os.path.join(output_dir, result.reldir)}"
+        )
     return Export(exit_code=0)
 
 

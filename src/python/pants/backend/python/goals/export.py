@@ -11,7 +11,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.core.goals.export import ExportableData, ExportableDataRequest, ExportError, Symlink
+from pants.core.goals.export import ExportError, ExportRequest, ExportResult, ExportResults, Symlink
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -19,14 +19,14 @@ from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
-class ExportedVenvRequest(ExportableDataRequest):
+class ExportVenvRequest(ExportRequest):
     pass
 
 
 @rule
 async def export_venv(
-    request: ExportedVenvRequest, python_setup: PythonSetup, pex_env: PexEnvironment
-) -> ExportableData:
+    request: ExportVenvRequest, python_setup: PythonSetup, pex_env: PexEnvironment
+) -> ExportResults:
     # Pick a single interpreter for the venv.
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         request.targets, python_setup
@@ -68,15 +68,16 @@ async def export_venv(
     )
     py_version = res.stdout.strip().decode()
 
-    return ExportableData(
+    result = ExportResult(
         f"virtualenv for {min_interpreter}",
         os.path.join("python", "virtualenv"),
         symlinks=[Symlink(venv_abspath, py_version)],
     )
+    return ExportResults((result,))
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(ExportableDataRequest, ExportedVenvRequest),
+        UnionRule(ExportRequest, ExportVenvRequest),
     ]

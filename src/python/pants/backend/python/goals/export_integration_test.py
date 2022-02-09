@@ -6,11 +6,11 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
-from pants.backend.python.goals.export import ExportedVenvRequest
+from pants.backend.python.goals.export import ExportVenvRequest
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.goals.export import ExportableData
+from pants.core.goals.export import ExportResults
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import RuleRunner
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(Targets, [AddressSpecs]),
-            QueryRule(ExportableData, [ExportedVenvRequest]),
+            QueryRule(ExportResults, [ExportVenvRequest]),
         ],
         target_types=[PythonRequirementTarget],
     )
@@ -43,7 +43,10 @@ def test_export_venv(rule_runner: RuleRunner) -> None:
         {"src/foo/BUILD": "python_requirement(name='req', requirements=['ansicolors==1.1.8'])"}
     )
     targets = rule_runner.request(Targets, [AddressSpecs([DescendantAddresses("src/foo")])])
-    data = rule_runner.request(ExportableData, [ExportedVenvRequest(targets)])
+    all_results = rule_runner.request(ExportResults, [ExportVenvRequest(targets)])
+    assert len(all_results) == 1
+    data = all_results[0]
+
     assert len(data.symlinks) == 1
     symlink = data.symlinks[0]
     assert symlink.link_rel_path == current_interpreter
