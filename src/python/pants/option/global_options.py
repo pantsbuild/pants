@@ -594,7 +594,7 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Use this Pants version. Note that Pants only uses this to verify that you are "  # noqa: PANTSBIN
             "using the requested version, as Pants cannot dynamically change the version it "
-            f"is using once the program is already running.\n\nIf you use the `./pants` script from "
+            "is using once the program is already running.\n\nIf you use the `./pants` script from "
             f"{doc_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
             "Run `./pants --version` to check what is being used.",
