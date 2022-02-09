@@ -3,6 +3,7 @@
 
 import os
 
+
 def pytest_sessionstart(session) -> None:
     # This is needed for `pants.util.docutil.pants_bin`, and needs to be defined very early in
     # pytests' lifecycle as `pants_bin` is used at import time to define static help strings.
