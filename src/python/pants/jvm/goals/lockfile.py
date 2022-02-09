@@ -16,9 +16,10 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
@@ -31,6 +32,24 @@ from pants.util.logging import LogLevel
 
 @dataclass(frozen=True)
 class GenerateJvmLockfile(GenerateLockfile):
+    artifacts: ArtifactRequirements
+
+
+@union
+@dataclass(frozen=True)
+class EditProposedJvmArtifactsForResolveRequest:
+    """Hook for other backends to augment or modify the artifact requirements proposed for a
+    resolve.
+
+    The main user is the Scala backend which will add Scala runtime libraries.
+    """
+
+    artifacts: ArtifactRequirements
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ProposedJvmArtifactsForResolve:
     artifacts: ArtifactRequirements
 
 
@@ -77,9 +96,43 @@ def determine_jvm_user_resolves(
     )
 
 
+@dataclass(frozen=True)
+class _ApplyJvmArtifactsProposalsRequest:
+    artifacts: ArtifactRequirements
+    resolve_name: str
+
+
+@rule
+async def apply_jvm_artifact_requirement_proposals(
+    request: _ApplyJvmArtifactsProposalsRequest,
+    union_membership: UnionMembership,
+    jvm_subsystem: JvmSubsystem,
+) -> GenerateJvmLockfile:
+    artifacts = request.artifacts
+    impls = union_membership.get(EditProposedJvmArtifactsForResolveRequest)
+    for impl in impls:
+        proposal = impl(artifacts=artifacts, resolve_name=request.resolve_name)
+        modified_proposal = await Get(
+            ProposedJvmArtifactsForResolve,
+            EditProposedJvmArtifactsForResolveRequest,
+            proposal,
+        )
+        artifacts = modified_proposal.artifacts
+
+    artifacts = ArtifactRequirements(sorted(artifacts))
+
+    return GenerateJvmLockfile(
+        artifacts=artifacts,
+        resolve_name=request.resolve_name,
+        lockfile_dest=jvm_subsystem.resolves[request.resolve_name],
+    )
+
+
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedJVMserResolveNames, all_targets: AllTargets, jvm_subsystem: JvmSubsystem
+    requested: RequestedJVMserResolveNames,
+    all_targets: AllTargets,
+    jvm_subsystem: JvmSubsystem,
 ) -> UserGenerateLockfiles:
     resolve_to_artifacts = defaultdict(set)
     for tgt in all_targets:
@@ -89,15 +142,19 @@ async def setup_user_lockfile_requests(
         for resolve in jvm_subsystem.resolves_for_target(tgt):
             resolve_to_artifacts[resolve].add(artifact)
 
-    return UserGenerateLockfiles(
-        GenerateJvmLockfile(
-            # Note that it's legal to have a resolve with no artifacts.
-            artifacts=ArtifactRequirements(sorted(resolve_to_artifacts.get(resolve, ()))),
-            resolve_name=resolve,
-            lockfile_dest=jvm_subsystem.resolves[resolve],
+    # Allow other backends to modify the proposed set of artifact requirements for each resolve.
+    jvm_lockfile_requests = await MultiGet(
+        Get(
+            GenerateJvmLockfile,
+            _ApplyJvmArtifactsProposalsRequest(
+                artifacts=ArtifactRequirements(sorted(resolve_to_artifacts.get(resolve, ()))),
+                resolve_name=resolve,
+            ),
         )
         for resolve in requested
     )
+
+    return UserGenerateLockfiles(jvm_lockfile_requests)
 
 
 def rules():
