@@ -37,7 +37,7 @@ class Nailgun:
 class JdkRequest:
     """Request for a JDK with a specific major version."""
 
-    version: str
+    version: str | None
 
 
 @dataclass(frozen=True)
@@ -117,7 +117,9 @@ async def global_jdk(jvm: JvmSubsystem) -> JdkSetup:
     won't be.
     """
 
-    env = await Get(JdkEnvironment, JdkRequest(jvm.jdk))
+    version = jvm.jdk if jvm.jdk != "system" else None
+
+    env = await Get(JdkEnvironment, JdkRequest(version))
     return JdkSetup(env)
 
 
@@ -128,7 +130,7 @@ async def prepare_jdk_environment(
     nailgun = nailgun_.classpath_entry
 
     # TODO: add support for system JDKs with specific version
-    if request.version == "system":
+    if request.version is None:
         coursier_jdk_option = "--system-jvm"
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={request.version}")
@@ -325,7 +327,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 @rule
 async def acceptable_jdk_request(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkRequest:
 
-    # TODO: verify that we're requesting the same JDK version for all members?
+    # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = ct.representative
 
     if not t.has_field(JvmCompatibleJdkVersionField):

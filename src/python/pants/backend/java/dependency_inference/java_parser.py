@@ -68,7 +68,7 @@ async def make_analysis_request_from_source_files(
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     processor_classfiles: JavaParserCompiledClassfiles,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
     request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
     source_files = request.source_files

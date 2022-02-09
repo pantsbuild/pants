@@ -150,8 +150,10 @@ async def gather_scalafmt_config_files(
 @rule
 async def setup_scalafmt_partition(
     request: SetupScalafmtPartition,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk_setup: JdkSetup,  # Should fmt tool jdk depend on the source files' jdk version? unclear?
 ) -> Partition:
+    jdk = jdk_setup.jdk
+
     sources_digest = await Get(
         Digest,
         DigestSubset(
@@ -177,7 +179,7 @@ async def setup_scalafmt_partition(
     args.extend(request.files)
 
     process = JvmProcess(
-        jdk=jdk_setup.jdk,
+        jdk=jdk,
         argv=args,
         classpath_entries=request.classpath_entries,
         input_digest=sources_digest,

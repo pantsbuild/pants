@@ -21,10 +21,11 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmCompatibleJdkVersionField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -32,9 +33,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ScalatestTestFieldSet(TestFieldSet):
-    required_fields = (ScalatestTestSourceField,)
+    required_fields = (
+        ScalatestTestSourceField,
+        JvmCompatibleJdkVersionField,
+    )
 
     sources: ScalatestTestSourceField
+    jdk_version: JvmCompatibleJdkVersionField
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -57,10 +62,10 @@ class TestSetup:
 async def setup_scalatest_for_target(
     request: TestSetupRequest,
     jvm: JvmSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     scalatest: Scalatest,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
+    jdk = await Get(JdkEnvironment, JdkRequest(request.field_set.jdk_version.value))
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
     classpath, scalatest_classpath = await MultiGet(
@@ -91,7 +96,7 @@ async def setup_scalatest_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     process = JvmProcess(
-        jdk=jdk_setup.jdk,
+        jdk=jdk,
         classpath_entries=[
             *classpath.args(),
             *scalatest_classpath.classpath_entries(toolcp_relpath),

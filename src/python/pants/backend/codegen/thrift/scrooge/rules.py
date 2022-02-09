@@ -42,11 +42,13 @@ class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
 @rule
 async def generate_scrooge_thrift_sources(
     request: GenerateScroogeThriftSourcesRequest,
+    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
     scrooge: ScroogeSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
 ) -> GeneratedScroogeThriftSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
+
+    jdk = jdk_setup.jdk
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScroogeToolLockfileSentinel())
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(
@@ -101,7 +103,7 @@ async def generate_scrooge_thrift_sources(
     result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "com.twitter.scrooge.Main",

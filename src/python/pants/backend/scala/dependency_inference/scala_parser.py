@@ -203,7 +203,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_scala_source_dependencies(
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk_setup: JdkSetup,  # Pants-internal tools can use a Pants-global JDK
     processor_classfiles: ScalaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleScalaSourceDependencyAnalysisResult:

@@ -63,7 +63,7 @@ class Setup:
 async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk_setup: JdkSetup,  # Should fmt tool jdk depend on the source files' jdk version? unclear?
 ) -> Setup:
 
     jdk = jdk_setup.jdk

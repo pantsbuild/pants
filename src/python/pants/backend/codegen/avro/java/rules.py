@@ -91,12 +91,15 @@ async def generate_java_from_avro(
 
 @rule
 async def compile_avro_source(
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     request: CompileAvroSourceRequest,
+    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
     avro_tools: AvroSubsystem,
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
+
+    jdk = jdk_setup.jdk
+
     lockfile_request = await Get(GenerateJvmLockfileFromTool, AvroToolLockfileSentinel())
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
@@ -137,7 +140,7 @@ async def compile_avro_source(
     ) -> JvmProcess:
 
         return JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             argv=(
                 "org.apache.avro.tool.Main",
                 *args,

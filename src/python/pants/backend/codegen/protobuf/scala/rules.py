@@ -99,10 +99,10 @@ class MaterializedJvmPlugins:
 @rule(desc="Generate Scala from Protobuf", level=LogLevel.DEBUG)
 async def generate_scala_from_protobuf(
     request: GenerateScalaFromProtobufRequest,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     protoc: Protoc,
     scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
+    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -250,7 +250,7 @@ SHIM_SCALA_VERSION = "2.13.7"
 @rule
 async def setup_scalapb_shim_classfiles(
     scalapb: ScalaPBSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk_setup: JdkSetup,  # TODO: Use global JDK here?
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 

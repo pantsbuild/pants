@@ -247,6 +247,7 @@ class DeployJarTarget(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassNameField,
+        JvmCompatibleJdkVersionField,
         JvmResolveField,
         RestartableField,
     )
