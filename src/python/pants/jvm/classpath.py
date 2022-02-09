@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from typing import Iterator
 
-from pants.engine.collection import Collection
 from pants.engine.fs import Digest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
@@ -17,7 +16,7 @@ from pants.jvm.resolve.key import CoursierResolveKey
 logger = logging.getLogger(__name__)
 
 
-class Classpath(Collection[ClasspathEntry]):
+class Classpath:
     """A transitive classpath which is sufficient to launch the target(s) it was generated for.
 
     There are two primary ways to consume a Classpath:
@@ -31,33 +30,39 @@ class Classpath(Collection[ClasspathEntry]):
     This classpath is guaranteed to contain only JAR files.
     """
 
+    def __init__(self, entries: tuple[ClasspathEntry, ...], resolve: CoursierResolveKey) -> None:
+        self.entries: tuple[ClasspathEntry, ...] = entries
+        self.resolve: CoursierResolveKey = resolve
+
     def args(self, *, prefix: str = "") -> Iterator[str]:
         """All transitive filenames for this Classpath."""
-        return ClasspathEntry.args(ClasspathEntry.closure(self), prefix=prefix)
+        return ClasspathEntry.args(ClasspathEntry.closure(self.entries), prefix=prefix)
 
     def root_args(self, *, prefix: str = "") -> Iterator[str]:
         """The root filenames for this Classpath."""
-        return ClasspathEntry.args(self, prefix=prefix)
+        return ClasspathEntry.args(self.entries, prefix=prefix)
 
     def digests(self) -> Iterator[Digest]:
         """All transitive Digests for this Classpath."""
-        return (entry.digest for entry in ClasspathEntry.closure(self))
+        return (entry.digest for entry in ClasspathEntry.closure(self.entries))
 
     def immutable_inputs(self, *, prefix: str = "") -> Iterator[tuple[str, Digest]]:
         """Returns (relpath, Digest) tuples for use with `Process.immutable_input_digests`."""
-        return ClasspathEntry.immutable_inputs(ClasspathEntry.closure(self), prefix=prefix)
+        return ClasspathEntry.immutable_inputs(ClasspathEntry.closure(self.entries), prefix=prefix)
 
     def immutable_inputs_args(self, *, prefix: str = "") -> Iterator[str]:
         """Returns relative filenames for the given entries to be used as immutable_inputs."""
-        return ClasspathEntry.immutable_inputs_args(ClasspathEntry.closure(self), prefix=prefix)
+        return ClasspathEntry.immutable_inputs_args(
+            ClasspathEntry.closure(self.entries), prefix=prefix
+        )
 
     def root_immutable_inputs(self, *, prefix: str = "") -> Iterator[tuple[str, Digest]]:
         """Returns root (relpath, Digest) tuples for use with `Process.immutable_input_digests`."""
-        return ClasspathEntry.immutable_inputs(self, prefix=prefix)
+        return ClasspathEntry.immutable_inputs(self.entries, prefix=prefix)
 
     def root_immutable_inputs_args(self, *, prefix: str = "") -> Iterator[str]:
         """Returns root relative filenames for the given entries to be used as immutable_inputs."""
-        return ClasspathEntry.immutable_inputs_args(self, prefix=prefix)
+        return ClasspathEntry.immutable_inputs_args(self.entries, prefix=prefix)
 
 
 @rule
@@ -81,7 +86,7 @@ async def classpath(
         for t in coarsened_targets
     )
 
-    return Classpath(classpath_entries)
+    return Classpath(classpath_entries, resolve)
 
 
 def rules():

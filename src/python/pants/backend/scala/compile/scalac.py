@@ -130,7 +130,7 @@ async def compile_scala_source(
     scalac_plugins_relpath = "__plugincp"
     usercp = "__cp"
 
-    user_classpath = Classpath(direct_dependency_classpath_entries)
+    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
 
     scala_version = scala.version_for_resolve(request.resolve.name)
     tool_classpath, sources_digest = await MultiGet(
