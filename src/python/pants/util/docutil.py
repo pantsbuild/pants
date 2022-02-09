@@ -28,7 +28,7 @@ def git_url(fp: str) -> str:
 def bin_name() -> str:
     """Return the Pants binary name, e.g. './pants'."""
     try:
-        os.environ["PANTS_BIN_NAME"]
+        return os.environ["PANTS_BIN_NAME"]
     except KeyError:
         raise AssertionError(
             "Expected 'PANTS_BIN_NAME' to be set. Please file a bug at "
