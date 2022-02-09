@@ -36,7 +36,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         )
         ohi = replace(ohi, **kwargs)
         lines = HelpFormatter(
-            show_advanced=False, show_deprecated=False, color=False, entity="some"
+            show_advanced=False, show_deprecated=False, color=False
         ).format_option(ohi)
         choices = kwargs.get("choices")
         assert len(lines) == 7 if choices else 6
@@ -67,7 +67,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [], False))
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "help.test")
         return HelpFormatter(
-            show_advanced=show_advanced, show_deprecated=show_deprecated, color=False, entity="some"
+            show_advanced=show_advanced, show_deprecated=show_deprecated, color=False
         ).format_options(oshi)
 
     def test_suppress_advanced(self):
