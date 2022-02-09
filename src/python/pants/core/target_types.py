@@ -49,6 +49,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import FilesNotFoundBehavior
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -385,11 +386,11 @@ class GenericTarget(Target):
 class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
     help = (
-        "Addresses to any targets that can be built with `./pants package`, e.g. "
-        '`["project:app"]`.\n\nPants will build the assets as if you had run `./pants package`. '
+        f"Addresses to any targets that can be built with `{bin_name()} package`, e.g. "
+        f'`["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`. '
         "It will include the results in your archive using the same name they would normally have, "
         "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
-        "be built by `./pants package`, e.g. a `pex_binary`, `python_awslambda`, or even another "
+        f"be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another "
         "`archive`."
     )
 

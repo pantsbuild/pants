@@ -22,6 +22,7 @@ from pants.engine.target import (
     UnexpandedTargets,
     WrappedTarget,
 )
+from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
         raise InvalidTargetException(
             f"The target {request.address} does not have a `go_mod` target in its BUILD file or "
             "any ancestor BUILD files. To fix, please make sure your project has a `go.mod` file "
-            "and add a `go_mod` target (you can run `./pants tailor` to do this)."
+            f"and add a `go_mod` target (you can run `{bin_name()} tailor` to do this)."
         )
     nearest_go_mod_target = go_mod_targets[0]
     return OwningGoMod(nearest_go_mod_target.address)

@@ -28,7 +28,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -191,7 +191,9 @@ class DockerImageRepositoryField(StringField):
 class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = "If set to true, do not push this image to registries when running `./pants publish`."
+    help = (
+        f"If set to true, do not push this image to registries when running `{bin_name()} publish`."
+    )
 
 
 OptionValueFormatter = Callable[[str], str]

@@ -10,6 +10,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.custom_types import shell_str
+from pants.util.docutil import bin_name
 
 
 class Shfmt(TemplatedExternalTool):
@@ -41,7 +42,7 @@ class Shfmt(TemplatedExternalTool):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use shfmt when running `./pants fmt` and `./pants lint`.",
+            help=f"Don't use shfmt when running `{bin_name()} fmt` and `{bin_name()} lint`.",
         )
         register(
             "--args",

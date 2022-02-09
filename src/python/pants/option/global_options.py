@@ -35,7 +35,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -1640,7 +1640,7 @@ def maybe_warn_python_macros_deprecation(bootstrap_options: OptionValueContainer
                 "To fix this deprecation, explicitly set `use_deprecated_python_macros = true` in "
                 "the `[GLOBAL]` section of `pants.toml`. Or, when you are ready to upgrade to "
                 "the improved target generation mechanism, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
                 "  2. Check the logs for an ERROR log to see if you have to manually add "
                 "`name=` anywhere.\n"
                 "  3. Set `use_deprecated_python_macros = false` in `[GLOBAL]` in pants.toml.\n\n"

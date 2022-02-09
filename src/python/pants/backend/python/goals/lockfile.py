@@ -44,6 +44,7 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -233,7 +234,7 @@ async def generate_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
             generate_lockfiles_subsystem.custom_command
-            or f"./pants generate-lockfiles --resolve={req.resolve_name}"
+            or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
         ),
     )
     final_lockfile_digest = await Get(

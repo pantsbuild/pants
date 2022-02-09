@@ -10,7 +10,7 @@ from typing import Iterable, Iterator, Optional, cast
 
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.memo import memoized_property
 from pants.util.osutil import CPU_COUNT
 
@@ -147,7 +147,7 @@ class PythonSetup(Subsystem):
                 "with multiple resolves. Practically, this means that you cannot yet reuse common "
                 "code, such as util files, across projects using different resolves. Support for "
                 "overlapping resolves is coming soon.\n\n"
-                "If you only need a single resolve, run `./pants generate-lockfiles` to generate "
+                f"If you only need a single resolve, run `{bin_name()} generate-lockfiles` to generate "
                 "the lockfile.\n\n"
                 "If you need multiple resolves:\n\n"
                 "  1. Via this option, define multiple resolve "
@@ -161,7 +161,7 @@ class PythonSetup(Subsystem):
                 "only need to update targets that you want in non-default resolves. "
                 "(Often you'll set this via the `python_requirements` or `poetry_requirements` "
                 "target generators)\n"
-                "  4. Run `./pants generate-lockfiles` to generate the lockfiles. If the results "
+                f"  4. Run `{bin_name()} generate-lockfiles` to generate the lockfiles. If the results "
                 "aren't what you'd expect, adjust the prior step.\n"
                 "  5. Update any targets like `python_source` / `python_sources`, "
                 "`python_test` / `python_tests`, and `pex_binary` which need to set a non-default "
