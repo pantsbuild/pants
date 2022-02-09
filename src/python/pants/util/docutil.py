@@ -26,10 +26,7 @@ def git_url(fp: str) -> str:
 
 
 def bin_name() -> str:
-    """Return the Pants binary name.
-
-    (E.g. "./pants")
-    """
+    """Return the Pants binary name, e.g. './pants'."""
     try:
         os.environ["PANTS_BIN_NAME"]
     except KeyError:
