@@ -26,31 +26,31 @@ async def create_scala_repl_request(
     request: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
     jdk = jdk_setup.jdk
-    user_classpath, tool_classpath = await MultiGet(
-        Get(Classpath, Addresses, request.addresses),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__toolcp",
-                artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=scala_subsystem.version,
-                        ),
-                    ]
-                ),
+
+    user_classpath = await Get(Classpath, Addresses, request.addresses)
+    scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            prefix="__toolcp",
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-compiler",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-reflect",
+                        version=scala_version,
+                    ),
+                ]
             ),
         ),
     )
