@@ -36,4 +36,4 @@ def bin_name() -> str:
     # However, this assumption really breaks down when we go to test pants (or a plugin author goes
     # to test their plugin). Therefore we give a fallback and have integration test(s) to assert
     # we've set this at the right point in time.
-    return os.environ.get("PANTS_BIN_NAME", "./pants")
+    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN
