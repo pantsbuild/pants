@@ -4,6 +4,7 @@
 from typing import cast
 
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 
 
 class GoVetSubsystem(Subsystem):
@@ -17,7 +18,7 @@ class GoVetSubsystem(Subsystem):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use `go vet` when running `{register.bootstrap.pants_bin_name} lint`.",
+            help=f"Don't use `go vet` when running `{bin_name()} lint`.",
         )
 
     @property

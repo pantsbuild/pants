@@ -41,7 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -77,7 +77,7 @@ class Flake8(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use Flake8 when running `{register.bootstrap.pants_bin_name} lint`",
+            help=f"Don't use Flake8 when running `{bin_name()} lint`",
         )
         register(
             "--args",

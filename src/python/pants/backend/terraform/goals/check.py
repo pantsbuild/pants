@@ -12,6 +12,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 
 
 class TerraformValidateSubsystem(Subsystem):
@@ -25,9 +26,7 @@ class TerraformValidateSubsystem(Subsystem):
             "--skip",
             type=bool,
             default=False,
-            help=(
-                f"Don't run `terraform validate` when running `{register.bootstrap.pants_bin_name} check`."
-            ),
+            help=f"Don't run `terraform validate` when running `{bin_name()} check`.",
         )
 
     @property
