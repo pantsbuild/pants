@@ -35,6 +35,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -89,6 +90,7 @@ async def find_putative_targets(
     req: PutativePythonTargetsRequest,
     all_owned_sources: AllOwnedSources,
     python_setup: PythonSetup,
+    global_options: GlobalOptions,
 ) -> PutativeTargets:
     # Find library/test/test_util targets.
 
@@ -120,21 +122,20 @@ async def find_putative_targets(
 
     if python_setup.tailor_requirements_targets:
         # Find requirements files.
-        all_requirements_files_globs: PathGlobs = req.search_paths.path_globs("*requirements*.txt")
-        all_requirements_files = await Get(Paths, PathGlobs, all_requirements_files_globs)
+        all_requirements_files = await Get(
+            Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")
+        )
         unowned_requirements_files = set(all_requirements_files.files) - set(all_owned_sources)
         for req_file in unowned_requirements_files:
             path, name = os.path.split(req_file)
             pts.append(
                 PutativeTarget(
                     path=path,
-                    # python_requirements is a macro and doesn't take a name argument, but the
-                    # PutativeTarget still needs a name for display purposes.
                     name=name,
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
-                    addressable=False,
+                    addressable=not global_options.options.use_deprecated_python_macros,
                     kwargs={} if name == "requirements.txt" else {"source": name},
                 )
             )
