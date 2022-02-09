@@ -17,7 +17,6 @@ from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
