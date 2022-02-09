@@ -16,7 +16,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
@@ -42,13 +42,13 @@ class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
 @rule
 async def generate_scrooge_thrift_sources(
     request: GenerateScroogeThriftSourcesRequest,
-    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
+    jdk_wrapper: InternalJdk,
     scrooge: ScroogeSubsystem,
 ) -> GeneratedScroogeThriftSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    jdk = jdk_setup.jdk
+    jdk = jdk_wrapper.jdk
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScroogeToolLockfileSentinel())
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(

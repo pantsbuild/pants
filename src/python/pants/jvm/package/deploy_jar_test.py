@@ -16,7 +16,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
@@ -40,7 +40,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *util_rules(),
             QueryRule(BashBinary, ()),
-            QueryRule(JdkSetup, ()),
+            QueryRule(InternalJdk, ()),
             QueryRule(BuiltPackage, (DeployJarFieldSet,)),
             QueryRule(ProcessResult, (JvmProcess,)),
             QueryRule(ProcessResult, (Process,)),
@@ -306,7 +306,7 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
 def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
     tgt = rule_runner.get_target(Address("", target_name=target_name))
-    jdk_setup = rule_runner.request(JdkSetup, [])
+    jdk_wrapper = rule_runner.request(InternalJdk, [])
     fat_jar = rule_runner.request(
         BuiltPackage,
         [DeployJarFieldSet.create(tgt)],
@@ -316,7 +316,7 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         ProcessResult,
         [
             JvmProcess(
-                jdk=jdk_setup.jdk,
+                jdk=jdk_wrapper.jdk,
                 argv=("-jar", "dave.jar"),
                 classpath_entries=[],
                 description="Run that test jar",

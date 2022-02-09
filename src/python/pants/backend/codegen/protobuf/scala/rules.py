@@ -45,7 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -102,7 +102,7 @@ async def generate_scala_from_protobuf(
     protoc: Protoc,
     scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
-    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
+    jdk_wrapper: InternalJdk,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -170,7 +170,7 @@ async def generate_scala_from_protobuf(
     result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk_wrapper.jdk,
             classpath_entries=[*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath],
             argv=[
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
@@ -250,7 +250,7 @@ SHIM_SCALA_VERSION = "2.13.7"
 @rule
 async def setup_scalapb_shim_classfiles(
     scalapb: ScalaPBSubsystem,
-    jdk_setup: JdkSetup,  # TODO: Use global JDK here?
+    jdk_wrapper: InternalJdk,  # TODO: Use global JDK here?
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 
@@ -300,7 +300,7 @@ async def setup_scalapb_shim_classfiles(
     process_result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk_wrapper.jdk,
             classpath_entries=tool_classpath.classpath_entries(),
             argv=[
                 "scala.tools.nsc.Main",

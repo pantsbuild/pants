@@ -30,7 +30,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.frozendict import FrozenDict
@@ -150,9 +150,9 @@ async def gather_scalafmt_config_files(
 @rule
 async def setup_scalafmt_partition(
     request: SetupScalafmtPartition,
-    jdk_setup: JdkSetup,  # TODO: Should fmt tool jdk depend on the source files' jdk version? unclear?
+    jdk_wrapper: InternalJdk,
 ) -> Partition:
-    jdk = jdk_setup.jdk
+    jdk = jdk_wrapper.jdk
 
     sources_digest = await Get(
         Digest,

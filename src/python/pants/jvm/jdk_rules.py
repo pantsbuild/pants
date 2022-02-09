@@ -83,7 +83,7 @@ class JdkEnvironment:
 
 
 @dataclass
-class JdkSetup:
+class InternalJdk:
     jdk: JdkEnvironment
 
 
@@ -119,7 +119,7 @@ async def fetch_nailgun() -> Nailgun:
 
 
 @rule
-async def global_jdk(jvm: JvmSubsystem) -> JdkSetup:
+async def global_jdk(jvm: JvmSubsystem) -> InternalJdk:
     """Creates a `JdkEnvironment` object based on the JVM subsystem options.
 
     This is effectively a singleton for now, but by the time we complete multiple JVM support, it
@@ -129,7 +129,7 @@ async def global_jdk(jvm: JvmSubsystem) -> JdkSetup:
     version = jvm.jdk if jvm.jdk != "system" else None
 
     env = await Get(JdkEnvironment, JdkRequest_(version))
-    return JdkSetup(env)
+    return InternalJdk(env)
 
 
 @rule

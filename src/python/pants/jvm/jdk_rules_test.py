@@ -13,7 +13,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import BashBinary, ProcessResult
 from pants.engine.process import rules as process_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess, parse_jre_major_version
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules(),
             *process_rules(),
             QueryRule(BashBinary, ()),
-            QueryRule(JdkSetup, ()),
+            QueryRule(InternalJdk, ()),
             QueryRule(ProcessResult, (JvmProcess,)),
         ],
     )
@@ -44,12 +44,12 @@ def rule_runner() -> RuleRunner:
 
 
 def run_javac_version(rule_runner: RuleRunner) -> str:
-    jdk_setup = rule_runner.request(JdkSetup, [])
+    jdk_wrapper = rule_runner.request(InternalJdk, [])
     process_result = rule_runner.request(
         ProcessResult,
         [
             JvmProcess(
-                jdk=jdk_setup.jdk,
+                jdk=jdk_wrapper.jdk,
                 classpath_entries=(),
                 argv=[
                     "-version",

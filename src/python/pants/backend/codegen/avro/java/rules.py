@@ -35,7 +35,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -92,13 +92,13 @@ async def generate_java_from_avro(
 @rule
 async def compile_avro_source(
     request: CompileAvroSourceRequest,
-    jdk_setup: JdkSetup,  # Pants-internal tools should use a Pants-global JDK to ensure correct compilation
+    jdk_wrapper: InternalJdk,
     avro_tools: AvroSubsystem,
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    jdk = jdk_setup.jdk
+    jdk = jdk_wrapper.jdk
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, AvroToolLockfileSentinel())
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(

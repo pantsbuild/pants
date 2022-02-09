@@ -11,7 +11,7 @@ from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import InternalJdk
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -23,9 +23,9 @@ class ScalaRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_scala_repl_request(
-    request: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
+    request: ScalaRepl, bash: BashBinary, jdk_wrapper: InternalJdk, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    jdk = jdk_setup.jdk
+    jdk = jdk_wrapper.jdk
     user_classpath, tool_classpath = await MultiGet(
         Get(Classpath, Addresses, request.addresses),
         Get(
