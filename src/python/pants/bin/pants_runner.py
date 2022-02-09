@@ -78,17 +78,19 @@ class PantsRunner:
             stdout_fileno=stdout_fileno,
             stderr_fileno=stderr_fileno,
         ):
-            # N.B. Inlining these imports speeds up the python thin client run, and avoids importing
+            # N.B. We inline imports to speed up the python thin client run, and avoids importing
             # engine types until after the runner has had a chance to set PANTS_BIN_NAME.
-            from pants.bin.local_pants_runner import LocalPantsRunner
-            from pants.bin.remote_pants_runner import RemotePantsRunner
 
             if self._should_run_with_pantsd(global_bootstrap_options):
+                from pants.bin.remote_pants_runner import RemotePantsRunner
+
                 try:
                     remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
                     return remote_runner.run(start_time)
                 except RemotePantsRunner.Fallback as e:
                     logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
+
+            from pants.bin.local_pants_runner import LocalPantsRunner
 
             # We only install signal handling via ExceptionSink if the run will execute in this process.
             ExceptionSink.install(
