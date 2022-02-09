@@ -1,9 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
-
 import os
+from pathlib import Path
 
 # The top-level `pants` module must be a namespace package, because we build two dists from it
 # (pantsbuild.pants, and pantsbuild.pants.testutil) and consumers of these dists need to be
