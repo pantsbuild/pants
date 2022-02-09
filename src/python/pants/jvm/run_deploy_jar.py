@@ -38,8 +38,7 @@ async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
 ) -> RunRequest:
 
-    jdk_version = field_set.jdk_version.value
-    jdk = await Get(JdkEnvironment, JdkRequest(jdk_version))
+    jdk = await Get(JdkEnvironment, JdkRequest(field_set.jdk_version))
 
     main_class = field_set.main_class.value
     assert main_class is not None

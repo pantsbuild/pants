@@ -65,7 +65,7 @@ async def setup_junit_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    jdk = await Get(JdkEnvironment, JdkRequest(request.field_set.jdk_version.value))
+    jdk = await Get(JdkEnvironment, JdkRequest(request.field_set.jdk_version))
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
     classpath, junit_classpath = await MultiGet(

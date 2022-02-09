@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Optional, cast
 
 from pants.engine.target import InvalidFieldException, Target
 from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
@@ -12,7 +12,14 @@ from pants.option.subsystem import Subsystem
 
 class JvmSubsystem(Subsystem):
     options_scope = "jvm"
-    help = "Options for general JVM functionality."
+    help = (
+        "Options for general JVM functionality.\n\n"
+        " JDK strings will be passed directly to Coursier's `--jvm` parameter."
+        " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
+        " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
+        " instead, but note that this can lead to inconsistent behavior since the JVM version"
+        " will be whatever happens to be found first on the system's PATH."
+    )
 
     @classmethod
     def register_options(cls, register):
@@ -22,12 +29,19 @@ class JvmSubsystem(Subsystem):
             default="adopt:1.11",
             advanced=True,
             help=(
-                "The JDK to use.\n\n"
-                " This string will be passed directly to Coursier's `--jvm` parameter."
-                " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
-                " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
-                " instead, but note that this can lead to inconsistent behavior since the JVM version"
-                " will be whatever happens to be found first on the system's PATH."
+                "The JDK to use when building Pants' internal JVM support code and other "
+                "non-compiler tools."
+            ),
+        )
+        register(
+            "--default-source-jdk",
+            type=str,
+            default=None,
+            help=(
+                "The JDK to use when compiling sources or running tests.\n\n"
+                "If not specified, use the version specified by `--jvm-jdk`. This behavior is "
+                "deprecated, and future versions of Pants will require a specific version for "
+                "source files."
             ),
         )
         register(
@@ -61,6 +75,10 @@ class JvmSubsystem(Subsystem):
     @property
     def jdk(self) -> str:
         return cast(str, self.options.jdk)
+
+    @property
+    def default_source_jdk(self) -> str | None:
+        return cast(Optional[str], self.options.default_source_jdk)
 
     @property
     def resolves(self) -> dict[str, str]:

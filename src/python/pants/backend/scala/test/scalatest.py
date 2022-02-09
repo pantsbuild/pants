@@ -65,7 +65,7 @@ async def setup_scalatest_for_target(
     scalatest: Scalatest,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
-    jdk = await Get(JdkEnvironment, JdkRequest(request.field_set.jdk_version.value))
+    jdk = await Get(JdkEnvironment, JdkRequest(request.field_set.jdk_version))
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
     classpath, scalatest_classpath = await MultiGet(

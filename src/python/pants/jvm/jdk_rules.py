@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
 import re
 import shlex
@@ -11,6 +12,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
@@ -27,6 +29,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class Nailgun:
@@ -34,10 +38,15 @@ class Nailgun:
 
 
 @dataclass(frozen=True)
-class JdkRequest:
+class JdkRequest_:
     """Request for a JDK with a specific major version."""
 
     version: str | None
+
+
+@dataclass(frozen=True)
+class JdkRequest:
+    jdk_field: JvmCompatibleJdkVersionField
 
 
 @dataclass(frozen=True)
@@ -119,18 +128,19 @@ async def global_jdk(jvm: JvmSubsystem) -> JdkSetup:
 
     version = jvm.jdk if jvm.jdk != "system" else None
 
-    env = await Get(JdkEnvironment, JdkRequest(version))
+    env = await Get(JdkEnvironment, JdkRequest_(version))
     return JdkSetup(env)
 
 
 @rule
 async def prepare_jdk_environment(
-    coursier: Coursier, request: JdkRequest, nailgun_: Nailgun, bash: BashBinary
+    coursier: Coursier, request: JdkRequest_, nailgun_: Nailgun, bash: BashBinary
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
     # TODO: add support for system JDKs with specific version
     if request.version is None:
+        # raise Exception("system JVM wat?")
         coursier_jdk_option = "--system-jvm"
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={request.version}")
@@ -325,7 +335,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
 
 @rule
-async def jdk_request_for_target(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkRequest:
+async def jdk_request_for_target(ct: CoarsenedTarget) -> JdkRequest_:
 
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = ct.representative
@@ -333,13 +343,33 @@ async def jdk_request_for_target(jvm: JvmSubsystem, ct: CoarsenedTarget) -> JdkR
     if not t.has_field(JvmCompatibleJdkVersionField):
         raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
 
-    version = t[JvmCompatibleJdkVersionField].value
+    field = t[JvmCompatibleJdkVersionField]
 
-    if version is None:
-        # Return the default
-        return JdkRequest(jvm.jdk)
+    return await Get(JdkRequest_, JdkRequest(field))
 
-    return JdkRequest(version)
+
+@rule
+async def jdk_request(jvm: JvmSubsystem, request: JdkRequest) -> JdkRequest_:
+
+    version = request.jdk_field.value
+    if version is not None:
+        return JdkRequest_(version)
+
+    default_source = jvm.default_source_jdk
+    if default_source is not None:
+        return JdkRequest_(jvm.default_source_jdk)
+
+    warn_or_error(
+        "2.11.0.dev0",
+        "support for empty `--jvm-default-source-jdk` values",
+        (
+            "Set `--jvm-default-source-jdk` to a version listed when you run "
+            "`cs java --available`. Alternatively, set `jdk_version` on all JVM "
+            "source targets in your `BUILD` files."
+        ),
+    )
+
+    return JdkRequest_(jvm.jdk)
 
 
 def rules():
