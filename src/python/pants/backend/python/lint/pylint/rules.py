@@ -199,7 +199,11 @@ async def pylint_determine_partitions(
 
     resolve_and_interpreter_constraints_to_transitive_targets = defaultdict(set)
     for transitive_targets in transitive_targets_per_field_set:
-        resolve = transitive_targets.roots[0][PythonResolveField].normalized_value(python_setup)
+        resolve = (
+            transitive_targets.roots[0][PythonResolveField].normalized_value(python_setup)
+            if python_setup.enable_resolves
+            else "<ignore>"
+        )
         interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
             (
                 *(

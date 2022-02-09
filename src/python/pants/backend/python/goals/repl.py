@@ -65,7 +65,8 @@ class PythonRepl(ReplImplementation):
 async def create_python_repl_request(
     request: PythonRepl, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> ReplRequest:
-    validate_compatible_resolve(request.targets, python_setup)
+    if python_setup.enable_resolves:
+        validate_compatible_resolve(request.targets, python_setup)
 
     interpreter_constraints, transitive_targets = await MultiGet(
         Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
@@ -119,7 +120,8 @@ class IPythonRepl(ReplImplementation):
 async def create_ipython_repl_request(
     request: IPythonRepl, ipython: IPython, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> ReplRequest:
-    validate_compatible_resolve(request.targets, python_setup)
+    if python_setup.enable_resolves:
+        validate_compatible_resolve(request.targets, python_setup)
 
     interpreter_constraints, transitive_targets = await MultiGet(
         Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),

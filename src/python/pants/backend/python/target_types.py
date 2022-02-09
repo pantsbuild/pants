@@ -127,16 +127,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
             )
         return resolve
 
-    def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
-        """If configured, return the resolve name with its lockfile.
-
-        Error if the resolve name is invalid.
-        """
-        if not python_setup.enable_resolves:
-            return None
-        resolve = self.normalized_value(python_setup)
-        return (resolve, python_setup.resolves[resolve])
-
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` and `pex_binaries` target
