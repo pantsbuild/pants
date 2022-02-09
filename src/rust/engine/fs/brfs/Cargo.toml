@@ -11,7 +11,7 @@ clap = "2"
 dirs-next = "2"
 env_logger = "0.5.4"
 errno = "0.2.8"
-fuser = "0.9.1"
+fuser = "0.10.0"
 futures = "0.3"
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
