@@ -97,7 +97,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +230,7 @@ async def resolve_target_parametrizations(
     ):
         await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
 
-    target: Target
+    target: Target | None
     generate_request = target_types_to_generate_requests.request_for(target_type)
     if generate_request:
         # Split out the `propagated_fields` before construction.
@@ -250,6 +250,17 @@ async def resolve_target_parametrizations(
                 field_value = generator_fields.pop(field_type.alias, None)
                 if field_value is not None:
                     template_fields[field_type.alias] = field_value
+
+        generator_fields_parametrized = {
+            name for name, field in generator_fields.items() if isinstance(field, Parametrize)
+        }
+        if generator_fields_parametrized:
+            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+            raise ValueError(
+                f"Only fields which will be moved to generated targets may be parametrized, "
+                f"so target generator {address} (with type {target_type.alias}) cannot "
+                f"parametrize the {generator_fields_parametrized} {noun}."
+            )
 
         target = target_type(generator_fields, address, union_membership)
 
@@ -279,20 +290,36 @@ async def resolve_target_parametrizations(
                     target,
                     template_address=address,
                     template=template,
-                    # TODO: Apply parametrization to overrides.
-                    overrides=overrides,
+                    overrides={
+                        name: dict(Parametrize.expand(address, override))
+                        for name, override in overrides.items()
+                    },
                 ),
             )
             for address, template in Parametrize.expand(address, template_fields)
         )
-        generated = GeneratedTargets(
-            target, (t for generated_batch in all_generated for t in generated_batch.values())
+        generated = FrozenDict(
+            GeneratedTargets(
+                target, (t for generated_batch in all_generated for t in generated_batch.values())
+            )
         )
     else:
-        target = target_type(target_adaptor.kwargs, address, union_membership)
-        generated = GeneratedTargets(target, ())
+        first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
+        if rest:
+            target = None
+            generated = FrozenDict(
+                (
+                    parameterized_address,
+                    target_type(parameterized_fields, parameterized_address, union_membership),
+                )
+                for parameterized_address, parameterized_fields in (first, *rest)
+            )
+        else:
+            target = target_type(target_adaptor.kwargs, address, union_membership)
+            generated = FrozenDict()
 
-    for field_type in target.field_types:
+    # TODO: Move to Target constructor.
+    for field_type in target.field_types if target else ():
         if (
             field_type.deprecated_alias is not None
             and field_type.deprecated_alias in target_adaptor.kwargs
