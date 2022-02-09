@@ -126,7 +126,7 @@ extra_requirements.add = [
   "flake8-no-implicit-concat",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
-source_plugins = ["//build-support/flake8"]
+source_plugins = ["build-support/flake8"]
 
 [shellcheck]
 args = ["--external-sources"]
