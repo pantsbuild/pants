@@ -131,6 +131,8 @@ async def compile_scala_source(
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries)
+
+    scala_version = scala.version_for_resolve(request.resolve.name)
     tool_classpath, sources_digest = await MultiGet(
         Get(
             ToolClasspath,
@@ -140,12 +142,12 @@ async def compile_scala_source(
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-compiler",
-                            version=scala.version,
+                            version=scala_version,
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-library",
-                            version=scala.version,
+                            version=scala_version,
                         ),
                     ]
                 ),
