@@ -118,6 +118,8 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
         """Get the value after applying the default and validating that the key is recognized."""
+        if not python_setup.enable_resolves:
+            return "<ignore>"
         resolve = self.value or python_setup.default_resolve
         if resolve not in python_setup.resolves:
             raise UnrecognizedResolveNamesError(
@@ -946,6 +948,8 @@ class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMi
 
     def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
         """Get the value after applying the default and validating every key is recognized."""
+        if not python_setup.enable_resolves:
+            return ("<ignore>",)
         value_or_default = self.value or (python_setup.default_resolve,)
         invalid_resolves = set(value_or_default) - set(python_setup.resolves)
         if invalid_resolves:
