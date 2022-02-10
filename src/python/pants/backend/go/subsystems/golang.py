@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import cast
 
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import (
@@ -19,6 +18,7 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -31,49 +31,40 @@ class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--go-search-paths",
-            type=list,
-            member_type=str,
-            default=["<PATH>"],
-            help=(
-                "A list of paths to search for Go.\n\n"
-                "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
-                "Earlier entries will be searched first.\n\n"
-                "The special string '<PATH>' will expand to the contents of the PATH env var."
-            ),
-        )
-        # TODO(#13005): Support multiple Go versions in a project?
-        register(
-            "--expected-version",
-            type=str,
-            default="1.17",
-            help=(
-                "The Go version you are using, such as `1.17`.\n\n"
-                "Pants will only use Go distributions from `--go-search-paths` that have the "
-                "expected version, and it will error if none are found.\n\n"
-                "Do not include the patch version."
-            ),
-        )
-        register(
-            "--subprocess-env-vars",
-            type=list,
-            member_type=str,
-            default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
-            advanced=True,
-            help=(
-                "Environment variables to set when invoking the `go` tool. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment."
-            ),
-        )
+    _go_search_paths = StrListOption(
+        "--go-search-paths",
+        default=["<PATH>"],
+        help=(
+            "A list of paths to search for Go.\n\n"
+            "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
+            "Earlier entries will be searched first.\n\n"
+            "The special string '<PATH>' will expand to the contents of the PATH env var."
+        ),
+    )
+    # TODO(#13005): Support multiple Go versions in a project?
+    expected_version = StrOption(
+        "--expected-version",
+        default="1.17",
+        help=(
+            "The Go version you are using, such as `1.17`.\n\n"
+            "Pants will only use Go distributions from `--go-search-paths` that have the "
+            "expected version, and it will error if none are found.\n\n"
+            "Do not include the patch version."
+        ),
+    )
+    _subprocess_env_vars = StrListOption(
+        "--subprocess-env-vars",
+        default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+        help=(
+            "Environment variables to set when invoking the `go` tool. "
+            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+            "or just `ENV_VAR` to copy the value from Pants's own environment."
+        ),
+    ).advanced()
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
-            for entry in self.options.go_search_paths:
+            for entry in self._go_search_paths:
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
@@ -84,12 +75,8 @@ class GolangSubsystem(Subsystem):
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
-    def expected_version(self) -> str:
-        return cast(str, self.options.expected_version)
-
-    @property
     def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self.options.subprocess_env_vars)))
+        return tuple(sorted(set(self._subprocess_env_vars)))
 
 
 @dataclass(frozen=True)
