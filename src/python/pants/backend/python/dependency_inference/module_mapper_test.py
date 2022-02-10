@@ -330,7 +330,9 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
-    rule_runner.set_options(["--python-resolves={'default': '', 'another': ''}"])
+    rule_runner.set_options(
+        ["--python-resolves={'default': '', 'another': ''}", "--python-enable-resolves"]
+    )
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
         {
@@ -428,7 +430,7 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
         assert list(from_import_owners.unambiguous) == expected
         assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])
 
-    rule_runner.set_options(["--source-root-patterns=['root', '/']"])
+    rule_runner.set_options(["--source-root-patterns=['root', '/']", "--python-enable-resolves"])
     rule_runner.write_files(
         {
             # A root-level module.
