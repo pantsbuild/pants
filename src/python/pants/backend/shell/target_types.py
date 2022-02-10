@@ -42,13 +42,13 @@ class ShellGeneratingSourcesBase(MultipleSourcesField):
     uses_source_roots = False
 
 
-class GeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
     pass
 
 
 @rule
 def generator_settings(
-    _: GeneratorSettingsRequest,
+    _: ShellGeneratorSettingsRequest,
     shell_setup: ShellSetup,
 ) -> TargetFilesGeneratorSettings:
     return TargetFilesGeneratorSettings(
@@ -371,5 +371,5 @@ class ShellCommandRunTarget(Target):
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TargetFilesGeneratorSettingsRequest, GeneratorSettingsRequest),
+        UnionRule(TargetFilesGeneratorSettingsRequest, ShellGeneratorSettingsRequest),
     ]

@@ -813,8 +813,9 @@ class AllTargetsRequest:
 class TargetGenerator(Target):
     """A Target type which generates other Targets via installed `@rule` logic.
 
-    To act as a generator, a Target type should subclass this mixin and install generation `@rule`s
-    which consume a corresponding GenerateTargetsRequest subclass to produce GeneratedTargets.
+    To act as a generator, a Target type should subclass this base class and install generation
+    `@rule`s which consume a corresponding GenerateTargetsRequest subclass to produce
+    GeneratedTargets.
     """
 
     # The generated Target class.
@@ -823,12 +824,21 @@ class TargetGenerator(Target):
     # Fields which have their values copied from the generator Target to the generated Target.
     #
     # Must be a subset of `core_fields`.
+    #
+    # Fields should be copied from the generator to the generated when their semantic meaning is
+    # the same for both Target types, and when it is valuable for them to be introspected on
+    # either the generator or generated target (such as by `peek`, or in `filter`).
     copied_fields: ClassVar[Tuple[Type[Field], ...]]
 
     # Fields which are specified to instances of the generator Target, but which are propagated
     # to generated Targets rather than being stored on the generator Target.
     #
     # Must be disjoint from `core_fields`.
+    #
+    # Only Fields which are moved to the generated Target are allowed to be `parametrize`d. But
+    # it can also be the case that a Field only makes sense semantically when it is applied to
+    # the generated Target (for example, for an individual file), and the generator Target is just
+    # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
 

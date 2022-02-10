@@ -33,7 +33,7 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -88,7 +88,6 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 )
 
 
-@logging
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -135,7 +134,6 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     assert check_result.exit_code == 0
 
 
-@logging
 @maybe_skip_jdk_test
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -183,7 +181,6 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-@logging
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -371,7 +368,6 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
     assert "error: object joda is not a member of package org" in fallible_result.stderr
 
 
-@logging
 @maybe_skip_jdk_test
 def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
     acyclic_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
