@@ -83,8 +83,11 @@ class JdkEnvironment:
 
 @dataclass(frozen=True)
 class InternalJdk(JdkEnvironment):
-    """Represents the JDK configured for internal Pants usage, rather than for matching source
-    compatibility."""
+    """The JDK configured for internal Pants usage, rather than for matching source compatibility.
+    
+    The InternalJdk should only be used in situations where no classfiles are required for a user's
+    firstparty or thirdparty code (such as for codegen, or analysis of source files).
+    """
 
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
