@@ -13,8 +13,6 @@ from typing import Iterable, Iterator, Mapping, Optional, cast
 
 from pants.base.specs import AddressSpecs, AscendantAddresses, Spec, Specs
 from pants.build_graph.address import Address
-from pants.core.util_rules import pants_bin
-from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -40,7 +38,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 from pants.source.filespec import Filespec, matches_filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -604,7 +602,6 @@ async def tailor(
     union_membership: UnionMembership,
     specs: Specs,
     build_file_options: BuildFileOptions,
-    pants_bin: PantsBin,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
@@ -658,10 +655,10 @@ async def tailor(
         console.print_stdout(f"{verb} {console.blue(build_file_path)}:\n{formatted_changes}")
 
     if tailor_subsystem.check:
-        console.print_stdout(f"\nTo fix `tailor` failures, run `{pants_bin.name} tailor`.")
+        console.print_stdout(f"\nTo fix `tailor` failures, run `{bin_name()} tailor`.")
 
     return TailorGoal(exit_code=1 if tailor_subsystem.check else 0)
 
 
 def rules():
-    return (*collect_rules(), *pants_bin.rules())
+    return collect_rules()

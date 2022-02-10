@@ -44,10 +44,12 @@ def rule_runner() -> RuleRunner:
 
 
 def run_javac_version(rule_runner: RuleRunner) -> str:
+    jdk_setup = rule_runner.request(JdkSetup, [])
     process_result = rule_runner.request(
         ProcessResult,
         [
             JvmProcess(
+                jdk=jdk_setup.jdk,
                 classpath_entries=(),
                 argv=[
                     "-version",

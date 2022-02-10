@@ -16,6 +16,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -105,15 +106,10 @@ class SourceRootConfig(Subsystem):
         "src/java",
     ]
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
+    root_patterns = (
+        StrListOption(
             "--root-patterns",
-            metavar='["pattern1", "pattern2", ...]',
-            type=list,
-            default=cls.DEFAULT_ROOT_PATTERNS,
-            advanced=True,
+            default=DEFAULT_ROOT_PATTERNS,
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
             "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
@@ -123,18 +119,20 @@ class SourceRootConfig(Subsystem):
             "Use `/` to signify that the buildroot itself is a source root. "
             f"See {doc_url('source-roots')}.",
         )
-        register(
+        .advanced()
+        .metavar('["pattern1", "pattern2", ...]')
+    )
+    marker_filenames = (
+        StrListOption(
             "--marker-filenames",
-            metavar="filename",
-            type=list,
-            member_type=str,
-            default=None,
-            advanced=True,
             help="The presence of a file of this name in a directory indicates that the directory "
             "is a source root. The content of the file doesn't matter, and may be empty. "
             "Useful when you can't or don't wish to centrally enumerate source roots via "
             "`root_patterns`.",
         )
+        .advanced()
+        .metavar("filename")
+    )
 
     @memoized_method
     def get_pattern_matcher(self) -> SourceRootPatternMatcher:
@@ -272,7 +270,7 @@ async def get_optional_source_root(
         return OptionalSourceRoot(SourceRoot(str(path)))
 
     # B) Does it contain a marker file?
-    marker_filenames = source_root_config.options.marker_filenames
+    marker_filenames = source_root_config.marker_filenames
     if marker_filenames:
         for marker_filename in marker_filenames:
             if (

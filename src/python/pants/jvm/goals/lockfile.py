@@ -25,6 +25,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 
@@ -47,7 +48,7 @@ async def generate_jvm_lockfile(
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
     metadata = JVMLockfileMetadata.new(request.artifacts)
     resolved_lockfile_contents = metadata.add_header_to_lockfile(
-        resolved_lockfile_contents, regenerate_command="./pants generate-lockfiles"
+        resolved_lockfile_contents, regenerate_command=f"{bin_name()} generate-lockfiles"
     )
 
     lockfile_digest = await Get(

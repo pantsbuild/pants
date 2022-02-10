@@ -4,6 +4,7 @@
 
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 
 
 class GoVetSubsystem(Subsystem):
@@ -13,5 +14,5 @@ class GoVetSubsystem(Subsystem):
     skip = BoolOption(
         "--skip",
         default=False,
-        help=("Don't use gofmt when running `./pants fmt` and `./pants lint`."),
+        help=f"Don't use `go vet` when running `{bin_name()} lint`.",
     )

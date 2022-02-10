@@ -30,7 +30,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkSetup, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.frozendict import FrozenDict
@@ -53,7 +53,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    name = "scalafmt"
+    name = ScalafmtSubsystem.options_scope
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -148,7 +148,10 @@ async def gather_scalafmt_config_files(
 
 
 @rule
-async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition:
+async def setup_scalafmt_partition(
+    request: SetupScalafmtPartition,
+    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+) -> Partition:
     sources_digest = await Get(
         Digest,
         DigestSubset(
@@ -174,6 +177,7 @@ async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition
     args.extend(request.files)
 
     process = JvmProcess(
+        jdk=jdk_setup.jdk,
         argv=args,
         classpath_entries=request.classpath_entries,
         input_digest=sources_digest,

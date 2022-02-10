@@ -72,3 +72,16 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+
+def test_top_level_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--source-root-patterns=['/']"])
+    rule_runner.write_files({"protos/f.proto": "", "protos/BUILD": "protobuf_sources()"})
+    result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+
+    def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
+        return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
+
+    assert result == FirstPartyPythonMappingImpl(
+        {"protos.f_pb2": providers([Address("protos", relative_file_path="f.proto")])}
+    )

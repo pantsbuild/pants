@@ -75,6 +75,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import BoolOption, EnumOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -304,46 +305,37 @@ class SetupPyGeneration(Subsystem):
     options_scope = "setup-py-generation"
     help = "Options to control how setup.py is generated from a `python_distribution` target."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        # Generating setup is the more aggressive thing to do, so we'd prefer that the default
-        # be False. However that would break widespread existing usage, so we'll make that
-        # change in a future deprecation cycle.
-        register(
-            "--generate-setup-default",
-            type=bool,
-            default=True,
-            help=(
-                "The default value for the `generate_setup` field on `python_distribution` targets."
-                "Can be overridden per-target by setting that field explicitly. Set this to False "
-                "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
-                "Leave as True if you mostly rely on Pants generating setup files for you."
-            ),
-        )
+    # Generating setup is the more aggressive thing to do, so we'd prefer that the default
+    # be False. However that would break widespread existing usage, so we'll make that
+    # change in a future deprecation cycle.
+    generate_setup_default = BoolOption(
+        "--generate-setup-default",
+        default=True,
+        help=(
+            "The default value for the `generate_setup` field on `python_distribution` targets."
+            "Can be overridden per-target by setting that field explicitly. Set this to False "
+            "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
+            "Leave as True if you mostly rely on Pants generating setup files for you."
+        ),
+    )
 
-        register(
-            "--first-party-dependency-version-scheme",
-            type=FirstPartyDependencyVersionScheme,
-            default=FirstPartyDependencyVersionScheme.EXACT,
-            help=(
-                "What version to set in `install_requires` when a `python_distribution` depends on "
-                "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
-                "use `~=`. If `any`, will leave off the version. See "
-                "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
-            ),
-        )
-
-    @property
-    def generate_setup_default(self) -> bool:
-        return cast(bool, self.options.generate_setup_default)
+    first_party_dependency_version_scheme = EnumOption(
+        "--first-party-dependency-version-scheme",
+        default=FirstPartyDependencyVersionScheme.EXACT,
+        help=(
+            "What version to set in `install_requires` when a `python_distribution` depends on "
+            "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
+            "use `~=`. If `any`, will leave off the version. See "
+            "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+        ),
+    )
 
     def first_party_dependency_version(self, version: str) -> str:
         """Return the version string (e.g. '~=4.0') for a first-party dependency.
 
         If the user specified to use "any" version, then this will return an empty string.
         """
-        scheme = self.options.first_party_dependency_version_scheme
+        scheme = self.first_party_dependency_version_scheme
         if scheme == FirstPartyDependencyVersionScheme.ANY:
             return ""
         specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="

@@ -8,6 +8,7 @@ from typing import cast
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.option.custom_types import file_option, shell_str
+from pants.util.docutil import bin_name
 
 
 class Hadolint(TemplatedExternalTool):
@@ -39,7 +40,7 @@ class Hadolint(TemplatedExternalTool):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use Hadolint when running `./pants lint`.",
+            help=f"Don't use Hadolint when running `{bin_name()} lint`.",
         )
         register(
             "--args",

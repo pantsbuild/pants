@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class JavacCheckRequest(CheckRequest):
     field_set_type = JavaFieldSet
-    name = "javac"
+    name = JavacSubsystem.options_scope
 
 
 @rule(desc="Check javac compilation", level=LogLevel.DEBUG)

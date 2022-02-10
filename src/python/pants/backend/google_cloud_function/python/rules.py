@@ -37,7 +37,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ async def package_python_google_cloud_function(
             " third-party dependencies without binary wheels (bdist) for Linux available, it will"
             " fail to build. If this happens, you will either need to update your dependencies to"
             " only use dependencies with pre-built wheels, or find a Linux environment to run"
-            " ./pants package. (See https://realpython.com/python-wheels/ for more about"
+            f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
             " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
         )
 

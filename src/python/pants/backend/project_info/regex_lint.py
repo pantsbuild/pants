@@ -10,14 +10,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
 
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
 from pants.engine.collection import Collection
-from pants.engine.console import Console
-from pants.engine.fs import Digest, DigestContents, PathGlobs, SpecsSnapshot
-from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, collect_rules, goal_rule, rule
+from pants.engine.fs import DigestContents, PathGlobs
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -42,27 +39,6 @@ class DetailLevel(Enum):
     nonmatching = "nonmatching"
     names = "names"
     all = "all"
-
-
-class ValidateSubsystem(GoalSubsystem):
-    name = "validate"
-    help = "Deprecated: to use, set `[regex-lint].config` and run with the `lint` goal"
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--detail-level",
-            type=DetailLevel,
-            default=DetailLevel.nonmatching,
-            help="How much detail to emit to the console.",
-            removal_version="2.11.0.dev0",
-            removal_hint="Use `[regex-lint].detail_level` instead, which behaves the same.",
-        )
-
-
-class Validate(Goal):
-    subsystem_cls = ValidateSubsystem
 
 
 @dataclass(frozen=True)
@@ -105,9 +81,6 @@ class RegexLintSubsystem(Subsystem):
         "`--changed-since=<sha>` does not yet cause this linter to run. We are exploring how to "
         "improve both these gotchas."
     )
-
-    deprecated_options_scope = "sourcefile-validation"
-    deprecated_options_scope_removal_version = "2.11.0.dev0"
 
     @classmethod
     def register_options(cls, register):
@@ -169,18 +142,8 @@ class RegexLintSubsystem(Subsystem):
             else None
         )
 
-    def detail_level(self, validate_subsystem: ValidateSubsystem) -> DetailLevel:
-        return cast(
-            DetailLevel,
-            resolve_conflicting_options(
-                old_option="detail_level",
-                new_option="detail_level",
-                old_container=validate_subsystem.options,
-                new_container=self.options,
-                old_scope=validate_subsystem.name,
-                new_scope=self.options_scope,
-            ),
-        )
+    def detail_level(self) -> DetailLevel:
+        return cast(DetailLevel, self.options.detail_level)
 
 
 @dataclass(frozen=True)
@@ -321,89 +284,13 @@ class MultiMatcher:
         return applicable_content_pattern_names, content_encoding
 
 
-@goal_rule
-async def validate_goal(
-    console: Console,
-    specs_snapshot: SpecsSnapshot,
-    validate_subsystem: ValidateSubsystem,
-    regex_lint_subsystem: RegexLintSubsystem,
-) -> Validate:
-    warn_or_error(
-        "2.11.0.dev0",
-        "the `validate` goal",
-        (
-            "The `regex-lint` check run by the `validate` goal is now run as part of the "
-            "`lint` goal. So long as you have set up `[regex-lint].config` "
-            "(or the deprecated `[sourcefile-validation].config`), this checker will run.\n\n"
-            "Note that if you were running `validate '**'` in order to check files without "
-            "owning targets (e.g. to check BUILD file contents), then you will need to run "
-            "`lint '**'` rather than `lint ::`. Also, `--changed-since=<sha>` will not cause "
-            "`regex-lint` to run, same as it how `validate` worked. We are exploring how to remove "
-            "both these gotchas."
-        ),
-    )
-    multi_matcher = regex_lint_subsystem.get_multi_matcher()
-    if multi_matcher is None:
-        logger.error(
-            "You must set the option `[sourcefile-validation].config` for the "
-            "`validate` goal to work. Run `./pants help sourcefile-validation`."
-        )
-        return Validate(PANTS_FAILED_EXIT_CODE)
-
-    digest_contents = await Get(DigestContents, Digest, specs_snapshot.snapshot.digest)
-    regex_match_results = RegexMatchResults(
-        multi_matcher.check_source_file(file_content.path, file_content.content)
-        for file_content in sorted(digest_contents, key=lambda fc: fc.path)
-    )
-
-    detail_level = regex_lint_subsystem.detail_level(validate_subsystem)
-    num_matched_all = 0
-    num_nonmatched_some = 0
-    for rmr in regex_match_results:
-        if not rmr.matching and not rmr.nonmatching:
-            continue
-        if detail_level == DetailLevel.names:
-            if rmr.nonmatching:
-                console.print_stdout(rmr.path)
-            continue
-
-        if rmr.nonmatching:
-            icon = "X"
-            num_nonmatched_some += 1
-        else:
-            icon = "V"
-            num_matched_all += 1
-        matched_msg = " Matched: {}".format(",".join(rmr.matching)) if rmr.matching else ""
-        nonmatched_msg = (
-            " Didn't match: {}".format(",".join(rmr.nonmatching)) if rmr.nonmatching else ""
-        )
-        if detail_level == DetailLevel.all or (
-            detail_level == DetailLevel.nonmatching and nonmatched_msg
-        ):
-            console.print_stdout(f"{icon} {rmr.path}:{matched_msg}{nonmatched_msg}")
-
-    if detail_level not in (DetailLevel.none, DetailLevel.names):
-        console.print_stdout(f"\n{num_matched_all} files matched all required patterns.")
-        console.print_stdout(
-            f"{num_nonmatched_some} files failed to match at least one required pattern."
-        )
-
-    if num_nonmatched_some:
-        exit_code = PANTS_FAILED_EXIT_CODE
-    else:
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-    return Validate(exit_code)
-
-
 class RegexLintRequest(LintFilesRequest):
-    name = "regex-lint"
+    name = RegexLintSubsystem.options_scope
 
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)
 async def lint_with_regex_patterns(
-    request: RegexLintRequest,
-    validate_subsystem: ValidateSubsystem,
-    regex_lint_subsystem: RegexLintSubsystem,
+    request: RegexLintRequest, regex_lint_subsystem: RegexLintSubsystem
 ) -> LintResults:
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     if multi_matcher is None:
@@ -416,7 +303,7 @@ async def lint_with_regex_patterns(
     )
 
     stdout = ""
-    detail_level = regex_lint_subsystem.detail_level(validate_subsystem)
+    detail_level = regex_lint_subsystem.detail_level()
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:
