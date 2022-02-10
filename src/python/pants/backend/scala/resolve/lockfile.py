@@ -5,8 +5,8 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.goals.lockfile import (
-    EditProposedJvmArtifactsForResolveRequest,
-    ProposedJvmArtifactsForResolve,
+    AugmentedJvmArtifactsForResolve,
+    AugmentJvmArtifactsForResolveRequest,
 )
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.subsystems import JvmSubsystem
@@ -15,18 +15,17 @@ _SCALA_LIBRARY_GROUP = "org.scala-lang"
 _SCALA_LIBRARY_ARTIFACT = "scala-library"
 
 
-class ProposeScalaArtifactsForResolveRequest(EditProposedJvmArtifactsForResolveRequest):
+class AugmentResolveWithScalaArtifactsRequest(AugmentJvmArtifactsForResolveRequest):
     pass
 
 
 @rule
 async def propose_scala_artifacts_for_resolve(
-    request: ProposeScalaArtifactsForResolveRequest,
+    request: AugmentResolveWithScalaArtifactsRequest,
     scala_subsystem: ScalaSubsystem,
     scala_targets: AllScalaTargets,
     jvm: JvmSubsystem,
-) -> ProposedJvmArtifactsForResolve:
-    print(f"propose_scala_artifacts_for_resolve: request={request}")
+) -> AugmentedJvmArtifactsForResolve:
     first_party_target_uses_this_resolve = False
     for tgt in scala_targets:
         resolves_for_target = jvm.resolves_for_target(tgt)
@@ -35,7 +34,7 @@ async def propose_scala_artifacts_for_resolve(
             break
 
     if not first_party_target_uses_this_resolve:
-        return ProposedJvmArtifactsForResolve(request.artifacts)
+        return AugmentedJvmArtifactsForResolve(None)
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
     # TODO: Uncomment this once `--scala-version` goes away in v2.11.x.
@@ -56,28 +55,23 @@ async def propose_scala_artifacts_for_resolve(
 
     if not has_scala_library_artifact:
         artifacts = ArtifactRequirements(
-            sorted(
-                [
-                    *request.artifacts,
-                    ArtifactRequirement(
-                        coordinate=Coordinate(
-                            group=_SCALA_LIBRARY_GROUP,
-                            artifact=_SCALA_LIBRARY_ARTIFACT,
-                            version=scala_version,
-                        )
-                    ),
-                ]
-            )
+            [
+                ArtifactRequirement(
+                    coordinate=Coordinate(
+                        group=_SCALA_LIBRARY_GROUP,
+                        artifact=_SCALA_LIBRARY_ARTIFACT,
+                        version=scala_version,
+                    )
+                ),
+            ]
         )
-        return ProposedJvmArtifactsForResolve(artifacts)
+        return AugmentedJvmArtifactsForResolve(artifacts)
     else:
-        return ProposedJvmArtifactsForResolve(request.artifacts)
+        return AugmentedJvmArtifactsForResolve(None)
 
 
 def rules():
     return (
         *collect_rules(),
-        UnionRule(
-            EditProposedJvmArtifactsForResolveRequest, ProposeScalaArtifactsForResolveRequest
-        ),
+        UnionRule(AugmentJvmArtifactsForResolveRequest, AugmentResolveWithScalaArtifactsRequest),
     )

@@ -37,9 +37,8 @@ class GenerateJvmLockfile(GenerateLockfile):
 
 @union
 @dataclass(frozen=True)
-class EditProposedJvmArtifactsForResolveRequest:
-    """Hook for other backends to augment or modify the artifact requirements proposed for a
-    resolve.
+class AugmentJvmArtifactsForResolveRequest:
+    """Hook for backends to add to the artifact requirements requested for a resolve.
 
     The main user is the Scala backend which will add Scala runtime libraries.
     """
@@ -49,8 +48,10 @@ class EditProposedJvmArtifactsForResolveRequest:
 
 
 @dataclass(frozen=True)
-class ProposedJvmArtifactsForResolve:
-    artifacts: ArtifactRequirements
+class AugmentedJvmArtifactsForResolve:
+    """Additional artifacts to add to a JVM resolve."""
+
+    artifacts: ArtifactRequirements | None
 
 
 @rule
@@ -97,29 +98,34 @@ def determine_jvm_user_resolves(
 
 
 @dataclass(frozen=True)
-class _ApplyJvmArtifactsProposalsRequest:
+class _AugmentJvmArtifactsRequest:
     artifacts: ArtifactRequirements
     resolve_name: str
 
 
 @rule
-async def apply_jvm_artifact_requirement_proposals(
-    request: _ApplyJvmArtifactsProposalsRequest,
+async def augment_jvm_artifacts_for_resolve(
+    request: _AugmentJvmArtifactsRequest,
     union_membership: UnionMembership,
     jvm_subsystem: JvmSubsystem,
 ) -> GenerateJvmLockfile:
-    artifacts = request.artifacts
-    impls = union_membership.get(EditProposedJvmArtifactsForResolveRequest)
+    impls = union_membership.get(AugmentJvmArtifactsForResolveRequest)
+    augmented_artifacts: set[ArtifactRequirement] = set()
     for impl in impls:
-        proposal = impl(artifacts=artifacts, resolve_name=request.resolve_name)
-        modified_proposal = await Get(
-            ProposedJvmArtifactsForResolve,
-            EditProposedJvmArtifactsForResolveRequest,
-            proposal,
+        augment_request = impl(artifacts=request.artifacts, resolve_name=request.resolve_name)
+        augment_response = await Get(
+            AugmentedJvmArtifactsForResolve,
+            AugmentJvmArtifactsForResolveRequest,
+            augment_request,
         )
-        artifacts = modified_proposal.artifacts
+        if augment_response.artifacts:
+            for artifact in augment_response.artifacts:
+                augmented_artifacts.add(artifact)
 
-    artifacts = ArtifactRequirements(sorted(artifacts))
+    if augmented_artifacts:
+        artifacts = ArtifactRequirements(sorted([*request.artifacts, *augmented_artifacts]))
+    else:
+        artifacts = request.artifacts
 
     return GenerateJvmLockfile(
         artifacts=artifacts,
@@ -146,7 +152,7 @@ async def setup_user_lockfile_requests(
     jvm_lockfile_requests = await MultiGet(
         Get(
             GenerateJvmLockfile,
-            _ApplyJvmArtifactsProposalsRequest(
+            _AugmentJvmArtifactsRequest(
                 artifacts=ArtifactRequirements(sorted(resolve_to_artifacts.get(resolve, ()))),
                 resolve_name=resolve,
             ),
