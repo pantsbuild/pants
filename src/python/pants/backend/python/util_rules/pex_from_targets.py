@@ -16,7 +16,6 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementsField,
     PythonResolveField,
     parse_requirements_file,
@@ -177,7 +176,8 @@ async def interpreter_constraints_for_targets(
         transitive_targets.closure, python_setup
     )
     # If there are no targets, we fall back to the global constraints. This is relevant,
-    # for example, when running `./pants repl` with no specs.
+    # for example, when running `./pants repl` with no specs or only on targets without
+    # `interpreter_constraints` (e.g. `python_requirement`).
     interpreter_constraints = calculated_constraints or InterpreterConstraints(
         python_setup.interpreter_constraints
     )
@@ -211,12 +211,6 @@ class NoCompatibleResolveException(Exception):
             if tgt.has_field(PythonResolveField):
                 resolve = tgt[PythonResolveField].normalized_value(python_setup)
                 resolves_to_addresses[resolve].append(tgt.address.spec)
-            elif tgt.has_field(PythonRequirementCompatibleResolvesField):
-                resolves = tgt[PythonRequirementCompatibleResolvesField].normalized_value(
-                    python_setup
-                )
-                for resolve in resolves:
-                    resolves_to_addresses[resolve].append(tgt.address.spec)
 
         formatted_resolve_lists = "\n\n".join(
             f"{resolve}:\n{bullet_list(sorted(addresses))}"
@@ -226,9 +220,8 @@ class NoCompatibleResolveException(Exception):
             f"{msg_prefix}:\n\n"
             f"{formatted_resolve_lists}\n\n"
             "Targets which will be used together must all have the same resolve (from the "
-            f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) or "
-            f"[compatible_resolves]({doc_url('reference-python_requirement#codecompatible_resolvescode')}) "
-            "fields) in common." + (f"\n\n{msg_suffix}" if msg_suffix else "")
+            f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) "
+            "field) in common." + (f"\n\n{msg_suffix}" if msg_suffix else "")
         )
 
 
@@ -245,9 +238,8 @@ async def choose_python_resolve(
         if root.has_field(PythonResolveField)
     }
     if not root_resolves:
-        # If there are no targets, we fall back to the default resolve. This is relevant,
-        # for example, when running `./pants repl` with no specs or directly on
-        # python_requirement targets.
+        # If there are no relevant targets, we fall back to the default resolve. This is relevant,
+        # for example, when running `./pants repl` with no specs or only on non-Python targets.
         return ChosenPythonResolve(
             name=python_setup.default_resolve,
             lockfile_path=python_setup.resolves[python_setup.default_resolve],
@@ -264,19 +256,10 @@ async def choose_python_resolve(
 
     # Then, validate that all transitive deps are compatible.
     for tgt in transitive_targets.dependencies:
-        invalid_resolve_field = (
+        if (
             tgt.has_field(PythonResolveField)
             and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
-        )
-        invalid_compatible_resolves_field = tgt.has_field(
-            PythonRequirementCompatibleResolvesField
-        ) and not any(
-            resolve == chosen_resolve
-            for resolve in tgt[PythonRequirementCompatibleResolvesField].normalized_value(
-                python_setup
-            )
-        )
-        if invalid_resolve_field or invalid_compatible_resolves_field:
+        ):
             plural = ("s", "their") if len(transitive_targets.roots) > 1 else ("", "its")
             raise NoCompatibleResolveException(
                 python_setup,
