@@ -136,9 +136,11 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         )
 
         registries_options = tuple(registries.get(*(self.registries.value or [])) or [None])
-        
+
         return tuple(
-            "/".join([registry.address, image_name]) if registry and registry.address else image_name
+            "/".join([registry.address, image_name])
+            if registry and registry.address
+            else image_name
             for image_name in image_names
             for registry in registries_options
         )
