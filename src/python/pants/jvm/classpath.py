@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Iterator
 
 from pants.engine.fs import Digest
@@ -16,6 +17,7 @@ from pants.jvm.resolve.key import CoursierResolveKey
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
 class Classpath:
     """A transitive classpath which is sufficient to launch the target(s) it was generated for.
 
@@ -30,9 +32,8 @@ class Classpath:
     This classpath is guaranteed to contain only JAR files.
     """
 
-    def __init__(self, entries: tuple[ClasspathEntry, ...], resolve: CoursierResolveKey) -> None:
-        self.entries: tuple[ClasspathEntry, ...] = entries
-        self.resolve: CoursierResolveKey = resolve
+    entries: tuple[ClasspathEntry, ...]
+    resolve: CoursierResolveKey
 
     def args(self, *, prefix: str = "") -> Iterator[str]:
         """All transitive filenames for this Classpath."""
