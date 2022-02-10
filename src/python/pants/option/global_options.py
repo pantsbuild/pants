@@ -34,7 +34,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import doc_url, bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
