@@ -93,7 +93,6 @@ class Export(Goal):
 async def export(
     console: Console,
     targets: Targets,
-    export_subsystem: ExportSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
     build_root: BuildRoot,
