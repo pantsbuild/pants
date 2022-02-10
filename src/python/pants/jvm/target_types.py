@@ -48,13 +48,12 @@ class JvmResolveField(StringField):
     )
 
 
-class JvmCompatibleJdkVersionField(StringField):
-    alias = "jdk_version"
+class JvmJdkField(StringField):
+    alias = "jdk"
     required = False
     help = (
         "The major version of the JDK that this target should be built with. If not defined, "
-        "will default to `[jvm].default_jdk`. While `[jvm].jdk` remains available during "
-        "deprecation, it is not appropriate to set `jdk_version` on targets and `[jvm].jdk`."
+        "will default to `[jvm].default_source_jdk`."
     )
 
 
@@ -247,7 +246,7 @@ class DeployJarTarget(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassNameField,
-        JvmCompatibleJdkVersionField,
+        JvmJdkField,
         JvmResolveField,
         RestartableField,
     )

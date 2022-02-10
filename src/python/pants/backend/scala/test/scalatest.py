@@ -25,7 +25,7 @@ from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmCompatibleJdkVersionField
+from pants.jvm.target_types import JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 class ScalatestTestFieldSet(TestFieldSet):
     required_fields = (
         ScalatestTestSourceField,
-        JvmCompatibleJdkVersionField,
+        JvmJdkField,
     )
 
     sources: ScalatestTestSourceField
-    jdk_version: JvmCompatibleJdkVersionField
+    jdk_version: JvmJdkField
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):

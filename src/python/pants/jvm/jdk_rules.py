@@ -23,7 +23,7 @@ from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmCompatibleJdkVersionField
+from pants.jvm.target_types import JvmJdkField
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -45,7 +45,7 @@ class JdkForClasspathRequest:
 class JdkRequest:
     """Request for a JDK with a specific major version, or None (use System JDK)."""
 
-    version: str | JvmCompatibleJdkVersionField | None
+    version: str | JvmJdkField | None
 
 
 @dataclass(frozen=True)
@@ -341,10 +341,10 @@ async def jdk_request_for_classpath(request: JdkForClasspathRequest) -> JdkReque
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = request.cper.component.representative
 
-    if not t.has_field(JvmCompatibleJdkVersionField):
+    if not t.has_field(JvmJdkField):
         raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
 
-    field = t[JvmCompatibleJdkVersionField]
+    field = t[JvmJdkField]
 
     return JdkRequest(field)
 
