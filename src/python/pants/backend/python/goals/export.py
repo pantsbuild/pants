@@ -36,7 +36,7 @@ class ExportVenvsRequest(ExportRequest):
 
 @dataclass(frozen=True)
 class _ExportVenvRequest(EngineAwareParameter):
-    resolve: str
+    resolve: str | None
     root_python_targets: tuple[Target, ...]
 
     def debug_hint(self) -> str:
@@ -47,18 +47,34 @@ class _ExportVenvRequest(EngineAwareParameter):
 async def export_virtualenv(
     request: _ExportVenvRequest, python_setup: PythonSetup, pex_env: PexEnvironment
 ) -> ExportResult:
-    interpreter_constraints = InterpreterConstraints(
-        python_setup.resolves_to_interpreter_constraints.get(
-            request.resolve, python_setup.interpreter_constraints
+    if request.resolve:
+        interpreter_constraints = InterpreterConstraints(
+            python_setup.resolves_to_interpreter_constraints.get(
+                request.resolve, python_setup.interpreter_constraints
+            )
         )
-    )
+    else:
+        interpreter_constraints = InterpreterConstraints.create_from_targets(
+            request.root_python_targets, python_setup
+        ) or InterpreterConstraints(python_setup.interpreter_constraints)
+
     min_interpreter = interpreter_constraints.snap_to_minimum(python_setup.interpreter_universe)
     if not min_interpreter:
-        raise ExportError(
-            f"The resolve '{request.resolve}' (from `[python].resolves`) has invalid interpreter "
-            f"constraints, which are set via `[python].resolves_to_interpreter_constraints`: "
-            f"{interpreter_constraints}. Could not determine the minimum compatible interpreter."
+        err_msg = (
+            (
+                f"The resolve '{request.resolve}' (from `[python].resolves`) has invalid interpreter "
+                f"constraints, which are set via `[python].resolves_to_interpreter_constraints`: "
+                f"{interpreter_constraints}. Could not determine the minimum compatible interpreter."
+            )
+            if request.resolve
+            else (
+                "The following interpreter constraints were computed for all the targets for which "
+                f"export was requested: {interpreter_constraints}. There is no python interpreter "
+                "compatible with these constraints. Please restrict the target set to one that shares "
+                "a compatible interpreter."
+            )
         )
+        raise ExportError(err_msg)
 
     venv_pex = await Get(
         VenvPex,
@@ -85,9 +101,14 @@ async def export_virtualenv(
     )
     py_version = res.stdout.strip().decode()
 
+    dest = (
+        os.path.join("python", "virtualenvs", path_safe(request.resolve))
+        if request.resolve
+        else os.path.join("python", "virtualenv")
+    )
     return ExportResult(
         f"virtualenv for the resolve '{request.resolve}' (using {min_interpreter})",
-        os.path.join("python", "virtualenvs", path_safe(request.resolve)),
+        dest,
         symlinks=[Symlink(venv_abspath, py_version)],
     )
 
@@ -106,20 +127,19 @@ async def export_virtualenvs(
     venvs = await MultiGet(
         Get(
             ExportResult,
-            _ExportVenvRequest(
-                resolve if resolve != "<ignore>" else python_setup.default_resolve, tuple(tgts)
-            ),
+            _ExportVenvRequest(resolve if python_setup.enable_resolves else None, tuple(tgts)),
         )
         for resolve, tgts in resolve_to_root_targets.items()
     )
 
-    deprecated_path = dist_dir.relpath / "python" / "virtualenv"
-    if venvs and deprecated_path.exists():
+    no_resolves_dest = dist_dir.relpath / "python" / "virtualenv"
+    if venvs and python_setup.enable_resolves and no_resolves_dest.exists():
         logger.warning(
-            f"`{bin_name()} export ::` no longer writes virtualenvs to {deprecated_path}, but "
-            f"instead underneath {dist_dir.relpath / 'python' / 'virtualenvs'}. You will need to "
+            f"Because `[python].enable_resolves` is true, `{bin_name()} export ::` no longer "
+            f"writes virtualenvs to {no_resolves_dest}, but instead underneath "
+            f"{dist_dir.relpath / 'python' / 'virtualenvs'}. You will need to "
             "update your IDE to point to the new virtualenv.\n\n"
-            f"To silence this error, delete {deprecated_path}"
+            f"To silence this error, delete {no_resolves_dest}"
         )
 
     return ExportResults(venvs)

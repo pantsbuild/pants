@@ -37,17 +37,6 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
     # We know that the current interpreter exists on the system.
     vinfo = sys.version_info
     current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
-
-    rule_runner.set_options(
-        [
-            f"--python-interpreter-constraints=['=={current_interpreter}']",
-            "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
-            "--python-enable-resolves",
-            # Turn off lockfile validation to make the test simpler.
-            "--python-invalid-lockfile-behavior=ignore",
-        ],
-        env_inherit={"PATH", "PYENV_ROOT"},
-    )
     rule_runner.write_files(
         {
             "src/foo/BUILD": dedent(
@@ -59,16 +48,36 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
             "lock.txt": "ansicolors==1.1.8",
         }
     )
-    targets = rule_runner.request(Targets, [AddressSpecs([DescendantAddresses("src/foo")])])
-    all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
-    assert len(all_results) == 2
-    assert {result.reldir for result in all_results} == {
+
+    def run(enable_resolves: bool) -> ExportResults:
+        rule_runner.set_options(
+            [
+                f"--python-interpreter-constraints=['=={current_interpreter}']",
+                "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
+                f"--python-enable-resolves={enable_resolves}",
+                # Turn off lockfile validation to make the test simpler.
+                "--python-invalid-lockfile-behavior=ignore",
+            ],
+            env_inherit={"PATH", "PYENV_ROOT"},
+        )
+        targets = rule_runner.request(Targets, [AddressSpecs([DescendantAddresses("src/foo")])])
+        all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
+
+        for result in all_results:
+            assert len(result.symlinks) == 1
+            symlink = result.symlinks[0]
+            assert symlink.link_rel_path == current_interpreter
+            assert "named_caches/pex_root/venvs/" in symlink.source_path
+
+        return all_results
+
+    resolve_results = run(enable_resolves=True)
+    assert len(resolve_results) == 2
+    assert {result.reldir for result in resolve_results} == {
         "python/virtualenvs/a",
         "python/virtualenvs/b",
     }
 
-    for result in all_results:
-        assert len(result.symlinks) == 1
-        symlink = result.symlinks[0]
-        assert symlink.link_rel_path == current_interpreter
-        assert "named_caches/pex_root/venvs/" in symlink.source_path
+    no_resolve_results = run(enable_resolves=False)
+    assert len(no_resolve_results) == 1
+    assert no_resolve_results[0].reldir == "python/virtualenv"
