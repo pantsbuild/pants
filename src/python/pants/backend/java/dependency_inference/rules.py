@@ -121,7 +121,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     export_types.update(typ for typ in analysis.export_types if "." in typ)
 
     dep_map = first_party_dep_map.symbols
-    resolves = jvm.resolves_for_target(tgt)
+    resolve = jvm.resolve_for_target(tgt)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
@@ -129,7 +129,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     for typ in types:
         first_party_matches = dep_map.addresses_for_symbol(typ)
         third_party_matches = (
-            third_party_artifact_mapping.addresses_for_symbol(typ, resolves)
+            third_party_artifact_mapping.addresses_for_symbol(typ, [resolve])
             if java_infer_subsystem.third_party_imports
             else FrozenOrderedSet()
         )

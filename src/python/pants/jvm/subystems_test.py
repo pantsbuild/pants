@@ -5,60 +5,45 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.java.target_types import (
-    JavaJunitTestSourceField,
-    JavaSourceField,
-    JavaSourceTarget,
-    JunitTestTarget,
-)
+from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
+from pants.jvm.target_types import JvmResolveField
 from pants.testutil.option_util import create_subsystem
 
 
-def test_resolves_for_targets() -> None:
+def test_resolve_for_target() -> None:
     jvm = create_subsystem(
         JvmSubsystem, resolves={"a": "", "b": "", "c": "", "default": ""}, default_resolve="default"
     )
 
-    assert jvm.resolves_for_target(
-        JavaSourceTarget(
-            {JavaSourceField.alias: "foo", JvmCompatibleResolvesField.alias: ["a", "b"]},
-            Address("dir"),
+    assert (
+        jvm.resolve_for_target(
+            JavaSourceTarget(
+                {JavaSourceField.alias: "foo", JvmResolveField.alias: "a"},
+                Address("dir"),
+            )
         )
-    ) == ("a", "b")
-    assert jvm.resolves_for_target(
-        JavaSourceTarget({JavaSourceField.alias: "foo"}, Address("dir"))
-    ) == ("default",)
+        == "a"
+    )
+
+    assert (
+        jvm.resolve_for_target(JavaSourceTarget({JavaSourceField.alias: "foo"}, Address("dir")))
+        == "default"
+    )
+
     with pytest.raises(InvalidFieldException):
-        jvm.resolves_for_target(
+        jvm.resolve_for_target(
             JavaSourceTarget(
                 {
                     JavaSourceField.alias: "foo",
-                    JvmCompatibleResolvesField.alias: ["a", "bad", "malo"],
+                    JvmResolveField.alias: "malo",
                 },
                 Address("dir"),
             )
         )
 
-    assert jvm.resolves_for_target(
-        JunitTestTarget(
-            {JavaJunitTestSourceField.alias: "foo", JvmResolveField.alias: "a"}, Address("dir")
-        )
-    ) == ("a",)
-    assert jvm.resolves_for_target(
-        JunitTestTarget({JavaJunitTestSourceField.alias: "foo"}, Address("dir"))
-    ) == ("default",)
-    with pytest.raises(InvalidFieldException):
-        jvm.resolves_for_target(
-            JunitTestTarget(
-                {JavaJunitTestSourceField.alias: "foo", JvmResolveField.alias: "bad"},
-                Address("dir"),
-            )
-        )
-
     with pytest.raises(AssertionError):
-        jvm.resolves_for_target(GenericTarget({}, Address("dir")))
+        jvm.resolve_for_target(GenericTarget({}, Address("dir")))

@@ -24,7 +24,7 @@ from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactCompatibleResolvesField
+from pants.jvm.target_types import JvmArtifactResolveField
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
@@ -83,10 +83,10 @@ async def setup_user_lockfile_requests(
 ) -> UserGenerateLockfiles:
     resolve_to_artifacts = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_field(JvmArtifactCompatibleResolvesField):
+        if not tgt.has_field(JvmArtifactResolveField):
             continue
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        for resolve in jvm_subsystem.resolves_for_target(tgt):
+        for resolve in jvm_subsystem.resolve_for_target(tgt):
             resolve_to_artifacts[resolve].add(artifact)
 
     return UserGenerateLockfiles(

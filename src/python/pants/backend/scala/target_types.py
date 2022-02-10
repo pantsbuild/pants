@@ -19,12 +19,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.target_types import (
-    JunitTestSourceField,
-    JvmCompatibleResolvesField,
-    JvmProvidesTypesField,
-    JvmResolveField,
-)
+from pants.jvm.target_types import JunitTestSourceField, JvmProvidesTypesField, JvmResolveField
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -163,7 +158,7 @@ class ScalaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourceField,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "A single Scala source file containing application or library code."
@@ -189,14 +184,14 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         ScalaSourcesGeneratorSourcesField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
     )
     moved_fields = (JvmProvidesTypesField,)
     settings_request_cls = ScalaSettingsRequest

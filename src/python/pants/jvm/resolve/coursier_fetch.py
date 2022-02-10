@@ -78,15 +78,14 @@ class NoCompatibleResolve(Exception):
 
     def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
         targets_and_resolves_str = bullet_list(
-            f"{t.address.spec}\t{jvm.resolves_for_target(t)}" for t in incompatible_targets
+            f"{t.address.spec}\t{jvm.resolve_for_target(t)}" for t in incompatible_targets
         )
         super().__init__(
             f"{msg_prefix}:\n"
             f"{targets_and_resolves_str}\n"
-            "Targets which will be merged onto the same classpath must have at least one compatible "
-            f"resolve (from the [resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) or "
-            f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
-            "fields) in common."
+            "Targets which will be merged onto the same classpath must have at least one "
+            "compatible resolve (from the "
+            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field) in common."
         )
 
 
@@ -601,28 +600,26 @@ async def select_coursier_resolve_for_targets(
     # Find the set of resolves that are compatible with all roots by ANDing them all together.
     compatible_resolves: set[str] | None = None
     for tgt in root_targets:
-        current_resolves = set(jvm.resolves_for_target(tgt))
+        current_resolves = set([jvm.resolve_for_target(tgt)])
         if compatible_resolves is None:
             compatible_resolves = current_resolves
         else:
             compatible_resolves &= current_resolves
 
     # Select a resolve from the compatible set.
-    if not compatible_resolves:
+    if not compatible_resolves or len(compatible_resolves) != 1:
         raise NoCompatibleResolve(
             jvm, "The selected targets did not have a resolve in common", root_targets
         )
-    # Take the first compatible resolve.
-    resolve = min(compatible_resolves)
+    resolve = next(iter(compatible_resolves))
 
     # Validate that the selected resolve is compatible with all transitive dependencies.
     incompatible_targets = []
     for ct in coarsened_targets.closure():
         for t in ct.members:
-            if not jvm.is_jvm_target(t):
+            if not jvm.has_resolve(t):
                 continue
-            target_resolves = jvm.resolves_for_target(t)
-            if target_resolves is not None and resolve not in target_resolves:
+            if jvm.resolve_for_target(t) != resolve:
                 incompatible_targets.append(t)
     if incompatible_targets:
         raise NoCompatibleResolve(

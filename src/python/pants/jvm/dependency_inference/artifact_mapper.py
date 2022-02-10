@@ -208,10 +208,10 @@ async def find_available_third_party_artifacts(
         coord = UnversionedCoordinate(
             group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value
         )
-        for resolve in jvm.resolves_for_target(tgt):
-            key = (resolve, coord)
-            address_mapping[key].add(tgt.address)
-            package_mapping[key].update(tgt[JvmArtifactPackagesField].value or ())
+        resolve = jvm.resolve_for_target(tgt)
+        key = (resolve, coord)
+        address_mapping[key].add(tgt.address)
+        package_mapping[key].update(tgt[JvmArtifactPackagesField].value or ())
 
     return AvailableThirdPartyArtifacts(
         {
