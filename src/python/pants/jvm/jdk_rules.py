@@ -378,7 +378,7 @@ def _resolve_jdk_request_to_version(request: JdkRequest, defaults: JvmSubsystem)
         "support for empty `--jvm-default-source-jdk` values",
         (
             "Set `--jvm-default-source-jdk` to a version listed when you run "
-            "`cs java --available`. Alternatively, set `jdk_version` on all JVM "
+            f"`cs java --available`. Alternatively, set the `{JvmJdkField.alias}` field on all JVM "
             "source targets in your `BUILD` files."
         ),
     )
