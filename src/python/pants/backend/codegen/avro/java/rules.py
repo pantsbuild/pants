@@ -92,13 +92,11 @@ async def generate_java_from_avro(
 @rule
 async def compile_avro_source(
     request: CompileAvroSourceRequest,
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
     avro_tools: AvroSubsystem,
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
-
-    jdk = jdk_wrapper.jdk
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, AvroToolLockfileSentinel())
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(

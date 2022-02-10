@@ -23,9 +23,8 @@ class ScalaRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_scala_repl_request(
-    request: ScalaRepl, bash: BashBinary, jdk_wrapper: InternalJdk, scala_subsystem: ScalaSubsystem
+    request: ScalaRepl, bash: BashBinary, jdk: InternalJdk, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    jdk = jdk_wrapper.jdk
     user_classpath, tool_classpath = await MultiGet(
         Get(Classpath, Addresses, request.addresses),
         Get(

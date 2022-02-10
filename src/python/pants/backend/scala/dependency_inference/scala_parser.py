@@ -203,7 +203,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_scala_source_dependencies(
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
     processor_classfiles: ScalaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleScalaSourceDependencyAnalysisResult:
@@ -238,7 +238,7 @@ async def analyze_scala_source_dependencies(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk_wrapper.jdk,
+            jdk=jdk,
             classpath_entries=[
                 *tool_classpath.classpath_entries(toolcp_relpath),
                 processorcp_relpath,
@@ -284,7 +284,7 @@ async def resolve_fallible_result_to_analysis(
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def setup_scala_parser_classfiles(jdk_wrapper: InternalJdk) -> ScalaParserCompiledClassfiles:
+async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
     parser_source_content = pkgutil.get_data(
@@ -344,7 +344,7 @@ async def setup_scala_parser_classfiles(jdk_wrapper: InternalJdk) -> ScalaParser
     process_result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_wrapper.jdk,
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(),
             argv=[
                 "scala.tools.nsc.Main",

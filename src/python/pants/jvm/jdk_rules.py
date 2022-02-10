@@ -82,9 +82,10 @@ class JdkEnvironment:
         return {**self.coursier.immutable_input_digests, self.bin_dir: self._digest}
 
 
-@dataclass
-class InternalJdk:
-    jdk: JdkEnvironment
+@dataclass(frozen=True)
+class InternalJdk(JdkEnvironment):
+    """Represents the JDK configured for internal Pants usage, rather than for matching source
+    compatibility."""
 
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
@@ -119,17 +120,17 @@ async def fetch_nailgun() -> Nailgun:
 
 
 @rule
-async def global_jdk(jvm: JvmSubsystem) -> InternalJdk:
+async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
     """Creates a `JdkEnvironment` object based on the JVM subsystem options.
 
-    This is effectively a singleton for now, but by the time we complete multiple JVM support, it
-    won't be.
+    This is used for providing a predictable JDK version for Pants' internal usage rather than for
+    matching compatibility with source files (e.g. compilation/testing).
     """
 
     version = jvm.jdk if jvm.jdk != "system" else None
 
     env = await Get(JdkEnvironment, JdkRequest_(version))
-    return InternalJdk(env)
+    return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
 
 
 @rule

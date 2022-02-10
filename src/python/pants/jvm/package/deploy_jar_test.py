@@ -306,7 +306,7 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
 def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
     tgt = rule_runner.get_target(Address("", target_name=target_name))
-    jdk_wrapper = rule_runner.request(InternalJdk, [])
+    jdk = rule_runner.request(InternalJdk, [])
     fat_jar = rule_runner.request(
         BuiltPackage,
         [DeployJarFieldSet.create(tgt)],
@@ -316,7 +316,7 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
         ProcessResult,
         [
             JvmProcess(
-                jdk=jdk_wrapper.jdk,
+                jdk=jdk,
                 argv=("-jar", "dave.jar"),
                 classpath_entries=[],
                 description="Run that test jar",

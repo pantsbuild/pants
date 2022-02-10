@@ -54,10 +54,8 @@ class JavaParserCompiledClassfiles:
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def build_processors(jdk_wrapper: InternalJdk) -> JavaParserCompiledClassfiles:
+async def build_processors(jdk: InternalJdk) -> JavaParserCompiledClassfiles:
     dest_dir = "classfiles"
-    jdk = jdk_wrapper.jdk
-
     materialized_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,

@@ -42,13 +42,11 @@ class ScroogeToolLockfileSentinel(GenerateToolLockfileSentinel):
 @rule
 async def generate_scrooge_thrift_sources(
     request: GenerateScroogeThriftSourcesRequest,
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
     scrooge: ScroogeSubsystem,
 ) -> GeneratedScroogeThriftSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
-
-    jdk = jdk_wrapper.jdk
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScroogeToolLockfileSentinel())
     tool_classpath, transitive_targets, empty_output_dir_digest, wrapped_target = await MultiGet(

@@ -63,10 +63,8 @@ class Setup:
 async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
 ) -> Setup:
-
-    jdk = jdk_wrapper.jdk
 
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()

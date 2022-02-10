@@ -102,7 +102,7 @@ async def generate_scala_from_protobuf(
     protoc: Protoc,
     scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -170,7 +170,7 @@ async def generate_scala_from_protobuf(
     result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_wrapper.jdk,
+            jdk=jdk,
             classpath_entries=[*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath],
             argv=[
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
@@ -250,7 +250,7 @@ SHIM_SCALA_VERSION = "2.13.7"
 @rule
 async def setup_scalapb_shim_classfiles(
     scalapb: ScalaPBSubsystem,
-    jdk_wrapper: InternalJdk,  # TODO: Use global JDK here?
+    jdk: InternalJdk,
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 
@@ -300,7 +300,7 @@ async def setup_scalapb_shim_classfiles(
     process_result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=jdk_wrapper.jdk,
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(),
             argv=[
                 "scala.tools.nsc.Main",

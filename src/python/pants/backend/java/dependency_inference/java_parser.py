@@ -68,7 +68,7 @@ async def make_analysis_request_from_source_files(
 @rule(level=LogLevel.DEBUG)
 async def analyze_java_source_dependencies(
     processor_classfiles: JavaParserCompiledClassfiles,
-    jdk_wrapper: InternalJdk,
+    jdk: InternalJdk,
     request: JavaSourceDependencyAnalysisRequest,
 ) -> FallibleJavaSourceDependencyAnalysisResult:
     source_files = request.source_files
@@ -103,7 +103,7 @@ async def analyze_java_source_dependencies(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk_wrapper.jdk,
+            jdk=jdk,
             classpath_entries=[
                 *tool_classpath.classpath_entries(toolcp_relpath),
                 processorcp_relpath,
