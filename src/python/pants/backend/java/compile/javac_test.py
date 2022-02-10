@@ -80,6 +80,20 @@ JAVA_LIB_SOURCE = dedent(
     """
 )
 
+
+JAVA_LIB_JDK12_SOURCE = dedent(
+    """
+    package org.pantsbuild.example.lib;
+
+    public class ExampleLib {
+        public static String hello() {
+            return "Hello!".indent(4);
+        }
+    }
+    """
+)
+
+
 JAVA_LIB_MAIN_SOURCE = dedent(
     """
     package org.pantsbuild.example;
@@ -151,7 +165,9 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    rule_runner.set_options(["--jvm-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        ["--jvm-default-source-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
@@ -161,6 +177,62 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(ClasspathEntry, [request])
+
+
+@maybe_skip_jdk_test
+def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.12',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    classpath = rule_runner.request(RenderedClasspath, [request])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+    }
+
+
+@maybe_skip_jdk_test
+def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.11',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    with pytest.raises(ExecutionError):
+        rule_runner.request(RenderedClasspath, [request])
 
 
 @maybe_skip_jdk_test
