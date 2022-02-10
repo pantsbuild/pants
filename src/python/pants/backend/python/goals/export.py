@@ -39,7 +39,7 @@ class _ExportVenvRequest(EngineAwareParameter):
     resolve: str | None
     root_python_targets: tuple[Target, ...]
 
-    def debug_hint(self) -> str:
+    def debug_hint(self) -> str | None:
         return self.resolve
 
 
