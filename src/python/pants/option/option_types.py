@@ -287,7 +287,8 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
             cls, *flag_names, default=default, option_type=option_type, help=help
         )
 
-class DictOption(_OptionBase['dict[str, _ValueT]'], Generic[_ValueT]):
+
+class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
     """A dictionary option mapping strings to client-provided `_ValueT`.
 
     If you provide a `default` parameter, the `_ValueT` type parameter will be inferred from the
@@ -312,7 +313,9 @@ class DictOption(_OptionBase['dict[str, _ValueT]'], Generic[_ValueT]):
 
     option_type: Any = dict
 
-    def __new__(cls, *flag_names, default: dict[str, _ValueT] | None = None, help):
+    def __new__(
+        cls, *flag_names, default: dict[str, _ValueT] | None = None, help
+    ) -> DictOption[str, _ValueT]:
         return super().__new__(
             cls,
             *flag_names,
@@ -321,7 +324,7 @@ class DictOption(_OptionBase['dict[str, _ValueT]'], Generic[_ValueT]):
         )
 
     def _convert_(self, val: Any) -> dict[str, _ValueT]:
-        return cast('dict[_ValueT]', val)
+        return cast("dict[str, _ValueT]", val)
 
 
 class TargetOption(StrOption):
@@ -347,6 +350,10 @@ class ShellStrOption(StrOption):
 
     option_type: Any = custom_types.shell_str
 
+class WorkspacePathOption(StrOption):
+    """A workspace path option."""
+
+    option_type: Any = custom_types.workspace_path
 
 class MemorySizeOption(IntOption):
     """A memory size option."""

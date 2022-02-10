@@ -379,6 +379,7 @@ def test_subsystem_option_ordering() -> None:
         call("--a", type=str, default=None, help=""),
     ]
 
+
 def test_dict_option_valuetype() -> None:
     class MySubsystem(Subsystem):
         def __init__(self):
