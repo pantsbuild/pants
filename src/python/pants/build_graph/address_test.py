@@ -383,34 +383,6 @@ def test_address_maybe_convert_to_target_generator() -> None:
     assert_noops(Address("a/b"))
 
 
-def test_address_maybe_convert_to_generated_target() -> None:
-    def assert_converts(file_addr: Address, *, expected: Address) -> None:
-        assert file_addr.maybe_convert_to_generated_target() == expected
-
-    assert_converts(
-        Address("a/b", relative_file_path="c.txt", target_name="c"),
-        expected=Address("a/b", target_name="c", generated_name="c.txt"),
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="c.txt"), expected=Address("a/b", generated_name="c.txt")
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="subdir/f.txt"),
-        expected=Address("a/b", generated_name="subdir/f.txt"),
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="subdir/f.txt", target_name="original"),
-        expected=Address("a/b", target_name="original", generated_name="subdir/f.txt"),
-    )
-
-    def assert_noops(addr: Address) -> None:
-        assert addr.maybe_convert_to_generated_target() is addr
-
-    assert_noops(Address("a/b", target_name="c"))
-    assert_noops(Address("a/b"))
-    assert_noops(Address("a/b", generated_name="generated"))
-
-
 def test_address_create_generated() -> None:
     assert Address("dir", target_name="generator").create_generated("generated") == Address(
         "dir", target_name="generator", generated_name="generated"
