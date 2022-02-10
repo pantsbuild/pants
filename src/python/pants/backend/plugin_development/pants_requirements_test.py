@@ -12,8 +12,8 @@ from pants.backend.plugin_development.pants_requirements import (
 )
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import (
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
 )
 from pants.engine.addresses import Address
@@ -48,7 +48,7 @@ def test_target_generator() -> None:
             "BUILD": (
                 "pants_requirements(name='default')\n"
                 "pants_requirements(\n"
-                "  name='no_testutil', testutil=False, compatible_resolves=['a']\n"
+                "  name='no_testutil', testutil=False, resolve='a'\n"
                 ")"
             )
         }
@@ -72,7 +72,7 @@ def test_target_generator() -> None:
         PipRequirement.parse(f"pantsbuild.pants.testutil{determine_version()}"),
     )
     for t in (pants_req, testutil_req):
-        assert not t[PythonRequirementCompatibleResolvesField].value
+        assert not t[PythonRequirementResolveField].value
 
     generator = rule_runner.get_target(Address("", target_name="no_testutil"))
     result = rule_runner.request(
@@ -81,4 +81,4 @@ def test_target_generator() -> None:
     assert len(result) == 1
     assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
     pants_req = next(iter(result.values()))
-    assert pants_req[PythonRequirementCompatibleResolvesField].value == ("a",)
+    assert pants_req[PythonRequirementResolveField].value == "a"

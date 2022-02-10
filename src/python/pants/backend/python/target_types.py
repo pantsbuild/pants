@@ -110,10 +110,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     help = (
         "The resolve from `[python].resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
-        "All dependencies must share the same resolve. This means that you can only depend on "
-        "first-party targets like `python_source` that set their `resolve` field "
-        "to the same value, and on `python_requirement` targets that include the resolve in "
-        "their `compatible_resolves` field."
+        "All dependencies must share the same value for their `resolve` field."
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
@@ -126,16 +123,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
         return resolve
-
-    def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
-        """If configured, return the resolve name with its lockfile.
-
-        Error if the resolve name is invalid.
-        """
-        if not python_setup.enable_resolves:
-            return None
-        resolve = self.normalized_value(python_setup)
-        return (resolve, python_setup.resolves[resolve])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -939,32 +926,19 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "compatible_resolves"
+class PythonRequirementResolveField(PythonResolveField):
+    alias = "resolve"
     required = False
     help = (
-        "The resolves from `[python].resolves` that this requirement should be "
-        "included in.\n\n"
+        "The resolve from `[python].resolves` that this requirement is included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
-        "it will include all requirements that are declared compatible with that resolve. "
+        "it will include all requirements that are declared with that resolve. "
         "First-party targets like `python_source` and `pex_binary` then declare which resolve "
-        "they use via the `resolve` field; so, for your first-party code to use a "
+        "they use via their `resolve` field; so, for your first-party code to use a "
         "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )
-
-    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
-        """Get the value after applying the default and validating every key is recognized."""
-        value_or_default = self.value or (python_setup.default_resolve,)
-        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
-        if invalid_resolves:
-            raise UnrecognizedResolveNamesError(
-                sorted(invalid_resolves),
-                python_setup.resolves.keys(),
-                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
-            )
-        return value_or_default
 
 
 class PythonRequirementTarget(Target):
@@ -975,16 +949,15 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        PythonRequirementCompatibleResolvesField,
+        PythonRequirementResolveField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
         "This target is useful when you want to declare Python requirements inline in a "
         "BUILD file. If you have a `requirements.txt` file already, you can instead use "
-        "the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement()` target automatically. For Poetry, use "
-        "`poetry_requirements()`."
-        "\n\n"
+        "the target generator `python_requirements` to convert each "
+        "requirement into a `python_requirement` target automatically. For Poetry, use "
+        "`poetry_requirements`.\n\n"
         f"See {doc_url('python-third-party-dependencies')}."
     )
 
