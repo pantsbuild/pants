@@ -412,7 +412,7 @@ class TestOptionsBootstrapper:
         ) == ob.args
 
         assert (
-            "./pants",
+            "<ignored>",
             config_arg,
             "--backend-packages=pants.backend.python.lint.pyupgrade",
         ) == ob.bootstrap_args
