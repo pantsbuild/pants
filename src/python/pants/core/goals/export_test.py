@@ -23,7 +23,7 @@ from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeD
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
@@ -60,7 +60,6 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
             rule_args=[
                 console,
                 Targets(targets),
-                create_goal_subsystem(ExportSubsystem),
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 union_membership,
                 BuildRoot(),
