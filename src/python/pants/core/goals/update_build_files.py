@@ -20,7 +20,6 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -40,7 +39,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.dirutil import recursive_dirname
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -197,7 +196,6 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    pants_bin: PantsBin,
 ) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
@@ -283,7 +281,7 @@ async def update_build_files(
 
     if update_build_files_subsystem.check:
         console.print_stdout(
-            f"\nTo fix `update-build-files` failures, run `{pants_bin.name} update-build-files`."
+            f"\nTo fix `update-build-files` failures, run `{bin_name()} update-build-files`."
         )
 
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)

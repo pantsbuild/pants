@@ -299,13 +299,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         *,
         modules: list[str] | None = None,
         stub_modules: list[str] | None = None,
-        resolves: list[str] | None = None,
+        resolve: str = "default",
     ) -> str:
         return (
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"modules={modules or []},"
             f"type_stub_modules={stub_modules or []},"
-            f"compatible_resolves={resolves or ['default']})"
+            f"resolve={repr(resolve)})"
         )
 
     build_file = "\n\n".join(
@@ -323,8 +323,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("typed-dep5", "typed-dep5-foo", stub_modules=["typed_dep5"]),
             # A 3rd-party dependency can have both a type stub and implementation.
             req("multiple_owners1", "multiple_owners==1"),
-            req("multiple_owners2", "multiple_owners==2", resolves=["another"]),
-            req("multiple_owners_types", "types-multiple_owners==1", resolves=["another"]),
+            req("multiple_owners2", "multiple_owners==2", resolve="another"),
+            req("multiple_owners_types", "types-multiple_owners==1", resolve="another"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
         ]
@@ -592,13 +592,13 @@ def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
                 # result in ambiguity.
                 python_requirement(
                     name="dep1",
-                    compatible_resolves=["a"],
+                    resolve="a",
                     requirements=["dep"],
                 )
 
                 python_requirement(
                     name="dep2",
-                    compatible_resolves=["b"],
+                    resolve="b",
                     requirements=["dep"],
                 )
                 """

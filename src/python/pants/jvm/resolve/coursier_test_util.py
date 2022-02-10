@@ -7,6 +7,7 @@ from typing import Iterable
 from pants.jvm.resolve.common import ArtifactRequirement
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.util.docutil import bin_name
 
 
 @dataclass
@@ -24,7 +25,7 @@ class TestCoursierWrapper:
         return (
             JVMLockfileMetadata.new(requirements)
             .add_header_to_lockfile(
-                self.lockfile.to_serialized(), regenerate_command="./pants generate_lockfiles"
+                self.lockfile.to_serialized(), regenerate_command=f"{bin_name()} generate_lockfiles"
             )
             .decode()
         )

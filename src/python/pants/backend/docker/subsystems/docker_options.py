@@ -13,6 +13,7 @@ from pants.engine.environment import Environment
 from pants.option.custom_types import shell_str
 from pants.option.errors import ParseError
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
@@ -163,7 +164,7 @@ class DockerOptions(Subsystem):
             help=(
                 "Additional arguments to use for `docker run` invocations.\n\n"
                 "Example:\n\n"
-                f'    $ ./pants run --{cls.options_scope}-run-args="-p 127.0.0.1:80:8080/tcp '
+                f'    $ {bin_name()} run --{cls.options_scope}-run-args="-p 127.0.0.1:80:8080/tcp '
                 '--name demo" src/example:image -- [image entrypoint args]\n\n'
                 "To provide the top-level options to the `docker` client, use "
                 f"`[{cls.options_scope}].env_vars` to configure the [Environment variables]("

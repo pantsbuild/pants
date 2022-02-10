@@ -60,7 +60,7 @@ from pants.engine.target import (
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -110,10 +110,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
     help = (
         "The resolve from `[python].resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
-        "All dependencies must share the same resolve. This means that you can only depend on "
-        "first-party targets like `python_source` that set their `resolve` field "
-        "to the same value, and on `python_requirement` targets that include the resolve in "
-        "their `compatible_resolves` field."
+        "All dependencies must share the same value for their `resolve` field."
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
@@ -600,7 +597,7 @@ class PythonTestSourceField(PythonSourceField):
                 f"The {repr(self.alias)} field in target {self.address} should not be set to the "
                 f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing this target ({self.address}) to autogenerate a "
+                f"`{bin_name()} tailor` after removing this target ({self.address}) to autogenerate a "
                 "`python_test_utils` target."
             )
 
@@ -689,7 +686,7 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
                 f"The {repr(self.alias)} field in target {self.address} should not include the "
                 f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
+                f"`{bin_name()} tailor` after removing the files from the {repr(self.alias)} field of "
                 f"this target ({self.address}) to autogenerate a `python_test_utils` target."
             )
 
@@ -931,34 +928,19 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "compatible_resolves"
+class PythonRequirementResolveField(PythonResolveField):
+    alias = "resolve"
     required = False
     help = (
-        "The resolves from `[python].resolves` that this requirement should be "
-        "included in.\n\n"
+        "The resolve from `[python].resolves` that this requirement is included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
-        "it will include all requirements that are declared compatible with that resolve. "
+        "it will include all requirements that are declared with that resolve. "
         "First-party targets like `python_source` and `pex_binary` then declare which resolve "
-        "they use via the `resolve` field; so, for your first-party code to use a "
+        "they use via their `resolve` field; so, for your first-party code to use a "
         "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )
-
-    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
-        """Get the value after applying the default and validating every key is recognized."""
-        if not python_setup.enable_resolves:
-            return ("<ignore>",)
-        value_or_default = self.value or (python_setup.default_resolve,)
-        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
-        if invalid_resolves:
-            raise UnrecognizedResolveNamesError(
-                sorted(invalid_resolves),
-                python_setup.resolves.keys(),
-                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
-            )
-        return value_or_default
 
 
 class PythonRequirementTarget(Target):
@@ -969,16 +951,15 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        PythonRequirementCompatibleResolvesField,
+        PythonRequirementResolveField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
         "This target is useful when you want to declare Python requirements inline in a "
         "BUILD file. If you have a `requirements.txt` file already, you can instead use "
-        "the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement()` target automatically. For Poetry, use "
-        "`poetry_requirements()`."
-        "\n\n"
+        "the target generator `python_requirements` to convert each "
+        "requirement into a `python_requirement` target automatically. For Poetry, use "
+        "`poetry_requirements`.\n\n"
         f"See {doc_url('python-third-party-dependencies')}."
     )
 
@@ -1094,10 +1075,10 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
         "https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use "
         "`//` as a prefix for target addresses if you need to disambiguate.\n\n"
         + dedent(
-            """\
+            f"""\
             Pants will attempt to infer dependencies, which you can confirm by running:
 
-                ./pants dependencies <python_distribution target address>
+                {bin_name()} dependencies <python_distribution target address>
 
             """
         )

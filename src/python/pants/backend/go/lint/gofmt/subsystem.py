@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 
 
 class GofmtSubsystem(Subsystem):
@@ -15,8 +16,5 @@ class GofmtSubsystem(Subsystem):
             "--skip",
             type=bool,
             default=False,
-            help=(
-                f"Don't use gofmt when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`."
-            ),
+            help=f"Don't use gofmt when running `{bin_name()} fmt` and `{bin_name()} lint`.",
         )

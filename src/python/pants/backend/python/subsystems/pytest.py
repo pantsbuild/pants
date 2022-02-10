@@ -37,7 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 
@@ -192,7 +192,7 @@ class PyTest(PythonToolBase):
             "`pytest-cov`, which is needed to collect coverage data.\n\nThis happens when "
             "overriding the `extra_requirements` option. Please either explicitly add back "
             "`pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than "
-            "overriding it. Run `./pants help-advanced pytest` to see the default version of "
+            f"overriding it. Run `{bin_name()} help-advanced pytest` to see the default version of "
             f"`pytest-cov` and see {doc_url('options#list-values')} for more on adding vs. "
             "overriding list options."
         )
