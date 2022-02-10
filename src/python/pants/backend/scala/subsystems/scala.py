@@ -40,12 +40,10 @@ class ScalaSubsystem(Subsystem):
                 "A dictionary mapping the name of a resolve to the Scala version to use for all Scala "
                 "targets consuming that resolve.\n\n"
                 'All Scala-compiled jars on a resolve\'s classpath must be "compatible" with one another and '
-                "with all Scala-compiled first-party sources from `scala_sources` and other Scala target types. "
-                "This implies that the Scala version maps one to one with a resolve.\n\n"
-                "For each resolve listed in this option, Pants will (1) use the mapped Scala version as the version "
-                "of the Scala compiler to use when compiling first-party sources, (2) ensure the Scala runtime "
-                "libraries are added to the resolve, and (3) attempt to error if any Scala-compiled jars are part of "
-                'the resolve\'s classpath if "incompatible" with the Scala version.'
+                "with all Scala-compiled first-party sources from `scala_sources` (and other Scala target types) "
+                "using that resolve. The option sets the Scala version that will be used to compile all "
+                "first-party sources using the resolve. This ensures that the compatibility property is "
+                "maintained for a resolve. To support multiple Scala versions, use multiple resolves."
             ),
         )
 
