@@ -597,7 +597,7 @@ class GlobalOptions(Subsystem):
             f"is using once the program is already running.\n\nIf you use the `{bin_name()}` script from "
             f"{doc_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
-            "Run `./pants --version` to check what is being used.",
+            f"Run `{bin_name()} --version` to check what is being used.",
         )
         register(
             "--pants-bin-name",
