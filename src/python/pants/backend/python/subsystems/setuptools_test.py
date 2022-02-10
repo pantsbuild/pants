@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems import setuptools
@@ -18,6 +19,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     rule_runner = RuleRunner(
         rules=[
             *setuptools.rules(),
+            *target_types_rules.rules(),
             QueryRule(GeneratePythonLockfile, [SetuptoolsLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],

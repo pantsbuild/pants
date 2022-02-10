@@ -5,21 +5,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     FieldSet,
-    GeneratedTargets,
-    GenerateTargetsRequest,
     MultipleSourcesField,
     SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
     Target,
-    generate_file_level_targets,
+    TargetFilesGenerator,
 )
-from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
     JvmCompatibleResolvesField,
@@ -75,36 +70,23 @@ class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
 
 
-class JunitTestsGeneratorTarget(Target):
+class JunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JavaTestsGeneratorSourcesField,
         Dependencies,
+        JavaTestsGeneratorSourcesField,
+    )
+    generated_target_cls = JunitTestTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+    )
+    moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromJunitTests(GenerateTargetsRequest):
-    generate_from = JunitTestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_junit_tests(
-    request: GenerateTargetsFromJunitTests, union_membership: UnionMembership
-) -> GeneratedTargets:
-    paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[JavaTestsGeneratorSourcesField])
-    )
-    return generate_file_level_targets(
-        JunitTestTarget,
-        request.generator,
-        paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=False,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -128,42 +110,23 @@ class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
 
 
-class JavaSourcesGeneratorTarget(Target):
+class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "java_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
         JvmCompatibleResolvesField,
-        JvmProvidesTypesField,
     )
+    generated_target_cls = JavaSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        JvmCompatibleResolvesField,
+    )
+    moved_fields = (JvmProvidesTypesField,)
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 
-class GenerateTargetsFromJavaSources(GenerateTargetsRequest):
-    generate_from = JavaSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_java_sources(
-    request: GenerateTargetsFromJavaSources, union_membership: UnionMembership
-) -> GeneratedTargets:
-    paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[JavaSourcesGeneratorSourcesField])
-    )
-    return generate_file_level_targets(
-        JavaSourceTarget,
-        request.generator,
-        paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=False,
-        use_source_field=True,
-    )
-
-
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromJunitTests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromJavaSources),
-    )
+    return collect_rules()

@@ -5,6 +5,7 @@ import pytest
 
 from pants.backend.project_info import count_loc
 from pants.backend.project_info.count_loc import CountLinesOfCode
+from pants.backend.python import target_types_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.util_rules import external_tool
 from pants.engine.target import MultipleSourcesField, Target
@@ -23,7 +24,11 @@ class ElixirTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*count_loc.rules(), *external_tool.rules()],
+        rules=[
+            *count_loc.rules(),
+            *external_tool.rules(),
+            *target_types_rules.rules(),
+        ],
         target_types=[PythonSourcesGeneratorTarget, ElixirTarget],
     )
 

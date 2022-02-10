@@ -16,6 +16,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
 )
+from pants.backend.python.target_types_rules import rules as target_types_rules
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.backend.python.util_rules.pex_from_targets import NoCompatibleResolveException
@@ -41,6 +42,7 @@ def rule_runner() -> RuleRunner:
             *python_repl.rules(),
             *pex_from_targets.rules(),
             *local_dists.rules(),
+            *target_types_rules(),
             QueryRule(Process, (PexProcess,)),
         ],
         target_types=[

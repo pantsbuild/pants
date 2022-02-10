@@ -738,6 +738,7 @@ def test_get_requirements() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             SubsystemRule(SetupPyGeneration),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
@@ -817,6 +818,7 @@ def test_get_requirements_with_exclude() -> None:
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             SubsystemRule(SetupPyGeneration),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
@@ -878,6 +880,7 @@ def test_owned_dependencies() -> None:
         rules=[
             get_owned_dependencies,
             get_exporting_owner,
+            *target_types_rules.rules(),
             QueryRule(OwnedDependencies, (DependencyOwner,)),
         ]
     )
@@ -960,6 +963,7 @@ def exporting_owner_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
             get_exporting_owner,
+            *target_types_rules.rules(),
             QueryRule(ExportedTarget, (OwnedDependency,)),
         ]
     )
