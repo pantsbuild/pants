@@ -53,6 +53,13 @@ class HelpFormatter(MaybeColor):
             add_option(oshi.advanced, category="advanced")
         if self._show_deprecated:
             add_option(oshi.deprecated, category="deprecated")
+        if oshi.advanced and not self._show_advanced:
+            lines.append(
+                self.maybe_green(
+                    f"Advanced options available. You can list them by running "
+                    f"./pants help-advanced {oshi.scope}."
+                )
+            )
         return [*lines, ""]
 
     def format_option(self, ohi: OptionHelpInfo) -> List[str]:
