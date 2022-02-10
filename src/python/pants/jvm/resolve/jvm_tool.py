@@ -21,6 +21,7 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -77,7 +78,7 @@ class JvmToolBase(Subsystem):
                 "Pants, so long as you have not changed the `--version` option. "
                 f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
                 "To use a custom lockfile, set this option to a file path relative to the "
-                f"build root, then run `./pants jvm-generate-lockfiles "
+                f"build root, then run `{bin_name()} jvm-generate-lockfiles "
                 f"--resolve={cls.options_scope}`.\n\n"
             ),
         )

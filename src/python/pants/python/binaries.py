@@ -23,6 +23,7 @@ from pants.engine.process import (
     BinaryPathTest,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -41,15 +42,10 @@ class PythonBootstrapSubsystem(Subsystem):
         "`python` subsystem for that."
     )
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
+    search_path = (
+        StrListOption(
             "--search-path",
-            advanced=True,
-            type=list,
             default=["<PYENV>", "<PATH>"],
-            metavar="<binary-paths>",
             help=(
                 "A list of paths to search for Python interpreters.\n\n"
                 "Which interpeters are actually used from these paths is context-specific: "
@@ -70,12 +66,13 @@ class PythonBootstrapSubsystem(Subsystem):
                 "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
             ),
         )
-        register(
+        .advanced()
+        .metavar("<binary-paths>")
+    )
+    names = (
+        StrListOption(
             "--names",
-            advanced=True,
-            type=list,
             default=["python", "python3"],
-            metavar="<python-binary-names>",
             help=(
                 "The names of Python binaries to search for. See the `--search-path` option to "
                 "influence where interpreters are searched for.\n\n"
@@ -83,6 +80,9 @@ class PythonBootstrapSubsystem(Subsystem):
                 "is used to run internal tools."
             ),
         )
+        .advanced()
+        .metavar("<python-binary-names>")
+    )
 
 
 @dataclass(frozen=True)

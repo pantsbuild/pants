@@ -41,7 +41,7 @@ class ShellcheckFieldSet(FieldSet):
 
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
-    name = "Shellcheck"
+    name = Shellcheck.options_scope
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)

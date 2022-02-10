@@ -17,6 +17,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,13 @@ class TfFmtSubsystem(Subsystem):
     skip = BoolOption(
         "--skip",
         default=False,
-        help=("Don't use `terraform fmt` when running `./pants fmt` and `./pants lint`."),
+        help=f"Don't use `terraform fmt` when running `{bin_name()} fmt` and `{bin_name()} lint`.",
     )
 
 
 class TffmtRequest(FmtRequest):
     field_set_type = TerraformFieldSet
-    name = "tffmt"
+    name = TfFmtSubsystem.options_scope
 
 
 @rule(desc="Format with `terraform fmt`")

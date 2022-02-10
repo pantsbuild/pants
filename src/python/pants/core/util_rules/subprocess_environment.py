@@ -6,6 +6,7 @@ from typing import Tuple
 
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 
@@ -17,25 +18,19 @@ class SubprocessEnvironment(Subsystem):
     options_scope = "subprocess-environment"
     help = "Environment settings for forked subprocesses."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--env-vars",
-            type=list,
-            member_type=str,
-            default=["LANG", "LC_CTYPE", "LC_ALL"],
-            advanced=True,
-            help=(
-                "Environment variables to set for process invocations. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment."
-            ),
-        )
+    _env_vars = StrListOption(
+        "--env-vars",
+        default=["LANG", "LC_CTYPE", "LC_ALL"],
+        help=(
+            "Environment variables to set for process invocations. "
+            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+            "or just `ENV_VAR` to copy the value from Pants's own environment."
+        ),
+    ).advanced()
 
     @property
     def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
-        return tuple(sorted(set(self.options.env_vars)))
+        return tuple(sorted(set(self._env_vars)))
 
 
 @dataclass(frozen=True)

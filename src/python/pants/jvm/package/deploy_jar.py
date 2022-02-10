@@ -13,6 +13,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
+from pants.core.goals.run import RunFieldSet
 from pants.core.util_rules.archive import ZipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
@@ -39,7 +40,7 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 
 
 @dataclass(frozen=True)
-class DeployJarFieldSet(PackageFieldSet):
+class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,
         Dependencies,

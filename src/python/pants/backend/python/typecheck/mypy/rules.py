@@ -60,7 +60,7 @@ class MyPyPartitions(Collection[MyPyPartition]):
 
 class MyPyRequest(CheckRequest):
     field_set_type = MyPyFieldSet
-    name = "MyPy"
+    name = MyPy.options_scope
 
 
 def generate_argv(

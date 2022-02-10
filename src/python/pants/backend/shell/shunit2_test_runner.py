@@ -51,6 +51,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.strutil import create_path_env_var
 
@@ -132,7 +133,7 @@ async def determine_shunit2_shell(
                 f"Please either specify the `{Shunit2ShellField.alias}` field or add a "
                 f"shebang to {request.test_file_content.path} with one of the supported shells in "
                 f"the format `!#/path/to/shell` or `!#/path/to/env shell`"
-                f"(run `./pants help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
+                f"(run `{bin_name()} help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
             )
         tgt_shell = parse_result
 

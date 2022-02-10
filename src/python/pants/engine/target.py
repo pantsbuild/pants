@@ -49,7 +49,7 @@ from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
@@ -2294,7 +2294,7 @@ class Tags(StringSequenceField):
     alias = "tags"
     help = (
         "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        "with 'integration_test' so that you could run `./pants --tag='integration_test' test ::` "
+        f"with 'integration_test' so that you could run `{bin_name()} --tag='integration_test' test ::` "
         "to only run on targets with that tag."
     )
 
@@ -2302,7 +2302,7 @@ class Tags(StringSequenceField):
 class DescriptionField(StringField):
     alias = "description"
     help = (
-        "A human-readable description of the target.\n\nUse `./pants list --documented ::` to see "
+        f"A human-readable description of the target.\n\nUse `{bin_name()} list --documented ::` to see "
         "all targets with descriptions."
     )
 

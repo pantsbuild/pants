@@ -20,7 +20,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
 from pants.option.global_options import GlobalOptions
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -251,7 +251,7 @@ async def addresses_from_address_specs(
         )
         raise ResolveError(
             f"No targets found for {glob_description}\n\n"
-            f"Do targets exist in those directories? Maybe run `./pants tailor` to generate "
+            f"Do targets exist in those directories? Maybe run `{bin_name()} tailor` to generate "
             f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
         )
 

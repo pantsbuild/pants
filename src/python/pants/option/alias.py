@@ -13,6 +13,7 @@ from typing import Generator
 from pants.option.errors import OptionsError
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,8 @@ class CliOptions(Subsystem):
                 '    green = "fmt lint check"\n'
                 '    all-changed = "--changed-since=HEAD --changed-dependees=transitive"\n'
                 "\n"
-                "This would allow you to run `./pants green all-changed`, which is shorthand for "
-                "`./pants fmt lint check --changed-since=HEAD --changed-dependees=transitive`.\n\n"
+                f"This would allow you to run `{bin_name()} green all-changed`, which is shorthand for "
+                f"`{bin_name()} fmt lint check --changed-since=HEAD --changed-dependees=transitive`.\n\n"
                 "Notice: this option must be placed in a config file (e.g. `pants.toml` or "
                 "`pantsrc`) to have any effect."
             ),

@@ -64,8 +64,6 @@ remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
-use_deprecated_python_macros = false
-
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
@@ -83,6 +81,7 @@ root_patterns = [
   "tests/*",
   "3rdparty/*",
   "/build-support/bin",
+  "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
 ]
@@ -127,6 +126,7 @@ extra_requirements.add = [
   "flake8-no-implicit-concat",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
+source_plugins = ["build-support/flake8"]
 
 [shellcheck]
 args = ["--external-sources"]

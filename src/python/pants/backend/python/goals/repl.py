@@ -1,14 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
+from typing import Iterable
 
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
+    NoCompatibleResolveException,
     RequirementsPexRequest,
 )
 from pants.backend.python.util_rules.python_sources import (
@@ -18,9 +25,37 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+
+
+def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: PythonSetup) -> None:
+    """Eagerly validate that all roots are compatible.
+
+    We already end up checking this in pex_from_targets.py, but this is a more eager check so that
+    we have a better error message.
+    """
+    root_resolves = {
+        root[PythonResolveField].normalized_value(python_setup)
+        for root in root_targets
+        if root.has_field(PythonResolveField)
+    }
+    if len(root_resolves) > 1:
+        raise NoCompatibleResolveException(
+            python_setup,
+            "The input targets did not have a resolve in common",
+            root_targets,
+            (
+                "To work around this, choose which resolve you want to use from above. "
+                f'Then, run `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") | '
+                f'.["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the '
+                "resolve name, and possibly replace the specs `::` with what you were using "
+                "before. This will result in opening a REPL with only targets using the desired "
+                "resolve."
+            ),
+        )
 
 
 class PythonRepl(ReplImplementation):
@@ -28,7 +63,11 @@ class PythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_repl_request(request: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
+async def create_python_repl_request(
+    request: PythonRepl, pex_env: PexEnvironment, python_setup: PythonSetup
+) -> ReplRequest:
+    validate_compatible_resolve(request.targets, python_setup)
+
     interpreter_constraints, transitive_targets = await MultiGet(
         Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
@@ -79,8 +118,10 @@ class IPythonRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_ipython_repl_request(
-    request: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
+    request: IPythonRepl, ipython: IPython, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> ReplRequest:
+    validate_compatible_resolve(request.targets, python_setup)
+
     interpreter_constraints, transitive_targets = await MultiGet(
         Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),

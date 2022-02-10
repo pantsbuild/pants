@@ -16,8 +16,8 @@ from pants.backend.python.macros.common_fields import (
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementsFileSourcesField,
     PythonRequirementsFileTarget,
@@ -63,7 +63,7 @@ class PythonRequirementsTargetGenerator(Target):
         TypeStubsModuleMappingField,
         PythonRequirementsSourceField,
         RequirementsOverrideField,
-        PythonRequirementCompatibleResolvesField,
+        PythonRequirementResolveField,
     )
 
 
@@ -103,7 +103,8 @@ async def generate_from_python_requirement(
         requirements, lambda parsed_req: parsed_req.project_name
     )
 
-    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
+    # Validate the resolve is legal.
+    generator[PythonRequirementResolveField].normalized_value(python_setup)
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
@@ -111,7 +112,7 @@ async def generate_from_python_requirement(
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()
-        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementCompatibleResolvesField))
+        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
     }
 
     def generate_tgt(

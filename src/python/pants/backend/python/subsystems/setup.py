@@ -10,9 +10,8 @@ from typing import Iterable, Iterator, Optional, cast
 
 from pants.option.custom_types import file_option
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.memo import memoized_property
-from pants.util.osutil import CPU_COUNT
 
 logger = logging.getLogger(__name__)
 
@@ -103,23 +102,6 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--experimental-lockfile",
-            advanced=True,
-            type=str,
-            metavar="<file>",
-            mutually_exclusive_group="lockfile",
-            help="Deprecated.",
-            removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Instead, use the improved `[python].resolves` mechanism. Read its "
-                "help message for more information.\n\n"
-                "If you want to keep using a single resolve like before, update "
-                "`[python].resolves` with a name for the resolve and the path to "
-                "its lockfile, or use the default. Then make sure that "
-                "`[python].default_resolve` is set to that resolve name."
-            ),
-        )
-        register(
             "--enable-resolves",
             advanced=True,
             type=bool,
@@ -143,25 +125,24 @@ class PythonSetup(Subsystem):
                 "resolves, such as if you use two conflicting versions of a requirement in "
                 "your repository.\n\n"
                 "For now, Pants only has first-class support for disjoint resolves, meaning that "
-                "you cannot ergonomically set a `python_source` target, for example, to work "
-                "with multiple resolves. Practically, this means that you cannot yet reuse common "
-                "code, such as util files, across projects using different resolves. Support for "
-                "overlapping resolves is coming soon.\n\n"
-                "If you only need a single resolve, run `./pants generate-lockfiles` to generate "
-                "the lockfile.\n\n"
+                "you cannot ergonomically set a `python_requirement` or `python_source` target, "
+                "for example, to work with multiple resolves. Practically, this means that you "
+                "cannot yet ergonomically reuse common code, such as util files, across projects "
+                "using different resolves. Support for overlapping resolves is coming soon.\n\n"
+                f"If you only need a single resolve, run `{bin_name()} generate-lockfiles` to "
+                "generate the lockfile.\n\n"
                 "If you need multiple resolves:\n\n"
                 "  1. Via this option, define multiple resolve "
                 "names and their lockfile paths. The names should be meaningful to your "
                 "repository, such as `data-science` or `pants-plugins`.\n"
-                "  2. Set the default with "
-                "`[python].default_resolve`.\n"
+                "  2. Set the default with `[python].default_resolve`.\n"
                 "  3. Update your `python_requirement` targets with the "
-                "`compatible_resolves` field to declare which resolve(s) they should "
+                "`resolve` field to declare which resolve they should "
                 "be available in. They default to `[python].default_resolve`, so you "
                 "only need to update targets that you want in non-default resolves. "
                 "(Often you'll set this via the `python_requirements` or `poetry_requirements` "
                 "target generators)\n"
-                "  4. Run `./pants generate-lockfiles` to generate the lockfiles. If the results "
+                f"  4. Run `{bin_name()} generate-lockfiles` to generate the lockfiles. If the results "
                 "aren't what you'd expect, adjust the prior step.\n"
                 "  5. Update any targets like `python_source` / `python_sources`, "
                 "`python_test` / `python_tests`, and `pex_binary` which need to set a non-default "
@@ -175,7 +156,7 @@ class PythonSetup(Subsystem):
             type=str,
             default="python-default",
             help=(
-                "The default value used for the `resolve` and `compatible_resolves` fields.\n\n"
+                "The default value used for the `resolve` field.\n\n"
                 "The name must be defined as a resolve in `[python].resolves`."
             ),
         )
@@ -236,22 +217,6 @@ class PythonSetup(Subsystem):
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
             "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
-        )
-        register(
-            "--resolver-jobs",
-            type=int,
-            default=CPU_COUNT // 2,
-            default_help_repr="#cores/2",
-            removal_version="2.11.0.dev0",
-            removal_hint="Now set automatically based on the amount of concurrency available.",
-            advanced=True,
-            help=(
-                "The maximum number of concurrent jobs to build wheels with.\n\nBecause Pants "
-                "can run multiple subprocesses in parallel, the maximum total parallelism will be "
-                "`--process-execution-{local,remote}-parallelism x --python-resolver-jobs`. "
-                "\n\nSetting this option higher may result in better parallelism, but, if set too "
-                "high, may result in starvation and Out of Memory errors."
-            ),
         )
 
         register(
@@ -359,10 +324,6 @@ class PythonSetup(Subsystem):
             yield self.manylinux
         else:
             yield "--no-manylinux"
-
-    @property
-    def resolver_jobs(self) -> int:
-        return cast(int, self.options.resolver_jobs)
 
     @property
     def tailor_ignore_solitary_init_files(self) -> bool:
