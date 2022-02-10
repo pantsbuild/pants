@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.target_types import (
+    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
     PythonRequirementsField,
     PythonRequirementTarget,
@@ -41,7 +42,11 @@ class PantsRequirementsTargetGenerator(Target):
         "also invite you to share your ideas at "
         "https://github.com/pantsbuild/pants/issues/new/choose)"
     )
-    core_fields = (*COMMON_TARGET_FIELDS, PantsRequirementsTestutilField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PantsRequirementsTestutilField,
+        PythonRequirementCompatibleResolvesField,
+    )
 
 
 class GenerateFromPantsRequirementsRequest(GenerateTargetsRequest):
@@ -83,6 +88,9 @@ def generate_from_pants_requirements(
             {
                 PythonRequirementsField.alias: (f"{dist}{version}",),
                 PythonRequirementModulesField.alias: (module,),
+                PythonRequirementCompatibleResolvesField.alias: generator[
+                    PythonRequirementCompatibleResolvesField
+                ].value,
             },
             generator.address.create_generated(dist),
         )
