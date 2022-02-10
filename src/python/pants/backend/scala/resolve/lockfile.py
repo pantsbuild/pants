@@ -37,13 +37,6 @@ async def propose_scala_artifacts_for_resolve(
         return AugmentedJvmArtifactsForResolve(None)
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    # TODO: Uncomment this once `--scala-version` goes away in v2.11.x.
-    # if scala_version is None:
-    #     raise ValueError(
-    #         f"Resolve `{request.resolve_name}` is used by at least one Scala target, but no Scala version "
-    #         "for the resolve was set in the `[scala].version_for_resolve` option. Please set the "
-    #         "Scala version to use in the `[scala].version_for_resolve` option."
-    #     )
 
     has_scala_library_artifact = False
     for artifact in request.artifacts:
