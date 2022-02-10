@@ -60,7 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_no_compatible_resolve_error() -> None:
-    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""})
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""}, enable_resolves=True)
     targets = [
         PythonRequirementTarget(
             {PythonRequirementsField.alias: [], PythonResolveField.alias: "a"},
@@ -108,7 +108,7 @@ def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
             """
         )
 
-    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}"])
+    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"])
     rule_runner.write_files(
         {
             # Note that each of these BUILD files are entirely self-contained.

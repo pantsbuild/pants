@@ -316,12 +316,9 @@ async def map_module_to_address(
     request: PythonModuleOwnersRequest,
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
-    python_setup: PythonSetup,
 ) -> PythonModuleOwners:
     providers = [
-        *third_party_mapping.providers_for_module(
-            request.module, resolve=request.resolve if python_setup.enable_resolves else None
-        ),
+        *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
         *first_party_mapping.providers_for_module(request.module),
     ]
     addresses = tuple(provider.addr for provider in providers)
