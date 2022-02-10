@@ -30,7 +30,7 @@ class JvmSubsystem(Subsystem):
             advanced=True,
             help=(
                 "The JDK to use when building Pants' internal JVM support code and other "
-                "non-compiler tools."
+                "non-compiler tools. See `jvm` help for supported values."
             ),
         )
         register(
@@ -41,7 +41,7 @@ class JvmSubsystem(Subsystem):
                 "The JDK to use when compiling sources or running tests.\n\n"
                 "If not specified, use the version specified by `--jvm-jdk`. This behavior is "
                 "deprecated, and future versions of Pants will require a specific version for "
-                "source files."
+                "source files.  See `jvm` help for supported values."
             ),
         )
         register(
