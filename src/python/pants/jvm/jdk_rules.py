@@ -38,15 +38,10 @@ class Nailgun:
 
 
 @dataclass(frozen=True)
-class JdkRequest_:
-    """Request for a JDK with a specific major version."""
-
-    version: str | None
-
-
-@dataclass(frozen=True)
 class JdkRequest:
-    jdk_field: JvmCompatibleJdkVersionField
+    """Request for a JDK with a specific major version, or None (use System JDK)."""
+
+    version: str | JvmCompatibleJdkVersionField | None
 
 
 @dataclass(frozen=True)
@@ -129,22 +124,23 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
     version = jvm.jdk if jvm.jdk != "system" else None
 
-    env = await Get(JdkEnvironment, JdkRequest_(version))
+    env = await Get(JdkEnvironment, JdkRequest(version))
     return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
 
 
 @rule
 async def prepare_jdk_environment(
-    coursier: Coursier, request: JdkRequest_, nailgun_: Nailgun, bash: BashBinary
+    jvm: JvmSubsystem, coursier: Coursier, request: JdkRequest, nailgun_: Nailgun, bash: BashBinary
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
+    version = _resolve_jdk_request_to_version(request, jvm)
+
     # TODO: add support for system JDKs with specific version
-    if request.version is None:
-        # raise Exception("system JVM wat?")
+    if version is None:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={request.version}")
+        coursier_jdk_option = shlex.quote(f"--jvm={version}")
 
     # TODO(#14386) This argument re-writing code should be done in a more standardised way.
     # See also `run_deploy_jar` for other argument re-writing code.
@@ -336,7 +332,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
 
 @rule
-async def jdk_request_for_target(ct: CoarsenedTarget) -> JdkRequest_:
+async def jdk_request_for_target(ct: CoarsenedTarget) -> JdkRequest:
 
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = ct.representative
@@ -346,19 +342,29 @@ async def jdk_request_for_target(ct: CoarsenedTarget) -> JdkRequest_:
 
     field = t[JvmCompatibleJdkVersionField]
 
-    return await Get(JdkRequest_, JdkRequest(field))
+    return JdkRequest(field)
 
 
-@rule
-async def jdk_request(jvm: JvmSubsystem, request: JdkRequest) -> JdkRequest_:
+def _resolve_jdk_request_to_version(request: JdkRequest, defaults: JvmSubsystem) -> str | None:
+    """Resolves the version value from `JdkRequest` into a usable JDK spec.
 
-    version = request.jdk_field.value
+    If the return value is a string, it's a valid Coursier JDK spec. If `None`, Coursier will use
+    `--system-jdk`.
+    """
+
+    if request.version is None:
+        return None
+
+    if isinstance(request.version, str):
+        return request.version
+
+    version = request.version.value
     if version is not None:
-        return JdkRequest_(version)
+        return version
 
-    default_source = jvm.default_source_jdk
+    default_source = defaults.default_source_jdk
     if default_source is not None:
-        return JdkRequest_(jvm.default_source_jdk)
+        return default_source
 
     warn_or_error(
         "2.11.0.dev0",
@@ -370,7 +376,10 @@ async def jdk_request(jvm: JvmSubsystem, request: JdkRequest) -> JdkRequest_:
         ),
     )
 
-    return JdkRequest_(jvm.jdk)
+    if defaults.jdk == "system":
+        return None
+
+    return defaults.jdk
 
 
 def rules():
