@@ -389,12 +389,14 @@ class Address(EngineAwareParameter):
         return f"{prefix}{path}{target}{params}{generated}"
 
     def maybe_convert_to_target_generator(self) -> Address:
-        """If this address is generated or parametrized, convert it to its generator target.
+        """If this address is generated, convert it to its generator target.
 
         Otherwise, return self unmodified.
         """
-        if self.is_generated_target or self.is_parametrized:
-            return self.__class__(self.spec_path, target_name=self._target_name)
+        if self.is_generated_target:
+            return self.__class__(
+                self.spec_path, target_name=self._target_name, parameters=self.parameters
+            )
         return self
 
     def maybe_convert_to_generated_target(self) -> Address:

@@ -879,9 +879,9 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     # The base Address to generate for. Note that due to parametrization, this may not
     # always be the Address of the underlying target.
     template_address: Address
-    # The `TargetGenerator.moved_field/copied_field` Field instances that the generator
+    # The `TargetGenerator.moved_field/copied_field` Field values that the generator
     # should generate targets with.
-    template: dict[str, Field] = dataclasses.field(hash=False)
+    template: dict[str, Any] = dataclasses.field(hash=False)
     # Per-generated-Target overrides.
     overrides: dict[str, dict[str, Any]] = dataclasses.field(hash=False)
 

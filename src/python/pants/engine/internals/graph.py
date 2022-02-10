@@ -177,33 +177,23 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
 
 @dataclass(frozen=True)
 class _TargetParametrizations:
-    """All parametrizations and generated targets for a single input Address.
+    """All parametrizations and generated targets for a single input Address."""
 
-    If a Target has been parametrized, it might _not_ be present in this output, due to it not being
-    addressable using its un-parameterized Address.
-    """
-
-    target: Target | None
+    original_target: Target
     parametrizations: FrozenDict[Address, Target]
 
     def get(self, address: Address) -> Target | None:
-        if self.target and self.target.address == address:
-            return self.target
+        if self.original_target.address == address:
+            return self.original_target
         return self.parametrizations.get(address)
 
     def generated_or_generator(self, maybe_generator: Address) -> Iterator[Target]:
-        if not self.target:
-            raise ValueError(
-                "A `parametrized` target cannot be consumed without its parameters specified.\n"
-                f"Target `{maybe_generator}` can be addressed as:\n"
-                f"{bullet_list(addr.spec for addr in self.parametrizations)}"
-            )
         if self.parametrizations:
             # Generated Targets.
             yield from self.parametrizations.values()
         else:
             # Did not generate targets.
-            yield self.target
+            yield self.original_target
 
 
 @rule
@@ -295,13 +285,18 @@ async def resolve_target_parametrizations(
 
 
 @rule
-async def resolve_target(address: Address) -> WrappedTarget:
+async def resolve_target(
+    address: Address,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+) -> WrappedTarget:
     base_address = address.maybe_convert_to_target_generator()
     parametrizations = await Get(_TargetParametrizations, Address, base_address)
-    if not parametrizations.parametrizations and address.is_file_target and parametrizations.target:
-        # TODO: This is an accommodation to allow using file Addresses for non-generator singleton
-        # targets. See https://github.com/pantsbuild/pants/issues/14419.
-        return WrappedTarget(parametrizations.target)
+    if address.is_generated_target and not target_types_to_generate_requests.is_generator(
+        parametrizations.original_target
+    ):
+        # TODO: This is an accommodation to allow using file/generator Addresses for non-generator
+        # atom targets. See https://github.com/pantsbuild/pants/issues/14419.
+        return WrappedTarget(parametrizations.original_target)
     target = parametrizations.get(address)
     if target is None:
         raise ValueError(
