@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os.path
 from textwrap import dedent
-from typing import Callable, ContextManager, cast
+from typing import Any, Callable, ContextManager, cast
 
 import pytest
 
@@ -346,7 +346,16 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "registries",
+    [
+        {},
+        {"default": {"address": False}},
+    ],
+)
+def test_dynamic_image_version(
+    rule_runner: RuleRunner, registries: dict[str, dict[str, Any]]
+) -> None:
     interpolation_context = DockerInterpolationContext.from_dict(
         {
             "baseimage": {"tag": "3.8"},
@@ -362,7 +371,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
         fs = DockerFieldSet.create(tgt)
         tags = fs.image_refs(
             "image",
-            DockerRegistries.from_dict({}),
+            DockerRegistries.from_dict(registries),
             interpolation_context,
         )
         assert expect_tags == tags

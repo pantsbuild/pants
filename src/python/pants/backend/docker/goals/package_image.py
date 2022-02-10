@@ -135,12 +135,13 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             for tag in self.tags.value or ()
         )
 
-        registries_options = tuple(registries.get(*(self.registries.value or [])) or [None])
+        registries_options = tuple(registries.get(*(self.registries.value or [])))
+        if not registries_options:
+            # The image name is also valid as image ref without registry.
+            return image_names
 
         return tuple(
-            "/".join([registry.address, image_name])
-            if registry and registry.address
-            else image_name
+            registry.get_image_ref(image_name)
             for image_name in image_names
             for registry in registries_options
         )
