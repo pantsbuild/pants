@@ -19,8 +19,8 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
     PythonSourceField,
@@ -222,19 +222,18 @@ async def map_third_party_modules_to_addresses(
     ] = {}
 
     for tgt in all_python_tgts.third_party:
-        resolves = tgt[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
+        resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
-            for resolve in resolves:
-                if resolve not in resolves_to_modules_to_providers:
-                    resolves_to_modules_to_providers[resolve] = defaultdict(list)
-                for module in modules:
-                    resolves_to_modules_to_providers[resolve][module].append(
-                        ModuleProvider(
-                            tgt.address,
-                            ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
-                        )
+            if resolve not in resolves_to_modules_to_providers:
+                resolves_to_modules_to_providers[resolve] = defaultdict(list)
+            for module in modules:
+                resolves_to_modules_to_providers[resolve][module].append(
+                    ModuleProvider(
+                        tgt.address,
+                        ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
                     )
+                )
 
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:

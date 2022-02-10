@@ -20,7 +20,7 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    PythonRequirementCompatibleResolvesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -270,10 +270,10 @@ async def setup_user_lockfile_requests(
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_fields((PythonRequirementCompatibleResolvesField, PythonRequirementsField)):
+        if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
-        for resolve in tgt[PythonRequirementCompatibleResolvesField].normalized_value(python_setup):
-            resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
+        resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
