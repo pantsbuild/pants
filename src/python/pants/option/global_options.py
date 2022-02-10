@@ -34,7 +34,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import doc_url
+from pants.util.docutil import doc_url, bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -592,9 +592,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=pants_version(),
             daemon=True,
-            help="Use this Pants version. Note that Pants only uses this to verify that you are "  # noqa: PANTSBIN
+            help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
-            f"is using once the program is already running.\n\nIf you use the `./pants` script from "
+            f"is using once the program is already running.\n\nIf you use the `{bin_name()}` script from "
             f"{doc_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
             "Run `./pants --version` to check what is being used.",
@@ -698,7 +698,7 @@ class GlobalOptions(Subsystem):
             help=(
                 "Read additional specs (target addresses, files, and/or globs), one per line, "
                 "from these files."
-            ), # noqa: PANTSBIN
+            ),
         )
         register(
             "--verify-config",
@@ -1304,13 +1304,13 @@ class GlobalOptions(Subsystem):
             ),
             removal_version="2.12.0.dev0",
             removal_hint=(
-                "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "  # noqa: PANTSBIN
+                "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
                 "replaced with improved target generators, which are now enabled by "
                 "default.\n\n"
                 "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
                 "delete the option.\n\n"
                 "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
                 "  2. Check the logs for an ERROR log to see if you have to manually add "
                 "`name=` anywhere.\n"
                 "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
