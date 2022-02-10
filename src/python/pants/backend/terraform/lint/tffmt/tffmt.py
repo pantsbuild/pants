@@ -15,6 +15,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -26,15 +27,11 @@ class TfFmtSubsystem(Subsystem):
     options_scope = "terraform-fmt"
     help = "Terraform fmt options."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use `terraform fmt` when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-        )
+    skip = BoolOption(
+        "--skip",
+        default=False,
+        help=f"Don't use `terraform fmt` when running `{bin_name()} fmt` and `{bin_name()} lint`.",
+    )
 
 
 class TffmtRequest(FmtRequest):
@@ -44,7 +41,7 @@ class TffmtRequest(FmtRequest):
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
-    if tffmt.options.skip:
+    if tffmt.skip:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt",)))
     results = await MultiGet(
@@ -85,7 +82,7 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
 
 @rule(desc="Lint with `terraform fmt`", level=LogLevel.DEBUG)
 async def tffmt_lint(request: TffmtRequest, tffmt: TfFmtSubsystem) -> LintResults:
-    if tffmt.options.skip:
+    if tffmt.skip:
         return LintResults([], linter_name=request.name)
     setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt", "-check")))
     results = await MultiGet(
