@@ -81,12 +81,14 @@ async def compile_scala_source(
         for filename in dependency.filenames
     ]
 
+    scala_version = scala.version_for_resolve(request.resolve.name)
+
     # TODO(14171): Stop-gap for making sure that scala supplies all of its dependencies to
     # deploy targets.
     if not any(
         filename.startswith("org.scala-lang_scala-library_") for filename in all_dependency_jars
     ):
-        scala_library = await Get(ClasspathEntry, ScalaLibraryRequest(scala.version))
+        scala_library = await Get(ClasspathEntry, ScalaLibraryRequest(scala_version))
         direct_dependency_classpath_entries += (scala_library,)
 
     component_members_with_sources = tuple(
@@ -132,7 +134,6 @@ async def compile_scala_source(
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
 
-    scala_version = scala.version_for_resolve(request.resolve.name)
     tool_classpath, sources_digest = await MultiGet(
         Get(
             ToolClasspath,
