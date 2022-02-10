@@ -18,7 +18,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, SourcesField
+from pants.engine.target import SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
@@ -28,7 +28,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkEnvironment, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkForClasspathRequest, JvmProcess
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ async def compile_java_source(
             exit_code=1,
         )
 
-    jdk = await Get(JdkEnvironment, CoarsenedTarget, request.component)
+    jdk = await Get(JdkEnvironment, JdkForClasspathRequest(request))
 
     # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
     deps_to_classpath_entries = dict(

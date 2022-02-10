@@ -18,8 +18,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget
-from pants.jvm.compile import ClasspathEntry
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
 from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
@@ -35,6 +34,11 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Nailgun:
     classpath_entry: ClasspathEntry
+
+
+@dataclass(frozen=True)
+class JdkForClasspathRequest:
+    cper: ClasspathEntryRequest
 
 
 @dataclass(frozen=True)
@@ -130,7 +134,7 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
 @rule
 async def prepare_jdk_environment(
-    jvm: JvmSubsystem, coursier: Coursier, request: JdkRequest, nailgun_: Nailgun, bash: BashBinary
+    jvm: JvmSubsystem, coursier: Coursier, nailgun_: Nailgun, bash: BashBinary, request: JdkRequest
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
@@ -332,10 +336,10 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
 
 @rule
-async def jdk_request_for_target(ct: CoarsenedTarget) -> JdkRequest:
+async def jdk_request_for_classpath(request: JdkForClasspathRequest) -> JdkRequest:
 
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
-    t = ct.representative
+    t = request.cper.component.representative
 
     if not t.has_field(JvmCompatibleJdkVersionField):
         raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
