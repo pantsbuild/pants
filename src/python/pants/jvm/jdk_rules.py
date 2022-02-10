@@ -12,7 +12,6 @@ import textwrap
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
@@ -124,8 +123,7 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
     This is used for providing a predictable JDK version for Pants' internal usage rather than for
     matching compatibility with source files (e.g. compilation/testing).
     """
-
-    version = jvm.jdk if jvm.jdk != "system" else None
+    version = jvm.tool_jdk if jvm.tool_jdk != "system" else None
 
     env = await Get(JdkEnvironment, JdkRequest(version))
     return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
@@ -364,23 +362,6 @@ def _resolve_jdk_request_to_version(request: JdkRequest, defaults: JvmSubsystem)
     version = request.version.value
     if version is not None:
         return version
-
-    default_source = defaults.default_source_jdk
-    if default_source is not None:
-        return default_source
-
-    warn_or_error(
-        "2.11.0.dev0",
-        "support for empty `--jvm-default-source-jdk` values",
-        (
-            "Set `--jvm-default-source-jdk` to a version listed when you run "
-            f"`cs java --available`. Alternatively, set the `{JvmJdkField.alias}` field on all JVM "
-            "source targets in your `BUILD` files."
-        ),
-    )
-
-    if defaults.jdk == "system":
-        return None
 
     return defaults.jdk
 

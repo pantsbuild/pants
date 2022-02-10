@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, cast
+from typing import cast
 
 from pants.engine.target import InvalidFieldException, Target
 from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
@@ -25,7 +25,7 @@ class JvmSubsystem(Subsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--jdk",
+            "--tool-jdk",
             default="adopt:1.11",
             advanced=True,
             help=(
@@ -34,9 +34,9 @@ class JvmSubsystem(Subsystem):
             ),
         )
         register(
-            "--default-source-jdk",
+            "--jdk",
             type=str,
-            default=None,
+            default="adopt:1.11",
             help=(
                 "The JDK to use when compiling sources or running tests.\n\n"
                 "If not specified, use the version specified by `--jvm-jdk`. This behavior is "
@@ -77,8 +77,8 @@ class JvmSubsystem(Subsystem):
         return cast(str, self.options.jdk)
 
     @property
-    def default_source_jdk(self) -> str | None:
-        return cast(Optional[str], self.options.default_source_jdk)
+    def tool_jdk(self) -> str:
+        return cast(str, self.options.tool_jdk)
 
     @property
     def resolves(self) -> dict[str, str]:
