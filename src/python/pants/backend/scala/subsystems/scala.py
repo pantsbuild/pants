@@ -51,7 +51,7 @@ class ScalaSubsystem(Subsystem):
     def _version_for_resolve(self) -> dict[str, str]:
         return cast("dict[str, str]", self.options.version_for_resolve)
 
-    def version_for_resolve(self, resolve: str):
+    def version_for_resolve(self, resolve: str) -> str:
         version = self._version_for_resolve.get(resolve)
         if version:
             return version
