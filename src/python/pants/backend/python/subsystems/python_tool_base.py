@@ -18,6 +18,7 @@ from pants.core.util_rules.lockfile_metadata import calculate_invalidation_diges
 from pants.engine.fs import FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -105,7 +106,7 @@ class PythonToolRequirementsBase(Subsystem):
                     f"do not recommend this, though, as lockfiles are essential for reproducible "
                     f"builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
-                    f"build root, then run `./pants generate-lockfiles "
+                    f"build root, then run `{bin_name()} generate-lockfiles "
                     f"--resolve={cls.options_scope}`.\n\n"
                     "Lockfile generation currently does not wire up the `[python-repos]` options. "
                     "If lockfile generation fails, you can manually generate a lockfile, such as "

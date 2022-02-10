@@ -89,19 +89,14 @@ def test_multiple_resolves() -> None:
             "BUILD": dedent(
                 """\
                 python_requirement(
-                    name='both',
-                    requirements=['both1', 'both2'],
-                    compatible_resolves=['a', 'b'],
-                )
-                python_requirement(
                     name='a',
                     requirements=['a'],
-                    compatible_resolves=['a'],
+                    resolve='a',
                 )
                 python_requirement(
                     name='b',
                     requirements=['b'],
-                    compatible_resolves=['b'],
+                    resolve='b',
                 )
                 """
             ),
@@ -121,7 +116,7 @@ def test_multiple_resolves() -> None:
     )
     assert set(result) == {
         GeneratePythonLockfile(
-            requirements=FrozenOrderedSet(["a", "both1", "both2"]),
+            requirements=FrozenOrderedSet(["a"]),
             interpreter_constraints=InterpreterConstraints(
                 PythonSetup.default_interpreter_constraints
             ),
@@ -129,7 +124,7 @@ def test_multiple_resolves() -> None:
             lockfile_dest="a.lock",
         ),
         GeneratePythonLockfile(
-            requirements=FrozenOrderedSet(["b", "both1", "both2"]),
+            requirements=FrozenOrderedSet(["b"]),
             interpreter_constraints=InterpreterConstraints(["==3.7.*"]),
             resolve_name="b",
             lockfile_dest="b.lock",

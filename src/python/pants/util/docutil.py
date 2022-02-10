@@ -27,10 +27,13 @@ def git_url(fp: str) -> str:
 
 def bin_name() -> str:
     """Return the Pants binary name, e.g. './pants'."""
-    try:
-        return os.environ["PANTS_BIN_NAME"]
-    except KeyError:
-        raise AssertionError(
-            "Expected 'PANTS_BIN_NAME' to be set. Please file a bug at "
-            "https://github.com/pantsbuild/pants/issues with your Pants version and stack trace."
-        )
+    # NB: This will be called at import-time in several files to define static help strings
+    # (e.g. "help=f'run `{bin_name()} fmt`").
+    #
+    # Ideally, we'd assert this is set unconditionally before Pants imports any of the files which
+    # use it, to give us complete confidence we won't be returning "./pants" in our help strings.
+    #
+    # However, this assumption really breaks down when we go to test pants (or a plugin author goes
+    # to test their plugin). Therefore we give a fallback and have integration test(s) to assert
+    # we've set this at the right point in time.
+    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN

@@ -4,6 +4,13 @@
 python_sources()
 
 python_tests(
+    name="bin_name",
+    sources=["bin_name_integration_test.py"],
+    dependencies=["testprojects/src/python:hello_directory"],
+    timeout=240,
+)
+
+python_tests(
     name="build_ignore_integration", sources=["build_ignore_integration_test.py"], timeout=240
 )
 

@@ -149,7 +149,7 @@ async def compile_java_source(
     )
 
     usercp = "__cp"
-    user_classpath = Classpath(direct_dependency_classpath_entries)
+    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
     classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
     immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
 

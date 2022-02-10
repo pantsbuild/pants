@@ -55,7 +55,7 @@ from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileCon
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
 from pants.jvm.util_rules import ExtractFileDigest
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
 
@@ -264,7 +264,7 @@ class CoursierResolvedLockfile:
             deprecated.warn_or_error(
                 "2.11.0.dev0",
                 "JSON-encoded JVM lockfile",
-                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
+                f"Run `{bin_name()} generate-lockfiles` to generate lockfiles in the new format.",
             )
             return cls.from_json_dicts(json.loads(lockfile))
 
@@ -454,7 +454,7 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     ):
         raise ValueError(
             f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
-            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
             "lockfile based on the new requirements."
         )
 

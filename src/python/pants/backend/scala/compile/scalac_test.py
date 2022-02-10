@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 from textwrap import dedent
 
 import pytest
@@ -20,7 +21,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
-from pants.jvm.compile import CompileResult, FallibleClasspathEntry
+from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -52,6 +53,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
+            QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
         ],
         target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
     )
@@ -649,3 +651,64 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
         resolve=make_resolve(rule_runner),
     )
     rule_runner.request(RenderedClasspath, [request])
+
+
+@maybe_skip_jdk_test
+def test_compile_with_multiple_scala_versions(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'main',
+                )
+                """
+            ),
+            "Example.scala": SCALA_LIB_SOURCE,
+            "3rdparty/jvm/scala2.12.lock": EMPTY_LOCKFILE,
+            "3rdparty/jvm/scala2.13.lock": EMPTY_LOCKFILE,
+        }
+    )
+    rule_runner.set_options(
+        ['--scala-version-for-resolve={"scala2.12":"2.12.15","scala2.13":"2.13.8"}'],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    classpath_2_12 = rule_runner.request(
+        ClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                ),
+                resolve=make_resolve(rule_runner, "scala2.12", "3rdparty/jvm/scala2.12.lock"),
+            )
+        ],
+    )
+    entries_2_12 = list(ClasspathEntry.closure([classpath_2_12]))
+    filenames_2_12 = sorted(
+        itertools.chain.from_iterable(entry.filenames for entry in entries_2_12)
+    )
+    assert filenames_2_12 == [
+        ".Example.scala.main.scalac.jar",
+        "org.scala-lang_scala-library_2.12.15.jar",
+    ]
+
+    classpath_2_13 = rule_runner.request(
+        ClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner, Address(spec_path="", target_name="main")
+                ),
+                resolve=make_resolve(rule_runner, "scala2.13", "3rdparty/jvm/scala2.13.lock"),
+            )
+        ],
+    )
+    entries_2_13 = list(ClasspathEntry.closure([classpath_2_13]))
+    filenames_2_13 = sorted(
+        itertools.chain.from_iterable(entry.filenames for entry in entries_2_13)
+    )
+    assert filenames_2_13 == [
+        ".Example.scala.main.scalac.jar",
+        "org.scala-lang_scala-library_2.13.8.jar",
+    ]

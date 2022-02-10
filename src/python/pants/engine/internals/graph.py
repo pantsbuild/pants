@@ -85,7 +85,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -135,7 +135,7 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
         removal_version=tgt_type.deprecated_alias_removal_version,
         entity=f"the target name {tgt_type.deprecated_alias}",
         hint=(
-            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `./pants "
+            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `{bin_name()} "
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
@@ -161,7 +161,7 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
         removal_version=field_type.deprecated_alias_removal_version,
         entity=f"the field name {field_type.deprecated_alias}",
         hint=(
-            f"Instead, use `{field_type.alias}`, which behaves the same. Run `./pants "
+            f"Instead, use `{field_type.alias}`, which behaves the same. Run `{bin_name()} "
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
@@ -627,7 +627,7 @@ def _log_or_raise_unmatched_owners(
         )
     msg = (
         f"{prefix} See {doc_url('targets')} for more information on target definitions."
-        f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
+        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
@@ -1111,7 +1111,7 @@ class NoApplicableTargetsException(Exception):
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
         )
         pants_filter_command = (
-            f"./pants filter --target-type={','.join(applicable_target_aliases)} ::"
+            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
         )
         remedy = (
             f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
@@ -1119,7 +1119,7 @@ class NoApplicableTargetsException(Exception):
         )
         if filedeps_goal_works:
             remedy += (
-                f", or run `{pants_filter_command} | xargs ./pants filedeps` to find all "
+                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
                 "applicable files."
             )
         else:
