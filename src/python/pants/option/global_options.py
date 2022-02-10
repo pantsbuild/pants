@@ -34,7 +34,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -594,15 +594,15 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
-            "is using once the program is already running.\n\nIf you use the `./pants` script from "
+            f"is using once the program is already running.\n\nIf you use the `{bin_name()}` script from "
             f"{doc_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
-            "Run `./pants --version` to check what is being used.",
+            f"Run `{bin_name()} --version` to check what is being used.",
         )
         register(
             "--pants-bin-name",
             advanced=True,
-            default="./pants",
+            default="./pants",  # noqa: PANTSBIN
             help="The name of the script or binary used to invoke Pants. "
             "Useful when printing help messages.",
         )
@@ -630,7 +630,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "dist"),
-            help="Write end products, such as the results of `./pants package`, to this dir.",
+            help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
         )
         register(
             "--pants-subprocessdir",
@@ -1310,7 +1310,7 @@ class GlobalOptions(Subsystem):
                 "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
                 "delete the option.\n\n"
                 "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
                 "  2. Check the logs for an ERROR log to see if you have to manually add "
                 "`name=` anywhere.\n"
                 "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
