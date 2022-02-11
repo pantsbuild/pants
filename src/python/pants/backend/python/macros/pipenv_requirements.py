@@ -71,6 +71,10 @@ async def generate_from_pipenv_requirement(
     generator = request.generator
     lock_rel_path = generator[PipenvSourceField].value
     lock_full_path = generator[PipenvSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
 
     file_tgt = PythonRequirementsFileTarget(
         {PythonRequirementsFileSourcesField.alias: lock_rel_path},
@@ -96,7 +100,6 @@ async def generate_from_pipenv_requirement(
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    overrides = {canonicalize_project_name(k): v for k, v in request.overrides.items()}
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()
