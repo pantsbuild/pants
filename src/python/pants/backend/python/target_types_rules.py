@@ -93,7 +93,7 @@ async def generate_targets_from_pex_binaries(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     entry_points_field = request.generator[PexEntryPointsField].value or []
-    overrides = request.overrides
+    overrides = request.require_unparametrized_overrides()
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()

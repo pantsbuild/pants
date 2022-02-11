@@ -42,6 +42,7 @@ from pants.engine.internals.graph import (
     TransitiveExcludesNotSupportedError,
     _TargetParametrizations,
 )
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
@@ -107,9 +108,13 @@ class MockTarget(Target):
     deprecated_alias_removal_version = "9.9.9.dev0"
 
 
+class ResolveField(StringField):
+    alias = "resolve"
+
+
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, Tags, SingleSourceField)
+    core_fields = (MockDependencies, Tags, SingleSourceField, ResolveField)
 
 
 class MockTargetGenerator(TargetFilesGenerator):
@@ -117,7 +122,7 @@ class MockTargetGenerator(TargetFilesGenerator):
     core_fields = (Dependencies, MultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
     copied_fields = (Dependencies,)
-    moved_fields = (Tags,)
+    moved_fields = (Tags, ResolveField)
 
 
 @pytest.fixture
@@ -918,6 +923,7 @@ def generated_targets_rule_runner() -> RuleRunner:
             QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
     )
 
 
@@ -1004,6 +1010,113 @@ def test_generate_overrides_unused(generated_targets_rule_runner: RuleRunner) ->
             ["f1.ext"],
             set(),
         )
+
+
+def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
+                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
+                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=parametrize(t1=['t1'], t2=['t2']), resolve=parametrize('a', 'b'), sources=['f1.ext'])",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "a"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "a"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "a"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "a"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "b"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "b"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "b"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "b"}
+                ),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(overrides={'f1.ext': {'resolve': parametrize('a', 'b')}}, resolve='c', sources=['*.ext'])",
+        ["f1.ext", "f2.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
+                Address("demo", relative_file_path="f1.ext", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
+                Address("demo", relative_file_path="f1.ext", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f2.ext", ResolveField.alias: "c"},
+                Address("demo", relative_file_path="f2.ext"),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generated(resolve=parametrize('a', 'b'), source='f1.ext')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
+                Address("demo", target_name="demo", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
+                Address("demo", target_name="demo", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+        },
+    )
 
 
 # -----------------------------------------------------------------------------------------------

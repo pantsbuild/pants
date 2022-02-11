@@ -17,7 +17,6 @@ from pants.engine.target import (
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JvmCompatibleResolvesField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -103,7 +102,7 @@ class JavaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourceField,
-        JvmCompatibleResolvesField,
+        JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
     )
@@ -120,16 +119,17 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
-        JvmCompatibleResolvesField,
-        JvmJdkField,
     )
     generated_target_cls = JavaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmCompatibleResolvesField,
     )
-    moved_fields = (JvmProvidesTypesField,)
+    moved_fields = (
+        JvmResolveField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+    )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 
