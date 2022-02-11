@@ -10,6 +10,7 @@ import re
 import shlex
 import textwrap
 from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
@@ -26,7 +27,7 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
+from pants.util.meta import classproperty, frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,41 @@ class Nailgun:
     classpath_entry: ClasspathEntry
 
 
+class DefaultJdk(Enum):
+    SYSTEM = "system"
+    SOURCE_DEFAULT = "source_default"
+
+
 @dataclass(frozen=True)
 class JdkRequest:
-    """Request for a JDK with a specific major version, or None (use System JDK)."""
+    """Request for a JDK with a specific major version, or a default (`--jvm-jdk` or System)."""
 
-    version: str | JvmJdkField | None
+    version: str | DefaultJdk
+
+    @classproperty
+    def SYSTEM(cls) -> JdkRequest:
+        return JdkRequest(DefaultJdk.SYSTEM)
+
+    @classproperty
+    def SOURCE_DEFAULT(cls) -> JdkRequest:
+        return JdkRequest(DefaultJdk.SOURCE_DEFAULT)
+
+    @staticmethod
+    def from_field(field: JvmJdkField) -> JdkRequest:
+        version = field.value
+        if version == "system":
+            return JdkRequest.SYSTEM
+        return JdkRequest(version) if version is not None else JdkRequest.SOURCE_DEFAULT
+
+    @staticmethod
+    def from_target(target: CoarsenedTarget) -> JdkRequest:
+        # TODO: verify that we're requesting the same JDK version for all `ct` members?
+        t = target.representative
+
+        if not t.has_field(JvmJdkField):
+            raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
+
+        return JdkRequest.from_field(t[JvmJdkField])
 
 
 @dataclass(frozen=True)
@@ -123,9 +154,9 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
     This is used for providing a predictable JDK version for Pants' internal usage rather than for
     matching compatibility with source files (e.g. compilation/testing).
     """
-    version = jvm.tool_jdk if jvm.tool_jdk != "system" else None
 
-    env = await Get(JdkEnvironment, JdkRequest(version))
+    request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
+    env = await Get(JdkEnvironment, JdkRequest, request)
     return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
 
 
@@ -135,10 +166,12 @@ async def prepare_jdk_environment(
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
-    version = _resolve_jdk_request_to_version(request, jvm)
+    version = request.version
+    if version == DefaultJdk.SOURCE_DEFAULT:
+        version = jvm.jdk
 
     # TODO: add support for system JDKs with specific version
-    if version is None:
+    if version is DefaultJdk.SYSTEM:
         coursier_jdk_option = "--system-jvm"
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={version}")
@@ -330,40 +363,6 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
-
-
-@rule
-async def jdk_request_for_target(target: CoarsenedTarget) -> JdkRequest:
-
-    # TODO: verify that we're requesting the same JDK version for all `ct` members?
-    t = target.representative
-
-    if not t.has_field(JvmJdkField):
-        raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
-
-    field = t[JvmJdkField]
-
-    return JdkRequest(field)
-
-
-def _resolve_jdk_request_to_version(request: JdkRequest, defaults: JvmSubsystem) -> str | None:
-    """Resolves the version value from `JdkRequest` into a usable JDK spec.
-
-    If the return value is a string, it's a valid Coursier JDK spec. If `None`, Coursier will use
-    `--system-jdk`.
-    """
-
-    if request.version is None:
-        return None
-
-    if isinstance(request.version, str):
-        return request.version
-
-    version = request.version.value
-    if version is not None:
-        return version
-
-    return defaults.jdk
 
 
 def rules():
