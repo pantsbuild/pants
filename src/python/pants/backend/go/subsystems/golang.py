@@ -84,6 +84,19 @@ class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
 
     path: str
+    version: str
+
+    def is_compatible_version(self, version: str) -> bool:
+        """Can this Go compiler handle the target version?
+
+        Inspired by
+        https://github.com/golang/go/blob/30501bbef9fcfc9d53e611aaec4d20bb3cdb8ada/src/cmd/go/internal/work/exec.go#L429-L445.
+
+        Input expected in the form `1.17`.
+        """
+        if version == "1.0":
+            return True
+        return int(version[2:]) <= int(self.version[2:])  # e.g. `1.17` -> `17`
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
@@ -150,7 +163,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 ),
             )
             goroot = env_result.stdout.decode("utf-8").strip()
-            return GoRoot(goroot)
+            return GoRoot(goroot, version)
 
         logger.debug(
             f"Go binary at {binary_path.path} has version {version}, but this "

@@ -114,3 +114,11 @@ def test_no_valid_versions(rule_runner: RuleRunner) -> None:
     exc = e.value.wrapped_exceptions[0]
     assert isinstance(exc, BinaryNotFoundError)
     assert "Cannot find a `go` binary with the expected version" in str(exc)
+
+
+def test_valid_go_version() -> None:
+    go_root = GoRoot("", "1.15")
+    for v in range(16):
+        assert go_root.is_compatible_version(f"1.{v}") is True
+    for v in range(17, 40):
+        assert go_root.is_compatible_version(f"1.{v}") is False
