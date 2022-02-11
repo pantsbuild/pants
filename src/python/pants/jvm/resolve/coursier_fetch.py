@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tupl
 
 import toml
 
-from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -217,14 +216,6 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
-
-        return cls(
-            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
-        )
-
-    @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
         """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
 
@@ -256,15 +247,7 @@ class CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
         attached metadata, or old-style JSON.)."""
 
-        try:
-            return cls.from_toml(lockfile)
-        except toml.TomlDecodeError:
-            deprecated.warn_or_error(
-                "2.11.0.dev0",
-                "JSON-encoded JVM lockfile",
-                f"Run `{bin_name()} generate-lockfiles` to generate lockfiles in the new format.",
-            )
-            return cls.from_json_dicts(json.loads(lockfile))
+        return cls.from_toml(lockfile)
 
     def to_serialized(self) -> bytes:
         """Export this CoursierResolvedLockfile to a human-readable serialized form.
