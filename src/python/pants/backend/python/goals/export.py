@@ -23,7 +23,6 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe
 
 logger = logging.getLogger(__name__)
@@ -135,7 +134,7 @@ async def export_virtualenvs(
     no_resolves_dest = dist_dir.relpath / "python" / "virtualenv"
     if venvs and python_setup.enable_resolves and no_resolves_dest.exists():
         logger.warning(
-            f"Because `[python].enable_resolves` is true, `{bin_name()} export ::` no longer "
+            f"Because `[python].enable_resolves` is true, `./pants export` no longer "
             f"writes virtualenvs to {no_resolves_dest}, but instead underneath "
             f"{dist_dir.relpath / 'python' / 'virtualenvs'}. You will need to "
             "update your IDE to point to the new virtualenv.\n\n"
