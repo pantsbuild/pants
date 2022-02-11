@@ -44,7 +44,7 @@ class DefaultJdk(Enum):
 
 @dataclass(frozen=True)
 class JdkRequest:
-    """Request for a JDK with a specific major version, or None (use System JDK)."""
+    """Request for a JDK with a specific major version, or a default (`--jvm-jdk` or System)."""
 
     version: str | DefaultJdk
 
