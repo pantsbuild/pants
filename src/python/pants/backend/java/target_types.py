@@ -15,7 +15,12 @@ from pants.engine.target import (
     Target,
     TargetFilesGenerator,
 )
-from pants.jvm.target_types import JunitTestSourceField, JvmProvidesTypesField, JvmResolveField
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmJdkField,
+    JvmProvidesTypesField,
+    JvmResolveField,
+)
 
 
 class JavaSourceField(SingleSourceField):
@@ -57,6 +62,7 @@ class JunitTestTarget(Target):
         Dependencies,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Java test, run with JUnit."
 
@@ -71,11 +77,13 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaTestsGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = JunitTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
@@ -97,6 +105,7 @@ class JavaSourceTarget(Target):
         JavaSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Java source file containing application or library code."
 
@@ -111,14 +120,17 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = JavaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
+        JvmJdkField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."

@@ -29,7 +29,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
-from pants.jvm.target_types import JvmMainClassNameField
+from pants.jvm.target_types import JvmJdkField, JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +43,14 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,
+        JvmJdkField,
         Dependencies,
     )
 
     main_class: JvmMainClassNameField
     output_path: OutputPathField
     dependencies: Dependencies
+    jdk_version: JvmJdkField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):

@@ -17,7 +17,7 @@ from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -63,10 +63,8 @@ class Setup:
 async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
+    jdk: InternalJdk,
 ) -> Setup:
-
-    jdk = jdk_setup.jdk
 
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()

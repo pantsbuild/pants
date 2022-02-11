@@ -19,7 +19,12 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.target_types import JunitTestSourceField, JvmProvidesTypesField, JvmResolveField
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmJdkField,
+    JvmProvidesTypesField,
+    JvmResolveField,
+)
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -71,6 +76,7 @@ class ScalatestTestTarget(Target):
         ScalatestTestSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala test, run with Scalatest."
 
@@ -85,11 +91,13 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         Dependencies,
+        JvmJdkField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
@@ -119,6 +127,7 @@ class ScalaJunitTestTarget(Target):
         ScalaJunitTestSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala test, run with JUnit."
 
@@ -133,11 +142,13 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         Dependencies,
+        JvmJdkField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
@@ -160,6 +171,7 @@ class ScalaSourceTarget(Target):
         ScalaSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -185,14 +197,17 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourcesGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
+        JvmJdkField,
         JvmProvidesTypesField,
     )
     settings_request_cls = ScalaSettingsRequest

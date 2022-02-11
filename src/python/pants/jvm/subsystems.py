@@ -12,22 +12,34 @@ from pants.option.subsystem import Subsystem
 
 class JvmSubsystem(Subsystem):
     options_scope = "jvm"
-    help = "Options for general JVM functionality."
+    help = (
+        "Options for general JVM functionality.\n\n"
+        " JDK strings will be passed directly to Coursier's `--jvm` parameter."
+        " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
+        " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
+        " instead, but note that this can lead to inconsistent behavior since the JVM version"
+        " will be whatever happens to be found first on the system's PATH."
+    )
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--jdk",
+            "--tool-jdk",
             default="adopt:1.11",
             advanced=True,
             help=(
-                "The JDK to use.\n\n"
-                " This string will be passed directly to Coursier's `--jvm` parameter."
-                " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
-                " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
-                " instead, but note that this can lead to inconsistent behavior since the JVM version"
-                " will be whatever happens to be found first on the system's PATH."
+                "The JDK to use when building and running Pants' internal JVM support code and other "
+                "non-compiler tools. See `jvm` help for supported values."
+            ),
+        )
+        register(
+            "--jdk",
+            type=str,
+            default="adopt:1.11",
+            help=(
+                "The default JDK to use when compiling sources or running tests for your code.\n\n"
+                "See `jvm` help for supported values."
             ),
         )
         register(
@@ -61,6 +73,10 @@ class JvmSubsystem(Subsystem):
     @property
     def jdk(self) -> str:
         return cast(str, self.options.jdk)
+
+    @property
+    def tool_jdk(self) -> str:
+        return cast(str, self.options.tool_jdk)
 
     @property
     def resolves(self) -> dict[str, str]:

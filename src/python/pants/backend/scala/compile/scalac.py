@@ -17,7 +17,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField
+from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
@@ -27,7 +27,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -48,7 +48,6 @@ class ScalaLibraryRequest:
 @rule(desc="Compile with scalac")
 async def compile_scala_source(
     scala: ScalaSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
     union_membership: UnionMembership,
@@ -81,6 +80,7 @@ async def compile_scala_source(
         for filename in dependency.filenames
     ]
 
+    jdk = await Get(JdkEnvironment, CoarsenedTarget, request.component)
     scala_version = scala.version_for_resolve(request.resolve.name)
 
     # TODO(14171): Stop-gap for making sure that scala supplies all of its dependencies to
@@ -175,7 +175,7 @@ async def compile_scala_source(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "scala.tools.nsc.Main",
