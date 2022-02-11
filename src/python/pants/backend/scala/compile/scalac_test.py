@@ -34,7 +34,7 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -90,7 +90,6 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 )
 
 
-@logging
 @maybe_skip_jdk_test
 def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -137,7 +136,6 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     assert check_result.exit_code == 0
 
 
-@logging
 @maybe_skip_jdk_test
 def test_compile_with_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -185,7 +183,6 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-@logging
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

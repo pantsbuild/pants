@@ -8,7 +8,7 @@ import pytest
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, GenericTarget
+from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -193,17 +193,29 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
         }
     )
     tds = rule_runner.request(TargetDatas, [AddressSpecs([DescendantAddresses("foo")])])
-    assert tds == TargetDatas(
-        [
-            TargetData(
-                GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
-                None,
-                ("foo:baz",),
+    assert list(tds) == [
+        TargetData(
+            GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
+            None,
+            ("foo/a.txt:baz", "foo/b.txt:baz"),
+        ),
+        TargetData(
+            FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+            ("foo/a.txt", "foo/b.txt"),
+            ("foo/a.txt:baz", "foo/b.txt:baz"),
+        ),
+        TargetData(
+            FileTarget(
+                {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
             ),
-            TargetData(
-                FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-                ("foo/a.txt", "foo/b.txt"),
-                tuple(),
+            ("foo/a.txt",),
+            (),
+        ),
+        TargetData(
+            FileTarget(
+                {"source": "b.txt"}, Address("foo", relative_file_path="b.txt", target_name="baz")
             ),
-        ]
-    )
+            ("foo/b.txt",),
+            (),
+        ),
+    ]

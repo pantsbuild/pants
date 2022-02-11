@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, cast
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementsField,
@@ -46,6 +47,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_from_targets.rules(),
+            *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
@@ -92,28 +94,41 @@ def test_no_compatible_resolve_error() -> None:
 
 
 def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
-    def create_build(*, req_resolve: str, source_resolve: str, test_resolve: str) -> str:
-        return dedent(
-            f"""\
-            python_source(name="dep", source="dep.py", resolve="{source_resolve}")
-            python_requirement(
-                name="req", requirements=[], resolve="{req_resolve}"
-            )
-            python_test(
-                name="test",
-                source="tests.py",
-                dependencies=[":dep", ":req"],
-                resolve="{test_resolve}",
-            )
-            """
-        )
+    def create_target_files(
+        directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
+    ) -> dict[str | PurePath, str | bytes]:
+        return {
+            f"{directory}/BUILD": dedent(
+                f"""\
+              python_source(name="dep", source="dep.py", resolve="{source_resolve}")
+              python_requirement(
+                  name="req", requirements=[], resolve="{req_resolve}"
+              )
+              python_test(
+                  name="test",
+                  source="tests.py",
+                  dependencies=[":dep", ":req"],
+                  resolve="{test_resolve}",
+              )
+              """
+            ),
+            f"{directory}/tests.py": "",
+            f"{directory}/dep.py": "",
+        }
 
-    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"])
+    rule_runner.set_options(
+        ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"], env_inherit={"PATH"}
+    )
     rule_runner.write_files(
         {
             # Note that each of these BUILD files are entirely self-contained.
-            "valid/BUILD": create_build(req_resolve="a", source_resolve="a", test_resolve="a"),
-            "invalid/BUILD": create_build(req_resolve="a", source_resolve="b", test_resolve="b"),
+            **create_target_files("valid", req_resolve="a", source_resolve="a", test_resolve="a"),
+            **create_target_files(
+                "invalid",
+                req_resolve="a",
+                source_resolve="a",
+                test_resolve="b",
+            ),
         }
     )
 

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pants.engine.target import InvalidFieldException, Target
-from pants.jvm.target_types import JvmCompatibleResolvesField, JvmResolveField
+from pants.jvm.target_types import JvmResolveField, JvmResolveField
 from pants.option.option_types import DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 
@@ -48,33 +48,21 @@ class JvmSubsystem(Subsystem):
         ),
     )
 
-    def is_jvm_target(self, target: Target) -> bool:
-        """Returns `True` only if the given target is a valid JVM source or destination target."""
-        return target.has_field(JvmResolveField) or target.has_field(JvmCompatibleResolvesField)
+    def resolve_for_target(self, target: Target) -> str | None:
+        """Return the `JvmResolveField` value or its default for the given target.
 
-    def resolves_for_target(self, target: Target) -> tuple[str, ...]:
-        if target.has_field(JvmResolveField):
-            val = target[JvmResolveField].value or self.default_resolve
-            if val not in self.resolves:
-                raise InvalidFieldException(
-                    f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
-                    f"{target.address}: {val}.\n\n"
-                    "All valid resolve names (from `[jvm.resolves]`): "
-                    f"{sorted(self.resolves.keys())}"
-                )
-            return (val,)
-        if target.has_field(JvmCompatibleResolvesField):
-            vals = target[JvmCompatibleResolvesField].value or (self.default_resolve,)
-            invalid_resolves = set(vals) - set(self.resolves.keys())
-            if invalid_resolves:
-                raise InvalidFieldException(
-                    f"Unrecognized resolves in the {target[JvmCompatibleResolvesField].alias} "
-                    f"field for {target.address}: {sorted(vals)}.\n\n"
-                    "All valid resolve names (from `[jvm.resolves]`): "
-                    f"{sorted(self.resolves.keys())}"
-                )
-            return vals
-        raise AssertionError(
-            f"Invalid target type {target.alias} for {target.address}. Needs to have `resolve` or "
-            "`compatible_resolves` field registered."
-        )
+        If a Target does not have the `JvmResolveField` returns None, since we can be assured that
+        other codepaths will fail to (e.g.) produce a ClasspathEntry if an unsupported target type
+        is provided to the JVM rules.
+        """
+        if not target.has_field(JvmResolveField):
+            return None
+        val = target[JvmResolveField].value or self.default_resolve
+        if val not in self.resolves:
+            raise InvalidFieldException(
+                f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
+                f"{target.address}: {val}.\n\n"
+                "All valid resolve names (from `[jvm.resolves]`): "
+                f"{sorted(self.resolves.keys())}"
+            )
+        return val
