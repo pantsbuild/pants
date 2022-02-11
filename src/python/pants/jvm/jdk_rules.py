@@ -56,6 +56,21 @@ class JdkRequest:
     def source_default(cls) -> JdkRequest:
         return JdkRequest(DefaultJdk.SOURCE_DEFAULT)
 
+    @staticmethod
+    def from_field(field: JvmJdkField) -> JdkRequest:
+        version = field.value
+        return JdkRequest(version) if version is not None else JdkRequest.source_default
+
+    @staticmethod
+    def from_target(target: CoarsenedTarget) -> JdkRequest:
+        # TODO: verify that we're requesting the same JDK version for all `ct` members?
+        t = target.representative
+
+        if not t.has_field(JvmJdkField):
+            raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
+
+        return JdkRequest.from_field(t[JvmJdkField])
+
 
 @dataclass(frozen=True)
 class JdkEnvironment:
@@ -346,28 +361,6 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
-
-
-@rule
-async def jdk_request_for_target(target: CoarsenedTarget) -> JdkRequest:
-
-    # TODO: verify that we're requesting the same JDK version for all `ct` members?
-    t = target.representative
-
-    if not t.has_field(JvmJdkField):
-        raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
-
-    field = t[JvmJdkField]
-    version = field.value
-
-    return JdkRequest(version) if version is not None else JdkRequest.source_default
-
-
-@rule
-async def jdk_request_for_field(field: JvmJdkField) -> JdkRequest:
-    version = field.value
-
-    return JdkRequest(version) if version is not None else JdkRequest.source_default
 
 
 def rules():

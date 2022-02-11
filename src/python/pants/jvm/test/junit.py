@@ -20,7 +20,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkEnvironment, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
@@ -65,7 +65,9 @@ async def setup_junit_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    jdk = await Get(JdkEnvironment, JvmJdkField, request.field_set.jdk_version)
+    jdk = await Get(
+        JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)
+    )
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
     classpath, junit_classpath = await MultiGet(

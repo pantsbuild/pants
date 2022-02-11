@@ -9,10 +9,10 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import JdkEnvironment
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -29,7 +29,9 @@ async def create_scala_repl_request(
     user_classpath = await Get(Classpath, Addresses, request.addresses)
 
     roots = await Get(CoarsenedTargets, Addresses, request.addresses)
-    environs = await MultiGet(Get(JdkEnvironment, CoarsenedTarget, target) for target in roots)
+    environs = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target)) for target in roots
+    )
     jdk = max(environs, key=lambda j: j.jre_major_version)
 
     scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
