@@ -123,7 +123,7 @@ async def resolve_scala_library_for_resolve(
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
     for tgt in jvm_artifact_targets:
-        resolve = jvm.resolve_for_target(tgt)
+        resolve = jvm.resolve_for_target(tgt) or jvm.default_resolve
         if resolve != request.resolve_name:
             continue
 
@@ -151,7 +151,7 @@ async def inject_scala_library_dependency(
 ) -> InjectedDependencies:
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     target = wrapped_target.target
-    resolve = jvm.resolve_for_target(target)
+    resolve = jvm.resolve_for_target(target) or jvm.default_resolve
     if not resolve:
         raise ValueError(
             f"Target {target.address} does not have a resolve assigned to it. Please assign the target to a resolve "
