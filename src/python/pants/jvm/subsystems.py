@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pants.engine.target import InvalidFieldException, Target
-from pants.jvm.target_types import JvmResolveField, JvmResolveField
+from pants.jvm.target_types import JvmResolveField
 from pants.option.option_types import DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 
