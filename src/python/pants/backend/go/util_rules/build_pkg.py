@@ -6,6 +6,7 @@ import dataclasses
 import os.path
 from dataclasses import dataclass
 
+from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
@@ -198,7 +199,9 @@ class RenderedEmbedConfig:
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
-async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPackage:
+async def build_go_package(
+    request: BuildGoPackageRequest, go_root: GoRoot
+) -> FallibleBuiltGoPackage:
     maybe_built_deps = await MultiGet(
         Get(FallibleBuiltGoPackage, BuildGoPackageRequest, build_request)
         for build_request in request.direct_dependencies
@@ -255,10 +258,13 @@ async def build_go_package(request: BuildGoPackageRequest) -> FallibleBuiltGoPac
         request.import_path,
         "-importcfg",
         import_config.CONFIG_PATH,
-        # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
-        # for why Go sets the default to 1.16.
-        f"-lang=go{request.minimum_go_version or '1.16'}",
     ]
+
+    # See https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/cmd/go/internal/work/gc.go#L79-L100
+    # for where this logic comes from.
+    go_version = request.minimum_go_version or "1.16"
+    if go_root.is_compatible_version(go_version):
+        compile_args.append(f"-lang=go{go_version}")
 
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
