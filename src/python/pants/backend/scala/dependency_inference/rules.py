@@ -2,10 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.resolve.lockfile import SCALA_LIBRARY_ARTIFACT, SCALA_LIBRARY_GROUP
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -15,13 +19,20 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    ThirdPartyPackageToArtifactMapping,
+)
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.resolve.common import ArtifactRequirement
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
@@ -83,6 +94,86 @@ async def infer_scala_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
+class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
+    inject_for = ScalaDependenciesField
+
+
+@dataclass(frozen=True)
+class ResolveScalaLibraryTargetForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ResolvedScalaLibraryTargetForResolve:
+    address: Address
+
+
+@rule
+async def resolve_scala_library_for_resolve(
+    request: ResolveScalaLibraryTargetForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+    scala_subsystem: ScalaSubsystem,
+) -> ResolvedScalaLibraryTargetForResolve:
+    scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
+
+    for tgt in jvm_artifact_targets:
+        resolve = jvm.resolve_for_target(tgt)
+        if resolve != request.resolve_name:
+            continue
+
+        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
+        if (
+            artifact.coordinate.group != SCALA_LIBRARY_GROUP
+            or artifact.coordinate.artifact != SCALA_LIBRARY_ARTIFACT
+        ):
+            continue
+
+        if artifact.coordinate.version != scala_version:
+            raise ValueError(
+                f"The JVM resolve `{request.resolve_name}` contains a `jvm_artifact` target {tgt.address} with version "
+                f"{artifact.coordinate.version} which conflicts with Scala version {scala_version} "
+                "which is the configured version of Scala for this resolve from the `[scala].version_for_resolve` option. "
+                f"Please update the version in target {tgt.address} and then re-run the `generate-lockfiles` goal."
+            )
+
+        return ResolvedScalaLibraryTargetForResolve(tgt.address)
+
+    raise ValueError(
+        f"The JVM resolve `{request.resolve_name}` does not contain a requirement for the Scala runtime. "
+        "Since at least one Scala target type in this repository consumes this resolve, the resolve "
+        "must contain a `jvm_artifact` target for the Scala runtime.\n\n"
+        "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
+        "the `generate-lockfiles` goal:\n"
+        "jvm_artifact(\n"
+        f'  name="{SCALA_LIBRARY_GROUP}_{SCALA_LIBRARY_ARTIFACT}_{scala_version}",\n'
+        f'  group="{SCALA_LIBRARY_GROUP}",\n',
+        f'  artifact="{SCALA_LIBRARY_ARTIFACT}",\n',
+        f'  version="{scala_version}",\n',
+        f'  resolve="{request.resolve_name}",\n',
+        ")",
+    )
+
+
+@rule(desc="Inject dependency on scala-library artifact for Scala target.")
+async def inject_scala_library_dependency(
+    request: InjectScalaLibraryDependencyRequest,
+    jvm: JvmSubsystem,
+) -> InjectedDependencies:
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    target = wrapped_target.target
+    resolve = jvm.resolve_for_target(target)
+    if not resolve:
+        raise ValueError(
+            f"Target {target.address} does not have a resolve assigned to it. Please assign the target to a resolve "
+            f"by setting the `{JvmResolveField.alias}` to a specific JVM resolve."
+        )
+    scala_library_target_info = await Get(
+        ResolvedScalaLibraryTargetForResolve, ResolveScalaLibraryTargetForResolveRequest(resolve)
+    )
+    return InjectedDependencies((scala_library_target_info.address,))
+
+
 def rules():
     return [
         *collect_rules(),
@@ -90,4 +181,5 @@ def rules():
         *scala_parser.rules(),
         *symbol_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
+        UnionRule(InjectDependenciesRequest, InjectScalaLibraryDependencyRequest),
     ]
