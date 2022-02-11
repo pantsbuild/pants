@@ -96,7 +96,12 @@ class GoRoot:
         """
         if version == "1.0":
             return True
-        return int(version[2:]) <= int(self.version[2:])  # e.g. `1.17` -> `17`
+
+        def parse(v: str) -> tuple[int, int]:
+            major, minor = v.split(".", maxsplit=1)
+            return int(major), int(minor)
+
+        return parse(version) <= parse(self.version)
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)

@@ -122,3 +122,5 @@ def test_valid_go_version() -> None:
         assert go_root.is_compatible_version(f"1.{v}") is True
     for v in range(17, 40):
         assert go_root.is_compatible_version(f"1.{v}") is False
+    for v in range(2, 4):
+        assert go_root.is_compatible_version(f"{v}.0") is False
