@@ -13,7 +13,6 @@ from pants.core.goals.export import (
     ExportRequest,
     ExportResult,
     ExportResults,
-    ExportSubsystem,
     Symlink,
     export,
 )
