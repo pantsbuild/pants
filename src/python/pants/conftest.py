@@ -26,5 +26,14 @@ from pathlib import Path
 # Note that while this makes the (implicit) namespace package into a regular package,
 # that is fine at test time. We don't consume testutil from a dist but from source, in the same
 # source root (src/python). We only need `pants` to be a namespace package in the dists we create.
+namespace_init_path = Path("src/python/pants/__init__.py")
 
-Path("src/python/pants/__init__.py").touch()
+
+def pytest_sessionstart(session) -> None:
+    namespace_init_path.touch()
+
+
+def pytest_sessionfinish(session) -> None:
+    # Technically unecessary, but nice if people are running tests directly from repo
+    # (not using pants).
+    namespace_init_path.unlink()
