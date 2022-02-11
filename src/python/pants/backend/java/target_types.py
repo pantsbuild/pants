@@ -77,16 +77,17 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaTestsGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = JunitTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
-        JvmJdkField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
 
@@ -119,16 +120,17 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = JavaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
-        JvmJdkField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 

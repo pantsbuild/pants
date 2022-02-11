@@ -91,16 +91,17 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         Dependencies,
+        JvmJdkField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
-        JvmJdkField,
     )
     settings_request_cls = ScalaSettingsRequest
     help = (
@@ -141,16 +142,17 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         Dependencies,
+        JvmJdkField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
-        JvmJdkField,
     )
     settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_junit_test` target for each file in the `sources` field."
@@ -195,16 +197,17 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         ScalaSourcesGeneratorSourcesField,
+        JvmJdkField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
+        JvmJdkField,
     )
     moved_fields = (
         JvmResolveField,
         JvmProvidesTypesField,
-        JvmJdkField,
     )
     settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_source` target for each file in the `sources` field."
