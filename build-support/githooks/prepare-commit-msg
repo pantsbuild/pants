@@ -43,7 +43,7 @@ HAS_WHEELS_SKIP=$?
 if [[ "${HAS_RUST_SKIP}" -eq 1 ]] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
   cat << EOF >> "${COMMIT_MSG_FILEPATH}"
 
-# Rust tests and lints will be skipped. Delete if not intended.
+<!-- Rust tests and lints will be skipped. Delete if not intended. -->
 [ci skip-rust]
 EOF
 fi
@@ -51,7 +51,7 @@ fi
 if [[ "${HAS_WHEELS_SKIP}" -eq 1 ]] && [ "${NUM_RELEASE_FILES}" -eq 0 ]; then
   cat << EOF >> "${COMMIT_MSG_FILEPATH}"
 
-# Building wheels and fs_util will be skipped. Delete if not intended.
+<!-- Building wheels and fs_util will be skipped. Delete if not intended. -->
 [ci skip-build-wheels]
 EOF
 fi
