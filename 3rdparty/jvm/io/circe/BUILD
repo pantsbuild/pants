@@ -6,5 +6,5 @@ jvm_artifact(
     group="io.circe",
     artifact="circe-generic_2.13",
     version="0.14.1",
-    compatible_resolves=["scala_parser"],
+    resolve="scala_parser",
 )

@@ -6,5 +6,5 @@ jvm_artifact(
     group="com.github.javaparser",
     artifact="javaparser-symbol-solver-core",
     version="3.23.0",
-    compatible_resolves=["java_parser"],
+    resolve="java_parser",
 )
