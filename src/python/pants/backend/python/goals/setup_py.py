@@ -19,6 +19,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     GenerateSetupField,
+    LongDescriptionPath,
     PythonDistributionEntryPointsField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
@@ -46,6 +47,7 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -547,6 +549,20 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
             "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
+
+    if "long_description" not in setup_kwargs:
+        long_description_path = exported_target.target.get(LongDescriptionPath).value
+        if long_description_path:
+            digest_contents = await Get(
+                DigestContents,
+                PathGlobs(
+                    [long_description_path],
+                    description_of_origin="Reading file of long_description_path",
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                ),
+            )
+            long_description_content = digest_contents[0].content.decode()
+            setup_kwargs.update({"long_description": long_description_content})
 
     # Resolve entry points from python_distribution(entry_points=...) and from
     # python_distribution(provides=setup_py(entry_points=...)
