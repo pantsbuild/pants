@@ -49,17 +49,19 @@ class JdkRequest:
     version: str | DefaultJdk
 
     @classproperty
-    def system(cls) -> JdkRequest:
+    def SYSTEM(cls) -> JdkRequest:
         return JdkRequest(DefaultJdk.SYSTEM)
 
     @classproperty
-    def source_default(cls) -> JdkRequest:
+    def SOURCE_DEFAULT(cls) -> JdkRequest:
         return JdkRequest(DefaultJdk.SOURCE_DEFAULT)
 
     @staticmethod
     def from_field(field: JvmJdkField) -> JdkRequest:
         version = field.value
-        return JdkRequest(version) if version is not None else JdkRequest.source_default
+        if version == "system":
+            return JdkRequest.SYSTEM
+        return JdkRequest(version) if version is not None else JdkRequest.SOURCE_DEFAULT
 
     @staticmethod
     def from_target(target: CoarsenedTarget) -> JdkRequest:
@@ -153,7 +155,7 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
     matching compatibility with source files (e.g. compilation/testing).
     """
 
-    request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.system
+    request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
     env = await Get(JdkEnvironment, JdkRequest, request)
     return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
 
