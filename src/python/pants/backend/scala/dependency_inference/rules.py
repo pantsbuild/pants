@@ -6,7 +6,12 @@ from dataclasses import dataclass
 
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.resolve.lockfile import SCALA_LIBRARY_ARTIFACT, SCALA_LIBRARY_GROUP
+from pants.backend.scala.resolve.lockfile import (
+    SCALA_LIBRARY_ARTIFACT,
+    SCALA_LIBRARY_GROUP,
+    ConflictingScalaLibraryVersionInResolveError,
+    MissingScalaLibraryInResolveError,
+)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
@@ -130,29 +135,13 @@ async def resolve_scala_library_for_resolve(
             continue
 
         if artifact.coordinate.version != scala_version:
-            raise ValueError(
-                f"The JVM resolve `{request.resolve_name}` contains a `jvm_artifact` target {tgt.address} with version "
-                f"{artifact.coordinate.version} which conflicts with Scala version {scala_version} "
-                "which is the configured version of Scala for this resolve from the `[scala].version_for_resolve` option. "
-                f"Please update the version in target {tgt.address} and then re-run the `generate-lockfiles` goal."
+            raise ConflictingScalaLibraryVersionInResolveError(
+                request.resolve_name, scala_version, artifact.coordinate
             )
 
         return ResolvedScalaLibraryTargetForResolve(tgt.address)
 
-    raise ValueError(
-        f"The JVM resolve `{request.resolve_name}` does not contain a requirement for the Scala runtime. "
-        "Since at least one Scala target type in this repository consumes this resolve, the resolve "
-        "must contain a `jvm_artifact` target for the Scala runtime.\n\n"
-        "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
-        "the `generate-lockfiles` goal:\n"
-        "jvm_artifact(\n"
-        f'  name="{SCALA_LIBRARY_GROUP}_{SCALA_LIBRARY_ARTIFACT}_{scala_version}",\n'
-        f'  group="{SCALA_LIBRARY_GROUP}",\n',
-        f'  artifact="{SCALA_LIBRARY_ARTIFACT}",\n',
-        f'  version="{scala_version}",\n',
-        f'  resolve="{request.resolve_name}",\n',
-        ")",
-    )
+    raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
 
 @rule(desc="Inject dependency on scala-library artifact for Scala target.")
