@@ -38,10 +38,8 @@ class JvmSubsystem(Subsystem):
             type=str,
             default="adopt:1.11",
             help=(
-                "The JDK to use when compiling sources or running tests.\n\n"
-                "If not specified, use the version specified by `--jvm-jdk`. This behavior is "
-                "deprecated, and future versions of Pants will require a specific version for "
-                "source files.  See `jvm` help for supported values."
+                "The default JDK to use when compiling sources or running tests for your code.\n\n"
+                "See `jvm` help for supported values."
             ),
         )
         register(
