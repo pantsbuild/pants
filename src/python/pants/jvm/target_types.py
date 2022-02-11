@@ -38,6 +38,15 @@ class JvmResolveField(StringField):
     )
 
 
+class JvmJdkField(StringField):
+    alias = "jdk"
+    required = False
+    help = (
+        "The major version of the JDK that this target should be built with. If not defined, "
+        "will default to `[jvm].default_source_jdk`."
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `jvm_artifact` targets
 # -----------------------------------------------------------------------------------------------
@@ -227,6 +236,7 @@ class DeployJarTarget(Target):
         Dependencies,
         OutputPathField,
         JvmMainClassNameField,
+        JvmJdkField,
         JvmResolveField,
         RestartableField,
     )

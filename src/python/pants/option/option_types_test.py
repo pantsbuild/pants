@@ -8,8 +8,6 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, call
 
-import pytest
-
 from pants.option.custom_types import dir_option, file_option, memory_size, shell_str, target_option
 from pants.option.option_types import (
     ArgsListOption,
@@ -304,31 +302,6 @@ def test_option_typeclasses() -> None:
     var_memorysize_list: tuple[int, ...] = my_subsystem.memorysize_list_prop  # noqa: F841
 
     var_args: tuple[str, ...] = my_subsystem.args_prop  # noqa: F841
-
-
-@pytest.mark.parametrize(
-    "prop_type, opt_val",
-    [
-        (DirOption, ""),
-        (FileOption, ""),
-        (MemorySizeOption, "2GiB"),
-        (DirListOption, [""]),
-        (FileListOption, [""]),
-        (MemorySizeListOption, ["2GiB"]),
-    ],
-)
-def test_conversion(prop_type, opt_val) -> None:
-    class MySubsystem(Subsystem):
-        def __init__(self):
-            self.options = SimpleNamespace()
-            self.options.opt = opt_val
-
-        prop = prop_type("--opt", help="")
-
-    my_subsystem = MySubsystem()
-    # We don't need to test the actual function, just that it transformed the value into something
-    # else.
-    assert my_subsystem.prop != opt_val
 
 
 def test_builder_methods():

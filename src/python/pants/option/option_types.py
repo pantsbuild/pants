@@ -95,7 +95,7 @@ class _OptionBase(Generic[_PropType]):
 
     # Subclasses can override if necessary
     def _convert_(self, val: Any) -> _PropType:
-        return cast("_PropType", self._kwargs["type"](val))
+        return cast("_PropType", val)
 
     def advanced(self) -> _OptionBase[_PropType]:
         self._kwargs["advanced"] = True
@@ -167,7 +167,7 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
         return instance
 
     def _convert_(self, value: list[Any]) -> tuple[_ListMemberType]:
-        return cast("tuple[_ListMemberType]", tuple(map(self._kwargs["member_type"], value)))
+        return cast("tuple[_ListMemberType]", tuple(value))
 
 
 # -----------------------------------------------------------------------------------------------

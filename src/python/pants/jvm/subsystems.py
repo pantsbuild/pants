@@ -11,8 +11,23 @@ from pants.option.subsystem import Subsystem
 
 class JvmSubsystem(Subsystem):
     options_scope = "jvm"
-    help = "Options for general JVM functionality."
+    help = (
+        "Options for general JVM functionality.\n\n"
+        " JDK strings will be passed directly to Coursier's `--jvm` parameter."
+        " Run `cs java --available` to see a list of available JVM versions on your platform.\n\n"
+        " If the string 'system' is passed, Coursier's `--system-jvm` option will be used"
+        " instead, but note that this can lead to inconsistent behavior since the JVM version"
+        " will be whatever happens to be found first on the system's PATH."
+    )
 
+    tool_jdk = StrOption(
+        "--tool-jdk",
+        default="adopt:1.11",
+        help=(
+            "The JDK to use when building and running Pants' internal JVM support code and other "
+            "non-compiler tools. See `jvm` help for supported values."
+        ),
+    ).advanced()
     jdk = StrOption(
         "--jdk",
         default="adopt:1.11",

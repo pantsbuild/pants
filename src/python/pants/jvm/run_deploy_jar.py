@@ -13,7 +13,7 @@ from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkEnvironment, JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -21,7 +21,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class __RuntimeJvm:
     """Allows Coursier to download a JDK into a Digest, rather than an append-only cache for use
     with `pants run`.
@@ -36,11 +36,9 @@ class __RuntimeJvm:
 @rule(level=LogLevel.DEBUG)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
 ) -> RunRequest:
-    jdk = jdk_setup.jdk
 
-    runtime_jvm = await Get(__RuntimeJvm, JdkEnvironment, jdk)
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
 
     main_class = field_set.main_class.value
     assert main_class is not None
@@ -53,7 +51,7 @@ async def create_deploy_jar_run_request(
     proc = await Get(
         Process,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             classpath_entries=[f"{{chroot}}/{jar_path}"],
             argv=(main_class,),
             input_digest=package.digest,
@@ -67,6 +65,7 @@ async def create_deploy_jar_run_request(
         for prefix, digest in proc.immutable_input_digests.items()
     )
 
+    runtime_jvm = await Get(__RuntimeJvm, JdkEnvironment, jdk)
     support_digests += (runtime_jvm.digest,)
 
     # TODO(#14386) This argument re-writing code should be done in a more standardised way.
@@ -121,18 +120,16 @@ async def ensure_jdk_for_pants_run(jdk: JdkEnvironment) -> __RuntimeJvm:
         ),
     )
 
-    # Do not treat the coursier JDK digest an append-only cache, so that we can capture the
+    # Do not treat the coursier JDK locations as an append-only cache, so that we can capture the
     # downloaded JDK in a `Digest`
-    new_append_only_caches = {
-        "coursier_archive": ".cache/arc",
-        "coursier_jvm": ".cache/jvm",
-    }
 
     ensure_jvm_process = dataclasses.replace(
         ensure_jvm_process,
-        append_only_caches=FrozenDict(new_append_only_caches),
-        output_directories=(".cache/jdk",),
+        append_only_caches=FrozenDict(),
+        output_directories=(".cache/jdk", ".cache/arc"),
+        use_nailgun=(),
     )
+
     ensure_jvm = await Get(ProcessResult, Process, ensure_jvm_process)
 
     return __RuntimeJvm(ensure_jvm.output_digest)

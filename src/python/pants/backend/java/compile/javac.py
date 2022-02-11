@@ -28,7 +28,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
 @rule(desc="Compile with javac")
 async def compile_java_source(
     bash: BashBinary,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
     union_membership: UnionMembership,
@@ -72,7 +71,8 @@ async def compile_java_source(
             exit_code=1,
         )
 
-    jdk = jdk_setup.jdk
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
+
     # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
     deps_to_classpath_entries = dict(
         zip(request.component.dependencies, direct_dependency_classpath_entries or ())
@@ -157,7 +157,7 @@ async def compile_java_source(
     compile_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",

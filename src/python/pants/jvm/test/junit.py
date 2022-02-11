@@ -20,11 +20,11 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JunitTestSourceField
+from pants.jvm.target_types import JunitTestSourceField, JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -32,9 +32,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class JunitTestFieldSet(TestFieldSet):
-    required_fields = (JunitTestSourceField,)
+    required_fields = (
+        JunitTestSourceField,
+        JvmJdkField,
+    )
 
     sources: JunitTestSourceField
+    jdk_version: JvmJdkField
 
 
 class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -57,10 +61,13 @@ class TestSetup:
 async def setup_junit_for_target(
     request: TestSetupRequest,
     jvm: JvmSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     junit: JUnit,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
+
+    jdk = await Get(
+        JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)
+    )
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
     classpath, junit_classpath = await MultiGet(
@@ -91,7 +98,7 @@ async def setup_junit_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     process = JvmProcess(
-        jdk=jdk_setup.jdk,
+        jdk=jdk,
         classpath_entries=[
             *classpath.args(),
             *junit_classpath.classpath_entries(toolcp_relpath),
