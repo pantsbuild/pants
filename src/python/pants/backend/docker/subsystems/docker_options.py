@@ -10,8 +10,7 @@ from typing import cast
 
 from pants.backend.docker.registries import DockerRegistries
 from pants.engine.environment import Environment
-from pants.option.custom_types import shell_str
-from pants.option.errors import ParseError
+from pants.option.custom_types import shell_str, workspace_path
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method
@@ -23,20 +22,6 @@ doc_links = {
         "https://docs.docker.com/engine/reference/commandline/cli/#environment-variables"
     ),
 }
-
-
-def workspace_path(s: str) -> str:
-    """Same type as 'str', but indicates string represents a directory path that is relative to
-    either the build root, or a BUILD file if prefix with `./`.
-
-    :API: public
-    """
-    if s.startswith("/"):
-        raise ParseError(
-            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
-            "`./relative/path` to make it relative to the BUILD files rather than the build root."
-        )
-    return s
 
 
 class DockerOptions(Subsystem):

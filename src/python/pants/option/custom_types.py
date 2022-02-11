@@ -100,6 +100,7 @@ def shell_str(s: str) -> str:
     """
     return s
 
+
 def workspace_path(s: str) -> str:
     """Same type as 'str', but indicates string represents a directory path that is relative to
     either the build root, or a BUILD file if prefix with `./`.
@@ -112,6 +113,7 @@ def workspace_path(s: str) -> str:
             "`./relative/path` to make it relative to the BUILD files rather than the build root."
         )
     return s
+
 
 def memory_size(s: str | int | float) -> int:
     """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.

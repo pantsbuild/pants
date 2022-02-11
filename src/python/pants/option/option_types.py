@@ -302,9 +302,8 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
         # Implicit
         DictOption(...)  # property type is `dict[str, Any]`
         DictOption(..., default={"key": "val"})  # property type is `dict[str, str]`
-        DictOption(..., default=dict(key="val"))  # property type is `dict[str, str]`
-        DictOption(..., default=dict(key=1))  # property type is `dict[str, int]`
-        DictOption(..., default=dict(key1=1, key2="str"))  # property type is `dict[str, Any]`
+        DictOption(..., default={"key": 1})  # property type is `dict[str, int]`
+        DictOption(..., default={"key1": 1, "key2": "str"})  # property type is `dict[str, Any]`
 
     NOTE: The property returns a mutable object. Care should be used to not mutate the object.
     NOTE: Dictionary values are simply returned as parsed, and are not guaranteed to be of the
@@ -313,11 +312,9 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
 
     option_type: Any = dict
 
-    def __new__(
-        cls, *flag_names, default: dict[str, _ValueT] | None = None, help
-    ) -> DictOption[str, _ValueT]:
+    def __new__(cls, *flag_names, default: dict[str, _ValueT] | None = None, help):
         return super().__new__(
-            cls,
+            cls,  # type: ignore[arg-type]
             *flag_names,
             default=default or {},
             help=help,
@@ -350,10 +347,12 @@ class ShellStrOption(StrOption):
 
     option_type: Any = custom_types.shell_str
 
+
 class WorkspacePathOption(StrOption):
     """A workspace path option."""
 
     option_type: Any = custom_types.workspace_path
+
 
 class MemorySizeOption(IntOption):
     """A memory size option."""
