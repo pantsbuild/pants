@@ -77,33 +77,33 @@ class Parametrize:
                 for field_name, v in fields.items()
                 if isinstance(v, Parametrize)
             ]
-            if not parametrized:
-                yield (address, fields)
-                return
-
-            non_parametrized = [
-                (field_name, field_value)
-                for field_name, field_value in fields.items()
-                if not isinstance(field_value, Parametrize)
-            ]
-
-            for parametrized_args in itertools.product(*parametrized):
-                expanded_address = address.parametrize(
-                    {field_name: alias for field_name, alias, _ in parametrized_args}
-                )
-                expanded_fields: dict[str, Any] = dict(
-                    (
-                        *non_parametrized,
-                        *(
-                            (field_name, field_value)
-                            for field_name, _, field_value in parametrized_args
-                        ),
-                    )
-                )
-                yield (expanded_address, expanded_fields)
-
         except Exception as e:
             raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
+
+        if not parametrized:
+            yield (address, fields)
+            return
+
+        non_parametrized = [
+            (field_name, field_value)
+            for field_name, field_value in fields.items()
+            if not isinstance(field_value, Parametrize)
+        ]
+
+        for parametrized_args in itertools.product(*parametrized):
+            expanded_address = address.parametrize(
+                {field_name: alias for field_name, alias, _ in parametrized_args}
+            )
+            expanded_fields: dict[str, Any] = dict(
+                (
+                    *non_parametrized,
+                    *(
+                        (field_name, field_value)
+                        for field_name, _, field_value in parametrized_args
+                    ),
+                )
+            )
+            yield (expanded_address, expanded_fields)
 
     def __repr__(self) -> str:
         strs = [str(s) for s in self.args]

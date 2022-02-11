@@ -1098,6 +1098,27 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
     )
 
 
+def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generated(resolve=parametrize('a', 'b'), source='f1.ext')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
+                Address("demo", target_name="demo", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
+                Address("demo", target_name="demo", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test FieldSets. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
