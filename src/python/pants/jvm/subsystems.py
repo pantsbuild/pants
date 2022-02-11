@@ -29,7 +29,7 @@ class JvmSubsystem(Subsystem):
             default="adopt:1.11",
             advanced=True,
             help=(
-                "The JDK to use when building Pants' internal JVM support code and other "
+                "The JDK to use when building and running Pants' internal JVM support code and other "
                 "non-compiler tools. See `jvm` help for supported values."
             ),
         )
