@@ -13,8 +13,9 @@ from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.target_types import JvmJdkField
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -38,7 +39,7 @@ async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
 ) -> RunRequest:
 
-    jdk = await Get(JdkEnvironment, JdkRequest(field_set.jdk_version))
+    jdk = await Get(JdkEnvironment, JvmJdkField, field_set.jdk_version)
 
     main_class = field_set.main_class.value
     assert main_class is not None

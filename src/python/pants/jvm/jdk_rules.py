@@ -135,7 +135,7 @@ async def prepare_jdk_environment(
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
-    version = _resolve_jdk_request_to_version(request, jvm)
+    version = request.version
 
     # TODO: add support for system JDKs with specific version
     if version is None:
@@ -333,7 +333,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
 
 
 @rule
-async def jdk_request_for_target(target: CoarsenedTarget) -> JdkRequest:
+async def jdk_request_for_target(target: CoarsenedTarget, defaults: JvmSubsystem) -> JdkRequest:
 
     # TODO: verify that we're requesting the same JDK version for all `ct` members?
     t = target.representative
@@ -343,27 +343,21 @@ async def jdk_request_for_target(target: CoarsenedTarget) -> JdkRequest:
 
     field = t[JvmJdkField]
 
-    return JdkRequest(field)
+    return JdkRequest(_jdk_request_for_field(field, defaults))
 
 
-def _resolve_jdk_request_to_version(request: JdkRequest, defaults: JvmSubsystem) -> str | None:
-    """Resolves the version value from `JdkRequest` into a usable JDK spec.
+@rule
+async def jdk_request_for_field(field: JvmJdkField, defaults: JvmSubsystem) -> JdkRequest:
+    return JdkRequest(_jdk_request_for_field(field, defaults))
 
-    If the return value is a string, it's a valid Coursier JDK spec. If `None`, Coursier will use
-    `--system-jdk`.
-    """
 
-    if request.version is None:
-        return None
+def _jdk_request_for_field(field: JvmJdkField, defaults: JvmSubsystem) -> str:
+    version = field.value
 
-    if isinstance(request.version, str):
-        return request.version
+    if version is None:
+        return defaults.jdk
 
-    version = request.version.value
-    if version is not None:
-        return version
-
-    return defaults.jdk
+    return version
 
 
 def rules():
