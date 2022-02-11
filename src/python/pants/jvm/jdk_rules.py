@@ -137,8 +137,6 @@ async def prepare_jdk_environment(
 
     version = _resolve_jdk_request_to_version(request, jvm)
 
-    logger.warning("%s", f"{version=}")
-
     # TODO: add support for system JDKs with specific version
     if version is None:
         coursier_jdk_option = "--system-jvm"
