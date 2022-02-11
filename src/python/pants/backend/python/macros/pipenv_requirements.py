@@ -96,7 +96,7 @@ async def generate_from_pipenv_requirement(
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    overrides = generator[RequirementsOverrideField].flatten_and_normalize()
+    overrides = {canonicalize_project_name(k): v for k, v in request.overrides.items()}
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()

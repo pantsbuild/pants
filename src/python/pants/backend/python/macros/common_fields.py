@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Iterable, Tuple
-
-from packaging.utils import canonicalize_name as canonicalize_project_name
+from typing import ClassVar, Dict, Iterable, Tuple
 
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -77,6 +75,3 @@ class RequirementsOverrideField(OverridesField):
         "You can specify the same requirement in multiple keys, so long as you don't "
         "override the same field more than one time for the requirement."
     )
-
-    def flatten_and_normalize(self) -> dict[str, dict[str, Any]]:
-        return {canonicalize_project_name(req): v for req, v in super().flatten().items()}

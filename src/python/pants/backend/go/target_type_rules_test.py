@@ -8,10 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import (
-    GenerateTargetsFromGoModRequest,
-    InjectGoBinaryMainDependencyRequest,
-)
+from pants.backend.go.target_type_rules import InjectGoBinaryMainDependencyRequest
 from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
@@ -36,11 +33,11 @@ from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Addresses
+from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    GeneratedTargets,
     InjectedDependencies,
     InvalidFieldException,
     InvalidTargetException,
@@ -64,6 +61,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
+            QueryRule(_TargetParametrizations, [Address]),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
             QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
@@ -196,8 +194,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             "src/go/another_dir/subdir/f.go": "",
         }
     )
-    generator = rule_runner.get_target(Address("src/go"))
-    generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromGoModRequest(generator)])
+    generated = rule_runner.request(_TargetParametrizations, [Address("src/go")]).parametrizations
 
     def gen_third_party_tgt(import_path: str) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
@@ -205,28 +202,22 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             Address("src/go", generated_name=import_path),
         )
 
-    expected = GeneratedTargets(
-        generator,
-        {
-            gen_third_party_tgt(pkg)
-            for pkg in (
-                "github.com/google/uuid",
-                "github.com/google/go-cmp/cmp",
-                "github.com/google/go-cmp/cmp/cmpopts",
-                "github.com/google/go-cmp/cmp/internal/diff",
-                "github.com/google/go-cmp/cmp/internal/flags",
-                "github.com/google/go-cmp/cmp/internal/function",
-                "github.com/google/go-cmp/cmp/internal/testprotos",
-                "github.com/google/go-cmp/cmp/internal/teststructs",
-                "github.com/google/go-cmp/cmp/internal/value",
-                "golang.org/x/xerrors",
-                "golang.org/x/xerrors/internal",
-            )
-        },
-    )
-    assert list(generated.keys()) == list(expected.keys())
-    for addr, tgt in generated.items():
-        assert tgt == expected[addr]
+    assert set(generated.values()) == {
+        gen_third_party_tgt(pkg)
+        for pkg in (
+            "github.com/google/uuid",
+            "github.com/google/go-cmp/cmp",
+            "github.com/google/go-cmp/cmp/cmpopts",
+            "github.com/google/go-cmp/cmp/internal/diff",
+            "github.com/google/go-cmp/cmp/internal/flags",
+            "github.com/google/go-cmp/cmp/internal/function",
+            "github.com/google/go-cmp/cmp/internal/testprotos",
+            "github.com/google/go-cmp/cmp/internal/teststructs",
+            "github.com/google/go-cmp/cmp/internal/value",
+            "golang.org/x/xerrors",
+            "golang.org/x/xerrors/internal",
+        )
+    }
 
 
 def test_third_party_package_targets_cannot_be_manually_created() -> None:

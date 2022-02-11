@@ -165,9 +165,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    rule_runner.set_options(
-        ["--jvm-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV
-    )
+    rule_runner.set_options(["--jvm-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}

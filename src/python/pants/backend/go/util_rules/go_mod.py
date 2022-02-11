@@ -74,18 +74,24 @@ class GoModInfo:
 
 @dataclass(frozen=True)
 class GoModInfoRequest(EngineAwareParameter):
-    address: Address
+    source: Address | GoModSourcesField
 
     def debug_hint(self) -> str:
-        return self.address.spec
+        if isinstance(self.source, Address):
+            return self.source.spec
+        else:
+            return self.source.address.spec
 
 
 @rule
 async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
-    sources_field = wrapped_target.target[GoModSourcesField]
+    if isinstance(request.source, Address):
+        wrapped_target = await Get(WrappedTarget, Address, request.source)
+        sources_field = wrapped_target.target[GoModSourcesField]
+    else:
+        sources_field = request.source
     go_mod_path = sources_field.go_mod_path
     go_mod_dir = os.path.dirname(go_mod_path)
 

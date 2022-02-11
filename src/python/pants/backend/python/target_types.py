@@ -53,6 +53,8 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettingsRequest,
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
@@ -125,6 +127,15 @@ class PythonResolveField(StringField, AsyncFieldMixin):
                 description_of_origin=f"the field `{self.alias}` in the target {self.address}",
             )
         return resolve
+
+
+# -----------------------------------------------------------------------------------------------
+# Target generation support
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonFilesGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
 
 
 # -----------------------------------------------------------------------------------------------
@@ -647,11 +658,9 @@ class SkipPythonTestsField(BoolField):
     help = "If true, don't run this target's tests."
 
 
-_PYTHON_TEST_COMMON_FIELDS = (
+_PYTHON_TEST_MOVED_FIELDS = (
     *COMMON_TARGET_FIELDS,
-    InterpreterConstraintsField,
     PythonResolveField,
-    PythonTestsDependenciesField,
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
@@ -661,7 +670,12 @@ _PYTHON_TEST_COMMON_FIELDS = (
 
 class PythonTestTarget(Target):
     alias = "python_test"
-    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestSourceField)
+    core_fields = (
+        *_PYTHON_TEST_MOVED_FIELDS,
+        PythonTestsDependenciesField,
+        PythonTestSourceField,
+        InterpreterConstraintsField,
+    )
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
@@ -704,13 +718,21 @@ class PythonTestsOverrideField(OverridesField):
     )
 
 
-class PythonTestsGeneratorTarget(Target):
+class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
     core_fields = (
-        *_PYTHON_TEST_COMMON_FIELDS,
+        PythonTestsDependenciesField,
         PythonTestsGeneratingSourcesField,
+        InterpreterConstraintsField,
         PythonTestsOverrideField,
     )
+    generated_target_cls = PythonTestTarget
+    copied_fields = (
+        PythonTestsDependenciesField,
+        InterpreterConstraintsField,
+    )
+    moved_fields = _PYTHON_TEST_MOVED_FIELDS
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
 
 
@@ -756,17 +778,23 @@ class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
     )
 
 
-class PythonTestUtilsGeneratorTarget(Target):
+class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     alias = "python_test_utils"
     # Keep in sync with `PythonSourcesGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         Dependencies,
-        PythonResolveField,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
+    generated_target_cls = PythonSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
+    moved_fields = (PythonResolveField,)
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
         "This target generator is intended for test utility files like `conftest.py`, although it "
@@ -776,17 +804,24 @@ class PythonTestUtilsGeneratorTarget(Target):
     )
 
 
-class PythonSourcesGeneratorTarget(Target):
+class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "python_sources"
     # Keep in sync with `PythonTestUtilsGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         Dependencies,
-        PythonResolveField,
         PythonSourcesGeneratingSourcesField,
+        InterpreterConstraintsField,
         PythonSourcesOverridesField,
     )
+    generated_target_cls = PythonSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
+    moved_fields = (PythonResolveField,)
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
         "You can either use this target generator or `python_test_utils` for test utility files "
