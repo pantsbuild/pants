@@ -421,6 +421,10 @@ async def generate_from_python_requirement(
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
     pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
 
     file_tgt = PythonRequirementsFileTarget(
         {PythonRequirementsFileSourcesField.alias: pyproject_rel_path},
@@ -453,7 +457,6 @@ async def generate_from_python_requirement(
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    overrides = generator[RequirementsOverrideField].flatten_and_normalize()
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()

@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os.path
 from dataclasses import dataclass
@@ -38,7 +40,9 @@ from pants.engine.internals.graph import (
     OwnersRequest,
     TooManyTargetsException,
     TransitiveExcludesNotSupportedError,
+    _TargetParametrizations,
 )
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
@@ -52,9 +56,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     FieldSet,
     GeneratedSources,
-    GeneratedTargets,
     GenerateSourcesRequest,
-    GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -63,6 +65,7 @@ from pants.engine.target import (
     InjectedDependencies,
     MultipleSourcesField,
     NoApplicableTargetsBehavior,
+    OverridesField,
     SecondaryOwnerMixin,
     SingleSourceField,
     SourcesPaths,
@@ -71,12 +74,12 @@ from pants.engine.target import (
     StringField,
     Tags,
     Target,
+    TargetFilesGenerator,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
@@ -105,38 +108,27 @@ class MockTarget(Target):
     deprecated_alias_removal_version = "9.9.9.dev0"
 
 
+class ResolveField(StringField):
+    alias = "resolve"
+
+
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, SingleSourceField)
+    core_fields = (MockDependencies, Tags, SingleSourceField, ResolveField)
 
 
-class MockTargetGenerator(Target):
+class MockTargetGenerator(TargetFilesGenerator):
     alias = "generator"
-    core_fields = (Dependencies, MultipleSourcesField)
-
-
-class MockGenerateTargetsRequest(GenerateTargetsRequest):
-    generate_from = MockTargetGenerator
-
-
-@rule
-async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField]))
-    return generate_file_level_targets(
-        MockGeneratedTarget,
-        request.generator,
-        paths.files,
-        None,
-        add_dependencies_on_all_siblings=False,
-    )
+    core_fields = (Dependencies, MultipleSourcesField, OverridesField)
+    generated_target_cls = MockGeneratedTarget
+    copied_fields = (Dependencies,)
+    moved_fields = (Tags, ResolveField)
 
 
 @pytest.fixture
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            generate_mock_generated_target,
-            UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
             QueryRule(AllTargets, [AllTargetsRequest]),
             QueryRule(AllUnexpandedTargets, [AllTargetsRequest]),
             QueryRule(CoarsenedTargets, [Addresses]),
@@ -582,8 +574,8 @@ def test_resolve_generated_target(transitive_targets_rule_runner: RuleRunner) ->
             Address("", target_name="generator", relative_file_path="no_owner.txt")
         )
 
-    # Using a "file address" on a target that does not generate file-level targets will fall back
-    # to the target generator. This is temporary until we remove file address syntax.
+    # TODO: Using a "file address" on a target that does not generate file-level targets will fall
+    # back to the target generator. See https://github.com/pantsbuild/pants/issues/14419.
     non_generator_file_address = Address(
         "", target_name="non-generator", relative_file_path="f1.txt"
     )
@@ -662,8 +654,6 @@ class MockSecondaryOwnerTarget(Target):
 def owners_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            generate_mock_generated_target,
-            UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
             QueryRule(Owners, [OwnersRequest]),
         ],
         target_types=[
@@ -806,8 +796,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 def specs_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            generate_mock_generated_target,
-            UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
             QueryRule(Addresses, [FilesystemSpecs]),
             QueryRule(Addresses, [Specs]),
         ],
@@ -921,6 +909,214 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
         Address("multiple_files"),
         Address("multiple_files", relative_file_path="f2.txt"),
     }
+
+
+# -----------------------------------------------------------------------------------------------
+# Test file-level target generation and parameterization.
+# -----------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def generated_targets_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            QueryRule(_TargetParametrizations, [Address]),
+        ],
+        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
+    )
+
+
+def assert_generated(
+    rule_runner: RuleRunner,
+    address: Address,
+    build_content: str,
+    files: list[str],
+    expected: set[Target],
+) -> None:
+    rule_runner.write_files(
+        {
+            f"{address.spec_path}/BUILD": build_content,
+            **{os.path.join(address.spec_path, f): "" for f in files},
+        }
+    )
+    parametrizations = rule_runner.request(_TargetParametrizations, [address])
+    assert expected == set(t for t in parametrizations.parametrizations.values())
+
+
+def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=['tag'], sources=['*.ext'])",
+        ["f1.ext", "f2.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f1.ext"),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f2.ext", Tags.alias: ["tag"]},
+                Address("demo", relative_file_path="f2.ext"),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_generate_subdir(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("src/fortran", target_name="demo"),
+        "generator(name='demo', sources=['**/*.f95'])",
+        ["subdir/demo.f95"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "subdir/demo.f95"},
+                Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
+                residence_dir="src/fortran/subdir",
+            )
+        },
+    )
+
+
+def test_generate_overrides(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("example"),
+        "generator(sources=['*.ext'], tags=['override_me'], overrides={'f1.ext': {'tags': ['overridden']}})",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f1.ext",
+                    Tags.alias: ["overridden"],
+                },
+                Address("example", relative_file_path="f1.ext"),
+            ),
+        },
+    )
+
+
+def test_generate_overrides_unused(generated_targets_rule_runner: RuleRunner) -> None:
+    with engine_error(
+        contains="Unused file paths in the `overrides` field for demo:demo: ['fake.ext']"
+    ):
+        assert_generated(
+            generated_targets_rule_runner,
+            Address("demo"),
+            "generator(sources=['*.ext'], overrides={'fake.ext': {'tags': ['irrelevant']}})",
+            ["f1.ext"],
+            set(),
+        )
+
+
+def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
+                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
+                Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=parametrize(t1=['t1'], t2=['t2']), resolve=parametrize('a', 'b'), sources=['f1.ext'])",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "a"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "a"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "a"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "a"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "b"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "b"}
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "b"},
+                Address(
+                    "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "b"}
+                ),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(overrides={'f1.ext': {'resolve': parametrize('a', 'b')}}, resolve='c', sources=['*.ext'])",
+        ["f1.ext", "f2.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
+                Address("demo", relative_file_path="f1.ext", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
+                Address("demo", relative_file_path="f1.ext", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f2.ext", ResolveField.alias: "c"},
+                Address("demo", relative_file_path="f2.ext"),
+                residence_dir="demo",
+            ),
+        },
+    )
+
+
+def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generated(resolve=parametrize('a', 'b'), source='f1.ext')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
+                Address("demo", target_name="demo", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
+                Address("demo", target_name="demo", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+        },
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1331,7 +1527,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-class SmalltalkSources(MultipleSourcesField):
+class SmalltalkSource(SingleSourceField):
     pass
 
 
@@ -1346,7 +1542,7 @@ class AvroLibrary(Target):
 
 class GenerateSmalltalkFromAvroRequest(GenerateSourcesRequest):
     input = AvroSources
-    output = SmalltalkSources
+    output = SmalltalkSource
 
 
 @rule
@@ -1392,8 +1588,7 @@ def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
     addr = setup_codegen_protocol_tgt(codegen_rule_runner)
     protocol_sources = AvroSources(["*.avro"], addr)
     assert (
-        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
-        is True
+        protocol_sources.can_generate(SmalltalkSource, codegen_rule_runner.union_membership) is True
     )
 
     # First, get the original protocol sources.
@@ -1415,12 +1610,12 @@ def test_codegen_generates_sources(codegen_rule_runner: RuleRunner) -> None:
         HydratedSources,
         [
             HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                protocol_sources, for_sources_types=[SmalltalkSource], enable_codegen=True
             )
         ],
     )
     assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
-    assert generated_via_hydrate_sources.sources_type == SmalltalkSources
+    assert generated_via_hydrate_sources.sources_type == SmalltalkSource
 
 
 def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> None:
@@ -1431,14 +1626,13 @@ def test_codegen_works_with_subclass_fields(codegen_rule_runner: RuleRunner) -> 
 
     protocol_sources = CustomAvroSources(["*.avro"], addr)
     assert (
-        protocol_sources.can_generate(SmalltalkSources, codegen_rule_runner.union_membership)
-        is True
+        protocol_sources.can_generate(SmalltalkSource, codegen_rule_runner.union_membership) is True
     )
     generated = codegen_rule_runner.request(
         HydratedSources,
         [
             HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                protocol_sources, for_sources_types=[SmalltalkSource], enable_codegen=True
             )
         ],
     )
@@ -1469,11 +1663,11 @@ def test_ambiguous_codegen_implementations_exception() -> None:
     # This error message is quite complex. We test that it correctly generates the message.
     class SmalltalkGenerator1(GenerateSourcesRequest):
         input = AvroSources
-        output = SmalltalkSources
+        output = SmalltalkSource
 
     class SmalltalkGenerator2(GenerateSourcesRequest):
         input = AvroSources
-        output = SmalltalkSources
+        output = SmalltalkSource
 
     class AdaSources(MultipleSourcesField):
         pass
@@ -1487,9 +1681,9 @@ def test_ambiguous_codegen_implementations_exception() -> None:
 
     # Test when all generators have the same input and output.
     exc = AmbiguousCodegenImplementationsException(
-        [SmalltalkGenerator1, SmalltalkGenerator2], for_sources_types=[SmalltalkSources]
+        [SmalltalkGenerator1, SmalltalkGenerator2], for_sources_types=[SmalltalkSource]
     )
-    assert "can generate SmalltalkSources from AvroSources" in str(exc)
+    assert "can generate SmalltalkSource from AvroSources" in str(exc)
     assert "* SmalltalkGenerator1" in str(exc)
     assert "* SmalltalkGenerator2" in str(exc)
 
@@ -1497,11 +1691,11 @@ def test_ambiguous_codegen_implementations_exception() -> None:
     # the call site used too expansive of a `for_sources_types` argument.
     exc = AmbiguousCodegenImplementationsException(
         [SmalltalkGenerator1, AdaGenerator],
-        for_sources_types=[SmalltalkSources, AdaSources, IrrelevantSources],
+        for_sources_types=[SmalltalkSource, AdaSources, IrrelevantSources],
     )
-    assert "can generate one of ['AdaSources', 'SmalltalkSources'] from AvroSources" in str(exc)
+    assert "can generate one of ['AdaSources', 'SmalltalkSource'] from AvroSources" in str(exc)
     assert "IrrelevantSources" not in str(exc)
-    assert "* SmalltalkGenerator1 -> SmalltalkSources" in str(exc)
+    assert "* SmalltalkGenerator1 -> SmalltalkSource" in str(exc)
     assert "* AdaGenerator -> AdaSources" in str(exc)
 
 
@@ -1561,18 +1755,27 @@ def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> Inject
     return InjectedDependencies([Address("", target_name="custom_injected")])
 
 
-class SmalltalkLibrarySources(SmalltalkSources):
+class SmalltalkLibrarySource(SmalltalkSource):
     pass
 
 
 class SmalltalkLibrary(Target):
-    alias = "smalltalk"
+    alias = "smalltalk_library"
     # Note that we use MockDependencies so that we support transitive excludes (`!!`).
-    core_fields = (MockDependencies, SmalltalkLibrarySources)
+    core_fields = (MockDependencies, SmalltalkLibrarySource)
+
+
+class SmalltalkLibraryGenerator(TargetFilesGenerator):
+    alias = "smalltalk_libraries"
+    # Note that we use MockDependencies so that we support transitive excludes (`!!`).
+    core_fields = (MockDependencies, MultipleSourcesField)
+    generated_target_cls = SmalltalkLibrary
+    copied_fields = (MockDependencies,)
+    moved_fields = ()
 
 
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkSources
+    infer_from = SmalltalkLibrarySource
 
 
 @rule
@@ -1590,25 +1793,6 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     return InferredDependencies(resolved)
 
 
-class GenerateTargetsFromSmallTalkLibraryRequest(GenerateTargetsRequest):
-    generate_from = SmalltalkLibrary
-
-
-@rule
-async def generate_targets_from_smalltalk_library(
-    request: GenerateTargetsFromSmallTalkLibraryRequest,
-) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[SmalltalkSources]))
-    return generate_file_level_targets(
-        SmalltalkLibrary,
-        request.generator,
-        paths.files,
-        None,
-        add_dependencies_on_all_siblings=False,
-        use_source_field=False,
-    )
-
-
 @pytest.fixture
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -1616,15 +1800,13 @@ def dependencies_rule_runner() -> RuleRunner:
             inject_smalltalk_deps,
             inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
-            generate_targets_from_smalltalk_library,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
-            UnionRule(GenerateTargetsRequest, GenerateTargetsFromSmallTalkLibraryRequest),
         ],
-        target_types=[SmalltalkLibrary],
+        target_types=[SmalltalkLibraryGenerator],
     )
 
 
@@ -1648,11 +1830,11 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
         {
             "files/f.txt": "",
             "files/transitive_exclude.txt": "",
-            "files/BUILD": "smalltalk(sources=['*.txt'])",
-            "a/b/c/BUILD": "smalltalk()",
+            "files/BUILD": "smalltalk_libraries(sources=['*.txt'])",
+            "a/b/c/BUILD": "smalltalk_libraries()",
             "demo/subdir/BUILD": dedent(
                 """\
-                smalltalk(
+                smalltalk_libraries(
                     dependencies=[
                         'a/b/c',
                         '!a/b/c',
@@ -1681,11 +1863,11 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     dependencies_rule_runner.write_files(
         {
-            "src/smalltalk/BUILD": "smalltalk(dependencies=['//:dep1', '//:dep2', ':sibling'])",
-            "no_deps/BUILD": "smalltalk()",
+            "src/smalltalk/BUILD": "smalltalk_libraries(dependencies=['//:dep1', '//:dep2', ':sibling'])",
+            "no_deps/BUILD": "smalltalk_libraries()",
             # An ignore should override an include.
             "ignore/BUILD": (
-                "smalltalk(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
+                "smalltalk_libraries(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
             ),
         }
     )
@@ -1709,10 +1891,10 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
             "src/smalltalk/util/f2.st": "",
             "src/smalltalk/util/f3.st": "",
             "src/smalltalk/util/f4.st": "",
-            "src/smalltalk/util/BUILD": "smalltalk(sources=['*.st'])",
+            "src/smalltalk/util/BUILD": "smalltalk_libraries(sources=['*.st'])",
             "src/smalltalk/BUILD": dedent(
                 """\
-                smalltalk(
+                smalltalk_libraries(
                   dependencies=[
                     './util/f1.st',
                     'src/smalltalk/util/f2.st',
@@ -1737,7 +1919,7 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
 
 
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files({"BUILD": "smalltalk(name='target')"})
+    dependencies_rule_runner.write_files({"BUILD": "smalltalk_libraries(name='target')"})
 
     def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
         provided_deps = ["//:provided"]
@@ -1775,12 +1957,12 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
             "inferred_and_provided2.st": "",
             "BUILD": dedent(
                 """\
-                smalltalk(name='inferred1')
-                smalltalk(name='inferred2')
-                smalltalk(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
-                smalltalk(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
-                smalltalk(name='inferred_and_provided1')
-                smalltalk(name='inferred_and_provided2')
+                smalltalk_libraries(name='inferred1')
+                smalltalk_libraries(name='inferred2')
+                smalltalk_libraries(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
+                smalltalk_libraries(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
+                smalltalk_libraries(name='inferred_and_provided1')
+                smalltalk_libraries(name='inferred_and_provided2')
                 """
             ),
             "demo/f1.st": dedent(
@@ -1799,7 +1981,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
             ),
             "demo/BUILD": dedent(
                 """\
-                smalltalk(
+                smalltalk_libraries(
                   sources=['*.st'],
                   dependencies=[
                     '//:inferred_and_provided1',
@@ -1817,15 +1999,8 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
         dependencies_rule_runner,
         Address("demo"),
         expected=[
-            Address("", target_name="inferred1"),
-            Address("", relative_file_path="inferred2.st", target_name="inferred2"),
             Address("", target_name="inferred_and_provided1"),
             Address("", target_name="inferred_and_provided2"),
-            Address(
-                "",
-                relative_file_path="inferred_and_provided2.st",
-                target_name="inferred_and_provided2",
-            ),
             Address("demo", relative_file_path="f1.st"),
             Address("demo", relative_file_path="f2.st"),
         ],
@@ -1863,8 +2038,8 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
         {
             "src/smalltalk/f1.st": "",
             "src/smalltalk/f2.st": "",
-            "src/smalltalk/BUILD": "smalltalk(sources=['*.st'])",
-            "src/smalltalk/util/BUILD": "smalltalk()",
+            "src/smalltalk/BUILD": "smalltalk_libraries(sources=['*.st'])",
+            "src/smalltalk/util/BUILD": "smalltalk_libraries()",
         }
     )
     assert_dependencies_resolved(

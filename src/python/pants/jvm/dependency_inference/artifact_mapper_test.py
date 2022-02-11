@@ -160,14 +160,13 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
                 """\
                 artifact_args = {"group": "joda-time", "artifact": "joda-time", "version": "2.10.10"}
 
-                jvm_artifact(name="artifact_a", **artifact_args, compatible_resolves=["a"])
-                jvm_artifact(name="artifact_b", **artifact_args, compatible_resolves=["b"])
-                jvm_artifact(name="artifact_c", **artifact_args, compatible_resolves=["c"])
+                jvm_artifact(name="artifact_a", **artifact_args, resolve="a")
+                jvm_artifact(name="artifact_b", **artifact_args, resolve="b")
+                jvm_artifact(name="artifact_c", **artifact_args, resolve="c")
 
-                java_source(name='lib_a', source='PrintDate.java', compatible_resolves=['a'])
-                java_source(name='lib_b', source='PrintDate.java', compatible_resolves=['b'])
-                java_source(name='lib_c', source='PrintDate.java', compatible_resolves=['c'])
-                java_source(name='lib_ambiguous', source='PrintDate.java', compatible_resolves=['a', 'b'])
+                java_source(name='lib_a', source='PrintDate.java', resolve='a')
+                java_source(name='lib_b', source='PrintDate.java', resolve='b')
+                java_source(name='lib_c', source='PrintDate.java', resolve='c')
                 """
             ),
             "PrintDate.java": dedent(
@@ -189,7 +188,6 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
     assert_inferred("lib_a", ["artifact_a"])
     assert_inferred("lib_b", ["artifact_b"])
     assert_inferred("lib_c", ["artifact_c"])
-    assert_inferred("lib_ambiguous", [])
 
 
 @maybe_skip_jdk_test

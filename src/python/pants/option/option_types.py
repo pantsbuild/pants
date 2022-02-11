@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 _PropType = TypeVar("_PropType")
 _EnumT = TypeVar("_EnumT", bound=Enum)
-_ValueType = TypeVar("_ValueType")
+_ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
 
@@ -288,6 +288,42 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
         )
 
 
+class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
+    """A dictionary option mapping strings to client-provided `_ValueT`.
+
+    If you provide a `default` parameter, the `_ValueT` type parameter will be inferred from the
+    type of the values in the default. Otherwise, you'll need to provide `_ValueT` if you want a
+    non-`Any` type.
+
+    E.g.
+        # Explicit
+        DictOption[str](...)  # property type is `dict[str, str]`
+        DictOption[Any](..., default=dict(key="val"))  # property type is `dict[str, Any]`
+        # Implicit
+        DictOption(...)  # property type is `dict[str, Any]`
+        DictOption(..., default={"key": "val"})  # property type is `dict[str, str]`
+        DictOption(..., default={"key": 1})  # property type is `dict[str, int]`
+        DictOption(..., default={"key1": 1, "key2": "str"})  # property type is `dict[str, Any]`
+
+    NOTE: The property returns a mutable object. Care should be used to not mutate the object.
+    NOTE: Dictionary values are simply returned as parsed, and are not guaranteed to be of the
+    `_ValueT` specified.
+    """
+
+    option_type: Any = dict
+
+    def __new__(cls, *flag_names, default: dict[str, _ValueT] | None = None, help):
+        return super().__new__(
+            cls,  # type: ignore[arg-type]
+            *flag_names,
+            default=default or {},
+            help=help,
+        )
+
+    def _convert_(self, val: Any) -> dict[str, _ValueT]:
+        return cast("dict[str, _ValueT]", val)
+
+
 class TargetOption(StrOption):
     """A Pants Target option."""
 
@@ -310,6 +346,12 @@ class ShellStrOption(StrOption):
     """A shell string option."""
 
     option_type: Any = custom_types.shell_str
+
+
+class WorkspacePathOption(StrOption):
+    """A workspace path option."""
+
+    option_type: Any = custom_types.workspace_path
 
 
 class MemorySizeOption(IntOption):

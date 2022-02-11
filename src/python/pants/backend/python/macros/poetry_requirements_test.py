@@ -11,7 +11,6 @@ from packaging.version import Version
 
 from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
-    GenerateFromPoetryRequirementsRequest,
     PoetryRequirementsTargetGenerator,
     PyprojectAttr,
     PyProjectToml,
@@ -26,7 +25,8 @@ from pants.backend.python.macros.poetry_requirements import (
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets, Target
+from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 # ---------------------------------------------------------------------------------
@@ -402,7 +402,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *poetry_requirements.rules(),
-            QueryRule(GeneratedTargets, [GenerateFromPoetryRequirementsRequest]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[PoetryRequirementsTargetGenerator],
     )
@@ -417,11 +417,8 @@ def assert_poetry_requirements(
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
-    generator = rule_runner.get_target(Address("", target_name="reqs"))
-    result = rule_runner.request(
-        GeneratedTargets, [GenerateFromPoetryRequirementsRequest(generator)]
-    )
-    assert set(result.values()) == expected_targets
+    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    assert set(result.parametrizations.values()) == expected_targets
 
 
 def test_pyproject_toml(rule_runner: RuleRunner) -> None:

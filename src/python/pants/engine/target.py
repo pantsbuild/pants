@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import dataclasses
 import enum
 import itertools
 import logging
@@ -46,7 +47,7 @@ from pants.engine.fs import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import FilesNotFoundBehavior
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
@@ -808,14 +809,110 @@ class AllTargetsRequest:
 # Target generation
 # -----------------------------------------------------------------------------------------------
 
-_Tgt = TypeVar("_Tgt", bound=Target)
+
+class TargetGenerator(Target):
+    """A Target type which generates other Targets via installed `@rule` logic.
+
+    To act as a generator, a Target type should subclass this base class and install generation
+    `@rule`s which consume a corresponding GenerateTargetsRequest subclass to produce
+    GeneratedTargets.
+    """
+
+    # The generated Target class.
+    generated_target_cls: ClassVar[type[Target]]
+
+    # Fields which have their values copied from the generator Target to the generated Target.
+    #
+    # Must be a subset of `core_fields`.
+    #
+    # Fields should be copied from the generator to the generated when their semantic meaning is
+    # the same for both Target types, and when it is valuable for them to be introspected on
+    # either the generator or generated target (such as by `peek`, or in `filter`).
+    copied_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    # Fields which are specified to instances of the generator Target, but which are propagated
+    # to generated Targets rather than being stored on the generator Target.
+    #
+    # Must be disjoint from `core_fields`.
+    #
+    # Only Fields which are moved to the generated Target are allowed to be `parametrize`d. But
+    # it can also be the case that a Field only makes sense semantically when it is applied to
+    # the generated Target (for example, for an individual file), and the generator Target is just
+    # acting as a convenient place for them to be specified.
+    moved_fields: ClassVar[Tuple[Type[Field], ...]]
+
+
+class TargetFilesGenerator(TargetGenerator):
+    """A TargetGenerator which generates a Target per file matched by the generator.
+
+    Unlike TargetGenerator, no additional `@rules` are required to be installed, because generation
+    is implemented declaratively. But an optional `settings_request_cls` can be declared to
+    dynamically control some settings of generation.
+    """
+
+    settings_request_cls: ClassVar[type[TargetFilesGeneratorSettingsRequest] | None] = None
+
+
+@union
+class TargetFilesGeneratorSettingsRequest:
+    """An optional union to provide dynamic settings for a `TargetFilesGenerator`.
+
+    See `TargetFilesGenerator`.
+    """
+
+
+@dataclass
+class TargetFilesGeneratorSettings:
+    # Set `add_dependencies_on_all_siblings` to True so that each file-level target depends on all
+    # other generated targets from the target generator. This is useful if both are true:
+    #
+    # a) file-level targets usually need their siblings to be present to work. Most target types
+    #   (Python, Java, Shell, etc) meet this, except for `files` and `resources` which have no
+    #   concept of "imports"
+    # b) dependency inference cannot infer dependencies on sibling files.
+    #
+    # Otherwise, set `add_dependencies_on_all_siblings` to `False` so that dependencies are
+    # finer-grained.
+    add_dependencies_on_all_siblings: bool = False
+
+
+_TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
 @union
 @dataclass(frozen=True)
-class GenerateTargetsRequest(Generic[_Tgt]):
-    generate_from: ClassVar[type[_Tgt]]
-    generator: _Tgt
+class GenerateTargetsRequest(Generic[_TargetGenerator]):
+    generate_from: ClassVar[type[_TargetGenerator]]
+
+    # The TargetGenerator instance to generate targets for.
+    generator: _TargetGenerator
+    # The base Address to generate for. Note that due to parametrization, this may not
+    # always be the Address of the underlying target.
+    template_address: Address
+    # The `TargetGenerator.moved_field/copied_field` Field values that the generator
+    # should generate targets with.
+    template: dict[str, Any] = dataclasses.field(hash=False)
+    # Per-generated-Target overrides, with an additional `template_address` to be applied. The
+    # per-instance Address might not match the base `template_address` if parametrization was
+    # applied within overrides.
+    overrides: dict[str, dict[Address, dict[str, Any]]] = dataclasses.field(hash=False)
+
+    def require_unparametrized_overrides(self) -> dict[str, dict[str, Any]]:
+        """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
+
+        If `parametrize` has been used in overrides, this will raise an error indicating that that is
+        not yet supported for the generator target type.
+
+        TODO: https://github.com/pantsbuild/pants/issues/14430 covers porting implementations and
+        removing this method.
+        """
+        if any(len(templates) != 1 for templates in self.overrides.values()):
+            raise ValueError(
+                f"Target generators of type `{self.generate_from.alias}` (defined at "
+                f"`{self.generator.address}`) do not (yet) support use of the `parametrize(..)` "
+                f"builtin in their `{OverridesField.alias}=` field."
+            )
+        return {name: next(iter(templates.values())) for name, templates in self.overrides.items()}
 
 
 class GeneratedTargets(FrozenDict[Address, Target]):
@@ -855,20 +952,27 @@ class GeneratedTargets(FrozenDict[Address, Target]):
 class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
-        return type(tgt) in self
+        return bool(self.request_for(type(tgt)))
+
+    def request_for(self, tgt_cls: type[Target]) -> type[GenerateTargetsRequest] | None:
+        """Return the request type for the given Target, or None."""
+        if issubclass(tgt_cls, TargetFilesGenerator):
+            return self.get(TargetFilesGenerator)
+        return self.get(tgt_cls)
 
 
-def generate_file_level_targets(
+def _generate_file_level_targets(
     generated_target_cls: type[Target],
     generator: Target,
     paths: Sequence[str],
+    template_address: Address,
+    template: dict[str, Any],
+    overrides: dict[str, dict[Address, dict[str, Any]]],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
     add_dependencies_on_all_siblings: bool,
     use_generated_address_syntax: bool = False,
-    use_source_field: bool = True,
-    overrides: dict[str, dict[str, Any]] | None = None,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -887,63 +991,60 @@ def generate_file_level_targets(
     `overrides` allows changing the fields for particular targets. It expects the full file path
      as the key.
     """
-    if not generator.has_field(Dependencies) or not generator.has_field(SourcesField):
-        raise AssertionError(
-            f"The `{generator.alias}` target {generator.address.spec} does "
-            "not have both a `dependencies` and `sources` field, and thus cannot generate a "
-            f"`{generated_target_cls.alias}` target."
-        )
 
-    all_generated_addresses = []
-    for fp in paths:
-        relativized_fp = fast_relpath(fp, generator.address.spec_path)
-        all_generated_addresses.append(
-            generator.address.create_generated(relativized_fp)
+    def generate_address(base_address: Address, relativized_fp: str) -> Address:
+        return (
+            base_address.create_generated(relativized_fp)
             if use_generated_address_syntax
-            else Address(
-                generator.address.spec_path,
-                target_name=generator.address.target_name,
-                relative_file_path=relativized_fp,
-            )
+            else base_address.create_file(relativized_fp)
         )
 
+    normalized_overrides = dict(overrides or {})
+
+    all_generated_items: list[tuple[Address, str, dict[str, Any]]] = []
+    for fp in paths:
+        relativized_fp = fast_relpath(fp, template_address.spec_path)
+
+        generated_overrides = normalized_overrides.pop(fp, None)
+        if generated_overrides is None:
+            # No overrides apply.
+            all_generated_items.append(
+                (generate_address(template_address, relativized_fp), fp, dict(template))
+            )
+        else:
+            # At least one override applies. Generate a target per set of fields.
+            all_generated_items.extend(
+                (
+                    generate_address(overridden_address, relativized_fp),
+                    fp,
+                    {**template, **override_fields},
+                )
+                for overridden_address, override_fields in generated_overrides.items()
+            )
+
+    # TODO: Parametrization in overrides will result in some unusual internal dependencies when
+    # `add_dependencies_on_all_siblings`. Similar to inference, `add_dependencies_on_all_siblings`
+    # should probably be field value aware.
     all_generated_address_specs = (
-        FrozenOrderedSet(addr.spec for addr in all_generated_addresses)
+        FrozenOrderedSet(addr.spec for addr, _, _ in all_generated_items)
         if add_dependencies_on_all_siblings
         else FrozenOrderedSet()
     )
 
-    used_overrides = set()
-    normalized_overrides = overrides or {}
-
-    def gen_tgt(full_fp: str, address: Address) -> Target:
-        generated_target_fields: dict[str, ImmutableValue] = {}
-        for field in generator.field_values.values():
-            value: ImmutableValue
-            if isinstance(field, MultipleSourcesField):
-                if not bool(matches_filespec(field.filespec, paths=[full_fp])):
-                    raise AssertionError(
-                        f"Target {generator.address.spec}'s `sources` field does not match a file "
-                        f"{full_fp}."
-                    )
-                value = address._relative_file_path or address.generated_name
-                if use_source_field:
-                    generated_target_fields[SingleSourceField.alias] = value
-                else:
-                    generated_target_fields[MultipleSourcesField.alias] = (value,)
-            elif add_dependencies_on_all_siblings and isinstance(field, Dependencies):
-                generated_target_fields[Dependencies.alias] = (field.value or ()) + tuple(
-                    all_generated_address_specs - {address.spec}
+    def gen_tgt(address: Address, full_fp: str, generated_target_fields: dict[str, Any]) -> Target:
+        if add_dependencies_on_all_siblings:
+            if not generator.has_field(Dependencies):
+                raise AssertionError(
+                    f"The `{generator.alias}` target {template_address.spec} does "
+                    "not have a `dependencies` field, and thus cannot "
+                    "`add_dependencies_on_all_siblings`."
                 )
-            elif isinstance(field, OverridesField):
-                continue
-            elif field.value != field.default:
-                generated_target_fields[field.alias] = field.value
+            original_deps = generated_target_fields.get(Dependencies.alias, ())
+            generated_target_fields[Dependencies.alias] = tuple(original_deps) + tuple(
+                all_generated_address_specs - {address.spec}
+            )
 
-        if full_fp in normalized_overrides:
-            used_overrides.add(full_fp)
-            generated_target_fields.update(normalized_overrides[full_fp])
-
+        generated_target_fields[SingleSourceField.alias] = fast_relpath(full_fp, address.spec_path)
         return generated_target_cls(
             generated_target_fields,
             address,
@@ -951,23 +1052,23 @@ def generate_file_level_targets(
             residence_dir=os.path.dirname(full_fp),
         )
 
-    result = tuple(gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
+    result = tuple(
+        gen_tgt(address, full_fp, fields) for address, full_fp, fields in all_generated_items
+    )
 
-    unused_overrides = set(normalized_overrides.keys()) - used_overrides
-    if unused_overrides:
+    if normalized_overrides:
         unused_relative_paths = sorted(
-            fast_relpath(fp, generator.address.spec_path) for fp in unused_overrides
+            fast_relpath(fp, template_address.spec_path) for fp in normalized_overrides
         )
         all_valid_relative_paths = sorted(
             cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
             for tgt in result
         )
         raise InvalidFieldException(
-            f"Unused file paths in the `overrides` field for {generator.address}: "
+            f"Unused file paths in the `overrides` field for {template_address}: "
             f"{sorted(unused_relative_paths)}"
             f"\n\nDid you mean one of these valid paths?\n\n"
-            f"{all_valid_relative_paths}\n\n"
-            f"Tip: if you want to override a value for all generated targets, set the ..."
+            f"{all_valid_relative_paths}"
         )
 
     return GeneratedTargets(generator, result)
@@ -2361,30 +2462,32 @@ class OverridesField(AsyncFieldMixin, Field):
         # The value might have unhashable elements like `list`, so we stringify it.
         return hash((self.__class__, repr(self.value)))
 
-    def _relativize_globs(self, globs: tuple[str, ...]) -> tuple[str, ...]:
-        return tuple(
-            f"!{os.path.join(self.address.spec_path, glob[1:])}"
-            if glob.startswith("!")
-            else os.path.join(self.address.spec_path, glob)
-            for glob in globs
-        )
-
+    @classmethod
     def to_path_globs(
-        self, files_not_found_behavior: FilesNotFoundBehavior
+        cls,
+        address: Address,
+        overrides_keys: Iterable[str],
+        files_not_found_behavior: FilesNotFoundBehavior,
     ) -> tuple[PathGlobs, ...]:
         """Create a `PathGlobs` for each key.
 
         This should only be used if the keys are file globs.
         """
-        if not self.value:
-            return ()
+
+        def relativize_glob(glob: str) -> str:
+            return (
+                f"!{os.path.join(address.spec_path, glob[1:])}"
+                if glob.startswith("!")
+                else os.path.join(address.spec_path, glob)
+            )
+
         return tuple(
             PathGlobs(
-                self._relativize_globs(globs),
+                [relativize_glob(glob)],
                 glob_match_error_behavior=files_not_found_behavior.to_glob_match_error_behavior(),
-                description_of_origin=f"the `overrides` field for {self.address}",
+                description_of_origin=f"the `overrides` field for {address}",
             )
-            for globs in self.value
+            for glob in overrides_keys
         )
 
     def flatten(self) -> dict[str, dict[str, Any]]:
@@ -2409,13 +2512,18 @@ class OverridesField(AsyncFieldMixin, Field):
                     )
         return result
 
+    @classmethod
     def flatten_paths(
-        self, paths_to_overrides: Mapping[Paths, dict[str, Any]]
+        cls,
+        address: Address,
+        paths_and_overrides: Iterable[tuple[Paths, PathGlobs, dict[str, Any]]],
     ) -> dict[str, dict[str, Any]]:
         """Combine all overrides for each file into a single dictionary."""
         result: dict[str, dict[str, Any]] = {}
-        for paths, override in paths_to_overrides.items():
-            for path in paths.files:
+        for paths, globs, override in paths_and_overrides:
+            # NB: If some globs did not result in any Paths, we preserve them to ensure that
+            # unconsumed overrides trigger errors during generation.
+            for path in paths.files or globs.globs:
                 for field, value in override.items():
                     if path not in result:
                         result[path] = {field: value}
@@ -2423,12 +2531,11 @@ class OverridesField(AsyncFieldMixin, Field):
                     if field not in result[path]:
                         result[path][field] = value
                         continue
-                    relpath = fast_relpath(path, self.address.spec_path)
+                    relpath = fast_relpath(path, address.spec_path)
                     raise InvalidFieldException(
-                        f"Conflicting overrides in the `{self.alias}` field of "
-                        f"`{self.address}` for the relative path `{relpath}` for "
-                        f"the field `{field}`. You cannot specify the same field name "
-                        "multiple times for the same path.\n\n"
+                        f"Conflicting overrides for `{address}` for the relative path "
+                        f"`{relpath}` for the field `{field}`. You cannot specify the same field "
+                        f"name multiple times for the same path.\n\n"
                         f"(One override sets the field to `{repr(result[path][field])}` "
                         f"but another sets to `{repr(value)}`.)"
                     )

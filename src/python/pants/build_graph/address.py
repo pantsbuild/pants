@@ -17,9 +17,10 @@ from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_prefix
 
-# `:` and `#` used as delimiters already. Others are reserved for possible future needs.
+# `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
 BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":#!@?=")
+BANNED_CHARS_IN_PARAMETERS = frozenset(r":#!@?=, ")
 
 
 class InvalidAddress(ValueError):
@@ -303,6 +304,10 @@ class Address(EngineAwareParameter):
         return self._target_name is None
 
     @property
+    def is_parametrized(self) -> bool:
+        return bool(self.parameters)
+
+    @property
     def filename(self) -> str:
         if self._relative_file_path is None:
             raise AssertionError(
@@ -384,40 +389,44 @@ class Address(EngineAwareParameter):
         prefix = sanitize(self.spec_path)
         return f"{prefix}{path}{target}{params}{generated}"
 
+    def parametrize(self, parameters: Mapping[str, str]) -> Address:
+        """Creates a new Address with the given `parameters` merged over self.parameters."""
+        merged_parameters = {**self.parameters, **parameters}
+        return self.__class__(
+            self.spec_path,
+            target_name=self._target_name,
+            generated_name=self.generated_name,
+            relative_file_path=self._relative_file_path,
+            parameters=merged_parameters,
+        )
+
     def maybe_convert_to_target_generator(self) -> Address:
-        """If this address is generated, convert it to its generator target.
+        """If this address is generated or parametrized, convert it to its generator target.
 
-        Otherwise, return itself unmodified.
+        Otherwise, return self unmodified.
         """
-        if self.is_generated_target:
-            return self.__class__(
-                self.spec_path, target_name=self._target_name, parameters=self.parameters
-            )
-        return self
-
-    def maybe_convert_to_generated_target(self) -> Address:
-        """If this address is for a file target, convert it into generated target syntax
-        (dir/f.ext:lib -> dir:lib#f.ext).
-
-        Otherwise, return itself unmodified.
-        """
-        if self.is_file_target:
-            return self.__class__(
-                self.spec_path,
-                target_name=self._target_name,
-                parameters=self.parameters,
-                generated_name=self._relative_file_path,
-            )
+        if self.is_generated_target or self.is_parametrized:
+            return self.__class__(self.spec_path, target_name=self._target_name)
         return self
 
     def create_generated(self, generated_name: str) -> Address:
         if self.is_generated_target:
-            raise AssertionError("Cannot call `create_generated` on `{self}`.")
+            raise AssertionError(f"Cannot call `create_generated` on `{self}`.")
         return self.__class__(
             self.spec_path,
             target_name=self._target_name,
             parameters=self.parameters,
             generated_name=generated_name,
+        )
+
+    def create_file(self, relative_file_path: str) -> Address:
+        if self.is_generated_target:
+            raise AssertionError(f"Cannot call `create_file` on `{self}`.")
+        return self.__class__(
+            self.spec_path,
+            target_name=self._target_name,
+            parameters=self.parameters,
+            relative_file_path=relative_file_path,
         )
 
     def __eq__(self, other):
