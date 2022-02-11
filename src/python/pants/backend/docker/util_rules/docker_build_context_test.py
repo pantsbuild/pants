@@ -24,7 +24,6 @@ from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
-    DockerfileImageTagsDeprecation,
 )
 from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
 from pants.backend.docker.value_interpolation import (
@@ -146,8 +145,6 @@ def test_pants_hash(rule_runner: RuleRunner) -> None:
                 "baseimage": "latest",
                 "stage0": "latest",
             },
-            "baseimage": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "stage0": DockerfileImageTagsDeprecation({"tag": "latest"}),
             "build_args": {},
             "pants": {"hash": "fd19488a9b08a0184432762cab85f1370904d09bafd9df1a2f8a94614b2b7eb6"},
         },
@@ -248,8 +245,6 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                 "baseimage": "latest",
                 "stage0": "latest",
             },
-            "baseimage": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "stage0": DockerfileImageTagsDeprecation({"tag": "latest"}),
             "build_args": {
                 "BASE_IMAGE": "upstream/image:latest",
             },
@@ -336,11 +331,6 @@ def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:
                 "stage2": "latest",
                 "output": "1-1",
             },
-            "baseimage": DockerfileImageTagsDeprecation({"tag": "3.8"}),
-            "stage0": DockerfileImageTagsDeprecation({"tag": "3.8"}),
-            "interim": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "stage2": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "output": DockerfileImageTagsDeprecation({"tag": "1-1"}),
             "build_args": {},
         },
     )
@@ -376,11 +366,6 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
                 "stage2": "latest",
                 "output": "1-1",
             },
-            "baseimage": DockerfileImageTagsDeprecation({"tag": "3.8"}),
-            "stage0": DockerfileImageTagsDeprecation({"tag": "3.8"}),
-            "interim": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "stage2": DockerfileImageTagsDeprecation({"tag": "latest"}),
-            "output": DockerfileImageTagsDeprecation({"tag": "1-1"}),
             "build_args": {},
         },
     )
@@ -456,8 +441,6 @@ def test_build_arg_defaults_from_dockerfile(rule_runner: RuleRunner) -> None:
                 "baseimage": "${base_version}",
                 "stage0": "${base_version}",
             },
-            "baseimage": DockerfileImageTagsDeprecation({"tag": "${base_version}"}),
-            "stage0": DockerfileImageTagsDeprecation({"tag": "${base_version}"}),
             "build_args": {
                 # `base_name` is not listed here, as it was not an explicitly defined build arg.
                 "base_version": "3.9",
