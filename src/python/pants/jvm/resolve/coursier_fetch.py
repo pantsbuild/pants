@@ -83,9 +83,8 @@ class NoCompatibleResolve(Exception):
         super().__init__(
             f"{msg_prefix}:\n"
             f"{targets_and_resolves_str}\n"
-            "Targets which will be merged onto the same classpath must have at least one "
-            "compatible resolve (from the "
-            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field) in common."
+            "Targets which will be merged onto the same classpath must share a resolve (from the "
+            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
         )
 
 
@@ -597,37 +596,24 @@ async def select_coursier_resolve_for_targets(
     """
     root_targets = [t for ct in coarsened_targets for t in ct.members]
 
-    # Find the set of resolves that are compatible with all roots by ANDing them all together.
-    compatible_resolves: set[str] | None = None
-    for tgt in root_targets:
-        current_resolves = set([jvm.resolve_for_target(tgt)])
-        if compatible_resolves is None:
-            compatible_resolves = current_resolves
-        else:
-            compatible_resolves &= current_resolves
+    # Find a single resolve that is compatible with all targets in the closure.
+    compatible_resolve: str | None = None
+    all_compatible = True
+    for ct in coarsened_targets.closure():
+        for tgt in ct.members:
+            resolve = jvm.resolve_for_target(tgt)
+            if not resolve:
+                continue
+            if compatible_resolve is None:
+                compatible_resolve = resolve
+            elif resolve != compatible_resolve:
+                all_compatible = False
 
-    # Select a resolve from the compatible set.
-    if not compatible_resolves or len(compatible_resolves) != 1:
+    if not compatible_resolve or not all_compatible:
         raise NoCompatibleResolve(
             jvm, "The selected targets did not have a resolve in common", root_targets
         )
-    resolve = next(iter(compatible_resolves))
-
-    # Validate that the selected resolve is compatible with all transitive dependencies.
-    incompatible_targets = []
-    for ct in coarsened_targets.closure():
-        for t in ct.members:
-            if not jvm.has_resolve(t):
-                continue
-            if jvm.resolve_for_target(t) != resolve:
-                incompatible_targets.append(t)
-    if incompatible_targets:
-        raise NoCompatibleResolve(
-            jvm,
-            f"The resolve chosen for the root targets was {resolve}, but some of their "
-            "dependencies were not compatible with that resolve",
-            incompatible_targets,
-        )
+    resolve = compatible_resolve
 
     # Load the resolve.
     resolve_path = jvm.resolves[resolve]

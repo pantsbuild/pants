@@ -122,6 +122,11 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     dep_map = first_party_dep_map.symbols
     resolve = jvm.resolve_for_target(tgt)
+    if not resolve:
+        raise ValueError(
+            "Cannot infer Java dependencies for a target without a `resolve` field: "
+            "`{address}` (with type `{tgt.alias}`)."
+        )
 
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()

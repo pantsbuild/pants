@@ -86,8 +86,9 @@ async def setup_user_lockfile_requests(
         if not tgt.has_field(JvmArtifactResolveField):
             continue
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        for resolve in jvm_subsystem.resolve_for_target(tgt):
-            resolve_to_artifacts[resolve].add(artifact)
+        resolve = jvm_subsystem.resolve_for_target(tgt)
+        assert resolve
+        resolve_to_artifacts[resolve].add(artifact)
 
     return UserGenerateLockfiles(
         GenerateJvmLockfile(

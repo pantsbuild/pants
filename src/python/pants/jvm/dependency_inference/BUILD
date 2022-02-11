@@ -7,5 +7,6 @@ python_tests(
     name="tests",
     overrides={
         "java_scala_interop_test.py": {"timeout": 120},
+        "artifact_mapper_test.py": {"timeout": 120},
     },
 )

@@ -74,22 +74,21 @@ class JvmSubsystem(Subsystem):
     def debug_args(self) -> tuple[str, ...]:
         return cast("tuple[str, ...]", tuple(self.options.debug_args))
 
-    def has_resolve(self, target: Target) -> bool:
-        """Returns `True` only if the given target is a valid JVM source or destination target."""
-        return target.has_field(JvmResolveField)
+    def resolve_for_target(self, target: Target) -> str | None:
+        """Return the `JvmResolveField` value or its default for the given target.
 
-    def resolve_for_target(self, target: Target) -> str:
-        if target.has_field(JvmResolveField):
-            val = target[JvmResolveField].value or self.default_resolve
-            if val not in self.resolves:
-                raise InvalidFieldException(
-                    f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
-                    f"{target.address}: {val}.\n\n"
-                    "All valid resolve names (from `[jvm.resolves]`): "
-                    f"{sorted(self.resolves.keys())}"
-                )
-            return val
-        raise AssertionError(
-            f"Invalid target type {target.alias} for {target.address}. Needs to have a "
-            f"`{JvmResolveField.alias}` field registered."
-        )
+        If a Target does not have the `JvmResolveField` returns None, since we can be assured that
+        other codepaths will fail to (e.g.) produce a ClasspathEntry if an unsupported target type
+        is provided to the JVM rules.
+        """
+        if not target.has_field(JvmResolveField):
+            return None
+        val = target[JvmResolveField].value or self.default_resolve
+        if val not in self.resolves:
+            raise InvalidFieldException(
+                f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
+                f"{target.address}: {val}.\n\n"
+                "All valid resolve names (from `[jvm.resolves]`): "
+                f"{sorted(self.resolves.keys())}"
+            )
+        return val

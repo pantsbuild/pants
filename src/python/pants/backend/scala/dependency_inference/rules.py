@@ -49,6 +49,11 @@ async def infer_scala_dependencies_via_source_analysis(
     )
 
     resolve = jvm.resolve_for_target(tgt)
+    if not resolve:
+        raise ValueError(
+            "Cannot infer Scala dependencies for a target without a `resolve` field: "
+            "`{address}` (with type `{tgt.alias}`)."
+        )
 
     symbols: OrderedSet[str] = OrderedSet()
     if scala_infer_subsystem.imports:

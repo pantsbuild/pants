@@ -45,5 +45,4 @@ def test_resolve_for_target() -> None:
             )
         )
 
-    with pytest.raises(AssertionError):
-        jvm.resolve_for_target(GenericTarget({}, Address("dir")))
+    assert jvm.resolve_for_target(GenericTarget({}, Address("dir"))) is None

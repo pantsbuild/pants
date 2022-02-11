@@ -111,15 +111,16 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         JavaSourcesGeneratorSourcesField,
-        JvmResolveField,
     )
     generated_target_cls = JavaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmResolveField,
     )
-    moved_fields = (JvmProvidesTypesField,)
+    moved_fields = (
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
 

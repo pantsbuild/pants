@@ -184,16 +184,17 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmResolveField,
         ScalaSourcesGeneratorSourcesField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JvmResolveField,
     )
-    moved_fields = (JvmProvidesTypesField,)
+    moved_fields = (
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
     settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_source` target for each file in the `sources` field."
 
