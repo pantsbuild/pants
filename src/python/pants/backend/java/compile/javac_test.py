@@ -166,7 +166,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         resolve=make_resolve(rule_runner),
     )
     rule_runner.set_options(
-        ["--jvm-default-source-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV
+        ["--jvm-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV
     )
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
