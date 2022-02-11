@@ -207,6 +207,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     )
     moved_fields = (
         JvmResolveField,
+        JvmJdkField,
         JvmProvidesTypesField,
     )
     settings_request_cls = ScalaSettingsRequest

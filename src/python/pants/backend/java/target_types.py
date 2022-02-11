@@ -130,6 +130,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     )
     moved_fields = (
         JvmResolveField,
+        JvmJdkField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
