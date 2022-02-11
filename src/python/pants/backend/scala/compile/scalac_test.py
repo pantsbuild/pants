@@ -198,7 +198,8 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )
@@ -225,7 +226,8 @@ def test_compile_jdk_12_file_fails_on_jdk_11(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )

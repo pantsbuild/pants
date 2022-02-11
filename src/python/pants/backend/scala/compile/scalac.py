@@ -74,6 +74,7 @@ async def compile_scala_source(
             exit_code=1,
         )
 
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
     scala_version = scala.version_for_resolve(request.resolve.name)
 
     component_members_with_sources = tuple(
