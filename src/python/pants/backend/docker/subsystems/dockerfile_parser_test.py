@@ -169,3 +169,26 @@ def test_copy_source_references(rule_runner: RuleRunner) -> None:
 
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
     assert info.copy_sources == ("a", "b", "c/d", "e/f/g", "j", "k")
+
+
+def test_baseimage_tags(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": "docker_image()",
+            "test/Dockerfile": (
+                "FROM untagged\n"
+                "FROM tagged:v1.2\n"
+                "FROM digest@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
+                "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:"
+                "v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d\n"
+            ),
+        }
+    )
+
+    info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
+    assert info.version_tags == (
+        "stage0 latest",
+        "stage1 v1.2",
+        # Stage 2 is not pinned with a tag.
+        "stage3 v0.54.0",
+    )
