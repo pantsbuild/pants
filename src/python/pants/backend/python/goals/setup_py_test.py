@@ -30,10 +30,10 @@ from pants.backend.python.goals.setup_py import (
     SetupKwargsRequest,
     SetupPyGeneration,
     declares_pkg_resources_namespace_package,
-    determine_setup_kwargs,
+    determine_explicitly_provided_setup_kwargs,
+    determine_finalized_setup_kwargs,
     generate_chroot,
     generate_setup_py,
-    generate_setup_py_kwargs,
     get_exporting_owner,
     get_owned_dependencies,
     get_requirements,
@@ -59,6 +59,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
+from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -101,10 +102,10 @@ def chroot_rule_runner() -> RuleRunner:
     return create_setup_py_rule_runner(
         rules=[
             *core_target_types_rules(),
-            determine_setup_kwargs,
+            determine_explicitly_provided_setup_kwargs,
             generate_chroot,
             generate_setup_py,
-            generate_setup_py_kwargs,
+            determine_finalized_setup_kwargs,
             get_sources,
             get_requirements,
             get_owned_dependencies,
@@ -500,6 +501,98 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    long_description_path="src/python/foo/readme.md",
+                    provides=setup_py(
+                        name='foo',
+                        version='1.2.3',
+                    )
+                )
+                """
+            ),
+            "src/python/foo/readme.md": "Some long description.",
+        }
+    )
+    assert_chroot(
+        chroot_rule_runner,
+        [
+            "setup.py",
+            "MANIFEST.in",
+        ],
+        {
+            "name": "foo",
+            "version": "1.2.3",
+            "plugin_demo": "hello world",
+            "packages": tuple(),
+            "namespace_packages": tuple(),
+            "package_data": {},
+            "install_requires": tuple(),
+            "long_description": "Some long description.",
+        },
+        Address("src/python/foo", target_name="foo-dist"),
+    )
+
+
+def test_generate_long_description_field_from_file_already_having_it(
+    chroot_rule_runner: RuleRunner,
+) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    long_description_path="src/python/foo/readme.md",
+                    provides=setup_py(
+                        name='foo',
+                        version='1.2.3',
+                        long_description="Some long description.",
+                    )
+                )
+                """
+            ),
+            "src/python/foo/readme.md": "Some long description.",
+        }
+    )
+    assert_chroot_error(
+        chroot_rule_runner,
+        Address("src/python/foo", target_name="foo-dist"),
+        InvalidFieldException,
+    )
+
+
+def test_generate_long_description_field_from_non_existing_file(
+    chroot_rule_runner: RuleRunner,
+) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    long_description_path="src/python/foo/readme.md",
+                    provides=setup_py(
+                        name='foo',
+                        version='1.2.3',
+                    )
+                )
+                """
+            ),
+        }
+    )
+    assert_chroot_error(
+        chroot_rule_runner,
+        Address("src/python/foo", target_name="foo-dist"),
+        Exception,
+    )
+
+
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
@@ -734,7 +827,7 @@ def test_get_sources() -> None:
 def test_get_requirements() -> None:
     rule_runner = create_setup_py_rule_runner(
         rules=[
-            determine_setup_kwargs,
+            determine_explicitly_provided_setup_kwargs,
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
@@ -814,7 +907,7 @@ def test_get_requirements() -> None:
 def test_get_requirements_with_exclude() -> None:
     rule_runner = create_setup_py_rule_runner(
         rules=[
-            determine_setup_kwargs,
+            determine_explicitly_provided_setup_kwargs,
             get_requirements,
             get_owned_dependencies,
             get_exporting_owner,
@@ -1220,10 +1313,10 @@ def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> No
 def test_no_dist_type_selected() -> None:
     rule_runner = RuleRunner(
         rules=[
-            determine_setup_kwargs,
+            determine_explicitly_provided_setup_kwargs,
             generate_chroot,
             generate_setup_py,
-            generate_setup_py_kwargs,
+            determine_finalized_setup_kwargs,
             get_sources,
             get_requirements,
             get_owned_dependencies,
