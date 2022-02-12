@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.option.option_types import DictOption, StrOption
+from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
 
 DEFAULT_SCALA_VERSION = "2.13.6"
@@ -16,17 +16,6 @@ _logger = logging.getLogger(__name__)
 class ScalaSubsystem(Subsystem):
     options_scope = "scala"
     help = "Scala programming language"
-
-    version = StrOption(
-        "--version",
-        default=DEFAULT_SCALA_VERSION,
-        help=(
-            "The version of Scala to use.\n\n"
-            "This option is deprecated in favor of the `[scala].version_for_resolve` option. If "
-            "`[scala].version_for_resolve` does not have an entry for a resolve, then the value of "
-            "this option will be used as the Scala version for that resolve."
-        ),
-    ).deprecated(removal_version="2.11.0.dev0", hint="Use `[scala].version_for_resolve` instead.")
 
     _version_for_resolve = DictOption[str](
         "--version-for-resolve",
@@ -45,4 +34,4 @@ class ScalaSubsystem(Subsystem):
         version = self._version_for_resolve.get(resolve)
         if version:
             return version
-        return self.version
+        return DEFAULT_SCALA_VERSION
