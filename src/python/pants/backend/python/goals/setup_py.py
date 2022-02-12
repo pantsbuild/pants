@@ -19,7 +19,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     GenerateSetupField,
-    LongDescriptionPath,
+    LongDescriptionPathField,
     PythonDistributionEntryPointsField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
@@ -69,6 +69,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    InvalidFieldException,
     SourcesField,
     Target,
     Targets,
@@ -434,7 +435,7 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def determine_setup_kwargs(
+async def determine_explicitly_provided_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
@@ -523,7 +524,7 @@ async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy
 
 
 @rule
-async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
+async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
     exported_target = request.exported_target
     sources = request.sources
     requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
@@ -550,19 +551,31 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
         }
     )
 
-    if "long_description" not in setup_kwargs:
-        long_description_path = exported_target.target.get(LongDescriptionPath).value
-        if long_description_path:
-            digest_contents = await Get(
-                DigestContents,
-                PathGlobs(
-                    [long_description_path],
-                    description_of_origin="Reading file of long_description_path",
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+    long_description_path = exported_target.target.get(LongDescriptionPathField).value
+
+    if "long_description" in setup_kwargs and long_description_path:
+        raise InvalidFieldException(
+            f"The {repr(LongDescriptionPathField.alias)} field of the "
+            f"target {exported_target.target.address} is set, but "
+            f"'long_description' is already provided explicitly in "
+            f"the provides=setup_py() field. You may only set one "
+            f"of these two values."
+        )
+
+    if long_description_path:
+        digest_contents = await Get(
+            DigestContents,
+            PathGlobs(
+                [long_description_path],
+                description_of_origin=(
+                    f"the {LongDescriptionPathField.alias} "
+                    f"field of {exported_target.target.address}"
                 ),
-            )
-            long_description_content = digest_contents[0].content.decode()
-            setup_kwargs.update({"long_description": long_description_content})
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            ),
+        )
+        long_description_content = digest_contents[0].content.decode()
+        setup_kwargs.update({"long_description": long_description_content})
 
     # Resolve entry points from python_distribution(entry_points=...) and from
     # python_distribution(provides=setup_py(entry_points=...)

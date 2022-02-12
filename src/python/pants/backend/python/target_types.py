@@ -1209,13 +1209,17 @@ class GenerateSetupField(TriBoolField):
     )
 
 
-class LongDescriptionPath(StringField):
-    """Path to a file that will be used to fill the long_description field in setup.py."""
-
+class LongDescriptionPathField(StringField):
     alias = "long_description_path"
     required = False
 
-    help = "Path to a file that will be used to fill the long_description field in setup.py."
+    help = (
+        "Path to a file that will be used to fill the long_description field in setup.py.\n\n"
+        "Path is relative to the build root.\n\n"
+        "Alternatively, you can set the `long_description` in the `provides` field, but not both.\n\n"
+        "This field won't automatically set `long_description_content_type` field for you. "
+        "You have to specify this field yourself in the `provides` field."
+    )
 
 
 class PythonDistribution(Target):
@@ -1230,7 +1234,7 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
-        LongDescriptionPath,
+        LongDescriptionPathField,
     )
     help = (
         "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "
