@@ -6,6 +6,7 @@ import re
 import textwrap
 
 from pants.testutil.pants_integration_test import run_pants
+from pants.util.docutil import doc_url
 
 
 def test_help() -> None:
@@ -168,13 +169,13 @@ def test_help_provided_target_plugin_field() -> None:
 
     assert (
         textwrap.dedent(
-            """
+            f"""
             `python_distribution` target
             ----------------------------
 
             A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
-            See https://www.pantsbuild.org/v2.10/docs/python-distributions.
+            See {doc_url("python-distributions")}.
 
 
             Activated by pants.backend.python
