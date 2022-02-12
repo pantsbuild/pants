@@ -8,7 +8,7 @@ import re
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
@@ -16,6 +16,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import DictOption, EnumOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -81,69 +82,56 @@ class RegexLintSubsystem(Subsystem):
         "`--changed-since=<sha>` does not yet cause this linter to run. We are exploring how to "
         "improve both these gotchas."
     )
-
-    @classmethod
-    def register_options(cls, register):
-        schema_help = textwrap.dedent(
-            """\
-            ```
-            {
-              'required_matches': {
-                'path_pattern1': [content_pattern1, content_pattern2],
-                'path_pattern2': [content_pattern1, content_pattern3],
-                ...
-              },
-              'path_patterns': [
+    schema_help = textwrap.dedent(
+        """\
+                ```
                 {
-                  'name': path_pattern1',
-                  'pattern': <path regex pattern>,
-                  'inverted': True|False (defaults to False),
-                  'content_encoding': <encoding> (defaults to utf8)
+                'required_matches': {
+                    'path_pattern1': [content_pattern1, content_pattern2],
+                    'path_pattern2': [content_pattern1, content_pattern3],
+                    ...
                 },
-                ...
-              ],
-              'content_patterns': [
-                {
-                  'name': 'content_pattern1',
-                  'pattern': <content regex pattern>,
-                  'inverted': True|False (defaults to False)
+                'path_patterns': [
+                    {
+                    'name': path_pattern1',
+                    'pattern': <path regex pattern>,
+                    'inverted': True|False (defaults to False),
+                    'content_encoding': <encoding> (defaults to utf8)
+                    },
+                    ...
+                ],
+                'content_patterns': [
+                    {
+                    'name': 'content_pattern1',
+                    'pattern': <content regex pattern>,
+                    'inverted': True|False (defaults to False)
+                    }
+                    ...
+                ]
                 }
-                ...
-              ]
-            }
-            ```
-            """
-        )
-        super().register_options(register)
-        register(
-            "--config",
-            type=dict,
-            fromfile=True,
-            help=(
-                f"Config schema is as follows:\n\n{schema_help}\n\n"
-                "Meaning: if a file matches some path pattern, its content must match all the "
-                "corresponding content patterns.\n\n"
-                "It's often helpful to load this config from a JSON or YAML file. To do that, set "
-                "`[regex-lint].config = '@path/to/config.yaml'`, for example."
-            ),
-        )
-        register(
-            "--detail-level",
-            type=DetailLevel,
-            default=DetailLevel.nonmatching,
-            help="How much detail to include in the result.",
-        )
+                ```
+                """
+    )
+
+    _config = DictOption[Any](
+        "--config",
+        help=(
+            f"Config schema is as follows:\n\n{schema_help}\n\n"
+            "Meaning: if a file matches some path pattern, its content must match all the "
+            "corresponding content patterns.\n\n"
+            "It's often helpful to load this config from a JSON or YAML file. To do that, set "
+            "`[regex-lint].config = '@path/to/config.yaml'`, for example."
+        ),
+    ).from_file()
+    detail_level = EnumOption(
+        "--detail-level",
+        default=DetailLevel.nonmatching,
+        help="How much detail to include in the result.",
+    )
 
     @memoized_method
     def get_multi_matcher(self) -> MultiMatcher | None:
-        return (
-            MultiMatcher(ValidationConfig.from_dict(self.options.config))
-            if self.options.config
-            else None
-        )
-
-    def detail_level(self) -> DetailLevel:
-        return cast(DetailLevel, self.options.detail_level)
+        return MultiMatcher(ValidationConfig.from_dict(self._config)) if self._config else None
 
 
 @dataclass(frozen=True)
@@ -303,7 +291,7 @@ async def lint_with_regex_patterns(
     )
 
     stdout = ""
-    detail_level = regex_lint_subsystem.detail_level()
+    detail_level = regex_lint_subsystem.detail_level
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:
