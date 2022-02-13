@@ -1,10 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
+from typing import Sequence
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     DictStringToStringField,
+    InvalidFieldException,
     MultipleSourcesField,
     SpecialCasedDependencies,
     StringField,
@@ -20,6 +23,24 @@ class DebianSources(MultipleSourcesField):
         "It is required to include a Debian control file.\n\n"
         "Paths are relative to the BUILD file's directory."
     )
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        """Check that all files are coming from the same directory."""
+        files_outside_dirs = [f for f in files if len(PurePath(f).parts) == 1]
+        if files_outside_dirs:
+            raise InvalidFieldException(
+                f"The `{self.alias}` field in target `{self.address}` must be paths to "
+                f"files in a single sources directory. Individual files "
+                f"were found: {files_outside_dirs}"
+            )
+
+        directory_prefixes = set([PurePath(f).parts[0] for f in files])
+        if len(directory_prefixes) > 1:
+            raise InvalidFieldException(
+                f"The `{self.alias}` field in target `{self.address}` must be paths to "
+                f"files in a single sources directory. Multiple directories "
+                f"were found: {directory_prefixes}"
+            )
 
 
 class DebianSymlinks(DictStringToStringField):

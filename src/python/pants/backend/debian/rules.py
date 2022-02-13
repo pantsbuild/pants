@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.debian.target_types import (
-    DebianSources,
     DebianInstallPrefix,
     DebianPackageDependencies,
+    DebianSources,
 )
 from pants.core.goals.package import (
     BuiltPackage,
@@ -20,7 +20,7 @@ from pants.core.util_rules.archive import TarBinary
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import HydrateSourcesRequest, HydratedSources
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -36,8 +36,9 @@ class DebianPackageFieldSet(PackageFieldSet):
 
 
 @rule(level=LogLevel.INFO)
-async def package_debian_package(field_set: DebianPackageFieldSet,
-                                 tar_binary_path: TarBinary) -> BuiltPackage:
+async def package_debian_package(
+    field_set: DebianPackageFieldSet, tar_binary_path: TarBinary
+) -> BuiltPackage:
     dpkg_deb_path = await Get(
         BinaryPaths,
         BinaryPathRequest(
@@ -49,11 +50,15 @@ async def package_debian_package(field_set: DebianPackageFieldSet,
         raise OSError("Could not find the `dpkg-deb` program on search paths ")
 
     output_filename = field_set.output_path.value_or_default(
-
         file_ending="deb",
     )
 
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources_dir))
+
+    # TODO(alexey): now need to copy those files into a single directory, preserving the
+    #  directory hierarchy to be passed later to the dpkg-deb
+    for i in hydrated_sources.snapshot.files:
+        print(i)
 
     result = await Get(
         ProcessResult,
