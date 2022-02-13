@@ -93,7 +93,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="hello",
                   dependencies=[":build-utils", ":files"],
                   tools=[
@@ -143,7 +143,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="quotes",
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
@@ -166,7 +166,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
         {
             "src/a/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["echo"],
                   outputs=["msg"],
@@ -176,7 +176,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
             ),
             "src/b/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["cp", "echo"],
                   outputs=["msg"],
@@ -209,7 +209,7 @@ def test_side_effecting_command(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="side-effect",
                   command="echo 'server started' && echo 'warn msg' >&2",
                   tools=["echo"],
@@ -240,7 +240,7 @@ def test_tool_search_path_stable(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="paths",
                   command="mkdir subdir; cd subdir; ls .",
                   tools=["cd", "ls", "mkdir"],
@@ -262,7 +262,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
@@ -304,7 +304,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
@@ -317,7 +317,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   files=[":msg-gen"],
                 )
 
-                experimental_shell_command(
+                shell_command(
                   name="test",
                   command="ls .",
                   tools=["ls"],
@@ -345,12 +345,12 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_run_shell_command(
+                run_shell_command(
                   name="test",
                   command="some cmd string",
                 )
 
-                experimental_run_shell_command(
+                run_shell_command(
                   name="cd-test",
                   command="some cmd string",
                   workdir="src/with space'n quote",
@@ -376,7 +376,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="boot-script-test",
                   tools=[
                     "python3.8",

@@ -301,7 +301,9 @@ class ShellCommandRunWorkdirField(StringField):
 
 
 class ShellCommandTarget(Target):
-    alias = "experimental_shell_command"
+    alias = "shell_command"
+    deprecated_alias = "experimental_shell_command"
+    deprecated_alias_removal_version = "2.12.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
@@ -319,7 +321,7 @@ class ShellCommandTarget(Target):
 
             Example BUILD file:
 
-                experimental_shell_command(
+                shell_command(
                   command="./my-script.sh --flag",
                   tools=["tar", "curl", "cat", "bash", "env"],
                   dependencies=[":scripts"],
@@ -338,7 +340,9 @@ class ShellCommandTarget(Target):
 
 
 class ShellCommandRunTarget(Target):
-    alias = "experimental_run_shell_command"
+    alias = "run_shell_command"
+    deprecated_alias = "experimental_run_shell_command"
+    deprecated_alias_removal_version = "2.12.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
@@ -352,7 +356,7 @@ class ShellCommandRunTarget(Target):
 
             Example BUILD file:
 
-                experimental_run_shell_command(
+                run_shell_command(
                   command="./scripts/my-script.sh --data-files-dir={chroot}",
                   dependencies=["src/project/files:data"],
                 )
@@ -361,7 +365,7 @@ class ShellCommandRunTarget(Target):
         )
         + "The `command` may use either `{chroot}` on the command line, or the `$CHROOT` "
         "environment variable to get the root directory for where any dependencies are located.\n\n"
-        "In contrast to the `experimental_shell_command`, in addition to `workdir` you only have "
+        "In contrast to the `shell_command`, in addition to `workdir` you only have "
         "the `command` and `dependencies` fields as the `tools` you are going to use are already "
         "on the PATH which is inherited from the Pants environment. Also, the `outputs` does not "
         "apply, as any output files produced will end up directly in your project tree."
