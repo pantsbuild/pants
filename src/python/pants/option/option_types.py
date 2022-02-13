@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
 
@@ -14,12 +15,19 @@ _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
-_MaybeClassFunc = Union[Callable[["_OptionBase"], _ValueT], _ValueT]
+_SubsystemT = TypeVar("_SubsystemT")
+_MaybeClassFunc = Union[Callable[[Any], _ValueT], _ValueT]
 _HelpT = _MaybeClassFunc[str]
 
-def _call_lazy(cls: type[_OptionBase], val: _MaybeClassFunc[_ValueT]) -> _ValueT:
-    """"You're lazy!" JK it evaluates the possible classfunction."""
-    return val(cls) if inspect.isfunction(val) else val
+
+def _eval_maybe_classfunc(subsystem_cls, val: _MaybeClassFunc[_ValueT]) -> _ValueT:
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore
+
+
+@dataclass(frozen=True)
+class OptionsInfo:
+    flag_names: tuple[str, ...]
+    flag_options: dict[str, Any]
 
 
 class _OptionBase(Generic[_PropType]):
@@ -31,9 +39,7 @@ class _OptionBase(Generic[_PropType]):
         - Collect registration values for your option.
         - Provide a typed property for Python usage
 
-    In order to define the `type` registration option, `self.option_type` must return a valid
-    registration type. This can either be set using a class variable or by passing it into
-    `__new__`.
+    @TODO: option_type
 
     NOTE: Due to https://github.com/python/mypy/issues/5146 subclasses unfortunately need to provide
     overloaded `__new__` methods, as subclasses do not inherit overloaded function's annotations.
@@ -41,7 +47,9 @@ class _OptionBase(Generic[_PropType]):
     """
 
     _flag_names: tuple[str, ...]
-    _flag_options: dict
+    _default: _MaybeClassFunc[Any]
+    _help = _HelpT
+    _extra_kwargs: dict[str, Any]
 
     # NB: Due to https://github.com/python/mypy/issues/5146, we try to keep the parameter list as
     # short as possible to avoid having to repeat the param in each of the 3 `__new__` specs that
@@ -54,32 +62,29 @@ class _OptionBase(Generic[_PropType]):
         cls,
         *flag_names: str,
         default: _MaybeClassFunc[Any],
-        help: _HelpT[str],
+        help: _HelpT,
     ):
         self = super().__new__(cls)
         self._flag_names = flag_names
         self._default = default
         self._help = help
-        self._kwargs = {}
+        self._extra_kwargs = {}
         return self
 
-    @property
-    def flag_names(self) -> tuple[str, ...]:
-        """Returns the flag names."""
-        return self._flag_names
+    def get_option_type(self, subsystem_cls):
+        # Default implementation
+        return type(self).option_type
 
-    @property
-    def flag_options(self) -> dict:
-        """Returns the internal flag options."""
+    def get_flag_options(self, subsystem_cls) -> dict:
         return dict(
-            help=_call_lazy(type(self), self._help),
-            default=_call_lazy(type(self), self._default),
-            type=getattr(self, "option_type"),
-            **self._kwargs,
+            help=_eval_maybe_classfunc(subsystem_cls, self._help),
+            default=_eval_maybe_classfunc(subsystem_cls, self._default),
+            type=self.get_option_type(subsystem_cls),
+            **self._extra_kwargs,
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> _OptionBase[_PropType]:
+    def __get__(self, obj: None, objtype: Any) -> OptionsInfo:
         ...
 
     @overload
@@ -88,8 +93,8 @@ class _OptionBase(Generic[_PropType]):
 
     def __get__(self, obj, objtype):
         if obj is None:
-            return self
-        long_name = self.flag_names[-1]
+            return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+        long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
         if option_value is None:
             return None
@@ -100,36 +105,36 @@ class _OptionBase(Generic[_PropType]):
         return cast("_PropType", val)
 
     def advanced(self) -> _OptionBase[_PropType]:
-        self._kwargs["advanced"] = True
+        self._extra_kwargs["advanced"] = True
         return self
 
     def from_file(self) -> _OptionBase[_PropType]:
-        self._kwargs["fromfile"] = True
+        self._extra_kwargs["fromfile"] = True
         return self
 
     def metavar(self, metavar: str) -> _OptionBase[_PropType]:
-        self._kwargs["metavar"] = metavar
+        self._extra_kwargs["metavar"] = metavar
         return self
 
     def mutually_exclusive_group(self, mutually_exclusive_group: str) -> _OptionBase[_PropType]:
-        self._kwargs["mutually_exclusive_group"] = mutually_exclusive_group
+        self._extra_kwargs["mutually_exclusive_group"] = mutually_exclusive_group
         return self
 
     def default_help_repr(self, default_help_repr: str) -> _OptionBase[_PropType]:
-        self._kwargs["default_help_repr"] = default_help_repr
+        self._extra_kwargs["default_help_repr"] = default_help_repr
         return self
 
     def deprecated(self, *, removal_version: str, hint: str) -> _OptionBase[_PropType]:
-        self._kwargs["removal_version"] = removal_version
-        self._kwargs["removal_hint"] = hint
+        self._extra_kwargs["removal_version"] = removal_version
+        self._extra_kwargs["removal_hint"] = hint
         return self
 
     def daemoned(self) -> _OptionBase[_PropType]:
-        self._kwargs["daemon"] = True
+        self._extra_kwargs["daemon"] = True
         return self
 
     def non_fingerprinted(self) -> _OptionBase[_PropType]:
-        self._kwargs["fingerprint"] = False
+        self._extra_kwargs["fingerprint"] = False
         return self
 
 
@@ -150,7 +155,7 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
     def __new__(
         cls,
         *flag_names: str,
-        default: list[_ListMemberType] | None = None,
+        default: _MaybeClassFunc["list[_ListMemberType] | None"] = None,
         help: _HelpT,
     ):
         default = default or []
@@ -162,9 +167,15 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
         )
         return instance
 
-    @property
-    def flag_options(self) -> dict:
-        return dict(member_type=getattr(self, "member_type"), **super().flag_options)
+    def get_member_type(self, subsystem_cls):
+        # Default implementation
+        return type(self).member_type
+
+    def get_flag_options(self, subsystem_cls) -> dict[str, Any]:
+        return dict(
+            member_type=self.get_member_type(subsystem_cls),
+            **super().get_flag_options(subsystem_cls),
+        )
 
     def _convert_(self, value: list[Any]) -> tuple[_ListMemberType]:
         return cast("tuple[_ListMemberType]", tuple(value))
@@ -181,7 +192,9 @@ class StrOption(_OptionBase[_PropType]):
     option_type: Any = str
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> StrOption[str]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[str], help: _HelpT
+    ) -> StrOption[str]:
         ...
 
     @overload
@@ -198,7 +211,9 @@ class IntOption(_OptionBase[_PropType]):
     option_type: Any = int
 
     @overload
-    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> IntOption[int]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[int], help: _HelpT
+    ) -> IntOption[int]:
         ...
 
     @overload
@@ -215,7 +230,9 @@ class FloatOption(_OptionBase[_PropType]):
     option_type: Any = float
 
     @overload
-    def __new__(cls, *flag_names: str, default: float, help: _HelpT) -> FloatOption[float]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[float], help: _HelpT
+    ) -> FloatOption[float]:
         ...
 
     @overload
@@ -236,7 +253,9 @@ class BoolOption(_OptionBase[_PropType]):
     option_type: Any = bool
 
     @overload
-    def __new__(cls, *flag_names: str, default: bool, help: _HelpT) -> BoolOption[bool]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[bool], help: _HelpT
+    ) -> BoolOption[bool]:
         ...
 
     @overload
@@ -250,46 +269,49 @@ class BoolOption(_OptionBase[_PropType]):
 class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     """An Enum option.
 
-    If you provide a `default` parameter, the `option_type` parameter will be inferred from the type
-    of the default. Otherwise, you'll need to provide the `option_type`.
-    In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
-    provide it.
+    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
+    of the default. Otherwise, you'll need to provide the `enum_type`.
+    In either case, mypy will infer the correct Generic's type-parameter so you shouldn't need to
+    provide it, unless you're using a "dynamic" default (e.g. `lambda cls: ...`) in which case you
+    _will_ need ot provide the type-parameter.
 
     E.g.
-        EnumOption(..., option_type=MyEnum)  # property type is deduced as `MyEnum | None`
+        EnumOption(..., enum_type=MyEnum)  # property type is deduced as `MyEnum | None`
         EnumOption(..., default=MyEnum.Value)  # property type is deduced as `MyEnum`
+        EnumOption[MyEnum](..., default=lambda cls: cls.default_val)  # property type is `MyEnum`
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[_EnumT], help: _HelpT
+    ) -> EnumOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `option_type`.
+    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, option_type: type[_EnumT], help: _HelpT
+        cls, *flag_names: str, enum_type: _MaybeClassFunc[type[_EnumT]], help: _HelpT
     ) -> EnumOption[_EnumT | None]:
         ...
 
     def __new__(
         cls,
         *flag_names,
-        option_type=None,
+        enum_type=None,
         default=None,
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)
-        instance._option_type = option_type
+        instance._enum_type = enum_type
         return instance
 
-    @property
-    def option_type(self) -> type[_EnumT]:
-        option_type = _call_lazy(self._option_type)
-        default = _call_lazy(self._default)
+    def get_option_type(self, subsystem_cls):
+        option_type = _eval_maybe_classfunc(subsystem_cls, self._enum_type)
+        default = _eval_maybe_classfunc(subsystem_cls, self._default)
         if option_type is None:
             if default is None:
                 raise ValueError(
-                    "`option_type` must be provided to the constructor if `default` isn't provided."
+                    "`enum_type` must be provided to the constructor if `default` isn't provided."
                 )
             return type(default)
         return option_type
@@ -319,11 +341,11 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
 
     option_type: Any = dict
 
-    def __new__(cls, *flag_names, default: dict[str, _ValueT] | None = None, help):
+    def __new__(cls, *flag_names, default: _MaybeClassFunc[dict[str, _ValueT]] | None = None, help):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             *flag_names,
-            default=default or {},
+            default={} if default is None else default,
             help=help,
         )
 
@@ -397,42 +419,51 @@ class BoolListOption(_ListOptionBase[bool]):
 class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     """An homogenous list of Enum options.
 
-    If you provide a `default` parameter, the `member_type` parameter will be inferred from the type
+    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
     of the first element of the default. Otherwise, you'll need to provide the `option_type`.
     In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
     provide it.
 
     E.g.
-        EnumListOption(..., member_type=MyEnum)  # property type is deduced as `[MyEnum]`
+        EnumListOption(..., enum_type=MyEnum)  # property type is deduced as `[MyEnum]`
         EnumListOption(..., default=[MyEnum.Value])  # property type is deduced as `[MyEnum]`
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: list[_EnumT], help: _HelpT) -> EnumListOption[_EnumT]:
+    def __new__(
+        cls, *flag_names: str, default: _MaybeClassFunc[list[_EnumT]], help: _HelpT
+    ) -> EnumListOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `member_type`.
+    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, member_type: type[_EnumT], help: _HelpT
+        cls, *flag_names: str, enum_type: _MaybeClassFunc[type[_EnumT]], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
     def __new__(
         cls,
         *flag_names,
-        member_type=None,
+        enum_type=None,
         default=None,
         help,
     ):
-        if member_type is None:
-            if default is None:
-                raise ValueError("`member_type` must be provided if `default` isn't provided.")
-            member_type = type(default[0])
+        instance = super().__new__(cls, *flag_names, default=default, help=help)
+        instance._enum_type = enum_type
+        return instance
 
-        return super().__new__(
-            cls, *flag_names, member_type=member_type, default=default, help=help
-        )
+    def get_member_type(self, subsystem_cls):
+        member_type = _eval_maybe_classfunc(subsystem_cls, self._enum_type)
+        default = _eval_maybe_classfunc(subsystem_cls, self._default)
+        if member_type is None:
+            if not default:
+                raise ValueError(
+                    "`enum_type` must be provided to the constructor if `default` isn't provided "
+                    "or is empty."
+                )
+            return type(default[0])
+        return member_type
 
 
 class TargetListOption(StrListOption):
@@ -484,5 +515,5 @@ class ArgsListOption(ShellStrListOption):
         This should be used when callers can alternatively use "--" followed by the arguments,
         instead of having to provide "--[scope]-args='--arg1 --arg2'".
         """
-        self._kwargs["passthrough"] = True
+        self._extra_kwargs["passthrough"] = True
         return self
