@@ -3,19 +3,23 @@
 
 from __future__ import annotations
 
+import inspect
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
+from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
-
-if TYPE_CHECKING:
-    pass
 
 _PropType = TypeVar("_PropType")
 _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
+_MaybeClassFunc = Union[Callable[["_OptionBase"], _ValueT], _ValueT]
+_HelpT = _MaybeClassFunc[str]
+
+def _call_lazy(cls: type[_OptionBase], val: _MaybeClassFunc[_ValueT]) -> _ValueT:
+    """"You're lazy!" JK it evaluates the possible classfunction."""
+    return val(cls) if inspect.isfunction(val) else val
 
 
 class _OptionBase(Generic[_PropType]):
@@ -37,8 +41,7 @@ class _OptionBase(Generic[_PropType]):
     """
 
     _flag_names: tuple[str, ...]
-    _kwargs: dict
-    option_type: Any  # NB: This should be some kind of callable that returns _PropType
+    _flag_options: dict
 
     # NB: Due to https://github.com/python/mypy/issues/5146, we try to keep the parameter list as
     # short as possible to avoid having to repeat the param in each of the 3 `__new__` specs that
@@ -50,20 +53,14 @@ class _OptionBase(Generic[_PropType]):
     def __new__(
         cls,
         *flag_names: str,
-        default: Any,
-        option_type: type | None = None,
-        help: str,
+        default: _MaybeClassFunc[Any],
+        help: _HelpT[str],
     ):
         self = super().__new__(cls)
         self._flag_names = flag_names
-        if option_type is None:
-            option_type = cls.option_type
-
-        self._kwargs = dict(
-            type=option_type,
-            default=default,
-            help=help,
-        )
+        self._default = default
+        self._help = help
+        self._kwargs = {}
         return self
 
     @property
@@ -73,8 +70,13 @@ class _OptionBase(Generic[_PropType]):
 
     @property
     def flag_options(self) -> dict:
-        """Returns a shallow-copy of the the internal flag options."""
-        return self._kwargs.copy()
+        """Returns the internal flag options."""
+        return dict(
+            help=_call_lazy(type(self), self._help),
+            default=_call_lazy(type(self), self._default),
+            type=getattr(self, "option_type"),
+            **self._kwargs,
+        )
 
     @overload
     def __get__(self, obj: None, objtype: Any) -> _OptionBase[_PropType]:
@@ -144,18 +146,13 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
     """
 
     option_type = list
-    member_type: Any
 
     def __new__(
         cls,
         *flag_names: str,
-        member_type: _ListMemberType | None = None,
         default: list[_ListMemberType] | None = None,
-        help: str,
+        help: _HelpT,
     ):
-        if member_type is None:
-            member_type = cls.member_type
-
         default = default or []
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
@@ -163,8 +160,11 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
             default=default,
             help=help,
         )
-        instance._kwargs["member_type"] = member_type
         return instance
+
+    @property
+    def flag_options(self) -> dict:
+        return dict(member_type=getattr(self, "member_type"), **super().flag_options)
 
     def _convert_(self, value: list[Any]) -> tuple[_ListMemberType]:
         return cast("tuple[_ListMemberType]", tuple(value))
@@ -181,11 +181,11 @@ class StrOption(_OptionBase[_PropType]):
     option_type: Any = str
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> StrOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> StrOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> StrOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> StrOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -198,11 +198,11 @@ class IntOption(_OptionBase[_PropType]):
     option_type: Any = int
 
     @overload
-    def __new__(cls, *flag_names: str, default: int, help: str) -> IntOption[int]:
+    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> IntOption[int]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> IntOption[int | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> IntOption[int | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -215,11 +215,11 @@ class FloatOption(_OptionBase[_PropType]):
     option_type: Any = float
 
     @overload
-    def __new__(cls, *flag_names: str, default: float, help: str) -> FloatOption[float]:
+    def __new__(cls, *flag_names: str, default: float, help: _HelpT) -> FloatOption[float]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> FloatOption[float | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> FloatOption[float | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -236,11 +236,11 @@ class BoolOption(_OptionBase[_PropType]):
     option_type: Any = bool
 
     @overload
-    def __new__(cls, *flag_names: str, default: bool, help: str) -> BoolOption[bool]:
+    def __new__(cls, *flag_names: str, default: bool, help: _HelpT) -> BoolOption[bool]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> BoolOption[bool | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> BoolOption[bool | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -261,13 +261,13 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: _EnumT, help: str) -> EnumOption[_EnumT]:
+    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
         ...
 
     # N.B. This has an additional param for the no-default-provided case: `option_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, option_type: type[_EnumT], help: str
+        cls, *flag_names: str, option_type: type[_EnumT], help: _HelpT
     ) -> EnumOption[_EnumT | None]:
         ...
 
@@ -278,14 +278,21 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
         default=None,
         help,
     ):
+        instance = super().__new__(cls, *flag_names, default=default, help=help)
+        instance._option_type = option_type
+        return instance
+
+    @property
+    def option_type(self) -> type[_EnumT]:
+        option_type = _call_lazy(self._option_type)
+        default = _call_lazy(self._default)
         if option_type is None:
             if default is None:
-                raise ValueError("`option_type` must be provided if `default` isn't provided.")
-            option_type = type(default)
-
-        return super().__new__(
-            cls, *flag_names, default=default, option_type=option_type, help=help
-        )
+                raise ValueError(
+                    "`option_type` must be provided to the constructor if `default` isn't provided."
+                )
+            return type(default)
+        return option_type
 
 
 class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
@@ -401,13 +408,13 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: list[_EnumT], help: str) -> EnumListOption[_EnumT]:
+    def __new__(cls, *flag_names: str, default: list[_EnumT], help: _HelpT) -> EnumListOption[_EnumT]:
         ...
 
     # N.B. This has an additional param for the no-default-provided case: `member_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, member_type: type[_EnumT], help: str
+        cls, *flag_names: str, member_type: type[_EnumT], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -464,7 +471,7 @@ class ArgsListOption(ShellStrListOption):
     Clients can call `passthrough()` to set the "passthrough" flag. See `passthrough` for more info.
     """
 
-    def __new__(cls, help: str):
+    def __new__(cls, help: _HelpT):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
