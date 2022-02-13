@@ -15,7 +15,6 @@ _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
-_SubsystemT = TypeVar("_SubsystemT")
 _MaybeClassFunc = Union[Callable[[Any], _ValueT], _ValueT]
 _HelpT = _MaybeClassFunc[str]
 
@@ -38,8 +37,6 @@ class _OptionBase(Generic[_PropType]):
     This class serves two purposes:
         - Collect registration values for your option.
         - Provide a typed property for Python usage
-
-    @TODO: option_type
 
     NOTE: Due to https://github.com/python/mypy/issues/5146 subclasses unfortunately need to provide
     overloaded `__new__` methods, as subclasses do not inherit overloaded function's annotations.
@@ -71,8 +68,8 @@ class _OptionBase(Generic[_PropType]):
         self._extra_kwargs = {}
         return self
 
+    # Override if necessary
     def get_option_type(self, subsystem_cls):
-        # Default implementation
         return type(self).option_type
 
     def get_flag_options(self, subsystem_cls) -> dict:
@@ -167,8 +164,8 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
         )
         return instance
 
+    # Override if necessary
     def get_member_type(self, subsystem_cls):
-        # Default implementation
         return type(self).member_type
 
     def get_flag_options(self, subsystem_cls) -> dict[str, Any]:
