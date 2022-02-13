@@ -141,7 +141,7 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=tgt_type.deprecated_alias_removal_version,
-        entity=f"the target name {tgt_type.deprecated_alias}",
+        entity=f"the target name `{tgt_type.deprecated_alias}`",
         hint=(
             f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `{bin_name()} "
             "update-build-files` to automatically fix your BUILD files."

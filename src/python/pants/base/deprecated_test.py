@@ -223,3 +223,22 @@ def test_is_deprecation_active() -> None:
     assert is_deprecation_active(start_version=None)
     assert is_deprecation_active(start_version="1.0.0")
     assert not is_deprecation_active(start_version=FUTURE_VERSION)
+
+
+def test_deprecation_class(caplog) -> None:
+    @deprecated(FUTURE_VERSION, "A hint!")
+    class DeprecatedClass:
+        """Doc string."""
+
+        def __init__(self, arg=42):
+            self.arg = arg
+
+    assert not caplog.records
+    assert DeprecatedClass.__name__ == "DeprecatedClass"
+    assert DeprecatedClass.__doc__ == "Doc string."
+
+    instance = DeprecatedClass(24)
+    assert instance.arg == 24
+    assert len(caplog.records) == 1
+    assert DeprecatedClass.__name__ in caplog.text
+    assert "A hint!" in caplog.text

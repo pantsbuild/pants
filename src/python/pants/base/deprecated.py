@@ -182,11 +182,28 @@ def deprecated(
     """Mark a function or method as deprecated."""
     validate_deprecation_semver(removal_version, "removal version")
 
-    def decorator(func):
-        if not inspect.isfunction(func):
+    def decorator(obj):
+        if inspect.isclass(obj):
+
+            @wraps(obj, updated=())
+            class Wrapper(obj):
+                def __init__(self, *args, **kwargs):
+                    warn_or_error(
+                        removal_version,
+                        f"class {Wrapper.__module__}.{Wrapper.__name__}",
+                        hint,
+                        start_version=start_version,
+                    )
+                    super().__init__(*args, **kwargs)
+
+            return Wrapper
+
+        if not inspect.isfunction(obj):
             raise BadDecoratorNestingError(
                 "The @deprecated decorator must be applied innermost of all decorators."
             )
+
+        func = obj
 
         @wraps(func)
         def wrapper(*args, **kwargs):
