@@ -20,6 +20,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -176,6 +177,16 @@ async def inject_lambda_handler_dependency(
     return InjectedDependencies(unambiguous_owners)
 
 
+class PythonAwsLambdaIncludeRequirements(BoolField):
+    alias = "include_requirements"
+    default = True
+    help = (
+        "Whether to resolve requirements and include them in the Pex. This is "
+        "most useful with Lambda Layers to make code uploads smaller when "
+        "deps are in layers. https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html"
+    )
+
+
 class PythonAwsLambdaRuntime(StringField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
@@ -210,6 +221,7 @@ class PythonAWSLambda(Target):
         OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
+        PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonResolveField,
     )
