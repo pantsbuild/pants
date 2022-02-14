@@ -19,7 +19,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies
+from pants.engine.target import CoarsenedTargets, Dependencies
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm import classpath
 from pants.jvm.classpath import Classpath
@@ -29,6 +29,7 @@ from pants.jvm.compile import (
     CompileResult,
     FallibleClasspathEntry,
 )
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.target_types import JvmJdkField, JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,19 @@ async def deploy_jar_classpath(
             "`deploy_jar` targets should not depend on one another:\n"
             f"{request.component.bullet_list()}"
         )
+
+    minimum_jdk_for_dependencies = await Get(JdkEnvironment, CoarsenedTargets([request.component]))
+    requested_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
+
+    if requested_jdk.jre_major_version < minimum_jdk_for_dependencies.jre_major_version:
+        raise Exception(
+            f"The `deploy_jar` target at `{request.component.representative.address}` specifies "
+            f"JDK version {requested_jdk.jre_major_version}, but has a dependency that requires "
+            f"version {minimum_jdk_for_dependencies.jre_major_version}. To fix, either build all "
+            "sources at the lower version, or specify a later JDK version for the `deploy_jar` "
+            "target."
+        )
+
     classpath_entries = FallibleClasspathEntry.if_all_succeeded(
         await MultiGet(
             Get(

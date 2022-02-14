@@ -11,14 +11,14 @@ import shlex
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar, Iterable, Iterator, Mapping
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve.common import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
@@ -363,6 +363,33 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
+
+
+@rule
+async def minimum_compatible_jdk(coarsened_targets: CoarsenedTargets) -> JdkEnvironment:
+    """Returns a `JdkEnvironment` that is capable of running all the specified targets.
+
+    The JVM tends to guarantee backwards compatibility, so it's legal to make JARs that consist of
+    multiple JVM bytecode versions. However, it is not possible to run newer versions of JVM
+    bytecode on older JVMs. This rule returns the lowest major JRE version compatible with all of
+    of the specified targets and their dependencies.
+
+    Any `Classpath` may be run by a JRE of equal or greater version than the `jre_major_version`
+    specified by that classpath.
+    """
+
+    def flatten(targets: Iterable[CoarsenedTarget]) -> Iterator[CoarsenedTarget]:
+        for target in targets:
+            if target.representative.has_field(JvmJdkField):
+                yield target
+            yield from flatten(target.dependencies)
+
+    jdks = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target))
+        for target in flatten(coarsened_targets)
+    )
+
+    return max(jdks, key=lambda jdk: jdk.jre_major_version)
 
 
 def rules():
