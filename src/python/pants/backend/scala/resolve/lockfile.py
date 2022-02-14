@@ -10,6 +10,7 @@ from pants.jvm.goals.lockfile import (
 )
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
+from pants.util.docutil import bin_name
 
 SCALA_LIBRARY_GROUP = "org.scala-lang"
 SCALA_LIBRARY_ARTIFACT = "scala-library"
@@ -26,7 +27,8 @@ class ConflictingScalaLibraryVersionInResolveError(ValueError):
             f"of the Scala runtime. This conflicts with Scala version {required_version} which is the configured version "
             "of Scala for this resolve from the `[scala].version_for_resolve` option. "
             "Please remove the `jvm_artifact` target with JVM coordinate "
-            f"{conflicting_coordinate.to_coord_str()}, then re-run the `generate-lockfiles` goal."
+            f"{conflicting_coordinate.to_coord_str()}, then re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`"
         )
 
 
@@ -37,7 +39,7 @@ class MissingScalaLibraryInResolveError(ValueError):
             "Since at least one Scala target type in this repository consumes this resolve, the resolve "
             "must contain a `jvm_artifact` target for the Scala runtime.\n\n"
             "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
-            "the `generate-lockfiles` goal:\n"
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
             "jvm_artifact(\n"
             f'  name="{SCALA_LIBRARY_GROUP}_{SCALA_LIBRARY_ARTIFACT}_{scala_version}",\n'
             f'  group="{SCALA_LIBRARY_GROUP}",\n',
