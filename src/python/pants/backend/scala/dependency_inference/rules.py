@@ -150,12 +150,11 @@ async def inject_scala_library_dependency(
 ) -> InjectedDependencies:
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     target = wrapped_target.target
+
     resolve = jvm.resolve_for_target(target)
     if not resolve:
-        raise AssertionError(
-            f"Attempted to inject a scala-library dependency on target `{target.address}` but it does "
-            "not have a resolve assigned. This should not have occurred. Please report to Pants maintainers."
-        )
+        return InjectedDependencies()
+
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
     )
