@@ -40,6 +40,10 @@ _PANTS_MANIFEST_PARTIAL_JAR_FILENAME = "pants_manifest_only.notajar"
 _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 
 
+class DeployJarAssemblyException(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
@@ -69,7 +73,7 @@ async def deploy_jar_classpath(
         # If multiple DeployJar targets were coarsened into a single instance, it's because they
         # formed a cycle among themselves... but at a high level, they shouldn't have dependencies
         # on one another anyway.
-        raise Exception(
+        raise DeployJarAssemblyException(
             "`deploy_jar` targets should not depend on one another:\n"
             f"{request.component.bullet_list()}"
         )
@@ -78,7 +82,7 @@ async def deploy_jar_classpath(
     requested_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
 
     if requested_jdk.jre_major_version < minimum_jdk_for_dependencies.jre_major_version:
-        raise Exception(
+        raise DeployJarAssemblyException(
             f"The `deploy_jar` target at `{request.component.representative.address}` specifies "
             f"JDK version {requested_jdk.jre_major_version}, but has a dependency that requires "
             f"version {minimum_jdk_for_dependencies.jre_major_version}. To fix, either build all "

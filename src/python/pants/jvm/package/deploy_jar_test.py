@@ -17,14 +17,14 @@ from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
-from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.package.deploy_jar import DeployJarAssemblyException, DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -334,3 +334,80 @@ def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
     )
 
     assert process_result.stdout.decode("utf-8").strip() == "Hello, World!"
+
+
+@maybe_skip_jdk_test
+def test_deploy_jar_fails_on_jdk_mismatch(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        output_path="dave.jar",
+                        jdk="adopt:1.11",
+                        dependencies=[
+                            ":app",
+                        ],
+                    )
+
+                    java_sources(
+                        name="app",
+                        jdk="adopt:1.11",
+                    )
+                """
+            ),
+            "lib/BUILD": dedent(
+                """\
+                    java_sources(
+                        jdk="adopt:1.12",
+                    )
+                """
+            ),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "Example.java": JAVA_MAIN_SOURCE,
+            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
+        }
+    )
+
+    with engine_error(DeployJarAssemblyException, contains="or specify a later JDK version"):
+        _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+
+
+@maybe_skip_jdk_test
+def test_deploy_jar_succeeds_if_deploy_jdk_greater_than_sources(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        output_path="dave.jar",
+                        jdk="adopt:1.12",
+                        dependencies=[
+                            ":app",
+                        ],
+                    )
+
+                    java_sources(
+                        name="app",
+                        jdk="adopt:1.11",
+                    )
+                """
+            ),
+            "lib/BUILD": dedent(
+                """\
+                    java_sources(
+                        jdk="adopt:1.11",
+                    )
+                """
+            ),
+            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "Example.java": JAVA_MAIN_SOURCE,
+            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
+        }
+    )
+
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
