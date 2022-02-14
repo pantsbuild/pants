@@ -146,7 +146,7 @@ async def build_local_dists(
 
     # We check source roots in reverse lexicographic order,
     # so we'll find the innermost root that matches.
-    source_roots = list(reversed(sorted(request.sources.source_roots)))
+    source_roots = sorted(request.sources.source_roots, reverse=True)
     remaining_sources = set(request.sources.source_files.files)
     unrooted_files_set = set(request.sources.source_files.unrooted_files)
     for source in request.sources.source_files.files:

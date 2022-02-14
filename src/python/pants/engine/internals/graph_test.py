@@ -373,10 +373,10 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             CoarsenedTargets,
             [Addresses([a])],
         )
-        assert list(sorted(t.address for t in coarsened_targets[0].members)) == expected_members
+        assert sorted(t.address for t in coarsened_targets[0].members) == expected_members
         # NB: Only the direct dependencies are compared.
         assert (
-            list(sorted(d.address for ct in coarsened_targets[0].dependencies for d in ct.members))
+            sorted(d.address for ct in coarsened_targets[0].dependencies for d in ct.members)
             == expected_dependencies
         )
 
@@ -1927,7 +1927,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
             provided_deps.append("!//:injected2")
         deps_field = deps_cls(provided_deps, Address("", target_name="target"))
         result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted([*injected, Address("", target_name="provided")]))
+        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
 
     assert_injected(Dependencies, injected=[])
     assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])

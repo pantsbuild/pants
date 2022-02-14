@@ -163,7 +163,7 @@ class RunTracker:
             "standard_goals": [goal for goal in self.goals if goal in self.STANDARD_GOALS],
             # Lets us know of any custom goals were used, without knowing their names.
             "num_goals": str(len(self.goals)),
-            "active_standard_backends": sorted(list(self.active_standard_backends)),
+            "active_standard_backends": sorted(self.active_standard_backends),
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:
