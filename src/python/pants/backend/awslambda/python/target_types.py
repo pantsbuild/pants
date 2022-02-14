@@ -181,8 +181,9 @@ class PythonAwsLambdaIncludeRequirements(BoolField):
     alias = "include_requirements"
     default = True
     help = (
-        "Whether to resolve requirements and include them in the Pex. See "
-        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
+        "Whether to resolve requirements and include them in the Pex. This is "
+        "most useful with Lambda Layers to make code uploads smaller when "
+        "deps are in layers. https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html"
     )
 
 
