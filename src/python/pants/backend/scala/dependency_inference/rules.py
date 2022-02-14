@@ -104,22 +104,22 @@ class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
 
 
 @dataclass(frozen=True)
-class ResolveScalaLibraryTargetForResolveRequest:
+class ScalaRuntimeForResolveRequest:
     resolve_name: str
 
 
 @dataclass(frozen=True)
-class ResolvedScalaLibraryTargetForResolve:
+class ScalaRuntimeForResolve:
     address: Address
 
 
 @rule
 async def resolve_scala_library_for_resolve(
-    request: ResolveScalaLibraryTargetForResolveRequest,
+    request: ScalaRuntimeForResolveRequest,
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
     scala_subsystem: ScalaSubsystem,
-) -> ResolvedScalaLibraryTargetForResolve:
+) -> ScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
     for tgt in jvm_artifact_targets:
@@ -139,7 +139,7 @@ async def resolve_scala_library_for_resolve(
                 request.resolve_name, scala_version, artifact.coordinate
             )
 
-        return ResolvedScalaLibraryTargetForResolve(tgt.address)
+        return ScalaRuntimeForResolve(tgt.address)
 
     raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
@@ -158,7 +158,7 @@ async def inject_scala_library_dependency(
             f"by setting the `{JvmResolveField.alias}` to a specific JVM resolve."
         )
     scala_library_target_info = await Get(
-        ResolvedScalaLibraryTargetForResolve, ResolveScalaLibraryTargetForResolveRequest(resolve)
+        ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
     )
     return InjectedDependencies((scala_library_target_info.address,))
 
