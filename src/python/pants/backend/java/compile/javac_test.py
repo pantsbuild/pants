@@ -276,7 +276,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
     coarsened_targets_sorted = sorted(
-        list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
+        coarsened_targets, key=lambda ctgt: str(list(ctgt.members)[0].address)
     )
 
     request0 = CompileJavaSourceRequest(
