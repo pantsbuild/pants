@@ -17,8 +17,16 @@ from pants.core.goals.package import (
 from pants.engine.fs import CreateDigest, Digest
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.core.util_rules.archive import TarBinary
+from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
+from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import (
+    BinaryPathRequest,
+    BinaryPaths,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+)
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -47,18 +55,13 @@ async def package_debian_package(
         ),
     )
     if not dpkg_deb_path.first_path:
-        raise OSError("Could not find the `dpkg-deb` program on search paths ")
-
-    output_filename = field_set.output_path.value_or_default(
-        file_ending="deb",
-    )
+        raise OSError(f"Could not find the `{dpkg_deb_path.binary_name}` program on search paths ")
 
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources_dir))
 
-    # TODO(alexey): now need to copy those files into a single directory, preserving the
-    #  directory hierarchy to be passed later to the dpkg-deb
-    for i in hydrated_sources.snapshot.files:
-        print(i)
+    # since all the sources are coming only from a single directory, it is
+    # safe to pick an arbitrary file and get its root directory name
+    sources_directory_name = PurePath(hydrated_sources.snapshot.files[0]).parts[0]
 
     result = await Get(
         ProcessResult,
@@ -66,16 +69,27 @@ async def package_debian_package(
             argv=(
                 dpkg_deb_path.first_path.path,
                 "--build",
-                # TODO: this needs to become the root directory name that we get from sources_dir
-                "sample-debian-package",
+                sources_directory_name,
             ),
             description="Create a Debian package from the produced packages.",
             input_digest=hydrated_sources.snapshot.digest,
-            output_files=(output_filename,),
+            # dpkg-deb produces a file with the same name as the input directory
+            output_files=(f"{sources_directory_name}.deb",),
             env={"PATH": str(PurePath(tar_binary_path.path).parent)},
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
-    return BuiltPackage(result.output_digest, artifacts=(BuiltPackageArtifact(output_filename),))
+    files = await Get(DigestEntries, Digest, result.output_digest)
+
+    # the output Debian package file needs to be renamed to match the name field in the
+    # debian_package target declaration
+    output_filename = field_set.output_path.value_or_default(
+        file_ending="deb",
+    )
+    file_of_interest = [f for f in files if isinstance(f, FileEntry)][0]
+    new_file = FileEntry(path=output_filename, file_digest=file_of_interest.file_digest)
+    final_result = await Get(Digest, CreateDigest([new_file]))
+    return BuiltPackage(final_result, artifacts=(BuiltPackageArtifact(output_filename),))
 
 
 def rules():
