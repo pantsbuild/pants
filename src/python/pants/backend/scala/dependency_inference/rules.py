@@ -37,7 +37,6 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.jvm.resolve.common import ArtifactRequirement
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
@@ -123,7 +122,7 @@ async def resolve_scala_library_for_resolve(
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
     for tgt in jvm_artifact_targets:
-        resolve = jvm.resolve_for_target(tgt) or jvm.default_resolve
+        resolve = jvm.resolve_for_target(tgt)
         if resolve != request.resolve_name:
             continue
 
@@ -151,11 +150,11 @@ async def inject_scala_library_dependency(
 ) -> InjectedDependencies:
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     target = wrapped_target.target
-    resolve = jvm.resolve_for_target(target) or jvm.default_resolve
+    resolve = jvm.resolve_for_target(target)
     if not resolve:
-        raise ValueError(
-            f"Target {target.address} does not have a resolve assigned to it. Please assign the target to a resolve "
-            f"by setting the `{JvmResolveField.alias}` to a specific JVM resolve."
+        raise AssertionError(
+            f"Attempted to inject a scala-library dependency on target `{target.address}` but it does "
+            "not have a resolve assigned. This should not have occurred. Please report to Pants maintainers."
         )
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
