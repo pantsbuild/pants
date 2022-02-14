@@ -21,7 +21,6 @@ from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
-from pants.jvm.target_types import JvmArtifactArtifactField
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
@@ -47,8 +46,6 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
         if target.has_field(ScalacPluginArtifactField):
             artifact_address_inputs.append(cast(str, target[ScalacPluginArtifactField].value))
             names.append(target.get(ScalacPluginNameField).value or target.address.target_name)
-        elif target.has_field(JvmArtifactArtifactField):
-            artifact_address_inputs.append(str(target.address))
         else:
             invalid_targets.append(target)
 
