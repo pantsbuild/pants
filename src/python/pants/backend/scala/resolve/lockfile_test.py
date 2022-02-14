@@ -15,7 +15,6 @@ from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGene
 from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.internals import build_files, graph
-from pants.engine.internals.scheduler import ExecutionError
 from pants.jvm import jdk_rules
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMserResolveNames
@@ -25,7 +24,7 @@ from pants.jvm.resolve.jvm_tool import rules as coursier_jvm_tool_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -70,14 +69,11 @@ def test_missing_scala_library_triggers_error(rule_runner: RuleRunner) -> None:
         }
     )
 
-    with pytest.raises(ExecutionError) as exc_info:
+    with engine_error(ValueError, contains="does not contain a requirement for the Scala runtime"):
         _ = rule_runner.request(
             UserGenerateLockfiles,
             [RequestedJVMserResolveNames(["foo"])],
         )
-    assert "does not contain a requirement for the Scala runtime" in str(
-        exc_info.value.wrapped_exceptions[0]
-    )
 
 
 @maybe_skip_jdk_test
@@ -100,12 +96,11 @@ def test_conflicting_scala_library_triggers_error(rule_runner: RuleRunner) -> No
         }
     )
 
-    with pytest.raises(ExecutionError) as exc_info:
+    with engine_error(
+        ValueError,
+        contains="The JVM resolve `foo` contains a `jvm_artifact` for version 2.13.1 of the Scala runtime",
+    ):
         _ = rule_runner.request(
             UserGenerateLockfiles,
             [RequestedJVMserResolveNames(["foo"])],
         )
-    assert (
-        "The JVM resolve `foo` contains a `jvm_artifact` for version 2.13.1 of the Scala runtime"
-        in str(exc_info.value.wrapped_exceptions[0])
-    )
