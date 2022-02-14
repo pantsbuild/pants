@@ -11,7 +11,7 @@ import shlex
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Iterator, Mapping
+from typing import ClassVar, Iterable, Mapping
 
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -378,15 +378,15 @@ async def minimum_compatible_jdk(coarsened_targets: CoarsenedTargets) -> JdkEnvi
     specified by that classpath.
     """
 
-    def flatten(targets: Iterable[CoarsenedTarget]) -> Iterator[CoarsenedTarget]:
-        for target in targets:
-            if target.representative.has_field(JvmJdkField):
-                yield target
-            yield from flatten(target.dependencies)
+    jdk_specifying_targets = (
+        target
+        for target in coarsened_targets.closure()
+        if target.representative.has_field(JvmJdkField)
+    )
 
     jdks = await MultiGet(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target))
-        for target in flatten(coarsened_targets)
+        for target in jdk_specifying_targets
     )
 
     return max(jdks, key=lambda jdk: jdk.jre_major_version)
