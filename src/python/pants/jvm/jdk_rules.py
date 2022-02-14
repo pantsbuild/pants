@@ -384,10 +384,11 @@ async def minimum_compatible_jdk(coarsened_targets: CoarsenedTargets) -> JdkEnvi
         if target.representative.has_field(JvmJdkField)
     )
 
-    jdks = await MultiGet(
-        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target))
-        for target in jdk_specifying_targets
-    )
+    # Deduplicate the set of `JdkRequest` objects _before_ making concurrent requests for their
+    # relevant JDKs (post-caching isn't useful if the request starts before we can cache!)
+    jdk_requests = set(JdkRequest.from_target(target) for target in jdk_specifying_targets)
+
+    jdks = await MultiGet(Get(JdkEnvironment, JdkRequest, request) for request in jdk_requests)
 
     return max(jdks, key=lambda jdk: jdk.jre_major_version)
 
