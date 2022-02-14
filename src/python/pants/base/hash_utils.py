@@ -85,20 +85,16 @@ class CoercingEncoder(json.JSONEncoder):
             # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
             # OrderedDict above.
             if isinstance(o, OrderedSet):
-                raise TypeError(
-                    "{cls} does not support OrderedSet inputs: {val!r}.".format(
-                        cls=type(self).__name__, val=o
-                    )
-                )
+                raise TypeError(f"{type(self).__name__} does not support OrderedSet inputs: {o!r}.")
             # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
             return sorted(self.default(i) for i in o)
         if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
-            return list(self.default(i) for i in o)
+            return [self.default(i) for i in o]
         logger.debug(
-            "Our custom json encoder {} is trying to hash a primitive type, but has gone through"
+            f"Our custom json encoder {type(self).__name__} is trying to hash a primitive type, but has gone through"
             "checking every other registered type class before. These checks are expensive,"
-            "so you should consider registering the type {} within"
-            "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__)
+            f"so you should consider registering the type {type(o)} within"
+            f"this function ({type(self).__name__}.default)"
         )
         return o
 

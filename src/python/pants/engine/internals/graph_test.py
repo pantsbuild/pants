@@ -941,7 +941,7 @@ def assert_generated(
         }
     )
     parametrizations = rule_runner.request(_TargetParametrizations, [address])
-    assert expected == set(t for t in parametrizations.parametrizations.values())
+    assert expected == set(parametrizations.parametrizations.values())
 
 
 def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
