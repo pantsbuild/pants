@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandlerField,
+    PythonAwsLambdaIncludeRequirements,
     PythonAwsLambdaRuntime,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
@@ -47,6 +48,7 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
     required_fields = (PythonAwsLambdaHandlerField, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandlerField
+    include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
     output_path: OutputPathField
 
@@ -94,6 +96,7 @@ async def package_python_awslambda(
     pex_request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
+        include_requirements=field_set.include_requirements.value,
         output_filename=output_filename,
         platforms=PexPlatforms([platform_str]),
         additional_args=additional_pex_args,
