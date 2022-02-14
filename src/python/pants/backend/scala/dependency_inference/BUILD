@@ -13,3 +13,11 @@ scala_sources(
     # TODO: Allow the parser files to be formatted.
     skip_scalafmt=True,
 )
+
+jvm_artifact(
+    name="org.scala-lang_scala-library_2.13.7",
+    group="org.scala-lang",
+    artifact="scala-library",
+    version="2.13.7",
+    resolve="scala_parser",
+)

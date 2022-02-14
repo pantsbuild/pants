@@ -180,6 +180,9 @@ java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lo
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
 
+[scala]
+version_for_resolve = { "scala_parser" = '2.13.7' }
+
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"

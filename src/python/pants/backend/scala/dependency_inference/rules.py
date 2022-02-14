@@ -2,10 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.resolve.lockfile import (
+    SCALA_LIBRARY_ARTIFACT,
+    SCALA_LIBRARY_GROUP,
+    ConflictingScalaLibraryVersionInResolveError,
+    MissingScalaLibraryInResolveError,
+)
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -15,12 +24,18 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    ThirdPartyPackageToArtifactMapping,
+)
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.resolve.common import ArtifactRequirement
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.ordered_set import OrderedSet
 
@@ -83,6 +98,69 @@ async def infer_scala_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
+class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
+    inject_for = ScalaDependenciesField
+
+
+@dataclass(frozen=True)
+class ScalaRuntimeForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ScalaRuntimeForResolve:
+    address: Address
+
+
+@rule
+async def resolve_scala_library_for_resolve(
+    request: ScalaRuntimeForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+    scala_subsystem: ScalaSubsystem,
+) -> ScalaRuntimeForResolve:
+    scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
+
+    for tgt in jvm_artifact_targets:
+        resolve = jvm.resolve_for_target(tgt)
+        if resolve != request.resolve_name:
+            continue
+
+        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
+        if (
+            artifact.coordinate.group != SCALA_LIBRARY_GROUP
+            or artifact.coordinate.artifact != SCALA_LIBRARY_ARTIFACT
+        ):
+            continue
+
+        if artifact.coordinate.version != scala_version:
+            raise ConflictingScalaLibraryVersionInResolveError(
+                request.resolve_name, scala_version, artifact.coordinate
+            )
+
+        return ScalaRuntimeForResolve(tgt.address)
+
+    raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
+
+
+@rule(desc="Inject dependency on scala-library artifact for Scala target.")
+async def inject_scala_library_dependency(
+    request: InjectScalaLibraryDependencyRequest,
+    jvm: JvmSubsystem,
+) -> InjectedDependencies:
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    target = wrapped_target.target
+
+    resolve = jvm.resolve_for_target(target)
+    if not resolve:
+        return InjectedDependencies()
+
+    scala_library_target_info = await Get(
+        ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
+    )
+    return InjectedDependencies((scala_library_target_info.address,))
+
+
 def rules():
     return [
         *collect_rules(),
@@ -90,4 +168,5 @@ def rules():
         *scala_parser.rules(),
         *symbol_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
+        UnionRule(InjectDependenciesRequest, InjectScalaLibraryDependencyRequest),
     ]
