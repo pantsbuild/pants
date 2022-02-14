@@ -111,7 +111,7 @@ class OrgPair:
 
 
 def main():
-    orgs = sorted(list(_orgs), key=lambda x: x.name.lower())
+    orgs = sorted(_orgs, key=lambda x: x.name.lower())
     # Ensure an even number of cells, leaving one to render blankly if necessary.
     if len(orgs) % 2 == 1:
         orgs.append(Org("", "", ""))

@@ -186,12 +186,10 @@ class ScalaSourceTarget(Target):
 
 
 class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
-    default = tuple(
-        (
-            "*.scala",
-            *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
-            *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
-        )
+    default = (
+        "*.scala",
+        *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
+        *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
     )
 
 

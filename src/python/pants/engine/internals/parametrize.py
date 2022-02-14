@@ -95,13 +95,8 @@ class Parametrize:
                 {field_name: alias for field_name, alias, _ in parametrized_args}
             )
             expanded_fields: dict[str, Any] = dict(
-                (
-                    *non_parametrized,
-                    *(
-                        (field_name, field_value)
-                        for field_name, _, field_value in parametrized_args
-                    ),
-                )
+                *non_parametrized,
+                *((field_name, field_value) for field_name, _, field_value in parametrized_args),
             )
             yield (expanded_address, expanded_fields)
 
