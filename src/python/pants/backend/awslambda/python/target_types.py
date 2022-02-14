@@ -185,6 +185,7 @@ class PythonAwsLambdaIncludeRequirements(BoolField):
         "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
     )
 
+
 class PythonAwsLambdaRuntime(StringField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
