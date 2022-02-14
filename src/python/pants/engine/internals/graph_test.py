@@ -1927,7 +1927,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
             provided_deps.append("!//:injected2")
         deps_field = deps_cls(provided_deps, Address("", target_name="target"))
         result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted(*injected, Address("", target_name="provided")))
+        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
 
     assert_injected(Dependencies, injected=[])
     assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])
