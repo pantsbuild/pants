@@ -48,7 +48,7 @@ class ValidateJvmArtifactsForResolveRequest:
 
 
 @dataclass(frozen=True)
-class ValidatedJvmArtifactsForResolve:
+class ValidateJvmArtifactsForResolveResult:
     """Sentinel type that represents that a backend is satisfied with the artifacts for a JVM
     resolve."""
 
@@ -112,7 +112,7 @@ async def validate_jvm_artifacts_for_resolve(
     for impl in impls:
         validate_request = impl(artifacts=request.artifacts, resolve_name=request.resolve_name)
         _ = await Get(
-            ValidatedJvmArtifactsForResolve,
+            ValidateJvmArtifactsForResolveResult,
             ValidateJvmArtifactsForResolveRequest,
             validate_request,
         )

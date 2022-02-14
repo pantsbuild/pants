@@ -5,8 +5,8 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.goals.lockfile import (
-    ValidatedJvmArtifactsForResolve,
     ValidateJvmArtifactsForResolveRequest,
+    ValidateJvmArtifactsForResolveResult,
 )
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
@@ -60,7 +60,7 @@ async def validate_scala_runtime_is_present_in_resolve(
     scala_subsystem: ScalaSubsystem,
     scala_targets: AllScalaTargets,
     jvm: JvmSubsystem,
-) -> ValidatedJvmArtifactsForResolve:
+) -> ValidateJvmArtifactsForResolveResult:
     first_party_target_uses_this_resolve = False
     for tgt in scala_targets:
         tgt_resolve_name = jvm.resolve_for_target(tgt)
@@ -69,7 +69,7 @@ async def validate_scala_runtime_is_present_in_resolve(
             break
 
     if not first_party_target_uses_this_resolve:
-        return ValidatedJvmArtifactsForResolve()
+        return ValidateJvmArtifactsForResolveResult()
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
@@ -91,7 +91,7 @@ async def validate_scala_runtime_is_present_in_resolve(
     if not has_scala_library_artifact:
         raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
-    return ValidatedJvmArtifactsForResolve()
+    return ValidateJvmArtifactsForResolveResult()
 
 
 def rules():
