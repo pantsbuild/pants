@@ -16,7 +16,7 @@ from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.lambdex import rules as awslambda_python_subsystem_rules
-from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles, ResourcesGeneratorTarget
@@ -40,6 +40,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             PythonAWSLambda,
+            PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
             FilesGeneratorTarget,
             RelocatedFiles,
@@ -80,16 +81,26 @@ def test_create_hello_world_lambda(
         {
             "src/python/foo/bar/hello_world.py": dedent(
                 """
+                import mureq
+
                 def handler(event, context):
                     print('Hello, World!')
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
                 """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
                 python_sources(name='lib')
 
                 python_awslambda(
                     name='lambda',
+                    dependencies=[':lib'],
+                    handler='foo.bar.hello_world:handler',
+                    runtime='python3.7',
+                )
+                python_awslambda(
+                    name='slimlambda',
+                    include_requirements=False,
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
                     runtime='python3.7',
@@ -107,9 +118,23 @@ def test_create_hello_world_lambda(
     zipfile = ZipFile(BytesIO(content))
     names = set(zipfile.namelist())
     assert "lambdex_handler.py" in names
-    assert "foo/bar/hello_world.py" in names
+    assert (
+        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
+    ), "third-party dep `mureq` must be included"
     if sys.platform == "darwin":
         assert "AWS Lambdas built on macOS may fail to build." in caplog.text
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="slimlambda"),
+        extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+    )
+    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert (
+        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" not in names
+    ), "Using include_requirements=False should exclude third-party deps"
 
 
 def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
