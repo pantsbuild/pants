@@ -5,18 +5,17 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
 
 _PropType = TypeVar("_PropType")
-_EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
-_MaybeClassFunc = Union[Callable[[Any], _ValueT], _ValueT]
-_HelpT = _MaybeClassFunc[str]
+_ClassFunc = Callable[[Any], _ValueT]
+_MaybeClassFunc = Union[_ClassFunc[_ValueT], _ValueT]
+_HelpT = Union[Callable[[Any], str], str]
 
 
 def _eval_maybe_classfunc(subsystem_cls, val: _MaybeClassFunc[_ValueT]) -> _ValueT:
@@ -44,7 +43,7 @@ class _OptionBase(Generic[_PropType]):
     """
 
     _flag_names: tuple[str, ...]
-    _default: _MaybeClassFunc[Any]
+    _default: Any | Callable[[Any], Any]
     _help = _HelpT
     _extra_kwargs: dict[str, Any]
 
@@ -58,7 +57,7 @@ class _OptionBase(Generic[_PropType]):
     def __new__(
         cls,
         *flag_names: str,
-        default: _MaybeClassFunc[Any],
+        default: Any | Callable[[Any], Any],
         help: _HelpT,
     ):
         self = super().__new__(cls)
@@ -263,32 +262,54 @@ class BoolOption(_OptionBase[_PropType]):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
-class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
+class EnumOption(_OptionBase[_PropType]):
     """An Enum option.
 
     If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
     of the default. Otherwise, you'll need to provide the `enum_type`.
     In either case, mypy will infer the correct Generic's type-parameter so you shouldn't need to
     provide it, unless you're using a "dynamic" default (e.g. `lambda cls: ...`) in which case you
-    _will_ need ot provide the type-parameter.
+    _will_ need to provide the type-parameter.
 
     E.g.
         EnumOption(..., enum_type=MyEnum)  # property type is deduced as `MyEnum | None`
         EnumOption(..., default=MyEnum.Value)  # property type is deduced as `MyEnum`
         EnumOption[MyEnum](..., default=lambda cls: cls.default_val)  # property type is `MyEnum`
+        # If the default is None-able, use [MyEnum | None] as the type parameter
+        EnumOption[MyEnum | None](..., default=lambda cls: cls.default_val)  # property type is `MyEnum | None`
     """
 
     @overload
     def __new__(
-        cls, *flag_names: str, default: _MaybeClassFunc[_EnumT], help: _HelpT
-    ) -> EnumOption[_EnumT]:
+        # NB: We mark the callable as returning `Any` because the caller will be providing the enum
+        # type parameter anyways, and will likely be using an untyped lambda for the default.
+        cls,
+        *flag_names: str,
+        default: _ClassFunc[Any],
+        help: _HelpT,
+    ) -> EnumOption[_PropType]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
+    @overload
+    def __new__(cls, *flag_names: str, default: _PropType, help: _HelpT) -> EnumOption[_PropType]:
+        ...
+
+    # N.B. These have an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, enum_type: _MaybeClassFunc[type[_EnumT]], help: _HelpT
-    ) -> EnumOption[_EnumT | None]:
+        # NB: We mark the callable as returning `Any` because the caller will be providing the enum
+        # type parameter anyways, and will likely be using an untyped lambda for the default.
+        cls,
+        *flag_names: str,
+        enum_type: _ClassFunc[Any],
+        help: _HelpT,
+    ) -> EnumOption[_PropType | None]:
+        ...
+
+    @overload
+    def __new__(
+        cls, *flag_names: str, enum_type: type[_PropType], help: _HelpT
+    ) -> EnumOption[_PropType | None]:
         ...
 
     def __new__(
@@ -413,30 +434,44 @@ class BoolListOption(_ListOptionBase[bool]):
     member_type: Any = bool
 
 
-class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
+class EnumListOption(_ListOptionBase[_PropType]):
     """An homogenous list of Enum options.
 
     If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
-    of the first element of the default. Otherwise, you'll need to provide the `option_type`.
-    In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
-    provide it.
+    of the first element of the default. Otherwise, you'll need to provide the `enum_type`.
+    In either case, mypy will infer the correct Generic's type-parameter so you shouldn't need to
+    provide it, unless you're using a "dynamic" default (e.g. `lambda cls: ...`) in which case you
+    _will_ need to provide the type-parameter.
 
     E.g.
         EnumListOption(..., enum_type=MyEnum)  # property type is deduced as `[MyEnum]`
         EnumListOption(..., default=[MyEnum.Value])  # property type is deduced as `[MyEnum]`
+        EnumListOption[MyEnum](..., default=lambda cls: cls.default_val)  # property type is `tuple[MyEnum, ...]`
     """
 
     @overload
     def __new__(
-        cls, *flag_names: str, default: _MaybeClassFunc[list[_EnumT]], help: _HelpT
-    ) -> EnumListOption[_EnumT]:
+        cls, *flag_names: str, default: _ClassFunc[Any], help: _HelpT
+    ) -> EnumListOption[_PropType]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, enum_type: _MaybeClassFunc[type[_EnumT]], help: _HelpT
-    ) -> EnumListOption[_EnumT]:
+        cls, *flag_names: str, default: list[_PropType], help: _HelpT
+    ) -> EnumListOption[_PropType]:
+        ...
+
+    # N.B. These have an additional param for the no-default-provided case: `enum_type`.
+    @overload
+    def __new__(
+        cls, *flag_names: str, enum_type: type[_PropType], help: _HelpT
+    ) -> EnumListOption[_PropType]:
+        ...
+
+    @overload
+    def __new__(
+        cls, *flag_names: str, enum_type: _ClassFunc[Any], help: _HelpT
+    ) -> EnumListOption[_PropType]:
         ...
 
     def __new__(

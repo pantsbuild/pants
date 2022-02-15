@@ -160,7 +160,7 @@ def test_enum_options() -> None:
         enum_list_prop = EnumListOption(
             "--enum-list-opt", default=[MyEnum.Val1], help=lambda cls: f"{cls.dyn_help}"
         )
-        dyn_enum_list_prop = EnumListOption(
+        dyn_enum_list_prop = EnumListOption[MyEnum](
             "--dyn-enum-list-opt", default=lambda cls: [cls.dyn_enum_val], help=""
         )
         defaultless_enum_list_prop = EnumListOption(
