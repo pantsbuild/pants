@@ -4,6 +4,7 @@
 from collections import defaultdict
 from typing import DefaultDict
 
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
     ProtobufGrpcToggleField,
@@ -15,7 +16,12 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ModuleProvider,
     ModuleProviderType,
 )
+from pants.backend.python.util_rules.pex_from_targets import (
+    ChosenPythonResolve,
+    ChosenPythonResolveRequest,
+)
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -33,8 +39,13 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
 @rule(desc="Creating map of Protobuf targets to generated Python modules", level=LogLevel.DEBUG)
 async def map_protobuf_to_python_modules(
     protobuf_targets: AllProtobufTargets,
+    python_protobuf: PythonProtobufSubsystem,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
+    runtime_deps = await Get(Addresses, UnparsedAddressInputs, python_protobuf.runtime_dependencies)
+    # TODO: better error message. Mention `runtime_dependencies` option.
+    resolve = await Get(ChosenPythonResolve, ChosenPythonResolveRequest(runtime_deps))
+
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
@@ -53,9 +64,8 @@ async def map_protobuf_to_python_modules(
                 proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc")
             ].append(ModuleProvider(tgt.address, ModuleProviderType.IMPL))
 
-    return FirstPartyPythonMappingImpl(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
-    )
+    mapping = ((k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items()))
+    return FirstPartyPythonMappingImpl({resolve.name: mapping})
 
 
 def rules():

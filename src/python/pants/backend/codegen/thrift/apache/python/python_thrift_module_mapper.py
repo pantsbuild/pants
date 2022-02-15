@@ -8,6 +8,7 @@ from pathlib import PurePath
 from typing import DefaultDict
 
 from pants.backend.codegen.thrift import thrift_parser
+from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
 from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -16,6 +17,11 @@ from pants.backend.python.dependency_inference.module_mapper import (
     ModuleProvider,
     ModuleProviderType,
 )
+from pants.backend.python.util_rules.pex_from_targets import (
+    ChosenPythonResolve,
+    ChosenPythonResolveRequest,
+)
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -33,8 +39,13 @@ class PythonThriftMappingMarker(FirstPartyPythonMappingImplMarker):
 @rule(desc="Creating map of Thrift targets to generated Python modules", level=LogLevel.DEBUG)
 async def map_thrift_to_python_modules(
     thrift_targets: AllThriftTargets,
+    python_thrift: ThriftPythonSubsystem,
     _: PythonThriftMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
+    runtime_deps = await Get(Addresses, UnparsedAddressInputs, python_thrift.runtime_dependencies)
+    # TODO: better error message. Mention `runtime_dependencies` option.
+    resolve = await Get(ChosenPythonResolve, ChosenPythonResolveRequest(runtime_deps))
+
     parsed_files = await MultiGet(
         Get(ParsedThrift, ParsedThriftRequest(tgt[ThriftSourceField])) for tgt in thrift_targets
     )
@@ -46,9 +57,9 @@ async def map_thrift_to_python_modules(
         )
         modules_to_providers[m1].append(provider)
         modules_to_providers[m2].append(provider)
-    return FirstPartyPythonMappingImpl(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
-    )
+
+    mapping = ((k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items()))
+    return FirstPartyPythonMappingImpl({resolve.name: mapping})
 
 
 def rules():

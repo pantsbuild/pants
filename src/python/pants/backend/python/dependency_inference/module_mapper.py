@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementTypeStubModulesField,
+    PythonResolveField,
     PythonSourceField,
 )
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
@@ -34,6 +35,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+_ResolveName = str
 
 
 class ModuleProviderType(enum.Enum):
@@ -77,9 +80,15 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
 # -----------------------------------------------------------------------------------------------
 
 
-class FirstPartyPythonMappingImpl(FrozenDict[str, Tuple[ModuleProvider, ...]]):
-    """A mapping of module names to owning addresses that a specific implementation adds for Python
-    import dependency inference."""
+class FirstPartyPythonMappingImpl(
+    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+):
+    """A mapping of each resolve name to the first-party module names contained and their owning
+    addresses.
+
+    This contains the modules from a specific implementation, e.g. a codegen backend. All
+    implementations then get merged.
+    """
 
 
 @union
@@ -92,15 +101,22 @@ class FirstPartyPythonMappingImplMarker:
     """
 
 
-class FirstPartyPythonModuleMapping(FrozenDict[str, Tuple[ModuleProvider, ...]]):
-    """A merged mapping of module names to owning addresses.
+class FirstPartyPythonModuleMapping(
+    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+):
+    """A merged mapping of each resolve name to the first-party module names contained and their
+    owning addresses.
 
     This mapping may have been constructed from multiple distinct implementations, e.g.
     implementations for each codegen backends.
     """
 
-    def providers_for_module(self, module: str) -> tuple[ModuleProvider, ...]:
-        result = self.get(module, ())
+    def _providers_for_resolve(self, module: str, resolve: str) -> tuple[ModuleProvider, ...]:
+        mapping = self.get(resolve)
+        if not mapping:
+            return ()
+
+        result = mapping.get(module, ())
         if result:
             return result
 
@@ -114,7 +130,21 @@ class FirstPartyPythonModuleMapping(FrozenDict[str, Tuple[ModuleProvider, ...]])
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.get(parent_module, ())
+        return mapping.get(parent_module, ())
+
+    def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
+        """Find all providers for the module.
+
+        If `resolve` is None, will not consider resolves, i.e. any `python_source` et al can be
+        used. Otherwise, providers can only come from first-party targets with the resolve.
+        """
+        if resolve:
+            return self._providers_for_resolve(module, resolve)
+        return tuple(
+            itertools.chain.from_iterable(
+                self._providers_for_resolve(module, resolve) for resolve in list(self.keys())
+            )
+        )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -129,6 +159,7 @@ async def merge_first_party_module_mappings(
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
+    # TODO: merge this
     modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
     for mapping_impl in all_mappings:
         for module, providers in mapping_impl.items():
@@ -146,32 +177,47 @@ class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
 
 @rule(desc="Creating map of first party Python targets to Python modules", level=LogLevel.DEBUG)
 async def map_first_party_python_targets_to_modules(
-    _: FirstPartyPythonTargetsMappingMarker, all_python_targets: AllPythonTargets
+    _: FirstPartyPythonTargetsMappingMarker,
+    all_python_targets: AllPythonTargets,
+    python_setup: PythonSetup,
 ) -> FirstPartyPythonMappingImpl:
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
         for tgt in all_python_targets.first_party
     )
 
-    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
+    resolves_to_modules_to_providers: dict[
+        _ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = {}
     for tgt, stripped_file in zip(all_python_targets.first_party, stripped_file_per_target):
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
+
         stripped_f = PurePath(stripped_file.value)
         provider_type = (
             ModuleProviderType.TYPE_STUB if stripped_f.suffix == ".pyi" else ModuleProviderType.IMPL
         )
         module = module_from_stripped_path(stripped_f)
-        modules_to_providers[module].append(ModuleProvider(tgt.address, provider_type))
+
+        if resolve not in resolves_to_modules_to_providers:
+            resolves_to_modules_to_providers[resolve] = defaultdict(list)
+        resolves_to_modules_to_providers[resolve][module].append(
+            ModuleProvider(tgt.address, provider_type)
+        )
 
     return FirstPartyPythonMappingImpl(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
+        (
+            resolve,
+            FrozenDict(
+                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+            ),
+        )
+        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
     )
 
 
 # -----------------------------------------------------------------------------------------------
 # Third party module mapping
 # -----------------------------------------------------------------------------------------------
-
-_ResolveName = str
 
 
 class ThirdPartyPythonModuleMapping(
@@ -200,8 +246,7 @@ class ThirdPartyPythonModuleMapping(
         """Find all providers for the module.
 
         If `resolve` is None, will not consider resolves, i.e. any `python_requirement` can be
-        consumed. Otherwise, providers can only come from `python_requirements` marked compatible
-        with the resolve.
+        consumed. Otherwise, providers can only come from `python_requirements` with the resolve.
         """
         if resolve:
             return self._providers_for_resolve(module, resolve)
@@ -319,7 +364,7 @@ async def map_module_to_address(
 ) -> PythonModuleOwners:
     providers = [
         *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
-        *first_party_mapping.providers_for_module(request.module),
+        *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     ]
     addresses = tuple(provider.addr for provider in providers)
 
