@@ -26,6 +26,9 @@ backend_packages.add = [
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
+  "pants.backend.experimental.helm",
+  "pants.backend.experimental.helm.codegen.helmdocs",
+  "pants.backend.experimental.helm.test.unittest",
   "internal_plugins.releases",
 ]
 plugins = [
