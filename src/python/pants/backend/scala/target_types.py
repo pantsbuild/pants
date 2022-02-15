@@ -50,12 +50,14 @@ class ScalaDependenciesField(Dependencies):
     pass
 
 
-class ScalaPluginNamesField(StringSequenceField):
+class ScalaConsumedPluginNamesField(StringSequenceField):
     """The names of Scala plugins that this source file requires.
 
     If not specified, this will default to the plugins specified in `--scalac-plugins` for this
     target's resolve.
     """
+
+    alias = "experimental_plugins"
 
 
 @dataclass(frozen=True)

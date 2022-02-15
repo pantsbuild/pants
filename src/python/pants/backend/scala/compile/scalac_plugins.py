@@ -8,19 +8,23 @@ from typing import Iterator, cast
 
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import (
+    ScalaConsumedPluginNamesField,
     ScalacPluginArtifactField,
     ScalacPluginNameField,
     ScalacPluginTarget,
 )
-from pants.build_graph.address import AddressInput
+from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import AllTargets, Target, Targets, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
@@ -29,6 +33,21 @@ from pants.util.strutil import bullet_list
 class _LoadedGlobalScalacPlugins:
     names: tuple[str, ...]
     artifact_address_inputs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ScalaPluginsForTargetRequest:
+    target: Target
+
+
+@dataclass(frozen=True)
+class ScalaPluginsForTarget:
+    plugins: Targets
+    artifacts: Targets
+
+
+class AllScalaPluginTargets(Targets):
+    pass
 
 
 @rule
@@ -45,7 +64,7 @@ async def parse_global_scalac_plugins(scalac_plugins: Scalac) -> _LoadedGlobalSc
         target = wrapped_target.target
         if target.has_field(ScalacPluginArtifactField):
             artifact_address_inputs.append(cast(str, target[ScalacPluginArtifactField].value))
-            names.append(target.get(ScalacPluginNameField).value or target.address.target_name)
+            names.append(_plugin_name(target))
         else:
             invalid_targets.append(target)
 
@@ -105,6 +124,66 @@ async def global_scalac_plugins(
         ToolClasspathRequest(prefix="__scalac_plugin_cp", lockfile=lockfile_request),
     )
     return GlobalScalacPlugins(loaded_global_plugins.names, classpath)
+
+
+@rule
+async def all_scala_plugin_targets(targets: AllTargets) -> AllScalaPluginTargets:
+    return AllScalaPluginTargets(
+        tgt for tgt in targets if tgt.has_fields((ScalacPluginArtifactField, ScalacPluginNameField))
+    )
+
+
+@rule
+async def resolve_scala_plugins_for_target(
+    request: ScalaPluginsForTargetRequest,
+    all_scala_plugins: AllScalaPluginTargets,
+    jvm: JvmSubsystem,
+    scalac: Scalac,
+) -> ScalaPluginsForTarget:
+
+    target = request.target
+    resolve = target[JvmResolveField].normalized_value(jvm)
+
+    plugin_names = target.get(ScalaConsumedPluginNamesField).value
+    if plugin_names is None:
+        plugin_names_by_resolve = scalac.parsed_default_plugins()
+        plugin_names = tuple(plugin_names_by_resolve.get(resolve) or ())
+
+    candidate_plugins: list[Target] = []
+    for plugin in all_scala_plugins:
+        if _plugin_name(plugin) in plugin_names:
+            candidate_plugins.append(plugin)
+
+    artifact_address_inputs = (
+        plugin[ScalacPluginArtifactField].value for plugin in candidate_plugins
+    )
+
+    artifact_addresses = await MultiGet(
+        # `is not None` is solely to satiate mypy. artifact field is required.
+        Get(Address, AddressInput, AddressInput.parse(ai))
+        for ai in artifact_address_inputs
+        if ai is not None
+    )
+
+    candidate_artifacts = await Get(Targets, Addresses(artifact_addresses))
+
+    plugins: dict[str, tuple[Target, Target]] = {}  # Maps plugin name to relevant JVM artifact
+    for plugin, artifact in zip(candidate_plugins, candidate_artifacts):
+        if artifact[JvmResolveField].normalized_value(jvm) != resolve:
+            continue
+
+        plugins[_plugin_name(plugin)] = (plugin, artifact)
+
+    for plugin_name in plugin_names:
+        if plugin_name not in plugins:
+            raise Exception(f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}`")
+
+    plugin_targets, artifact_targets = zip(*plugins.values())
+    return ScalaPluginsForTarget(Targets(plugin_targets), Targets(artifact_targets))
+
+
+def _plugin_name(target: Target) -> str:
+    return target[ScalacPluginNameField].value or target.address.target_name
 
 
 def rules():

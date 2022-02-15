@@ -55,4 +55,7 @@ class Scalac(Subsystem):
     ).advanced()
 
     def parsed_default_plugins(self) -> dict[str, list[str]]:
-        return {key: ",".split(value) for key, value in self.default_plugins.items()}
+        return {
+            key: [i.strip() for i in value.split(",")]
+            for key, value in self.default_plugins.items()
+        }

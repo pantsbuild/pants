@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
+from pants.backend.scala.compile.scalac_plugins import (
+    GlobalScalacPlugins,
+    ScalaPluginsForTarget,
+    ScalaPluginsForTargetRequest,
+)
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
@@ -95,6 +99,10 @@ async def compile_scala_source(
         ),
     )
 
+    plugins = await MultiGet(
+        Get(ScalaPluginsForTarget, ScalaPluginsForTargetRequest(target))
+        for target in request.component.members
+    )
     component_members_and_scala_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
