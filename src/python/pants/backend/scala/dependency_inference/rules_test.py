@@ -266,6 +266,8 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
                 """\
             package org.pantsbuild.user
 
+            import org.pantsbuild.lib.Library
+
             object Main {
               def main(args: Array[String]): Unit = {
                 Library.grok()
