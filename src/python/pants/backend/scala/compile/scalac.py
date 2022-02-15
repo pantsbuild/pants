@@ -10,8 +10,10 @@ from itertools import chain
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scalac_plugins import (
     GlobalScalacPlugins,
-    ScalaPluginsForTarget,
+    ScalaPlugins,
     ScalaPluginsForTargetRequest,
+    ScalaPluginsRequest,
+    ScalaPluginTargetsForTarget,
 )
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -99,10 +101,13 @@ async def compile_scala_source(
         ),
     )
 
-    plugins = await MultiGet(
-        Get(ScalaPluginsForTarget, ScalaPluginsForTargetRequest(target))
+    plugins_ = await MultiGet(
+        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(target))
         for target in request.component.members
     )
+    plugins_request = ScalaPluginsRequest.from_target_plugins(plugins_, request.resolve)
+    local_plugins = await Get(ScalaPlugins, ScalaPluginsRequest, plugins_request)
+
     component_members_and_scala_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
@@ -124,6 +129,7 @@ async def compile_scala_source(
 
     toolcp_relpath = "__toolcp"
     scalac_plugins_relpath = "__plugincp"
+    local_scalac_plugins_relpath = "__localplugincp"
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
@@ -159,6 +165,7 @@ async def compile_scala_source(
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
+        local_scalac_plugins_relpath: local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
@@ -176,6 +183,7 @@ async def compile_scala_source(
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
                 *scalac_plugins.args(scalac_plugins_relpath),
+                *local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
                 "-d",

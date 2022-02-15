@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPluginsForTarget,
     ScalaPluginsForTargetRequest,
+    ScalaPluginTargetsForTarget,
 )
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
@@ -178,7 +178,7 @@ async def inject_scala_plugin_dependencies(
     if not target.has_field(JvmResolveField):
         return InjectedDependencies()
 
-    scala_plugins = await Get(ScalaPluginsForTarget, ScalaPluginsForTargetRequest(target))
+    scala_plugins = await Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(target))
 
     plugin_addresses = [target.address for target in scala_plugins.artifacts]
 

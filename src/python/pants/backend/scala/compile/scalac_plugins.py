@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterator, cast
+from typing import Iterable, Iterator, cast
 
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import (
@@ -16,13 +16,20 @@ from pants.backend.scala.target_types import (
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Addresses
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, Target, Targets, WrappedTarget
+from pants.engine.target import AllTargets, CoarsenedTargets, Target, Targets, WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.jvm.compile import ClasspathEntry, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierFetchRequest,
+    ToolClasspath,
+    ToolClasspathRequest,
+)
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet
@@ -41,9 +48,41 @@ class ScalaPluginsForTargetRequest:
 
 
 @dataclass(frozen=True)
-class ScalaPluginsForTarget:
+class ScalaPluginTargetsForTarget:
     plugins: Targets
     artifacts: Targets
+
+
+@dataclass(frozen=True)
+class ScalaPluginsRequest:
+    plugins: Targets
+    artifacts: Targets
+    resolve: CoursierResolveKey
+
+    @classmethod
+    def from_target_plugins(
+        cls, seq: Iterable[ScalaPluginTargetsForTarget], resolve: CoursierResolveKey
+    ) -> ScalaPluginsRequest:
+        plugins: set[Target] = set()
+        artifacts: set[Target] = set()
+        for spft in seq:
+            plugins = plugins.union(spft.plugins)
+            artifacts = artifacts.union(spft.artifacts)
+
+        return ScalaPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
+
+
+@dataclass(frozen=True)
+class ScalaPlugins:
+    names: tuple[str, ...]
+    classpath: ClasspathEntry
+
+    def args(self, prefix: str | None = None) -> Iterator[str]:
+        p = f"{prefix}/" if prefix else ""
+        for scalac_plugin_path in self.classpath.filenames:
+            yield f"-Xplugin:{p}{scalac_plugin_path}"
+        for name in self.names:
+            yield f"-Xplugin-require:{name}"
 
 
 class AllScalaPluginTargets(Targets):
@@ -139,7 +178,7 @@ async def resolve_scala_plugins_for_target(
     all_scala_plugins: AllScalaPluginTargets,
     jvm: JvmSubsystem,
     scalac: Scalac,
-) -> ScalaPluginsForTarget:
+) -> ScalaPluginTargetsForTarget:
 
     target = request.target
     resolve = target[JvmResolveField].normalized_value(jvm)
@@ -179,11 +218,39 @@ async def resolve_scala_plugins_for_target(
             raise Exception(f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}`")
 
     plugin_targets, artifact_targets = zip(*plugins.values()) if plugins else ((), ())
-    return ScalaPluginsForTarget(Targets(plugin_targets), Targets(artifact_targets))
+    return ScalaPluginTargetsForTarget(Targets(plugin_targets), Targets(artifact_targets))
 
 
 def _plugin_name(target: Target) -> str:
     return target[ScalacPluginNameField].value or target.address.target_name
+
+
+@rule
+async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
+
+    # Fetch all the artifacts
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses(target.address for target in request.artifacts)
+    )
+    fallible_artifacts = await MultiGet(
+        Get(
+            FallibleClasspathEntry,
+            CoursierFetchRequest(ct, resolve=request.resolve),
+        )
+        for ct in coarsened_targets
+    )
+
+    artifacts = FallibleClasspathEntry.if_all_succeeded(fallible_artifacts)
+    if artifacts is None:
+        failed = [i for i in fallible_artifacts if i.exit_code != 0]
+        raise Exception(f"Something went wrong! {failed=}")
+
+    merged_classpath_digest = await Get(Digest, MergeDigests(i.digest for i in artifacts))
+    merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)
+
+    names = tuple(_plugin_name(target) for target in request.plugins)
+
+    return ScalaPlugins(names=names, classpath=merged)
 
 
 def rules():
