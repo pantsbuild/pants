@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Type
 
 from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
@@ -99,8 +98,8 @@ def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
 
 
 def fmt_rule_runner(
-    target_types: List[Type[Target]],
-    fmt_request_types: List[Type[FmtRequest]],
+    target_types: list[type[Target]],
+    fmt_request_types: list[type[FmtRequest]],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
@@ -124,7 +123,7 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
 
 
 def run_fmt(
-    rule_runner: RuleRunner, *, target_specs: List[str], only: list[str] | None = None
+    rule_runner: RuleRunner, *, target_specs: list[str], only: list[str] | None = None
 ) -> str:
     result = rule_runner.run_goal_rule(
         Fmt,

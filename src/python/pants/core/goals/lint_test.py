@@ -6,7 +6,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Type
+from typing import Iterable, Sequence
 
 import pytest
 
@@ -120,19 +120,19 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
-def make_target(address: Optional[Address] = None) -> Target:
+def make_target(address: Address | None = None) -> Target:
     return MockTarget({}, address or Address("", target_name="tests"))
 
 
 def run_lint_rule(
     rule_runner: RuleRunner,
     *,
-    lint_request_types: Sequence[Type[LintTargetsRequest]],
+    lint_request_types: Sequence[type[LintTargetsRequest]],
     targets: list[Target],
     run_files_linter: bool = False,
     batch_size: int = 128,
     only: list[str] | None = None,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     union_membership = UnionMembership(
         {
             LintTargetsRequest: lint_request_types,

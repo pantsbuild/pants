@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.export import (
@@ -48,7 +47,7 @@ def mock_export(edr: ExportRequest, digest: Digest, symlinks: tuple[Symlink, ...
     )
 
 
-def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int, str]:
+def run_export_rule(rule_runner: RuleRunner, targets: list[Target]) -> tuple[int, str]:
     union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")

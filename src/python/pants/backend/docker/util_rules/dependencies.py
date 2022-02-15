@@ -41,7 +41,7 @@ async def inject_docker_dependencies(request: InjectDockerDependencies) -> Injec
     directories = {address.spec_path for address in putative_addresses}
     all_addresses = await Get(Addresses, AddressSpecs(map(MaybeEmptySiblingAddresses, directories)))
     targets = await Get(
-        Targets, Addresses((address for address in putative_addresses if address in all_addresses))
+        Targets, Addresses(address for address in putative_addresses if address in all_addresses)
     )
 
     # Only keep those targets that we can "package".
