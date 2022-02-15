@@ -289,10 +289,6 @@ def test_address_spec() -> None:
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
 
     assert_spec(
-        Address("a/b", parameters={"k": "v"}), expected="a/b:b@k=v", expected_path_spec="a.b@@k=v"
-    )
-
-    assert_spec(
         Address("a/b", generated_name="generated"),
         expected="a/b#generated",
         expected_path_spec="a.b@generated",
@@ -348,6 +344,34 @@ def test_address_spec() -> None:
         expected="a/b/subdir/dir2/f.txt:../../b",
         expected_path_spec="a.b.subdir.dir2.f.txt@@b",
     )
+
+    assert_spec(
+        Address("", target_name="template", parameters={"k1": "v", "k2": "v"}),
+        expected="//:template@k1=v,k2=v",
+        expected_path_spec=".template@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", parameters={"k1": "v", "k2": "v"}),
+        expected="a/b@k1=v,k2=v",
+        expected_path_spec="a.b@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", generated_name="gen", parameters={"k": "v"}),
+        expected="a/b@k=v#gen",
+        expected_path_spec="a.b@@k=v@gen",
+    )
+    assert_spec(
+        Address("a/b", relative_file_path="f.ext", parameters={"k": "v"}),
+        expected="a/b/f.ext@k=v",
+        expected_path_spec="a.b.f.ext@@k=v",
+    )
+
+
+@pytest.mark.parametrize(
+    "params,expected", (({}, ""), ({"k": "v"}, "@k=v"), ({"k1": "v", "k2": "v"}, "@k1=v,k2=v"))
+)
+def test_address_parameters_repr(params: dict[str, str], expected: str) -> None:
+    assert Address("", target_name="foo", parameters=params).parameters_repr == expected
 
 
 def test_address_maybe_convert_to_target_generator() -> None:
