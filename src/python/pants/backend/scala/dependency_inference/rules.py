@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.scala.compile.scalac_plugins import AllScalaPluginTargets
+from pants.backend.scala.compile.scalac_plugins import (
+    ScalaPluginsForTarget,
+    ScalaPluginsForTargetRequest,
+)
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.resolve.lockfile import (
@@ -15,17 +18,9 @@ from pants.backend.scala.resolve.lockfile import (
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
-from pants.backend.scala.subsystems.scalac import Scalac
-from pants.backend.scala.target_types import (
-    ScalaConsumedPluginNamesField,
-    ScalacPluginArtifactField,
-    ScalacPluginNameField,
-    ScalaDependenciesField,
-    ScalaSourceField,
-)
-from pants.build_graph.address import Address, AddressInput
+from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
+from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -35,8 +30,6 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
-    Target,
-    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -109,6 +102,10 @@ class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
     inject_for = ScalaDependenciesField
 
 
+class InjectScalaPluginDependenciesRequest(InjectDependenciesRequest):
+    inject_for = ScalaDependenciesField
+
+
 @dataclass(frozen=True)
 class ScalaRuntimeForResolveRequest:
     resolve_name: str
@@ -150,68 +147,6 @@ async def resolve_scala_library_for_resolve(
     raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
 
-@dataclass(frozen=True)
-class ScalaPluginsForTargetRequest:
-    target: Target
-
-
-@dataclass(frozen=True)
-class ScalaPluginsForTarget:
-    plugins: Targets
-    artifacts: Targets
-
-
-@rule
-async def resolve_scala_plugins_for_target(
-    request: ScalaPluginsForTargetRequest,
-    all_scala_plugins: AllScalaPluginTargets,
-    jvm: JvmSubsystem,
-    scalac: Scalac,
-) -> ScalaPluginsForTarget:
-
-    target = request.target
-    resolve = target[JvmResolveField].normalized_value(jvm)
-
-    plugin_names = target.get(ScalaConsumedPluginNamesField).value
-    if plugin_names is None:
-        plugin_names_by_resolve = scalac.parsed_default_plugins()
-        plugin_names = tuple(plugin_names_by_resolve.get(resolve) or ())
-
-    candidate_plugins: list[Target] = []
-    for plugin in all_scala_plugins:
-        if plugin[ScalacPluginNameField].value in plugin_names:
-            candidate_plugins.append(plugin)
-
-    artifact_address_inputs = (
-        plugin[ScalacPluginArtifactField].value for plugin in candidate_plugins
-    )
-
-    artifact_addresses = await MultiGet(
-        # `is not None` is solely to satiate mypy. artifact field is required.
-        Get(Address, AddressInput, AddressInput.parse(ai))
-        for ai in artifact_address_inputs
-        if ai is not None
-    )
-
-    candidate_artifacts = await Get(Targets, Addresses(artifact_addresses))
-
-    plugins: dict[str, tuple[Target, Target]] = {}  # Maps plugin name to relevant JVM artifact
-    for plugin, artifact in zip(candidate_plugins, candidate_artifacts):
-        if artifact[JvmResolveField].normalized_value(jvm) != resolve:
-            continue
-
-        plugin_name = plugin[ScalacPluginNameField].value
-        assert plugin_name is not None
-        plugins[plugin_name] = (plugin, artifact)
-
-    for plugin_name in plugin_names:
-        if plugin_name not in plugins:
-            raise Exception(f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}`")
-
-    plugin_targets, artifact_targets = zip(*plugins.values())
-    return ScalaPluginsForTarget(Targets(plugin_targets), Targets(artifact_targets))
-
-
 @rule(desc="Inject dependency on scala-library artifact for Scala target.")
 async def inject_scala_library_dependency(
     request: InjectScalaLibraryDependencyRequest,
@@ -230,6 +165,26 @@ async def inject_scala_library_dependency(
     return InjectedDependencies((scala_library_target_info.address,))
 
 
+@rule(desc="Inject dependency on scala plugin artifacts for Scala target.")
+async def inject_scala_plugin_dependencies(
+    request: InjectScalaPluginDependenciesRequest,
+) -> InjectedDependencies:
+    """Adds dependencies on plugins for scala source files, so that they get included in the
+    target's resolve."""
+
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    target = wrapped_target.target
+
+    if not target.has_field(JvmResolveField):
+        return InjectedDependencies()
+
+    scala_plugins = await Get(ScalaPluginsForTarget, ScalaPluginsForTargetRequest(target))
+
+    plugin_addresses = [target.address for target in scala_plugins.artifacts]
+
+    return InjectedDependencies(plugin_addresses)
+
+
 def rules():
     return [
         *collect_rules(),
@@ -238,4 +193,5 @@ def rules():
         *symbol_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
         UnionRule(InjectDependenciesRequest, InjectScalaLibraryDependencyRequest),
+        UnionRule(InjectDependenciesRequest, InjectScalaPluginDependenciesRequest),
     ]
