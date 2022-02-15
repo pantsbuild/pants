@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, DefaultDict, Iterable, Tuple
@@ -149,50 +148,41 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
 class ThirdPartyPackageToArtifactMapping:
     mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
 
-    def addresses_for_symbol(
-        self, symbol: str, resolves: Iterable[str]
-    ) -> FrozenOrderedSet[Address]:
-        def addresses_for_resolve(resolve: str) -> FrozenOrderedSet[Address]:
-            imp_parts = symbol.split(".")
+    def addresses_for_symbol(self, symbol: str, resolve: str) -> FrozenOrderedSet[Address]:
+        imp_parts = symbol.split(".")
 
-            # Note that it's possible to have a resolve with no associated artifacts.
-            current_node = self.mapping_roots.get(resolve)
-            if not current_node:
-                return FrozenOrderedSet()
-
-            found_nodes = []
-            for imp_part in imp_parts:
-                child_node_opt = current_node.find_child(imp_part)
-                if not child_node_opt:
-                    break
-                found_nodes.append(child_node_opt)
-                current_node = child_node_opt
-
-            if not found_nodes:
-                return FrozenOrderedSet()
-
-            # If the length of the found nodes equals the number of parts of the package path, then
-            # there is an exact match.
-            if len(found_nodes) == len(imp_parts):
-                best_match = found_nodes[-1]
-                if best_match.first_party:
-                    return (
-                        FrozenOrderedSet()
-                    )  # The first-party symbol mapper should provide this dep
-                return found_nodes[-1].addresses
-
-            # Otherwise, check for the first found node (in reverse order) to match recursively, and
-            # use its coordinate.
-            for found_node in reversed(found_nodes):
-                if found_node.recursive:
-                    return found_node.addresses
-
-            # Nothing matched so return no match.
+        # Note that it's possible to have a resolve with no associated artifacts.
+        current_node = self.mapping_roots.get(resolve)
+        if not current_node:
             return FrozenOrderedSet()
 
-        return FrozenOrderedSet(
-            itertools.chain.from_iterable(addresses_for_resolve(resolve) for resolve in resolves)
-        )
+        found_nodes = []
+        for imp_part in imp_parts:
+            child_node_opt = current_node.find_child(imp_part)
+            if not child_node_opt:
+                break
+            found_nodes.append(child_node_opt)
+            current_node = child_node_opt
+
+        if not found_nodes:
+            return FrozenOrderedSet()
+
+        # If the length of the found nodes equals the number of parts of the package path, then
+        # there is an exact match.
+        if len(found_nodes) == len(imp_parts):
+            best_match = found_nodes[-1]
+            if best_match.first_party:
+                return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
+            return found_nodes[-1].addresses
+
+        # Otherwise, check for the first found node (in reverse order) to match recursively, and
+        # use its coordinate.
+        for found_node in reversed(found_nodes):
+            if found_node.recursive:
+                return found_node.addresses
+
+        # Nothing matched so return no match.
+        return FrozenOrderedSet()
 
 
 @rule

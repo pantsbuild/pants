@@ -75,7 +75,7 @@ async def infer_scala_dependencies_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
         first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(symbol)
-        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol, [resolve])
+        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol, resolve)
         matches = first_party_matches.union(third_party_matches)
         if not matches:
             continue
