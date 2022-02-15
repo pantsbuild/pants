@@ -66,8 +66,8 @@ class ScalaPluginsRequest:
         plugins: set[Target] = set()
         artifacts: set[Target] = set()
         for spft in seq:
-            plugins = plugins.union(spft.plugins)
-            artifacts = artifacts.union(spft.artifacts)
+            plugins.update(spft.plugins)
+            artifacts.update(spft.artifacts)
 
         return ScalaPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
 
@@ -186,7 +186,7 @@ async def resolve_scala_plugins_for_target(
     plugin_names = target.get(ScalaConsumedPluginNamesField).value
     if plugin_names is None:
         plugin_names_by_resolve = scalac.parsed_default_plugins()
-        plugin_names = tuple(plugin_names_by_resolve.get(resolve) or ())
+        plugin_names = tuple(plugin_names_by_resolve.get(resolve, ()))
 
     candidate_plugins: list[Target] = []
     for plugin in all_scala_plugins:
@@ -215,7 +215,10 @@ async def resolve_scala_plugins_for_target(
 
     for plugin_name in plugin_names:
         if plugin_name not in plugins:
-            raise Exception(f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}`")
+            raise Exception(
+                f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}` "
+                f"for target {request.target}"
+            )
 
     plugin_targets, artifact_targets = zip(*plugins.values()) if plugins else ((), ())
     return ScalaPluginTargetsForTarget(Targets(plugin_targets), Targets(artifact_targets))
@@ -227,7 +230,6 @@ def _plugin_name(target: Target) -> str:
 
 @rule
 async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
-
     # Fetch all the artifacts
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(target.address for target in request.artifacts)
@@ -243,7 +245,7 @@ async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
     artifacts = FallibleClasspathEntry.if_all_succeeded(fallible_artifacts)
     if artifacts is None:
         failed = [i for i in fallible_artifacts if i.exit_code != 0]
-        raise Exception(f"Something went wrong! {failed=}")
+        raise Exception(f"Fetching local scala plugins failed: {failed}")
 
     merged_classpath_digest = await Get(Digest, MergeDigests(i.digest for i in artifacts))
     merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)

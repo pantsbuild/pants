@@ -57,7 +57,7 @@ class ScalaConsumedPluginNamesField(StringSequenceField):
     target's resolve.
     """
 
-    alias = "experimental_plugins"
+    alias = "scalac_plugins"
 
 
 @dataclass(frozen=True)
