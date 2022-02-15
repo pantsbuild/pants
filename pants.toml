@@ -127,6 +127,7 @@ extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0",
   "flake8-no-implicit-concat",
+  "flake8-comprehensions>=3.8.0,<4.0",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
 source_plugins = ["build-support/flake8"]
