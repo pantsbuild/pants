@@ -293,3 +293,13 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
     assert deps == InferredDependencies(
         [Address("lib", relative_file_path="Library.scala", target_name="lib_2_13")]
     )
+
+    tgt = rule_runner.get_target(
+        Address("user", relative_file_path="Main.scala", target_name="user_2_12")
+    )
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies(
+        [Address("lib", relative_file_path="Library.scala", target_name="lib_2_12")]
+    )
