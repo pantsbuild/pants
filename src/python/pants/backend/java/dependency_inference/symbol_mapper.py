@@ -35,14 +35,18 @@ class FirstPartyJavaTargetsMappingRequest(FirstPartyMappingRequest):
 
 @rule(desc="Map all first party Java targets to their packages", level=LogLevel.DEBUG)
 async def map_first_party_java_targets_to_symbols(
-    _: FirstPartyJavaTargetsMappingRequest, java_targets: AllJavaTargets,
+    _: FirstPartyJavaTargetsMappingRequest,
+    java_targets: AllJavaTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
     source_analysis = await MultiGet(
         Get(JavaSourceDependencyAnalysis, SourceFilesRequest([target[JavaSourceField]]))
         for target in java_targets
     )
-    address_and_analysis = zip([(tgt.address, tgt[JvmResolveField].normalized_value(jvm)) for tgt in java_targets], source_analysis)
+    address_and_analysis = zip(
+        [(tgt.address, tgt[JvmResolveField].normalized_value(jvm)) for tgt in java_targets],
+        source_analysis,
+    )
 
     dep_map = SymbolMap()
     for (address, resolve), analysis in address_and_analysis:
