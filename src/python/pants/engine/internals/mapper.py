@@ -74,7 +74,8 @@ class AddressFamily:
     a particular namespace.
 
     :param namespace: The namespace path of this address family.
-    :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
+    :param name_to_target_adaptors: A dict mapping from name to the target adaptor. Note that the
+        name may include parametrization, e.g. `tgt@k=v`.
     """
 
     # The directory from which the adaptors were parsed.
@@ -104,7 +105,7 @@ class AddressFamily:
                 if name in name_to_target_adaptors:
                     previous_path, _ = name_to_target_adaptors[name]
                     raise DuplicateNameError(
-                        f"A target with name {name!r} is already defined in {previous_path!r}, but"
+                        f"A target with name {name!r} is already defined in {previous_path!r}, but "
                         f"is also defined in {address_map.path!r}. Because both targets share the "
                         f"same namespace of {spec_path!r}, this is not allowed."
                     )
@@ -117,26 +118,29 @@ class AddressFamily:
     @memoized_property
     def addresses_to_target_adaptors(self) -> Mapping[Address, TargetAdaptor]:
         return {
-            Address(spec_path=self.namespace, target_name=name): target_adaptor
-            for name, (_, target_adaptor) in self.name_to_target_adaptors.items()
+            target_adaptor.to_address(self.namespace): target_adaptor
+            for _, target_adaptor in self.name_to_target_adaptors.values()
         }
 
     @memoized_property
     def build_file_addresses(self) -> tuple[BuildFileAddress, ...]:
         return tuple(
-            BuildFileAddress(
-                rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
-            )
-            for name, (path, _) in self.name_to_target_adaptors.items()
+            BuildFileAddress(rel_path=path, address=target_adaptor.to_address(self.namespace))
+            for path, target_adaptor in self.name_to_target_adaptors.values()
         )
 
     @property
     def target_names(self) -> tuple[str, ...]:
-        return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
+        """All valid explicitly defined target names in the AddressMap.
+
+        Note that this does not include the names of generated targets, as these have not been
+        generated yet. It does, however, use the names of parametrized targets, e.g. `tgt@k=v`.
+        """
+        return tuple(self.name_to_target_adaptors.keys())
 
     def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
         assert address.spec_path == self.namespace
-        entry = self.name_to_target_adaptors.get(address.target_name)
+        entry = self.name_to_target_adaptors.get(f"{address.target_name}{address.parameters_repr}")
         if entry is None:
             return None
         _, target_adaptor = entry
