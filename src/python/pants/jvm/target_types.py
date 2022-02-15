@@ -12,6 +12,7 @@ from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     InvalidFieldException,
@@ -30,7 +31,7 @@ from pants.util.docutil import git_url
 # -----------------------------------------------------------------------------------------------
 
 
-class JvmResolveField(StringField):
+class JvmResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
     help = (
