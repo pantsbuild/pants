@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
     BinaryPath,
@@ -18,9 +19,13 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.scope import GLOBAL_SCOPE
+from pants.option.subsystem import Subsystem
+from pants.option.option_types import StrListOption
 from pants.python import binaries as python_binaries
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -32,13 +37,35 @@ class ArchiveFormat(Enum):
     ZIP = "zip"
 
 
+class ArchiveSubsystem(Subsystem):
+    # TODO define proper scope
+    options_scope = "foobar"
+    # options_scope = GLOBAL_SCOPE # FIXME fails with  DuplicateScopeError
+    # TODO define proper help
+    help = "foobar options"
+
+    _archive_search_paths = StrListOption(
+        "--archive-search-paths",
+        default=["<PATH>"],
+        help="",  # TODO define help-message
+    )
+
+    def archive_search_paths(self, env: Environment) -> tuple[str, ...]:
+        def iter_path_entries():
+            for entry in self._archive_search_paths:
+                if entry == "<PATH>":
+                    path = env.get("PATH")
+                    if path:
+                        yield from path.split(os.pathsep)
+                else:
+                    yield entry
+
+        return tuple(OrderedSet(iter_path_entries()))
+
+
 # -----------------------------------------------------------------------------------------------
 # Find binaries to create/extract archives
 # -----------------------------------------------------------------------------------------------
-
-# TODO: Should this be configurable?
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
-
 
 class ZipBinary(BinaryPath):
     def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
@@ -91,9 +118,11 @@ class TarBinary(BinaryPath):
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_zip() -> ZipBinary:
+async def find_zip(archive_subsystem: ArchiveSubsystem) -> ZipBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_paths = archive_subsystem.archive_search_paths(env)
     request = BinaryPathRequest(
-        binary_name="zip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="zip", search_path=search_paths, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
@@ -101,9 +130,11 @@ async def find_zip() -> ZipBinary:
 
 
 @rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
-async def find_unzip() -> UnzipBinary:
+async def find_unzip(archive_subsystem: ArchiveSubsystem) -> UnzipBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_paths = archive_subsystem.archive_search_paths(env)
     request = BinaryPathRequest(
-        binary_name="unzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="unzip", search_path=search_paths, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
@@ -118,9 +149,11 @@ def prepare_gunzip(python: PythonBinary) -> Gunzip:
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
-async def find_tar() -> TarBinary:
+async def find_tar(archive_subsystem: ArchiveSubsystem) -> TarBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_paths = archive_subsystem.archive_search_paths(env)
     request = BinaryPathRequest(
-        binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
+        binary_name="tar", search_path=search_paths, test=BinaryPathTest(args=["--version"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
@@ -184,17 +217,19 @@ class CreateArchive:
 
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
-async def create_archive(request: CreateArchive) -> Digest:
+async def create_archive(request: CreateArchive, subsystem: ArchiveSubsystem) -> Digest:
     if request.format == ArchiveFormat.ZIP:
         zip_binary = await Get(ZipBinary, _ZipBinaryRequest())
         argv = zip_binary.create_archive_argv(request)
-        env = {}
+        command_env = {}
         input_digest = request.snapshot.digest
     else:
         tar_binary = await Get(TarBinary, _TarBinaryRequest())
         argv = tar_binary.create_archive_argv(request)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        env = await Get(Environment, EnvironmentRequest(["PATH"]))
+        search_paths = subsystem.archive_search_paths(env)
+        command_env = {"PATH": os.pathsep.join(search_paths)}
         # `tar` requires that the output filename's parent directory exists.
         output_dir_digest = await Get(
             Digest, CreateDigest([Directory(os.path.dirname(request.output_filename))])
@@ -205,7 +240,7 @@ async def create_archive(request: CreateArchive) -> Digest:
         ProcessResult,
         Process(
             argv=argv,
-            env=env,
+            env=command_env,
             input_digest=input_digest,
             description=f"Create {request.output_filename}",
             level=LogLevel.DEBUG,
@@ -228,7 +263,7 @@ class ExtractedArchive:
 
 
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
+async def maybe_extract_archive(digest: Digest, subsystem: ArchiveSubsystem) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
@@ -254,7 +289,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
             Get(UnzipBinary, _UnzipBinaryRequest()),
         )
         argv = unzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
-        env = {}
+        command_env = {}
     elif is_tar:
         input_digest, tar_binary = await MultiGet(
             merge_digest_get,
@@ -262,20 +297,22 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
         )
         argv = tar_binary.extract_archive_argv(archive_path, extract_archive_dir)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        env = await Get(Environment, EnvironmentRequest(["PATH"]))
+        search_paths = subsystem.archive_search_paths(env)
+        command_env = {"PATH": os.pathsep.join(search_paths)}
     else:
         input_digest, gunzip = await MultiGet(
             merge_digest_get,
             Get(Gunzip, _GunzipRequest()),
         )
         argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
-        env = {}
+        command_env = {}
 
     result = await Get(
         ProcessResult,
         Process(
             argv=argv,
-            env=env,
+            env=command_env,
             input_digest=input_digest,
             description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
