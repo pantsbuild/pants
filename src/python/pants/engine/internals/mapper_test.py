@@ -16,6 +16,7 @@ from pants.engine.internals.mapper import (
     DifferingFamiliesError,
     DuplicateNameError,
 )
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import Tags, Target
@@ -24,7 +25,11 @@ from pants.util.frozendict import FrozenDict
 
 def parse_address_map(build_file: str) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(build_root="", target_type_aliases=["thing"], object_aliases=BuildFileAliases())
+    parser = Parser(
+        build_root="",
+        target_type_aliases=["thing"],
+        object_aliases=BuildFileAliases({"parametrize": Parametrize}),
+    )
     address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
     assert path == address_map.path
     return address_map
@@ -43,12 +48,28 @@ def test_address_map_parse() -> None:
               name="two",
               age=37,
             )
+
+            thing(
+                name="param",
+                age=parametrize(a=37, b=42),
+                # But do not apply parametrization inside fields, i.e. `overrides`:
+                overrides={
+                  "gen": {"field": parametrize("a", "b")}
+                },
+            )
             """
         )
     )
+    overrides = {"gen": {"field": Parametrize("a", "b")}}
     assert {
         "one": TargetAdaptor(type_alias="thing", name="one", age=42),
         "two": TargetAdaptor(type_alias="thing", name="two", age=37),
+        "param@age=a": TargetAdaptor(
+            type_alias="thing", name="param@age=a", age=37, overrides=overrides
+        ),
+        "param@age=b": TargetAdaptor(
+            type_alias="thing", name="param@age=b", age=42, overrides=overrides
+        ),
     } == address_map.name_to_target_adaptor
 
 

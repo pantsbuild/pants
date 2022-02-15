@@ -13,7 +13,9 @@ from typing import Any, Iterable
 
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
+from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -93,19 +95,30 @@ class Parser:
             def __init__(self, type_alias: str) -> None:
                 self._type_alias = type_alias
 
-            def __call__(self, **kwargs: Any) -> TargetAdaptor:
+            def __call__(self, **kwargs: Any) -> None:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
+                dirname = os.path.basename(parse_state.rel_path())
                 if "name" not in kwargs:
-                    dirname = os.path.basename(parse_state.rel_path())
                     if not dirname:
                         raise UnaddressableObjectError(
                             "Targets in root-level BUILD files must be named explicitly."
                         )
                     kwargs["name"] = dirname
-                target_adaptor = TargetAdaptor(self._type_alias, **kwargs)
-                parse_state.add(target_adaptor)
-                return target_adaptor
+
+                # Now apply parametrization. We update the `name` if parametrize is used. This
+                # won't be the final `Address(target_name)`, but it gives us a way to store the
+                # address in TargetAdaptor while making sure that the template target is never
+                # seen as an actual valid target.
+                #
+                # NB: This will not apply parametrization inside field values, only at the top
+                # level: namely, the overrides field. That will be evaluated inside target
+                # generation rules, which is necessary because we haven't yet generated any targets.
+                original_addr = Address(dirname, target_name=kwargs["name"])
+                for addr, kwargs in Parametrize.expand(original_addr, kwargs):
+                    kwargs["name"] = f"{addr.target_name}{addr.parameters_repr}"
+                    target_adaptor = TargetAdaptor(self._type_alias, **kwargs)
+                    parse_state.add(target_adaptor)
 
         symbols: dict[str, Any] = dict(object_aliases.objects)
         symbols.update(
