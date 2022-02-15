@@ -6,6 +6,7 @@ from __future__ import annotations
 from abc import ABCMeta
 from typing import Optional
 
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
@@ -21,6 +22,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 
 # -----------------------------------------------------------------------------------------------
@@ -36,6 +38,17 @@ class JvmResolveField(StringField):
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
         # TODO: Document expectations for dependencies once we validate that.
     )
+
+    def normalized_value(self, jvm_subsystem: JvmSubsystem) -> str:
+        """Get the value after applying the default and validating that the key is recognized."""
+        resolve = self.value or jvm_subsystem.default_resolve
+        if resolve not in jvm_subsystem.resolves:
+            raise UnrecognizedResolveNamesError(
+                [resolve],
+                jvm_subsystem.resolves.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
+        return resolve
 
 
 class JvmJdkField(StringField):

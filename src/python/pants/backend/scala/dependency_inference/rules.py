@@ -37,6 +37,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.jvm.resolve.common import ArtifactRequirement
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
@@ -63,18 +64,13 @@ async def infer_scala_dependencies_via_source_analysis(
         Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
     )
 
-    resolve = jvm.resolve_for_target(tgt)
-    if not resolve:
-        raise ValueError(
-            "Cannot infer Scala dependencies for a target without a `resolve` field: "
-            "`{address}` (with type `{tgt.alias}`)."
-        )
-
     symbols: OrderedSet[str] = OrderedSet()
     if scala_infer_subsystem.imports:
         symbols.update(analysis.all_imports())
     if scala_infer_subsystem.consumed_types:
         symbols.update(analysis.fully_qualified_consumed_symbols())
+
+    resolve = tgt[JvmResolveField].normalized_value(jvm)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
@@ -122,8 +118,7 @@ async def resolve_scala_library_for_resolve(
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
     for tgt in jvm_artifact_targets:
-        resolve = jvm.resolve_for_target(tgt)
-        if resolve != request.resolve_name:
+        if tgt[JvmResolveField].normalized_value(jvm) != request.resolve_name:
             continue
 
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
@@ -151,9 +146,9 @@ async def inject_scala_library_dependency(
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     target = wrapped_target.target
 
-    resolve = jvm.resolve_for_target(target)
-    if not resolve:
+    if not target.has_field(JvmResolveField):
         return InjectedDependencies()
+    resolve = target[JvmResolveField].normalized_value(jvm)
 
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)

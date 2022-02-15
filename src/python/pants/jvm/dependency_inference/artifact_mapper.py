@@ -18,6 +18,7 @@ from pants.jvm.target_types import (
     JvmArtifactGroupField,
     JvmArtifactPackagesField,
     JvmProvidesTypesField,
+    JvmResolveField,
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -208,8 +209,7 @@ async def find_available_third_party_artifacts(
         coord = UnversionedCoordinate(
             group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value
         )
-        resolve = jvm.resolve_for_target(tgt)
-        assert resolve
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
         key = (resolve, coord)
         address_mapping[key].add(tgt.address)
         package_mapping[key].update(tgt[JvmArtifactPackagesField].value or ())

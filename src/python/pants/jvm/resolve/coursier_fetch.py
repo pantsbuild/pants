@@ -8,6 +8,7 @@ import importlib.resources
 import json
 import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
@@ -52,7 +53,12 @@ from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JvmArtifactFieldSet,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+    JvmResolveField,
+)
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
@@ -75,13 +81,20 @@ class CoursierError(Exception):
 class NoCompatibleResolve(Exception):
     """No compatible resolve could be found for a set of targets."""
 
-    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
-        targets_and_resolves_str = bullet_list(
-            f"{t.address.spec}\t{jvm.resolve_for_target(t)}" for t in incompatible_targets
+    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, relevant_targets: Iterable[Target]):
+        resolves_to_addresses = defaultdict(list)
+        for tgt in relevant_targets:
+            if tgt.has_field(JvmResolveField):
+                resolve = tgt[JvmResolveField].normalized_value(jvm)
+                resolves_to_addresses[resolve].append(tgt.address.spec)
+
+        formatted_resolve_lists = "\n\n".join(
+            f"{resolve}:\n{bullet_list(sorted(addresses))}"
+            for resolve, addresses in sorted(resolves_to_addresses.items())
         )
         super().__init__(
-            f"{msg_prefix}:\n"
-            f"{targets_and_resolves_str}\n"
+            f"{msg_prefix}:\n\n"
+            f"{formatted_resolve_lists}\n\n"
             "Targets which will be merged onto the same classpath must share a resolve (from the "
             f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
         )
@@ -584,9 +597,9 @@ async def select_coursier_resolve_for_targets(
     all_compatible = True
     for ct in coarsened_targets.closure():
         for tgt in ct.members:
-            resolve = jvm.resolve_for_target(tgt)
-            if not resolve:
+            if not tgt.has_field(JvmResolveField):
                 continue
+            resolve = tgt[JvmResolveField].normalized_value(jvm)
             if compatible_resolve is None:
                 compatible_resolve = resolve
             elif resolve != compatible_resolve:
