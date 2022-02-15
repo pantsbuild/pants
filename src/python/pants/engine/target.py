@@ -892,27 +892,8 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     # The `TargetGenerator.moved_field/copied_field` Field values that the generator
     # should generate targets with.
     template: dict[str, Any] = dataclasses.field(hash=False)
-    # Per-generated-Target overrides, with an additional `template_address` to be applied. The
-    # per-instance Address might not match the base `template_address` if parametrization was
-    # applied within overrides.
-    overrides: dict[str, dict[Address, dict[str, Any]]] = dataclasses.field(hash=False)
-
-    def require_unparametrized_overrides(self) -> dict[str, dict[str, Any]]:
-        """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
-
-        If `parametrize` has been used in overrides, this will raise an error indicating that that is
-        not yet supported for the generator target type.
-
-        TODO: https://github.com/pantsbuild/pants/issues/14430 covers porting implementations and
-        removing this method.
-        """
-        if any(len(templates) != 1 for templates in self.overrides.values()):
-            raise ValueError(
-                f"Target generators of type `{self.generate_from.alias}` (defined at "
-                f"`{self.generator.address}`) do not (yet) support use of the `parametrize(..)` "
-                f"builtin in their `{OverridesField.alias}=` field."
-            )
-        return {name: next(iter(templates.values())) for name, templates in self.overrides.items()}
+    # Per-generated-Target overrides.
+    overrides: dict[str, dict[str, Any]] = dataclasses.field(hash=False)
 
 
 class GeneratedTargets(FrozenDict[Address, Target]):
@@ -967,7 +948,7 @@ def _generate_file_level_targets(
     paths: Sequence[str],
     template_address: Address,
     template: dict[str, Any],
-    overrides: dict[str, dict[Address, dict[str, Any]]],
+    overrides: dict[str, dict[str, Any]],
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
@@ -992,46 +973,29 @@ def _generate_file_level_targets(
      as the key.
     """
 
-    def generate_address(base_address: Address, relativized_fp: str) -> Address:
-        return (
-            base_address.create_generated(relativized_fp)
-            if use_generated_address_syntax
-            else base_address.create_file(relativized_fp)
-        )
-
-    normalized_overrides = dict(overrides or {})
-
-    all_generated_items: list[tuple[Address, str, dict[str, Any]]] = []
+    all_generated_addresses = []
     for fp in paths:
         relativized_fp = fast_relpath(fp, template_address.spec_path)
+        all_generated_addresses.append(
+            template_address.create_generated(relativized_fp)
+            if use_generated_address_syntax
+            else template_address.create_file(relativized_fp)
+        )
 
-        generated_overrides = normalized_overrides.pop(fp, None)
-        if generated_overrides is None:
-            # No overrides apply.
-            all_generated_items.append(
-                (generate_address(template_address, relativized_fp), fp, dict(template))
-            )
-        else:
-            # At least one override applies. Generate a target per set of fields.
-            all_generated_items.extend(
-                (
-                    generate_address(overridden_address, relativized_fp),
-                    fp,
-                    {**template, **override_fields},
-                )
-                for overridden_address, override_fields in generated_overrides.items()
-            )
-
-    # TODO: Parametrization in overrides will result in some unusual internal dependencies when
-    # `add_dependencies_on_all_siblings`. Similar to inference, `add_dependencies_on_all_siblings`
-    # should probably be field value aware.
     all_generated_address_specs = (
-        FrozenOrderedSet(addr.spec for addr, _, _ in all_generated_items)
+        FrozenOrderedSet(addr.spec for addr in all_generated_addresses)
         if add_dependencies_on_all_siblings
         else FrozenOrderedSet()
     )
 
-    def gen_tgt(address: Address, full_fp: str, generated_target_fields: dict[str, Any]) -> Target:
+    normalized_overrides = dict(overrides or {})
+
+    def gen_tgt(full_fp: str, address: Address) -> Target:
+        generated_target_fields = dict(template)
+
+        if full_fp in normalized_overrides:
+            generated_target_fields.update(normalized_overrides.pop(full_fp))
+
         if add_dependencies_on_all_siblings:
             if not generator.has_field(Dependencies):
                 raise AssertionError(
@@ -1044,7 +1008,9 @@ def _generate_file_level_targets(
                 all_generated_address_specs - {address.spec}
             )
 
-        generated_target_fields[SingleSourceField.alias] = fast_relpath(full_fp, address.spec_path)
+        generated_target_fields[SingleSourceField.alias] = (
+            address._relative_file_path or address.generated_name
+        )
         return generated_target_cls(
             generated_target_fields,
             address,
@@ -1052,9 +1018,7 @@ def _generate_file_level_targets(
             residence_dir=os.path.dirname(full_fp),
         )
 
-    result = tuple(
-        gen_tgt(address, full_fp, fields) for address, full_fp, fields in all_generated_items
-    )
+    result = tuple(gen_tgt(fp, address) for fp, address in zip(paths, all_generated_addresses))
 
     if normalized_overrides:
         unused_relative_paths = sorted(

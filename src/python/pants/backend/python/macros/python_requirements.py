@@ -78,10 +78,7 @@ async def generate_from_python_requirement(
     generator = request.generator
     requirements_rel_path = generator[PythonRequirementsSourceField].value
     requirements_full_path = generator[PythonRequirementsSourceField].file_path
-    overrides = {
-        canonicalize_project_name(k): v
-        for k, v in request.require_unparametrized_overrides().items()
-    }
+    overrides = {canonicalize_project_name(k): v for k, v in request.overrides.items()}
 
     file_tgt = PythonRequirementsFileTarget(
         {PythonRequirementsFileSourcesField.alias: requirements_rel_path},

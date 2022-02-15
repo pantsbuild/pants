@@ -39,7 +39,6 @@ from pants.engine.fs import (
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
-from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -97,7 +96,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list, pluralize
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -178,27 +177,17 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
 
 @dataclass(frozen=True)
 class _TargetParametrizations:
-    """All parametrizations and generated targets for a single input Address.
+    """All parametrizations and generated targets for a single input Address."""
 
-    If a Target has been parametrized, it might _not_ be present in this output, due to it not being
-    addressable using its un-parameterized Address.
-    """
-
-    original_target: Target | None
+    original_target: Target
     parametrizations: FrozenDict[Address, Target]
 
     def get(self, address: Address) -> Target | None:
-        if self.original_target and self.original_target.address == address:
+        if self.original_target.address == address:
             return self.original_target
         return self.parametrizations.get(address)
 
     def generated_or_generator(self, maybe_generator: Address) -> Iterator[Target]:
-        if not self.original_target:
-            raise ValueError(
-                "A `parametrized` target cannot be consumed without its parameters specified.\n"
-                f"Target `{maybe_generator}` can be addressed as:\n"
-                f"{bullet_list(addr.spec for addr in self.parametrizations)}"
-            )
         if self.parametrizations:
             # Generated Targets.
             yield from self.parametrizations.values()
@@ -215,7 +204,7 @@ async def resolve_target_parametrizations(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     files_not_found_behavior: FilesNotFoundBehavior,
 ) -> _TargetParametrizations:
-    assert not address.is_generated_target and not address.is_parametrized
+    assert not address.is_generated_target
 
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
@@ -230,7 +219,7 @@ async def resolve_target_parametrizations(
     ):
         await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
 
-    target: Target | None
+    target: Target
     generate_request = target_types_to_generate_requests.request_for(target_type)
     if generate_request:
         # Split out the `propagated_fields` before construction.
@@ -250,17 +239,6 @@ async def resolve_target_parametrizations(
                 field_value = generator_fields.pop(field_type.alias, None)
                 if field_value is not None:
                     template_fields[field_type.alias] = field_value
-
-        generator_fields_parametrized = {
-            name for name, field in generator_fields.items() if isinstance(field, Parametrize)
-        }
-        if generator_fields_parametrized:
-            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
-            raise ValueError(
-                f"Only fields which will be moved to generated targets may be parametrized, "
-                f"so target generator {address} (with type {target_type.alias}) cannot "
-                f"parametrize the {generator_fields_parametrized} {noun}."
-            )
 
         target = target_type(generator_fields, address, union_membership)
 
@@ -282,44 +260,22 @@ async def resolve_target_parametrizations(
             else:
                 overrides = overrides_field.flatten()
 
-        all_generated = await MultiGet(
-            Get(
-                GeneratedTargets,
-                GenerateTargetsRequest,
-                generate_request(
-                    target,
-                    template_address=address,
-                    template=template,
-                    overrides={
-                        name: dict(Parametrize.expand(address, override))
-                        for name, override in overrides.items()
-                    },
-                ),
-            )
-            for address, template in Parametrize.expand(address, template_fields)
-        )
-        generated = FrozenDict(
-            GeneratedTargets(
-                target, (t for generated_batch in all_generated for t in generated_batch.values())
-            )
+        generated = await Get(
+            GeneratedTargets,
+            GenerateTargetsRequest,
+            generate_request(
+                target,
+                template_address=address,
+                template=template_fields,
+                overrides=overrides,
+            ),
         )
     else:
-        first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-        if rest:
-            target = None
-            generated = FrozenDict(
-                (
-                    parameterized_address,
-                    target_type(parameterized_fields, parameterized_address, union_membership),
-                )
-                for parameterized_address, parameterized_fields in (first, *rest)
-            )
-        else:
-            target = target_type(target_adaptor.kwargs, address, union_membership)
-            generated = FrozenDict()
+        target = target_type(target_adaptor.kwargs, address, union_membership)
+        generated = GeneratedTargets(target, ())
 
     # TODO: Move to Target constructor.
-    for field_type in target.field_types if target else ():
+    for field_type in target.field_types:
         if (
             field_type.deprecated_alias is not None
             and field_type.deprecated_alias in target_adaptor.kwargs
@@ -336,10 +292,8 @@ async def resolve_target(
 ) -> WrappedTarget:
     base_address = address.maybe_convert_to_target_generator()
     parametrizations = await Get(_TargetParametrizations, Address, base_address)
-    if (
-        address.is_generated_target
-        and parametrizations.original_target
-        and not target_types_to_generate_requests.is_generator(parametrizations.original_target)
+    if address.is_generated_target and not target_types_to_generate_requests.is_generator(
+        parametrizations.original_target
     ):
         # TODO: This is an accommodation to allow using file/generator Addresses for non-generator
         # atom targets. See https://github.com/pantsbuild/pants/issues/14419.

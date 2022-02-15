@@ -71,10 +71,7 @@ async def generate_from_pipenv_requirement(
     generator = request.generator
     lock_rel_path = generator[PipenvSourceField].value
     lock_full_path = generator[PipenvSourceField].file_path
-    overrides = {
-        canonicalize_project_name(k): v
-        for k, v in request.require_unparametrized_overrides().items()
-    }
+    overrides = {canonicalize_project_name(k): v for k, v in request.overrides.items()}
 
     file_tgt = PythonRequirementsFileTarget(
         {PythonRequirementsFileSourcesField.alias: lock_rel_path},
