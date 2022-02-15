@@ -367,7 +367,7 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     )
 
     def assert_coarsened(
-        a: Address, expected_members: list[Address], expected_dependencies: list[Address]
+        a: Address, expected_members: List[Address], expected_dependencies: List[Address]
     ) -> None:
         coarsened_targets = transitive_targets_rule_runner.request(
             CoarsenedTargets,
@@ -435,7 +435,7 @@ def assert_failed_cycle(
     *,
     root_target_name: str,
     subject_target_name: str,
-    path_target_names: tuple[str, ...],
+    path_target_names: Tuple[str, ...],
 ) -> None:
     with pytest.raises(ExecutionError) as e:
         rule_runner.request(
@@ -666,7 +666,7 @@ def owners_rule_runner() -> RuleRunner:
 
 
 def assert_owners(
-    rule_runner: RuleRunner, requested: Iterable[str], *, expected: set[Address]
+    rule_runner: RuleRunner, requested: Iterable[str], *, expected: Set[Address]
 ) -> None:
     result = rule_runner.request(Owners, [OwnersRequest(tuple(requested))])
     assert set(result) == expected
@@ -806,7 +806,7 @@ def specs_rule_runner() -> RuleRunner:
 def resolve_filesystem_specs(
     rule_runner: RuleRunner,
     specs: Iterable[FilesystemSpec],
-) -> list[Address]:
+) -> List[Address]:
     result = rule_runner.request(Addresses, [FilesystemSpecs(specs)])
     return sorted(result)
 
@@ -941,7 +941,7 @@ def assert_generated(
         }
     )
     parametrizations = rule_runner.request(_TargetParametrizations, [address])
-    assert expected == set(parametrizations.parametrizations.values())
+    assert expected == set(t for t in parametrizations.parametrizations.values())
 
 
 def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
@@ -1179,7 +1179,7 @@ def test_find_valid_field_sets(caplog) -> None:
     invalid_spec = AddressLiteralSpec("", "invalid")
 
     def find_valid_field_sets(
-        superclass: type,
+        superclass: Type,
         address_specs: Iterable[AddressLiteralSpec],
         *,
         no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
@@ -1499,7 +1499,7 @@ def test_sources_expected_num_files(sources_rule_runner: RuleRunner) -> None:
 
     sources_rule_runner.write_files({f: "" for f in ["f1.txt", "f2.txt", "f3.txt", "f4.txt"]})
 
-    def hydrate(sources_cls: type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
+    def hydrate(sources_cls: Type[MultipleSourcesField], sources: Iterable[str]) -> HydratedSources:
         return sources_rule_runner.request(
             HydratedSources,
             [
@@ -1921,7 +1921,7 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
     dependencies_rule_runner.write_files({"BUILD": "smalltalk_libraries(name='target')"})
 
-    def assert_injected(deps_cls: type[Dependencies], *, injected: list[Address]) -> None:
+    def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
         provided_deps = ["//:provided"]
         if injected:
             provided_deps.append("!//:injected2")
