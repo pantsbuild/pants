@@ -13,6 +13,8 @@ from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -33,18 +35,19 @@ class FirstPartyJavaTargetsMappingRequest(FirstPartyMappingRequest):
 
 @rule(desc="Map all first party Java targets to their packages", level=LogLevel.DEBUG)
 async def map_first_party_java_targets_to_symbols(
-    _: FirstPartyJavaTargetsMappingRequest, java_targets: AllJavaTargets
+    _: FirstPartyJavaTargetsMappingRequest, java_targets: AllJavaTargets,
+    jvm: JvmSubsystem,
 ) -> SymbolMap:
     source_analysis = await MultiGet(
         Get(JavaSourceDependencyAnalysis, SourceFilesRequest([target[JavaSourceField]]))
         for target in java_targets
     )
-    address_and_analysis = zip([t.address for t in java_targets], source_analysis)
+    address_and_analysis = zip([(tgt.address, tgt[JvmResolveField].normalized_value(jvm)) for tgt in java_targets], source_analysis)
 
     dep_map = SymbolMap()
-    for address, analysis in address_and_analysis:
+    for (address, resolve), analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
-            dep_map.add_symbol(top_level_type, address=address)
+            dep_map.add_symbol(top_level_type, address=address, resolve=resolve)
 
     return dep_map
 
