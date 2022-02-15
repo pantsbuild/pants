@@ -233,3 +233,61 @@ def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunne
         InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
     )
     assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])
+
+
+@maybe_skip_jdk_test
+def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+            scala_sources(name="lib_2_13", resolve="scala-2.13")
+            scala_sources(name="lib_2_12", resolve="scala-2.12")
+            """
+            ),
+            "lib/Library.scala": dedent(
+                """\
+            package org.pantsbuild.lib
+
+            object Library {
+              def grok(): Unit = {
+                println("Hello world!")
+              }
+            }
+            """
+            ),
+            "user/BUILD": dedent(
+                """\
+            scala_sources(name="user_2_13", resolve="scala-2.13")
+            scala_sources(name="user_2_12", resolve="scala-2.12")
+            """
+            ),
+            "user/Main.scala": dedent(
+                """\
+            package org.pantsbuild.user
+
+            object Main {
+              def main(args: Array[String]): Unit = {
+                Library.grok()
+              }
+            }
+            """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            '--jvm-resolves={"scala-2.13":"3rdparty/jvm/scala-2.13.lock", "scala-2.12":"3rdparty/jvm/scala-2.12.lock"}'
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    tgt = rule_runner.get_target(
+        Address("user", relative_file_path="Main.scala", target_name="user_2_13")
+    )
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies(
+        [Address("lib", relative_file_path="Library.scala", target_name="lib_2_13")]
+    )
