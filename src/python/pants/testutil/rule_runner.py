@@ -27,6 +27,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
@@ -221,7 +222,8 @@ class RuleRunner:
         build_config_builder = BuildConfiguration.Builder()
         build_config_builder.register_aliases(
             BuildFileAliases(
-                objects=objects, context_aware_object_factories=context_aware_object_factories
+                objects={"parametrize": Parametrize, **(objects or {})},
+                context_aware_object_factories=context_aware_object_factories,
             )
         )
         build_config_builder.register_rules("_dummy_for_test_", all_rules)

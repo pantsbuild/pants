@@ -158,15 +158,19 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                artifact_args = {"group": "joda-time", "artifact": "joda-time", "version": "2.10.10"}
+                jvm_artifact(
+                    name="artifact",
+                    group="joda-time",
+                    artifact="joda-time",
+                    version="2.10.10",
+                    resolve=parametrize("a", "b", "c"),
+                )
 
-                jvm_artifact(name="artifact_a", **artifact_args, resolve="a")
-                jvm_artifact(name="artifact_b", **artifact_args, resolve="b")
-                jvm_artifact(name="artifact_c", **artifact_args, resolve="c")
-
-                java_source(name='lib_a', source='PrintDate.java', resolve='a')
-                java_source(name='lib_b', source='PrintDate.java', resolve='b')
-                java_source(name='lib_c', source='PrintDate.java', resolve='c')
+                java_source(
+                    name="lib",
+                    source="PrintDate.java",
+                    resolve=parametrize("a", "b", "c"),
+                )
                 """
             ),
             "PrintDate.java": dedent(
@@ -179,15 +183,16 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def assert_inferred(lib_name: str, expected: list[str]) -> None:
-        lib = rule_runner.get_target(Address("", target_name=lib_name))
+    def assert_inferred(resolve: str) -> None:
+        lib = rule_runner.get_target(
+            Address("", target_name="lib", parameters={"resolve": resolve})
+        )
         assert rule_runner.request(
             Addresses, [DependenciesRequest(lib[Dependencies])]
-        ) == Addresses(Address("", target_name=name) for name in expected)
+        ) == Addresses([Address("", target_name="artifact", parameters={"resolve": resolve})])
 
-    assert_inferred("lib_a", ["artifact_a"])
-    assert_inferred("lib_b", ["artifact_b"])
-    assert_inferred("lib_c", ["artifact_c"])
+    for r in ("a", "b", "c"):
+        assert_inferred(r)
 
 
 @maybe_skip_jdk_test

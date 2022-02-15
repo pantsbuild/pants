@@ -42,7 +42,6 @@ from pants.engine.internals.graph import (
     TransitiveExcludesNotSupportedError,
     _TargetParametrizations,
 )
-from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
@@ -923,7 +922,6 @@ def generated_targets_rule_runner() -> RuleRunner:
             QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
     )
 
 
