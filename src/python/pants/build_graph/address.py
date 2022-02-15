@@ -322,6 +322,13 @@ class Address(EngineAwareParameter):
         return self._target_name
 
     @property
+    def parameters_repr(self) -> str:
+        if not self.parameters:
+            return ""
+        rhs = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+        return f"@{rhs}"
+
+    @property
     def spec(self) -> str:
         """The canonical string representation of the Address.
 
@@ -333,7 +340,11 @@ class Address(EngineAwareParameter):
         prefix = "//" if not self.spec_path else ""
         if self._relative_file_path is None:
             path = self.spec_path
-            target = "" if self._target_name is None and self.generated_name else self.target_name
+            target = (
+                ""
+                if self._target_name is None and (self.generated_name or self.parameters)
+                else self.target_name
+            )
         else:
             path = self.filename
             parent_prefix = "../" * self._relative_file_path.count(os.path.sep)
@@ -343,20 +354,8 @@ class Address(EngineAwareParameter):
                 else f"{parent_prefix}{self.target_name}"
             )
         target_sep = ":" if target else ""
-        if self.parameters:
-            params_sep = "@"
-            params = ",".join(f"{k}={v}" for k, v in self.parameters.items())
-        else:
-            params_sep = ""
-            params = ""
-        if self.generated_name is None:
-            generated_sep = ""
-            generated = ""
-        else:
-            generated_sep = "#"
-            generated = self.generated_name
-
-        return f"{prefix}{path}{target_sep}{target}{params_sep}{params}{generated_sep}{generated}"
+        generated = "" if self.generated_name is None else f"#{self.generated_name}"
+        return f"{prefix}{path}{target_sep}{target}{self.parameters_repr}{generated}"
 
     @property
     def path_safe_spec(self) -> str:
