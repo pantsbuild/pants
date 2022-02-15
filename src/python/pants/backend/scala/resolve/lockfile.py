@@ -10,6 +10,7 @@ from pants.jvm.goals.lockfile import (
 )
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
 
 SCALA_LIBRARY_GROUP = "org.scala-lang"
@@ -63,8 +64,7 @@ async def validate_scala_runtime_is_present_in_resolve(
 ) -> ValidateJvmArtifactsForResolveResult:
     first_party_target_uses_this_resolve = False
     for tgt in scala_targets:
-        tgt_resolve_name = jvm.resolve_for_target(tgt)
-        if tgt_resolve_name == request.resolve_name:
+        if tgt[JvmResolveField].normalized_value(jvm) == request.resolve_name:
             first_party_target_uses_this_resolve = True
             break
 
