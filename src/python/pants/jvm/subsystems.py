@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from pants.engine.target import InvalidFieldException, Target
-from pants.jvm.target_types import JvmResolveField
 from pants.option.option_types import DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 
@@ -62,22 +60,3 @@ class JvmSubsystem(Subsystem):
             "['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']"
         ),
     )
-
-    def resolve_for_target(self, target: Target) -> str | None:
-        """Return the `JvmResolveField` value or its default for the given target.
-
-        If a Target does not have the `JvmResolveField` returns None, since we can be assured that
-        other codepaths will fail to (e.g.) produce a ClasspathEntry if an unsupported target type
-        is provided to the JVM rules.
-        """
-        if not target.has_field(JvmResolveField):
-            return None
-        val = target[JvmResolveField].value or self.default_resolve
-        if val not in self.resolves:
-            raise InvalidFieldException(
-                f"Unrecognized resolve in the {target[JvmResolveField].alias} field for "
-                f"{target.address}: {val}.\n\n"
-                "All valid resolve names (from `[jvm.resolves]`): "
-                f"{sorted(self.resolves.keys())}"
-            )
-        return val

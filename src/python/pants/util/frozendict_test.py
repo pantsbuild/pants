@@ -69,7 +69,7 @@ def test_get() -> None:
 def test_iter() -> None:
     fd1 = FrozenDict({"a": 0, "b": 1})
     assert list(iter(fd1)) == ["a", "b"]
-    assert [k for k in fd1] == ["a", "b"]
+    assert list(fd1) == ["a", "b"]
 
 
 def test_keys() -> None:

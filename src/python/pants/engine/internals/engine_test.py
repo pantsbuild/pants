@@ -361,7 +361,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
-        assert len(list(item for item in started if item["name"] == "canonical_rule_one")) > 0
+        assert len([item for item in started if item["name"] == "canonical_rule_one"]) > 0
 
         assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {
             "canonical_rule_one"
