@@ -180,12 +180,21 @@ class JvmArtifactResolveField(JvmResolveField):
     )
 
 
+class JvmArtifactProvidesScalaPluginField(StringField):
+    alias = "experimental_provides_scala_plugin"
+    help = (
+        "Optionally specifies the name of the scala plugin that this artifact provides. If None, "
+        "this artifact does not provide a Scala plugin."
+    )
+
+
 class JvmArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     url: JvmArtifactUrlField
+    scala_plugin: JvmArtifactProvidesScalaPluginField
 
     required_fields = (
         JvmArtifactGroupField,
@@ -203,6 +212,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
+        JvmArtifactProvidesScalaPluginField,
     )
     help = (
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
