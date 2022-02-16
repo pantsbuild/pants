@@ -102,7 +102,10 @@ async def compile_scala_source(
     )
 
     plugins_ = await MultiGet(
-        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(target))
+        Get(
+            ScalaPluginTargetsForTarget,
+            ScalaPluginsForTargetRequest(target, request.resolve.name),
+        )
         for target in request.component.members
     )
     plugins_request = ScalaPluginsRequest.from_target_plugins(plugins_, request.resolve)

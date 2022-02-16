@@ -43,8 +43,14 @@ class _LoadedGlobalScalacPlugins:
 
 
 @dataclass(frozen=True)
+class ScalaPluginsForTargetWithoutResolveRequest:
+    target: Target
+
+
+@dataclass(frozen=True)
 class ScalaPluginsForTargetRequest:
     target: Target
+    resolve_name: str
 
 
 @dataclass(frozen=True)
@@ -61,10 +67,13 @@ class ScalaPluginsRequest:
 
     @classmethod
     def from_target_plugins(
-        cls, seq: Iterable[ScalaPluginTargetsForTarget], resolve: CoursierResolveKey
+        cls,
+        seq: Iterable[ScalaPluginTargetsForTarget],
+        resolve: CoursierResolveKey,
     ) -> ScalaPluginsRequest:
         plugins: set[Target] = set()
         artifacts: set[Target] = set()
+
         for spft in seq:
             plugins.update(spft.plugins)
             artifacts.update(spft.artifacts)
@@ -173,6 +182,15 @@ async def all_scala_plugin_targets(targets: AllTargets) -> AllScalaPluginTargets
 
 
 @rule
+async def add_resolve_name_to_plugin_request(
+    request: ScalaPluginsForTargetWithoutResolveRequest, jvm: JvmSubsystem
+) -> ScalaPluginsForTargetRequest:
+    return ScalaPluginsForTargetRequest(
+        request.target, request.target[JvmResolveField].normalized_value(jvm)
+    )
+
+
+@rule
 async def resolve_scala_plugins_for_target(
     request: ScalaPluginsForTargetRequest,
     all_scala_plugins: AllScalaPluginTargets,
@@ -181,7 +199,7 @@ async def resolve_scala_plugins_for_target(
 ) -> ScalaPluginTargetsForTarget:
 
     target = request.target
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.resolve_name
 
     plugin_names = target.get(ScalaConsumedPluginNamesField).value
     if plugin_names is None:
