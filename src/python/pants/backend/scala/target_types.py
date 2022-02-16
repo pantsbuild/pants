@@ -13,6 +13,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     SingleSourceField,
     StringField,
+    StringSequenceField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
@@ -47,6 +48,16 @@ class ScalaGeneratorSourcesField(MultipleSourcesField):
 
 class ScalaDependenciesField(Dependencies):
     pass
+
+
+class ScalaConsumedPluginNamesField(StringSequenceField):
+    """The names of Scala plugins that this source file requires.
+
+    If not specified, this will default to the plugins specified in `--scalac-plugins` for this
+    target's resolve.
+    """
+
+    alias = "scalac_plugins"
 
 
 @dataclass(frozen=True)

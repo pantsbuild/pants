@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
-from pants.option.option_types import ArgsListOption, StrListOption, StrOption
+from pants.option.option_types import ArgsListOption, DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 
 
@@ -23,20 +23,53 @@ class Scalac(Subsystem):
     args = ArgsListOption(
         help=f"Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
     )
-    plugins_global = StrListOption(
-        "--plugins-global",
+    plugins_global = (
+        StrListOption(
+            "--plugins-global",
+            help=(
+                "A list of addresses of `scalac_plugin` targets which should be used for "
+                "compilation of all Scala targets in a build.\n\nIf you set this, you must also "
+                "set `[scalac].plugins_global_lockfile`."
+            ),
+        )
+        .advanced()
+        .deprecated(
+            removal_version="2.12.0dev0",
+            hint="Use `--plugins-for-resolve` instead to use user resolves",
+        )
+    )
+
+    # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option
+    default_plugins = DictOption[str](
+        "--plugins-for-resolve",
         help=(
-            "A list of addresses of `scalac_plugin` targets which should be used for "
-            "compilation of all Scala targets in a build.\n\nIf you set this, you must also "
-            "set `[scalac].plugins_global_lockfile`."
+            "A dictionary, whose keys are the names of each JVM resolve that requires default "
+            "Scala plugins, and the value is a comma-separated string consisting of scala plugin "
+            "names. Each speficied plugin must have a corresponding `jvm_artifact` that specifies "
+            "the name in its `experimental_provides_scala_plugin` field, and is compatible with "
+            "the current resolve."
         ),
-    ).advanced()
-    plugins_global_lockfile = StrOption(
-        "--plugins-global-lockfile",
-        default=DEFAULT_TOOL_LOCKFILE,
-        help=(
-            "The filename of the lockfile for global plugins. You must set this option to a "
-            "file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set "
-            "`[scalac].plugins_global`."
-        ),
-    ).advanced()
+    )
+
+    plugins_global_lockfile = (
+        StrOption(
+            "--plugins-global-lockfile",
+            default=DEFAULT_TOOL_LOCKFILE,
+            help=(
+                "The filename of the lockfile for global plugins. You must set this option to a "
+                "file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set "
+                "`[scalac].plugins_global`."
+            ),
+        )
+        .advanced()
+        .deprecated(
+            removal_version="2.12.0dev0",
+            hint="Use `--plugins-for-resolve`, which will add plugin dependencies to JVM user resolves instead.",
+        )
+    )
+
+    def parsed_default_plugins(self) -> dict[str, list[str]]:
+        return {
+            key: [i.strip() for i in value.split(",")]
+            for key, value in self.default_plugins.items()
+        }
