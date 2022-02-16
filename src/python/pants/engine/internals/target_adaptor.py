@@ -36,15 +36,15 @@ class TargetAdaptor:
         )
 
     def to_address(self, spec_path: str) -> Address:
+        parameters = {}
         if "@" in self.name:
             tgt, params_str = self.name.split("@")
-            parameters = {}
+
             for kv in params_str.split(","):
                 k, v = kv.split("=", 1)
                 parameters[k] = v
         else:
             tgt = self.name
-            parameters = None
 
         # Because a `TargetAdaptor` cannot represent a generated target, we don't need to worry
         # about those parts of the address.
