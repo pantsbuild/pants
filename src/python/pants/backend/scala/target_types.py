@@ -111,6 +111,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         ScalaDependenciesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     generated_target_cls = ScalatestTestTarget
@@ -164,6 +165,7 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         ScalaDependenciesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     generated_target_cls = ScalaJunitTestTarget
@@ -219,6 +221,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
         ScalaSourcesGeneratorSourcesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     generated_target_cls = ScalaSourceTarget
