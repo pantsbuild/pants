@@ -51,13 +51,17 @@ class ScalaDependenciesField(Dependencies):
 
 
 class ScalaConsumedPluginNamesField(StringSequenceField):
-    """The names of Scala plugins that this source file requires.
+    help = """The names of Scala plugins that this source file requires.
 
-    If not specified, this will default to the plugins specified in `--scalac-plugins` for this
-    target's resolve.
-    """
+        The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target,
+        and must be present in this target's resolve's lockfile.
+
+        If not specified, this will default to the plugins specified in `--scalac-plugins` for this
+        target's resolve.
+        """
 
     alias = "scalac_plugins"
+    required = False
 
 
 @dataclass(frozen=True)
@@ -89,6 +93,7 @@ class ScalatestTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
         ScalatestTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -112,6 +117,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     moved_fields = (
@@ -140,6 +146,7 @@ class ScalaJunitTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
         ScalaJunitTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -163,6 +170,7 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     moved_fields = (
@@ -184,6 +192,7 @@ class ScalaSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
         ScalaSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -216,6 +225,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
     )
     moved_fields = (
