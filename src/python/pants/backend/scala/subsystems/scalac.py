@@ -34,7 +34,7 @@ class Scalac(Subsystem):
         )
         .advanced()
         .deprecated(
-            removal_version="2.12.0dev0",
+            removal_version="2.12.0.dev0",
             hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
         )
     )
@@ -62,7 +62,7 @@ class Scalac(Subsystem):
         )
         .advanced()
         .deprecated(
-            removal_version="2.12.0dev0",
+            removal_version="2.12.0.dev0",
             hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
         )
     )

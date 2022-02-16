@@ -116,9 +116,9 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
-        ScalaConsumedPluginNamesField,
     )
     moved_fields = (
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -168,9 +168,9 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
-        ScalaConsumedPluginNamesField,
     )
     moved_fields = (
+        ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -222,9 +222,9 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaDependenciesField,
-        ScalaConsumedPluginNamesField,
     )
     moved_fields = (
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
