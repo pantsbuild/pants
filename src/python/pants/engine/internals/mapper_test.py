@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
     AddressFamily,
@@ -149,6 +149,42 @@ def test_address_family_duplicate_names() -> None:
                 ),
             ],
         )
+
+
+def test_address_family_methods() -> None:
+    tgt = TargetAdaptor("tgt_alias", "tgt", age=42)
+    overrides_a = TargetAdaptor("tgt_alias", "overrides@age=a", age=37)
+    overrides_b = TargetAdaptor("tgt_alias", "overrides@age=b", age=42)
+    family = AddressFamily(
+        namespace="dir",
+        name_to_target_adaptors={
+            tgt.name: ("BUILD", tgt),
+            overrides_a.name: ("BUILD.overrides", overrides_a),
+            overrides_b.name: ("BUILD.overrides", overrides_b),
+        },
+    )
+
+    assert family.target_names == ("tgt", "overrides@age=a", "overrides@age=b")
+    assert family.addresses_to_target_adaptors == {
+        tgt.to_address("dir"): tgt,
+        overrides_a.to_address("dir"): overrides_a,
+        overrides_b.to_address("dir"): overrides_b,
+    }
+    assert set(family.build_file_addresses) == {
+        BuildFileAddress(tgt.to_address("dir"), "BUILD"),
+        BuildFileAddress(overrides_a.to_address("dir"), "BUILD.overrides"),
+        BuildFileAddress(overrides_b.to_address("dir"), "BUILD.overrides"),
+    }
+
+    assert family.get_target_adaptor(tgt.to_address("dir")) == tgt
+    assert family.get_target_adaptor(overrides_a.to_address("dir")) == overrides_a
+    assert family.get_target_adaptor(overrides_b.to_address("dir")) == overrides_b
+    for addr in (
+        Address("dir", target_name="overrides"),
+        Address("dir", target_name="fake"),
+        Address("dir", target_name="fake", parameters={"age": "fake"}),
+    ):
+        assert family.get_target_adaptor(addr) is None
 
 
 def test_address_specs_filter_tags() -> None:
