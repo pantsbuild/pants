@@ -3,15 +3,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
-
-from attr import dataclass
+from typing import Any, Generic, TypeVar, cast, overload
 
 from pants.option import custom_types
-
-if TYPE_CHECKING:
-    pass
 
 _PropType = TypeVar("_PropType")
 _EnumT = TypeVar("_EnumT", bound=Enum)
