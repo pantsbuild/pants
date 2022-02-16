@@ -95,7 +95,12 @@ class Parser:
             def __init__(self, type_alias: str) -> None:
                 self._type_alias = type_alias
 
-            def __call__(self, **kwargs: Any) -> None:
+            # TODO: Return `None` once we finish deprecating `python_requirements` macro & the
+            #  CAOF mechanism. We only have to return this for the deprecated macros to still work.
+            #  Note that we return a single TargetAdaptor, even though parametrization means there
+            #  may be multiple created. That's fine because we're not using parametrization in the
+            #  CAOFs.
+            def __call__(self, **kwargs: Any) -> TargetAdaptor:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
                 dirname = os.path.basename(parse_state.rel_path())
@@ -115,10 +120,16 @@ class Parser:
                 # level: namely, the overrides field. That will be evaluated inside target
                 # generation rules, which is necessary because we haven't yet generated any targets.
                 original_addr = Address(dirname, target_name=kwargs["name"])
+                return_tgt: TargetAdaptor | None = None
                 for addr, kwargs in Parametrize.expand(original_addr, kwargs):
                     kwargs["name"] = f"{addr.target_name}{addr.parameters_repr}"
                     target_adaptor = TargetAdaptor(self._type_alias, **kwargs)
                     parse_state.add(target_adaptor)
+                    if return_tgt is None:
+                        return_tgt = target_adaptor
+
+                assert return_tgt is not None
+                return return_tgt
 
         symbols: dict[str, Any] = dict(object_aliases.objects)
         symbols.update(
