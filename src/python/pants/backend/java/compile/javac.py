@@ -71,8 +71,6 @@ async def compile_java_source(
             exit_code=1,
         )
 
-    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
-
     # Capture just the `ClasspathEntry` objects that are listed as `export` types by source analysis
     deps_to_classpath_entries = dict(
         zip(request.component.dependencies, direct_dependency_classpath_entries or ())
@@ -131,9 +129,12 @@ async def compile_java_source(
         )
 
     dest_dir = "classfiles"
-    dest_dir_digest = await Get(
-        Digest,
-        CreateDigest([Directory(dest_dir)]),
+    dest_dir_digest, jdk = await MultiGet(
+        Get(
+            Digest,
+            CreateDigest([Directory(dest_dir)]),
+        ),
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
     merged_digest = await Get(
         Digest,

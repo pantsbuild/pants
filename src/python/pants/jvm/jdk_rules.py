@@ -65,13 +65,23 @@ class JdkRequest:
 
     @staticmethod
     def from_target(target: CoarsenedTarget) -> JdkRequest:
-        # TODO: verify that we're requesting the same JDK version for all `ct` members?
-        t = target.representative
+        fields = [t[JvmJdkField] for t in target.members if t.has_field(JvmJdkField)]
 
-        if not t.has_field(JvmJdkField):
-            raise ValueError(f"Cannot construct a JDK request for a non-JVM target {t}")
+        if not fields:
+            raise ValueError(
+                f"Cannot construct a JDK request for {target}, since none of its "
+                f"members have a `{JvmJdkField.alias}=` field:\n{target.bullet_list()}"
+            )
 
-        return JdkRequest.from_field(t[JvmJdkField])
+        field = fields[0]
+        if not all(f.value == field.value for f in fields):
+            values = {f.value for f in fields}
+            raise ValueError(
+                f"The members of {target} had mismatched values of the "
+                f"`{JvmJdkField.alias}=` field ({values}):\n{target.bullet_list()}"
+            )
+
+        return JdkRequest.from_field(field)
 
 
 @dataclass(frozen=True)
