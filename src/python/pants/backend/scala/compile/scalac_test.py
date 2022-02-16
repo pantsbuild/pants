@@ -627,6 +627,130 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
+    acyclic_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
+    scala_library_coord = Coordinate(
+        group="org.scala-lang", artifact="scala-library", version="2.13.6"
+    )
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                    name = "acyclic_lib",
+                    group = "{acyclic_coord.group}",
+                    artifact = "{acyclic_coord.artifact}",
+                    version = "{acyclic_coord.version}",
+                    packages=["acyclic.**"],
+                )
+
+                scalac_plugin(
+                    name = "acyclic",
+                    # TODO: Support relative addresses.
+                    artifact = "lib:acyclic_lib",
+                )
+
+                scala_sources(
+                    scalac_plugins=["acyclic"],
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
+                entries=(
+                    CoursierLockfileEntry(
+                        coord=acyclic_coord,
+                        file_name="acyclic_2.13-0.2.1.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
+                            62534,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=scala_library_coord,
+                        file_name="org.scala-lang_scala-library_2.13.6.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
+                            5955737,
+                        ),
+                    ),
+                )
+            ).serialize(
+                [
+                    ArtifactRequirement(coordinate=acyclic_coord),
+                    ArtifactRequirement(scala_library_coord),
+                ]
+            ),
+            "3rdparty/jvm/scalac-plugins.lock": TestCoursierWrapper.new(
+                entries=(
+                    CoursierLockfileEntry(
+                        coord=acyclic_coord,
+                        file_name="acyclic_2.13-0.2.1.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
+                            62534,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=scala_library_coord,
+                        file_name="org.scala-lang_scala-library_2.13.6.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
+                            5955737,
+                        ),
+                    ),
+                )
+            ).serialize(
+                [
+                    ArtifactRequirement(coordinate=acyclic_coord),
+                ]
+            ),
+            "lib/A.scala": dedent(
+                """
+                package lib
+                import acyclic.file
+
+                class A {
+                  val b: B = null
+                }
+                """
+            ),
+            "lib/B.scala": dedent(
+                """
+                package lib
+
+                class B {
+                  val a: A = null
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        args=[],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="lib", relative_file_path="A.scala")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
+    assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
+    assert "error: Unwanted cyclic dependency" in fallible_result.stderr
+
+
+@maybe_skip_jdk_test
 def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
     better_monadic_coord = Coordinate(
         group="com.olegpy", artifact="better-monadic-for_2.13", version="0.3.1"
