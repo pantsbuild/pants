@@ -7,12 +7,15 @@ import json
 from collections import deque
 from typing import Iterable, cast
 
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.base.build_environment import get_buildroot
+from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
+from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import (
+    Dependencies,
     DependenciesRequest,
     Targets,
     TransitiveTargets,
@@ -90,35 +93,36 @@ def find_paths_breadth_first(
 
 
 @goal_rule
-async def paths(
-    console: Console, addresses: Addresses, paths_subsystem: PathsSubsystem
-) -> PathsGoal:
+async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
 
     path_from = paths_subsystem.path_from
     path_to = paths_subsystem.path_to
 
     if path_from is None:
-        raise ValueError("Must set a --paths-from")
+        raise ValueError("Must set --from")
 
     if path_to is None:
-        raise ValueError("Must set a --paths-to")
+        raise ValueError("Must set --to")
 
-    root, destination = await Get(
-        Addresses,
-        UnparsedAddressInputs(values=[path_from, path_to], owning_address=None),
+    specs_parser = SpecsParser(get_buildroot())
+
+    from_tgts, to_tgts = await MultiGet(
+        [
+            Get(Targets, Specs, specs_parser.parse_specs([path_from])),
+            Get(Targets, Specs, specs_parser.parse_specs([path_to])),
+        ]
     )
+    root = from_tgts.expect_single()
+    destination = to_tgts.expect_single()
 
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([root], include_special_cased_deps=True)
+        TransitiveTargets, TransitiveTargetsRequest([root.address], include_special_cased_deps=True)
     )
-
-    if not any(destination == dep.address for dep in transitive_targets.closure):
-        raise ValueError("The destination is not a dependency of the source")
 
     adjacent_targets_per_target = await MultiGet(
         Get(
             Targets,
-            DependenciesRequest(tgt.get(DependenciesField), include_special_cased_deps=True),
+            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
         )
         for tgt in transitive_targets.closure
     )
@@ -127,7 +131,7 @@ async def paths(
     adjacency_lists = dict(zip(transitive_targets_closure_addresses, adjacent_targets_per_target))
 
     spec_paths = []
-    for path in find_paths_breadth_first(adjacency_lists, root, destination):
+    for path in find_paths_breadth_first(adjacency_lists, root.address, destination.address):
         spec_path = [address.spec for address in path]
         spec_paths.append(spec_path)
 
