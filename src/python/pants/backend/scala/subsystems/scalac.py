@@ -35,7 +35,7 @@ class Scalac(Subsystem):
         .advanced()
         .deprecated(
             removal_version="2.12.0dev0",
-            hint="Use `--plugins-for-resolve` instead to use user resolves",
+            hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
         )
     )
 
@@ -44,10 +44,9 @@ class Scalac(Subsystem):
         "--plugins-for-resolve",
         help=(
             "A dictionary, whose keys are the names of each JVM resolve that requires default "
-            "Scala plugins, and the value is a comma-separated string consisting of scala plugin "
-            "names. Each speficied plugin must have a corresponding `jvm_artifact` that specifies "
-            "the name in its `experimental_provides_scala_plugin` field, and is compatible with "
-            "the current resolve."
+            "`scalac` plugins, and the value is a comma-separated string consisting of scalac plugin "
+            "names. Each specified plugin must have a corresponding `scalac_plugin` target that specifies "
+            "that name in either its `plugin_name` field or is the same as its target name."
         ),
     )
 
@@ -64,7 +63,7 @@ class Scalac(Subsystem):
         .advanced()
         .deprecated(
             removal_version="2.12.0dev0",
-            hint="Use `--plugins-for-resolve`, which will add plugin dependencies to JVM user resolves instead.",
+            hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
         )
     )
 
