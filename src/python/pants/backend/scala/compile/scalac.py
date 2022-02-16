@@ -80,7 +80,6 @@ async def compile_scala_source(
             exit_code=1,
         )
 
-    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
     scala_version = scala.version_for_resolve(request.resolve.name)
 
     component_members_with_sources = tuple(
@@ -137,7 +136,7 @@ async def compile_scala_source(
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
 
-    tool_classpath, sources_digest = await MultiGet(
+    tool_classpath, sources_digest, jdk = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
@@ -163,6 +162,7 @@ async def compile_scala_source(
                 (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
             ),
         ),
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
 
     extra_immutable_input_digests = {
