@@ -11,7 +11,6 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.base.build_environment import get_buildroot
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -901,9 +900,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
             "src/python/others/b.py": "print('')",
         }
     )
-    specs = SpecsParser(get_buildroot()).parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"]
-    )
+    specs = SpecsParser().parse_specs(["src/python/somefiles::", "src/python/others/b.py"])
 
     class Callback(WorkunitsCallback):
         @property
