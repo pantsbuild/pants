@@ -47,11 +47,25 @@ impl ManagedChild {
     })
   }
 
-  /// Kill the process's unique PGID or return an error if we don't have a PID or cannot kill.
-  pub fn kill_pgid(&mut self) -> Result<(), String> {
+  fn get_pgid(&self) -> Result<Pid, String> {
     let pid = self.id().ok_or_else(|| "Process had no PID.".to_owned())?;
     let pgid = getpgid(Some(Pid::from_raw(pid as i32)))
       .map_err(|e| format!("Could not get process group id of child process: {}", e))?;
+    Ok(pgid)
+  }
+
+  /// Send an interrupt signal to the process group
+  // fn send_interrupt(&mut self) -> Result<(), String> {
+  //   let pgid = self.get_pgid()?;
+  //   // Kill the negative PGID to kill the entire process group.
+  //   signal::kill(Pid::from_raw(-pgid.as_raw()), signal::Signal::SIGINT)
+  //     .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;
+  //   Ok(())
+  // }
+
+  /// Kill the process's unique PGID or return an error if we don't have a PID or cannot kill.
+  pub fn kill_pgid(&mut self) -> Result<(), String> {
+    let pgid = self.get_pgid()?;
     // Kill the negative PGID to kill the entire process group.
     signal::kill(Pid::from_raw(-pgid.as_raw()), signal::Signal::SIGKILL)
       .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;

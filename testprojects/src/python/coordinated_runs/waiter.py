@@ -7,11 +7,6 @@ import sys
 import time
 from multiprocessing import Process
 
-waiting_for_file = sys.argv[1]
-pid_file = sys.argv[2]
-child_pid_file = sys.argv[3]
-attempts = 60
-
 
 def run_child():
     while True:
@@ -19,21 +14,44 @@ def run_child():
         time.sleep(1)
 
 
-child = Process(target=run_child, daemon=True)
-child.start()
+def main():
+    waiting_for_file = sys.argv[1]
+    pid_file = sys.argv[2]
+    child_pid_file = sys.argv[3]
+    attempts = 60
 
-with open(child_pid_file, "w") as pf:
-    pf.write(str(child.pid))
+    child = Process(target=run_child, daemon=True)
+    child.start()
 
-with open(pid_file, "w") as pf:
-    pf.write(str(os.getpid()))
+    with open(child_pid_file, "w") as pf:
+        pf.write(str(child.pid))
 
-try:
-    while not os.path.isfile(waiting_for_file):
-        if attempts <= 0:
-            raise Exception("File was never written.")
-        attempts -= 1
-        sys.stderr.write("Waiting for file {}\n".format(waiting_for_file))
-        time.sleep(1)
-finally:
-    child.terminate()
+    with open(pid_file, "w") as pf:
+        pf.write(str(os.getpid()))
+
+    try:
+        while not os.path.isfile(waiting_for_file):
+            if attempts <= 0:
+                raise Exception("File was never written.")
+            attempts -= 1
+            sys.stderr.write("Waiting for file {}\n".format(waiting_for_file))
+            sys.stderr.flush()
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        sys.stderr.write("keyboard int received\n")
+        sys.stderr.flush()
+
+    finally:
+        sys.stderr.write("cleaning up\n")
+        sys.stderr.flush()
+
+        child.terminate()
+        time.sleep(10)
+
+        sys.stderr.write("cleaning complete\n")
+        sys.stderr.flush()
+
+
+if __name__ == "__main__":
+    main()

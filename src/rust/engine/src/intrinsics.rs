@@ -699,6 +699,7 @@ fn interactive_process(
               .try_clone_as_file()
               .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
           ));
+        log::info!("SPAWNING CHILD.");        
         let mut subprocess = ManagedChild::spawn(command)?;
         tokio::select! {
           _ = session.cancelled() => {

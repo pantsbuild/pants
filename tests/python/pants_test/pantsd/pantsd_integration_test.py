@@ -516,6 +516,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert child_process.is_running()
             checker.assert_started()
 
+            # give time to enter the try/finally block in the child process
+            time.sleep(5)
+
             # This should kill the client, which will cancel the run on the server, which will
             # kill the waiting process and its child.
             os.kill(client_pid, signum)
@@ -535,7 +538,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_sigint(self):
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
-            regexps=["Interrupted by user."],
+            regexps=["Interrupted by user.", "cleaning up"],
         )
 
     def test_sigint_kills_request_waiting_for_lock(self):
