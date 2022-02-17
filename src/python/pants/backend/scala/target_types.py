@@ -13,6 +13,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     SingleSourceField,
     StringField,
+    StringSequenceField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
@@ -45,6 +46,24 @@ class ScalaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".scala",)
 
 
+class ScalaDependenciesField(Dependencies):
+    pass
+
+
+class ScalaConsumedPluginNamesField(StringSequenceField):
+    help = """The names of Scala plugins that this source file requires.
+
+        The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target,
+        and must be present in this target's resolve's lockfile.
+
+        If not specified, this will default to the plugins specified in `--scalac-plugins` for this
+        target's resolve.
+        """
+
+    alias = "scalac_plugins"
+    required = False
+
+
 @dataclass(frozen=True)
 class ScalaFieldSet(FieldSet):
     required_fields = (ScalaSourceField,)
@@ -72,8 +91,9 @@ class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalatestTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -90,18 +110,18 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
-        Dependencies,
-        JvmJdkField,
+        ScalaDependenciesField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        JvmJdkField,
+        ScalaDependenciesField,
     )
     moved_fields = (
-        JvmResolveField,
+        ScalaConsumedPluginNamesField,
+        JvmJdkField,
         JvmProvidesTypesField,
+        JvmResolveField,
     )
     settings_request_cls = ScalaSettingsRequest
     help = (
@@ -123,8 +143,9 @@ class ScalaJunitTestTarget(Target):
     alias = "scala_junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaJunitTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -141,18 +162,18 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
-        Dependencies,
-        JvmJdkField,
+        ScalaDependenciesField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        JvmJdkField,
+        ScalaDependenciesField,
     )
     moved_fields = (
-        JvmResolveField,
+        ScalaConsumedPluginNamesField,
+        JvmJdkField,
         JvmProvidesTypesField,
+        JvmResolveField,
     )
     settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_junit_test` target for each file in the `sources` field."
@@ -167,8 +188,9 @@ class ScalaSourceTarget(Target):
     alias = "scala_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -182,12 +204,10 @@ class ScalaSourceTarget(Target):
 
 
 class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
-    default = tuple(
-        (
-            "*.scala",
-            *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
-            *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
-        )
+    default = (
+        "*.scala",
+        *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
+        *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
     )
 
 
@@ -195,17 +215,16 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "scala_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaSourcesGeneratorSourcesField,
-        JvmJdkField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        JvmJdkField,
+        ScalaDependenciesField,
     )
     moved_fields = (
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,

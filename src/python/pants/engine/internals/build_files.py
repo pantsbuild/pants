@@ -15,10 +15,11 @@ from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAd
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
+from pants.engine.internals.parametrize import _TargetParametrizations
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets, UnexpandedTargets, WrappedTarget
+from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -212,19 +213,19 @@ async def addresses_from_address_specs(
     )
     dirnames = {os.path.dirname(f) for f in build_file_paths.files}
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
-    candidate_addresses = Addresses(
+    base_addresses = Addresses(
         itertools.chain.from_iterable(
             address_family.addresses_to_target_adaptors for address_family in address_families
         )
     )
 
-    tgts_generators_kept, tgts_generators_replaced = await MultiGet(
-        Get(UnexpandedTargets, Addresses, candidate_addresses),
-        Get(Targets, Addresses, candidate_addresses),
+    target_parametrizations_list = await MultiGet(
+        Get(_TargetParametrizations, Address, base_address) for base_address in base_addresses
     )
     residence_dir_to_targets = defaultdict(list)
-    for tgt in (*tgts_generators_kept, *tgts_generators_replaced):
-        residence_dir_to_targets[tgt.residence_dir].append(tgt)
+    for target_parametrizations in target_parametrizations_list:
+        for tgt in target_parametrizations.all():
+            residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
     matched_globs = set()
     for glob_spec in address_specs.globs:

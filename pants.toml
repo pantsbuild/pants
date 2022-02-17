@@ -124,6 +124,7 @@ extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0",
   "flake8-no-implicit-concat",
+  "flake8-comprehensions>=3.8.0,<4.0",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
 source_plugins = ["build-support/flake8"]
@@ -179,6 +180,9 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
+
+[scala]
+version_for_resolve = { "scala_parser" = '2.13.7' }
 
 [toolchain-setup]
 repo = "pants"

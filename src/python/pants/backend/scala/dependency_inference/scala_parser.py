@@ -186,7 +186,7 @@ class ScalaSourceDependencyAnalysis:
                 for key, values in self.imports_by_scope.items()
             },
             "consumed_symbols_by_scope": {
-                k: sorted(list(v)) for k, v in self.consumed_symbols_by_scope.items()
+                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
             },
             "scopes": list(self.scopes),
         }
