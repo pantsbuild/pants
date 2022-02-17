@@ -123,6 +123,12 @@ class _TargetParametrizations:
     original_target: Target | None
     parametrizations: FrozenDict[Address, Target]
 
+    def all(self) -> Iterator[Target]:
+        """Iterates over all Target instances which are valid after parametrization."""
+        if self.original_target:
+            yield self.original_target
+        yield from self.parametrizations.values()
+
     def get(self, address: Address) -> Target | None:
         if self.original_target and self.original_target.address == address:
             return self.original_target

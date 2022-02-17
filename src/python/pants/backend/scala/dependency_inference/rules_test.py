@@ -13,6 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField, ScalaSourcesGener
 from pants.backend.scala.target_types import rules as scala_target_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -45,6 +46,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[ScalaSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -241,8 +243,7 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
         {
             "lib/BUILD": dedent(
                 """\
-            scala_sources(name="lib_2_13", resolve="scala-2.13")
-            scala_sources(name="lib_2_12", resolve="scala-2.12")
+            scala_sources(resolve=parametrize("scala-2.13", "scala-2.12"))
             """
             ),
             "lib/Library.scala": dedent(
@@ -258,8 +259,7 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
             ),
             "user/BUILD": dedent(
                 """\
-            scala_sources(name="user_2_13", resolve="scala-2.13")
-            scala_sources(name="user_2_12", resolve="scala-2.12")
+            scala_sources(resolve=parametrize("scala-2.13", "scala-2.12"))
             """
             ),
             "user/Main.scala": dedent(
@@ -285,21 +285,21 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(
-        Address("user", relative_file_path="Main.scala", target_name="user_2_13")
+        Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.13"})
     )
     deps = rule_runner.request(
         InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
     )
     assert deps == InferredDependencies(
-        [Address("lib", relative_file_path="Library.scala", target_name="lib_2_13")]
+        [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.13"})]
     )
 
     tgt = rule_runner.get_target(
-        Address("user", relative_file_path="Main.scala", target_name="user_2_12")
+        Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.12"})
     )
     deps = rule_runner.request(
         InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
     )
     assert deps == InferredDependencies(
-        [Address("lib", relative_file_path="Library.scala", target_name="lib_2_12")]
+        [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.12"})]
     )
