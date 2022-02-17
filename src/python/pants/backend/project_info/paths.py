@@ -7,7 +7,6 @@ import json
 from collections import deque
 from typing import Iterable, cast
 
-from pants.base.build_environment import get_buildroot
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address
@@ -104,7 +103,7 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
     if path_to is None:
         raise ValueError("Must set --to")
 
-    specs_parser = SpecsParser(get_buildroot())
+    specs_parser = SpecsParser()
 
     from_tgts, to_tgts = await MultiGet(
         [
