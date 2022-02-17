@@ -9,7 +9,10 @@ from typing import Any, Iterator
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
+from pants.engine.target import Target
+from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list
 
 
 @frozen_after_init
@@ -104,3 +107,43 @@ class Parametrize:
         strs = [str(s) for s in self.args]
         strs.extend(f"{alias}={value}" for alias, value in self.kwargs.items())
         return f"parametrize({', '.join(strs)}"
+
+
+# TODO: This is not the right name for this class, nor the best place for it to live. But it is
+# consumed by both `pants.engine.internals.graph` and `pants.engine.internals.build_files`, and
+# shouldn't live in `pants.engine.target` (yet? needs more stabilization).
+@dataclass(frozen=True)
+class _TargetParametrizations:
+    """All parametrizations and generated targets for a single input Address.
+
+    If a Target has been parametrized, it might _not_ be present in this output, due to it not being
+    addressable using its un-parameterized Address.
+    """
+
+    original_target: Target | None
+    parametrizations: FrozenDict[Address, Target]
+
+    def all(self) -> Iterator[Target]:
+        """Iterates over all Target instances which are valid after parametrization."""
+        if self.original_target:
+            yield self.original_target
+        yield from self.parametrizations.values()
+
+    def get(self, address: Address) -> Target | None:
+        if self.original_target and self.original_target.address == address:
+            return self.original_target
+        return self.parametrizations.get(address)
+
+    def generated_or_generator(self, maybe_generator: Address) -> Iterator[Target]:
+        if not self.original_target:
+            raise ValueError(
+                "A `parametrized` target cannot be consumed without its parameters specified.\n"
+                f"Target `{maybe_generator}` can be addressed as:\n"
+                f"{bullet_list(addr.spec for addr in self.parametrizations)}"
+            )
+        if self.parametrizations:
+            # Generated Targets.
+            yield from self.parametrizations.values()
+        else:
+            # Did not generate targets.
+            yield self.original_target
