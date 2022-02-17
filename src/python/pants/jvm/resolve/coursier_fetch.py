@@ -590,24 +590,23 @@ async def select_coursier_resolve_for_targets(
     resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
     in that case there might be multiple CoarsenedTargets.
     """
-    root_targets = [t for ct in coarsened_targets for t in ct.members]
+    targets = [t for ct in coarsened_targets.closure() for t in ct.members]
 
     # Find a single resolve that is compatible with all targets in the closure.
     compatible_resolve: str | None = None
     all_compatible = True
-    for ct in coarsened_targets.closure():
-        for tgt in ct.members:
-            if not tgt.has_field(JvmResolveField):
-                continue
-            resolve = tgt[JvmResolveField].normalized_value(jvm)
-            if compatible_resolve is None:
-                compatible_resolve = resolve
-            elif resolve != compatible_resolve:
-                all_compatible = False
+    for tgt in targets:
+        if not tgt.has_field(JvmResolveField):
+            continue
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
+        if compatible_resolve is None:
+            compatible_resolve = resolve
+        elif resolve != compatible_resolve:
+            all_compatible = False
 
     if not compatible_resolve or not all_compatible:
         raise NoCompatibleResolve(
-            jvm, "The selected targets did not have a resolve in common", root_targets
+            jvm, "The selected targets did not have a resolve in common", targets
         )
     resolve = compatible_resolve
 
