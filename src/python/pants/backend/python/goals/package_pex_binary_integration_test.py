@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import json
 import os.path
+import pkgutil
 import subprocess
 from textwrap import dedent
 
@@ -12,7 +14,12 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.target_types import PexBinary, PexLayout, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PexBinary,
+    PexLayout,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
 from pants.backend.python.util_rules import pex_from_targets
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
@@ -34,6 +41,7 @@ def rule_runner() -> RuleRunner:
         target_types=[
             FilesGeneratorTarget,
             PexBinary,
+            PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
             RelocatedFiles,
             ResourcesGeneratorTarget,
@@ -122,3 +130,54 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
         else os.path.join(expected_pex_relpath, "__main__.py"),
     )
     assert b"hello\n" == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout
+
+
+def test_resolve_local_platforms() -> None:
+    pass
+
+
+def test_complete_platforms(rule_runner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/platform-linux-py36.json": pkgutil.get_data(
+                __name__, "platform-linux-py36.json"
+            ),
+            "src/py/project/platform-mac-py36.json": pkgutil.get_data(
+                __name__, "platform-mac-py36.json"
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_requirement(name="p537", requirements=["p537==1.0.4"])
+                files(name="platforms", sources=["platform*.json"])
+                pex_binary(
+                    dependencies=[":p537"],
+                    complete_platforms=[":platforms"],
+                    include_tools=True,
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
+    pex_info = json.loads(
+        subprocess.run(
+            args=[executable, "info"],
+            env=dict(PEX_TOOLS="1", **os.environ),
+            stdout=subprocess.PIPE,
+            check=True,
+        ).stdout
+    )
+    assert sorted(
+        [
+            "p537-1.0.4-cp36-cp36m-manylinux1_x86_64.whl",
+            "p537-1.0.4-cp36-cp36m-macosx_10_13_x86_64.whl",
+        ]
+    ) == sorted(pex_info["distributions"])
