@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Iterator, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -40,6 +40,9 @@ from pants.engine.fs import (
 )
 from pants.engine.internals import native_engine
 from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.parametrize import (  # noqa: F401
+    _TargetParametrizations as _TargetParametrizations,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -174,37 +177,6 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
         ),
     )
     return _WarnDeprecatedField()
-
-
-@dataclass(frozen=True)
-class _TargetParametrizations:
-    """All parametrizations and generated targets for a single input Address.
-
-    If a Target has been parametrized, it might _not_ be present in this output, due to it not being
-    addressable using its un-parameterized Address.
-    """
-
-    original_target: Target | None
-    parametrizations: FrozenDict[Address, Target]
-
-    def get(self, address: Address) -> Target | None:
-        if self.original_target and self.original_target.address == address:
-            return self.original_target
-        return self.parametrizations.get(address)
-
-    def generated_or_generator(self, maybe_generator: Address) -> Iterator[Target]:
-        if not self.original_target:
-            raise ValueError(
-                "A `parametrized` target cannot be consumed without its parameters specified.\n"
-                f"Target `{maybe_generator}` can be addressed as:\n"
-                f"{bullet_list(addr.spec for addr in self.parametrizations)}"
-            )
-        if self.parametrizations:
-            # Generated Targets.
-            yield from self.parametrizations.values()
-        else:
-            # Did not generate targets.
-            yield self.original_target
 
 
 @rule
