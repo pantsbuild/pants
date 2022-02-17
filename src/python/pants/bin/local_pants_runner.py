@@ -7,7 +7,6 @@ import logging
 import sys
 from dataclasses import dataclass
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -151,7 +150,6 @@ class LocalPantsRunner:
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
-            build_root=get_buildroot(),
             session=graph_session.scheduler_session,
         )
 
@@ -240,7 +238,7 @@ class LocalPantsRunner:
 
     def run(self, start_time: float) -> ExitCode:
         with maybe_profiled(self.profile_path):
-            spec_parser = SpecsParser(get_buildroot())
+            spec_parser = SpecsParser()
             specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
             self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()
