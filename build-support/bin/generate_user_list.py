@@ -89,7 +89,7 @@ _orgs = (
     Org(
         "Snowfall",
         "https://snowfalltravel.com/",
-        "https://files.readme.io/13e796f-snowfall-small.png",
+        "https://files.readme.io/245f03e-snowfall-small.png",
     ),
     Org(
         "Tessian",
