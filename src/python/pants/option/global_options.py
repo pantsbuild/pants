@@ -1315,7 +1315,6 @@ class GlobalOptions(Subsystem):
                 "`name=` anywhere.\n"
                 "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
                 "pants.toml.\n\n"
-                "You can ignore this warning with `[GLOBAL].ignore_warnings`."
                 "(Why upgrade from the old macro mechanism to target generation? Among other "
                 "benefits, it makes sure that the Pants daemon is properly invalidated when you "
                 "change `requirements.txt` and `pyproject.toml`.)"
