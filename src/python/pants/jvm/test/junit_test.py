@@ -16,7 +16,7 @@ from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
-from pants.core.target_types import FileTarget
+from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
@@ -64,6 +64,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             FileTarget,
+            FilesGeneratorTarget,
+            RelocatedFiles,
             JvmArtifactTarget,
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
@@ -611,7 +613,7 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_vintage_file_dependencies(rule_runner: RuleRunner) -> None:
+def test_vintage_file_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
@@ -629,12 +631,12 @@ def test_vintage_file_dependencies(rule_runner: RuleRunner) -> None:
                     name='example-test',
                     dependencies= [
                         ':junit_junit',
-                        ':dave',
+                        ':ducks',
                     ],
                 )
                 file(
-                    name="dave",
-                    source="dave.txt",
+                    name="ducks",
+                    source="ducks.txt",
                 )
                 """
             ),
@@ -648,12 +650,128 @@ def test_vintage_file_dependencies(rule_runner: RuleRunner) -> None:
 
                 public class SimpleTest extends TestCase {
                    public void testHello() throws Exception {
-                        assertEquals("lol dave", Files.readString(Path.of("dave.txt")));
+                        assertEquals("lol ducks", Files.readString(Path.of("ducks.txt")));
                    }
                 }
                 """
             ),
-            "dave.txt": "lol dave",
+            "ducks.txt": "lol ducks",
+        }
+    )
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@maybe_skip_jdk_test
+def test_vintage_files_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=JUNIT_COORD)]
+            ),
+            "BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = '{JUNIT_COORD.group}',
+                  artifact = '{JUNIT_COORD.artifact}',
+                  version = '{JUNIT_COORD.version}',
+                )
+                junit_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':junit_junit',
+                        ':ducks',
+                    ],
+                )
+                files(
+                    name="ducks",
+                    sources="*.txt",
+                )
+                """
+            ),
+            "SimpleTest.java": dedent(
+                """
+                package org.pantsbuild.example;
+
+                import junit.framework.TestCase;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+
+                public class SimpleTest extends TestCase {
+                   public void testHello() throws Exception {
+                        assertEquals("lol ducks", Files.readString(Path.of("ducks.txt")));
+                   }
+                }
+                """
+            ),
+            "ducks.txt": "lol ducks",
+        }
+    )
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@maybe_skip_jdk_test
+def test_vintage_relocated_files_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=JUNIT_COORD)]
+            ),
+            "BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = '{JUNIT_COORD.group}',
+                  artifact = '{JUNIT_COORD.artifact}',
+                  version = '{JUNIT_COORD.version}',
+                )
+                junit_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':junit_junit',
+                        ':relocated_ducks',
+                    ],
+                )
+                file(
+                    name="ducks",
+                    source="ducks.txt",
+                )
+                relocated_files(
+                    name="relocated_ducks",
+                    files_targest=[":ducks"],
+                    src="",
+                    dest="ducks",
+                )
+                """
+            ),
+            "SimpleTest.java": dedent(
+                """
+                package org.pantsbuild.example;
+
+                import junit.framework.TestCase;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+
+                public class SimpleTest extends TestCase {
+                   public void testHello() throws Exception {
+                        assertEquals("lol ducks", Files.readString(Path.of("ducks/ducks.txt")));
+                   }
+                }
+                """
+            ),
+            "ducks.txt": "lol ducks",
         }
     )
 
