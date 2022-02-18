@@ -224,7 +224,7 @@ async def addresses_from_address_specs(
     )
     residence_dir_to_targets = defaultdict(list)
     for target_parametrizations in target_parametrizations_list:
-        for tgt in target_parametrizations.all():
+        for tgt in target_parametrizations.all:
             residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
     matched_globs = set()

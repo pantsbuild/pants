@@ -171,7 +171,11 @@ class AddressInput:
                     f"`{self.path_component}:original_target`, but {self.path_component} did not "
                     f"have an address."
                 )
-            return Address(spec_path=spec_path, relative_file_path=relative_file_path)
+            return Address(
+                spec_path=spec_path,
+                relative_file_path=relative_file_path,
+                parameters=self.parameters,
+            )
 
         # The target component may be "above" (but not below) the file in the filesystem.
         # Determine how many levels above the file it is, and validate that the path is relative.
@@ -182,6 +186,7 @@ class AddressInput:
                 spec_path=spec_path,
                 relative_file_path=relative_file_path,
                 target_name=self.target_component,
+                parameters=self.parameters,
             )
 
         expected_prefix = f"..{os.path.sep}" * parent_count
@@ -205,7 +210,12 @@ class AddressInput:
         spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
         relative_file_path = os.path.join(*path_components[offset:])
         target_name = os.path.basename(self.target_component)
-        return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
+        return Address(
+            spec_path,
+            relative_file_path=relative_file_path,
+            target_name=target_name,
+            parameters=self.parameters,
+        )
 
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
@@ -213,6 +223,7 @@ class AddressInput:
             spec_path=self.path_component,
             target_name=self.target_component,
             generated_name=self.generated_component,
+            parameters=self.parameters,
         )
 
 
