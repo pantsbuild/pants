@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from itertools import chain
 
@@ -19,12 +20,15 @@ from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, Merge
 from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
+    ClasspathEntryRequests,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
@@ -43,25 +47,18 @@ async def compile_java_source(
     bash: BashBinary,
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
-    union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
-    classpath_entry_requests = [
-        *((request.prerequisite,) if request.prerequisite else ()),
-        *(
-            ClasspathEntryRequest.for_targets(
-                union_membership, component=coarsened_dep, resolve=request.resolve
-            )
-            for coarsened_dep in request.component.dependencies
-        ),
-    ]
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(FallibleClasspathEntry, ClasspathEntryRequest, cpe)
-            for cpe in classpath_entry_requests
-        )
+    optional_prereq_request = [*((request.prerequisite,) if request.prerequisite else ())]
+    fallibles = await MultiGet(
+        Get(FallibleClasspathEntries, ClasspathEntryRequests(optional_prereq_request)),
+        Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request)),
     )
+
+    direct_dependency_classpath_entries = FallibleClasspathEntries(
+        itertools.chain(*fallibles)
+    ).if_all_succeeded()
 
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
