@@ -355,7 +355,7 @@ def classpath_dependency_requests(
             union_membership, component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
-        if request.ignore_generated or not ignore_because_generated(coarsened_dep)
+        if not request.ignore_generated or not ignore_because_generated(coarsened_dep)
     )
 
 
