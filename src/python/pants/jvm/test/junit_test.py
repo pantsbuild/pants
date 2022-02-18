@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
+from pants.core.target_types import FileTarget
 
 import pytest
 
@@ -60,6 +61,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
         target_types=[
+            FileTarget,
             JvmArtifactTarget,
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
@@ -604,6 +606,64 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+
+@maybe_skip_jdk_test
+def test_vintage_file_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=JUNIT_COORD)]
+            ),
+            "BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = '{JUNIT_COORD.group}',
+                  artifact = '{JUNIT_COORD.artifact}',
+                  version = '{JUNIT_COORD.version}',
+                )
+                junit_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':junit_junit',
+                        ':dave',
+                    ],
+                )
+                file(
+                    name="dave",
+                    source="dave.txt",
+                )
+                """
+            ),
+            "SimpleTest.java": dedent(
+                """
+                package org.pantsbuild.example;
+
+                import junit.framework.TestCase;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+
+                public class SimpleTest extends TestCase {
+                   public void testHello() {
+                        assertEquals("lol dave", Files.readString(Path.of("dave.txt")));
+                   }
+                }
+                """
+            ),
+            "dave.txt": "lol dave",
+        }
+    )
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
 
 
 def run_junit_test(
