@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -12,8 +14,10 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.target_types import PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
     Pex,
     PexPlatforms,
     PexRequest,
@@ -45,11 +49,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PythonAwsLambdaFieldSet(PackageFieldSet):
-    required_fields = (PythonAwsLambdaHandlerField, PythonAwsLambdaRuntime)
+    required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
+    complete_platforms: PexCompletePlatformsField
     output_path: OutputPathField
 
 
@@ -78,13 +83,17 @@ async def package_python_awslambda(
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
-    py_major, py_minor = field_set.runtime.to_interpreter_version()
-    platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
-    # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
-    if py_major <= 3 and py_minor < 8:
-        platform_str += "m"
-    if (py_major, py_minor) == (2, 7):
-        platform_str += "u"
+    pex_platforms = []
+    interpreter_version = field_set.runtime.to_interpreter_version()
+    if interpreter_version:
+        py_major, py_minor = interpreter_version
+        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+        if py_major <= 3 and py_minor < 8:
+            platform_str += "m"
+        if (py_major, py_minor) == (2, 7):
+            platform_str += "u"
+        pex_platforms.append(platform_str)
 
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -93,12 +102,18 @@ async def package_python_awslambda(
         # available and matching the AMI platform.
         "--resolve-local-platforms",
     )
+
+    complete_platforms = await Get(
+        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
+    )
+
     pex_request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
         include_requirements=field_set.include_requirements.value,
         output_filename=output_filename,
-        platforms=PexPlatforms([platform_str]),
+        platforms=PexPlatforms(pex_platforms),
+        complete_platforms=complete_platforms,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
@@ -145,13 +160,20 @@ async def package_python_awslambda(
             description=f"Setting up handler in {output_filename}",
         ),
     )
+
+    extra_log_data: list[tuple[str, str]] = []
+    if field_set.runtime.value:
+        extra_log_data.append(("Runtime", field_set.runtime.value))
+    extra_log_data.extend(("Complete platform", path) for path in complete_platforms)
+    # The AWS-facing handler function is always lambdex_handler.handler, which is the
+    # wrapper injected by lambdex that manages invocation of the actual handler.
+    extra_log_data.append(("Handler", "lambdex_handler.handler"))
+    first_column_width = 4 + max(len(header) for header, _ in extra_log_data)
+
     artifact = BuiltPackageArtifact(
         output_filename,
-        extra_log_lines=(
-            f"    Runtime: {field_set.runtime.value}",
-            # The AWS-facing handler function is always lambdex_handler.handler, which is the
-            # wrapper injected by lambdex that manages invocation of the actual handler.
-            "    Handler: lambdex_handler.handler",
+        extra_log_lines=tuple(
+            f"{header.rjust(first_column_width, ' ')}: {data}" for header, data in extra_log_data
         ),
     )
     return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
