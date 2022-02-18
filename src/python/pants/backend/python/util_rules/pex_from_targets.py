@@ -342,7 +342,6 @@ class _RepositoryPexRequest:
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
     internal_only: bool
-    additional_args: tuple[str, ...]
     additional_lockfile_args: tuple[str, ...]
 
     def __init__(
@@ -354,7 +353,6 @@ class _RepositoryPexRequest:
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         platforms: PexPlatforms = PexPlatforms(),
         complete_platforms: CompletePlatforms = CompletePlatforms(),
-        additional_args: tuple[str, ...] = (),
         additional_lockfile_args: tuple[str, ...] = (),
     ) -> None:
         self.addresses = Addresses(addresses)
@@ -363,7 +361,6 @@ class _RepositoryPexRequest:
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.platforms = platforms
         self.complete_platforms = complete_platforms
-        self.additional_args = additional_args
         self.additional_lockfile_args = additional_lockfile_args
 
     def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
@@ -443,7 +440,6 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
                 platforms=request.platforms,
                 complete_platforms=request.complete_platforms,
                 internal_only=request.internal_only,
-                additional_args=request.additional_args,
                 additional_lockfile_args=request.additional_lockfile_args,
             ),
         )
@@ -512,7 +508,7 @@ async def get_repository_pex(
             interpreter_constraints=interpreter_constraints,
             platforms=request.platforms,
             complete_platforms=request.complete_platforms,
-            additional_args=request.additional_args + request.additional_lockfile_args,
+            additional_args=request.additional_lockfile_args,
         )
     return OptionalPexRequest(repository_pex_request)
 
@@ -601,7 +597,7 @@ async def _setup_constraints_repository_pex(
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         complete_platforms=request.complete_platforms,
-        additional_args=request.additional_args + request.additional_lockfile_args,
+        additional_args=request.additional_lockfile_args,
     )
     return OptionalPexRequest(repository_pex)
 
