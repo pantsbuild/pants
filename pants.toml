@@ -164,9 +164,6 @@ interpreter_constraints = [">=3.7,<3.10"]
 extra_requirements.add = [
   "mypy-typing-asserts",
 ]
-extra_type_stubs.add = [
-  "mypy-typing-asserts",
-]
 lockfile = "3rdparty/python/lockfiles/mypy.txt"
 
 [coverage-py]
