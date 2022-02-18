@@ -947,7 +947,9 @@ def assert_generated(
         }
     )
     parametrizations = rule_runner.request(_TargetParametrizations, [address])
-    assert expected == set(parametrizations.parametrizations.values())
+    assert expected == {
+        t for parametrization in parametrizations for t in parametrization.parametrization.values()
+    }
 
     if dependencies is not None:
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
