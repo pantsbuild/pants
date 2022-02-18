@@ -40,6 +40,8 @@ from pants.engine.internals.graph import (
     OwnersRequest,
     TooManyTargetsException,
     TransitiveExcludesNotSupportedError,
+    _DependencyMapping,
+    _DependencyMappingRequest,
     _TargetParametrizations,
 )
 from pants.engine.internals.parametrize import Parametrize
@@ -920,6 +922,8 @@ def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
 def generated_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            QueryRule(Addresses, [Specs]),
+            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
             QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
@@ -933,6 +937,8 @@ def assert_generated(
     build_content: str,
     files: list[str],
     expected: set[Target],
+    *,
+    dependencies: dict[str, set[str]] | None = None,
 ) -> None:
     rule_runner.write_files(
         {
@@ -941,7 +947,27 @@ def assert_generated(
         }
     )
     parametrizations = rule_runner.request(_TargetParametrizations, [address])
-    assert expected == set(parametrizations.parametrizations.values())
+    assert expected == {
+        t for parametrization in parametrizations for t in parametrization.parametrization.values()
+    }
+
+    if dependencies is not None:
+        # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
+        #   see https://github.com/pantsbuild/pants/issues/11270
+        specs = SpecsParser(rule_runner.build_root).parse_specs(["::"])
+        addresses = rule_runner.request(Addresses, [specs])
+        dependency_mapping = rule_runner.request(
+            _DependencyMapping,
+            [
+                _DependencyMappingRequest(
+                    TransitiveTargetsRequest(addresses),
+                    expanded_targets=False,
+                )
+            ],
+        )
+        assert {
+            k.spec: {a.spec for a in v} for k, v in dependency_mapping.mapping.items()
+        } == dependencies
 
 
 def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
@@ -1030,6 +1056,12 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
                 residence_dir="demo",
             ),
         },
+        dependencies={
+            "demo@tags=t1": {"demo/f1.ext@tags=t1"},
+            "demo@tags=t2": {"demo/f1.ext@tags=t2"},
+            "demo/f1.ext@tags=t1": set(),
+            "demo/f1.ext@tags=t2": set(),
+        },
     )
 
 
@@ -1095,6 +1127,16 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
                 residence_dir="demo",
             ),
         },
+        dependencies={
+            "demo:demo": {
+                "demo/f1.ext@resolve=a",
+                "demo/f1.ext@resolve=b",
+                "demo/f2.ext",
+            },
+            "demo/f1.ext@resolve=a": set(),
+            "demo/f1.ext@resolve=b": set(),
+            "demo/f2.ext": set(),
+        },
     )
 
 
@@ -1115,6 +1157,10 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
                 Address("demo", target_name="demo", parameters={"resolve": "b"}),
                 residence_dir="demo",
             ),
+        },
+        dependencies={
+            "demo@resolve=a": set(),
+            "demo@resolve=b": set(),
         },
     )
 
