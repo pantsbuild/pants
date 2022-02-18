@@ -50,6 +50,7 @@ from pants.engine.target import (
     ScalarField,
     SecondaryOwnerMixin,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -285,9 +286,8 @@ class PexScriptField(Field):
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
     help = (
-        "The platforms the built PEX should be compatible with.\n\nThis defaults to the current "
-        "platform, but can be overridden to different platforms. There must be built wheels "
-        "available for all of the foreign platforms, rather than sdists.\n\n"
+        "The abbreviated platforms the built PEX should be compatible with.\n\nThere must be built "
+        "wheels available for all of the foreign platforms, rather than sdists.\n\n"
         "You can give a list of multiple platforms to create a multiplatform PEX, "
         "meaning that the PEX will be executable in all of the supported environments.\n\n"
         "Platforms should be in the format defined by Pex "
@@ -298,7 +298,25 @@ class PexPlatformsField(StringSequenceField):
         '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
         'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
         'the Python version, e.g. "27", "36".\n  - ABI: the ABI tag, e.g. "cp36m", '
-        '"cp27mu", "abi3", "none".'
+        '"cp27mu", "abi3", "none".\n\nNote that using an abbreviated platform means that certain '
+        "resolves will fail when they contain environment markers that cannot be deduced from the "
+        "abbreviated platform string. A common example of this is 'python_full_version' which "
+        "requires knowing the patch level version of the foreign platform. If your resolves fail "
+        "due to undefined environment markers like this, you should switch to specifying "
+        "`complete_platforms` instead."
+    )
+
+
+class PexCompletePlatformsField(SpecialCasedDependencies):
+    alias = "complete_platforms"
+    help = (
+        "The platforms the built PEX should be compatible with.\n\nThere must be built wheels "
+        "available for all of the foreign platforms, rather than sdists.\n\n"
+        "You can give a list of multiple complete platforms to create a multiplatform PEX, "
+        "meaning that the PEX will be executable in all of the supported environments.\n\n"
+        "Complete platforms should be addresses of `file` targets that point to files that contain "
+        "complete platform JSON as described by Pex "
+        "(https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform)."
     )
 
 
@@ -457,6 +475,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PythonResolveField,
     PexBinaryDependenciesField,
     PexPlatformsField,
+    PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
