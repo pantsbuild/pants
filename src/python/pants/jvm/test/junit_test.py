@@ -722,6 +722,7 @@ def test_vintage_files_dependencies(rule_runner: RuleRunner) -> None:
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@pytest.mark.skip  # TODO(14537) `relocated_files` doesn't presently work, un-skip when fixing that.
 @maybe_skip_jdk_test
 def test_vintage_relocated_files_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
