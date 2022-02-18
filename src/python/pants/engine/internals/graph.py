@@ -1051,12 +1051,150 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
+@dataclass(frozen=True)
+class _ResolveInjectDependenciesRequests:
+    deps_request: DependenciesRequest
+
+
+@dataclass(frozen=True)
+class _ResolveInjectDependenciesRequestsResult:
+    injected: tuple[InjectedDependencies, ...]
+
+
+@rule
+async def resolve_inject_dependencies_requests(
+    request: _ResolveInjectDependenciesRequests,
+    union_membership: UnionMembership,
+) -> _ResolveInjectDependenciesRequestsResult:
+    inject_request_types = union_membership.get(InjectDependenciesRequest)
+    injected = await MultiGet(
+        Get(
+            InjectedDependencies,
+            InjectDependenciesRequest,
+            inject_request_type(request.deps_request.field),
+        )
+        for inject_request_type in inject_request_types
+        if isinstance(request.deps_request.field, inject_request_type.inject_for)
+    )
+    return _ResolveInjectDependenciesRequestsResult(tuple(injected))
+
+
+@dataclass(frozen=True)
+class _ResolveInferDependenciesRequests:
+    deps_request: DependenciesRequest
+    target: Target
+
+
+@dataclass(frozen=True)
+class _ResolveInferDependenciesRequestsResult:
+    inferred: tuple[InferredDependencies, ...] = ()
+
+
+@rule
+async def resolve_infer_dependencies_requests(
+    request: _ResolveInferDependenciesRequests,
+    union_membership: UnionMembership,
+) -> _ResolveInferDependenciesRequestsResult:
+    inference_request_types = union_membership.get(InferDependenciesRequest)
+    if not inference_request_types:
+        return _ResolveInferDependenciesRequestsResult()
+
+    sources_field = request.target.get(SourcesField)
+    relevant_inference_request_types = [
+        inference_request_type
+        for inference_request_type in inference_request_types
+        # NB: `type: ignore`d due to https://github.com/python/mypy/issues/9815.
+        if isinstance(sources_field, inference_request_type.infer_from)  # type: ignore[misc]
+    ]
+    inferred = await MultiGet(
+        Get(
+            InferredDependencies,
+            InferDependenciesRequest,
+            inference_request_type(sources_field),
+        )
+        for inference_request_type in relevant_inference_request_types
+    )
+    return _ResolveInferDependenciesRequestsResult(tuple(inferred))
+
+
+@dataclass(frozen=True)
+class _ResolveGeneratedTargetsDependencies:
+    target: Target
+
+
+@dataclass(frozen=True)
+class _ResolveGeneratedTargetsDependenciesResult:
+    addresses: tuple[Address, ...] = ()
+
+
+@rule
+async def resolve_generated_targets_dependencies(
+    request: _ResolveGeneratedTargetsDependencies,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+) -> _ResolveGeneratedTargetsDependenciesResult:
+    if (
+        target_types_to_generate_requests.is_generator(request.target)
+        and not request.target.address.is_generated_target
+    ):
+        parametrizations = await Get(_TargetParametrizations, Address, request.target.address)
+        return _ResolveGeneratedTargetsDependenciesResult(
+            tuple(parametrizations.parametrizations.keys())
+        )
+    return _ResolveGeneratedTargetsDependenciesResult()
+
+
+@dataclass(frozen=True)
+class _ResolveSpecialCasedDependencies:
+    deps_request: DependenciesRequest
+    target: Target
+
+
+@dataclass(frozen=True)
+class _ResolveSpecialCasedDependenciesResult:
+    addresses: tuple[Address, ...] = ()
+
+
+@rule
+async def resolve_special_cased_dependencies(
+    request: _ResolveSpecialCasedDependencies,
+    subproject_roots: SubprojectRoots,
+) -> _ResolveSpecialCasedDependenciesResult:
+    # If the target has `SpecialCasedDependencies`, such as the `archive` target having
+    # `files` and `packages` fields, then we possibly include those too. We don't want to always
+    # include those dependencies because they should often be excluded from the result due to
+    # being handled elsewhere in the calling code.
+
+    if not request.deps_request.include_special_cased_deps:
+        return _ResolveSpecialCasedDependenciesResult()
+
+    # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+    # SpecialCasedDependencies.
+    special_cased_fields = tuple(
+        field
+        for field in request.target.field_values.values()
+        if isinstance(field, SpecialCasedDependencies)
+    )
+    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+    special_cased = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                addr,
+                relative_to=request.target.address.spec_path,
+                subproject_roots=subproject_roots,
+            ),
+        )
+        for special_cased_field in special_cased_fields
+        for addr in special_cased_field.to_unparsed_address_inputs().values
+    )
+
+    return _ResolveSpecialCasedDependenciesResult(tuple(special_cased))
+
+
 @rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
     request: DependenciesRequest,
-    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    union_membership: UnionMembership,
-    subproject_roots: SubprojectRoots,
 ) -> Addresses:
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(WrappedTarget, Address, request.field.address),
@@ -1064,76 +1202,28 @@ async def resolve_dependencies(
     )
     tgt = wrapped_tgt.target
 
-    # Inject any dependencies (based on `Dependencies` field rather than `SourcesField`).
-    inject_request_types = union_membership.get(InjectDependenciesRequest)
-    injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
+    (
+        injected_result,
+        inferred_result,
+        generated_targets_result,
+        special_cased_result,
+    ) = await MultiGet(
+        Get(_ResolveInjectDependenciesRequestsResult, _ResolveInjectDependenciesRequests(request)),
+        Get(
+            _ResolveInferDependenciesRequestsResult, _ResolveInferDependenciesRequests(request, tgt)
+        ),
+        Get(_ResolveGeneratedTargetsDependenciesResult, _ResolveGeneratedTargetsDependencies(tgt)),
+        Get(_ResolveSpecialCasedDependenciesResult, _ResolveSpecialCasedDependencies(request, tgt)),
     )
-
-    # Infer any dependencies (based on `SourcesField` field).
-    inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred: tuple[InferredDependencies, ...] = ()
-    if inference_request_types:
-        sources_field = tgt.get(SourcesField)
-        relevant_inference_request_types = [
-            inference_request_type
-            for inference_request_type in inference_request_types
-            # NB: `type: ignore`d due to https://github.com/python/mypy/issues/9815.
-            if isinstance(sources_field, inference_request_type.infer_from)  # type: ignore[misc]
-        ]
-        inferred = await MultiGet(
-            Get(
-                InferredDependencies,
-                InferDependenciesRequest,
-                inference_request_type(sources_field),
-            )
-            for inference_request_type in relevant_inference_request_types
-        )
-
-    # If it's a target generator, inject dependencies on all of its generated targets.
-    generated_addresses: tuple[Address, ...] = ()
-    if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
-        parametrizations = await Get(_TargetParametrizations, Address, tgt.address)
-        generated_addresses = tuple(parametrizations.parametrizations.keys())
-
-    # If the target has `SpecialCasedDependencies`, such as the `archive` target having
-    # `files` and `packages` fields, then we possibly include those too. We don't want to always
-    # include those dependencies because they should often be excluded from the result due to
-    # being handled elsewhere in the calling code.
-    special_cased: tuple[Address, ...] = ()
-    if request.include_special_cased_deps:
-        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependencies.
-        special_cased_fields = tuple(
-            field
-            for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependencies)
-        )
-        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-        special_cased = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(
-                    addr,
-                    relative_to=tgt.address.spec_path,
-                    subproject_roots=subproject_roots,
-                ),
-            )
-            for special_cased_field in special_cased_fields
-            for addr in special_cased_field.to_unparsed_address_inputs().values
-        )
 
     result = {
         addr
         for addr in (
-            *generated_addresses,
+            *generated_targets_result.addresses,
             *explicitly_provided.includes,
-            *itertools.chain.from_iterable(injected),
-            *itertools.chain.from_iterable(inferred),
-            *special_cased,
+            *itertools.chain.from_iterable(injected_result.injected),
+            *itertools.chain.from_iterable(inferred_result.inferred),
+            *special_cased_result.addresses,
         )
         if addr not in explicitly_provided.ignores
     }
