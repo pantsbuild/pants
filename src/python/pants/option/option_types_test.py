@@ -223,8 +223,12 @@ def test_property_types() -> None:
         # Enum opts
         enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
         optional_enum_opt = EnumOption("--opt", option_type=MyEnum, help="")
+        # mypy correctly complains about not matching any possibilities
+        enum_opt_bad = EnumOption("--opt", help="")  # type: ignore[call-overload]
         enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
         enum_list_opt2 = EnumListOption("--opt", member_type=MyEnum, help="")
+        # mypy correctly complains about needing a type annotation
+        enum_list_bad_opt = EnumListOption("--opt", default=[], help="")  # type: ignore[var-annotated]
 
         # Dict opts
         dict_opt1 = DictOption[str]("--opt", help="")
@@ -269,8 +273,10 @@ def test_property_types() -> None:
 
         assert_type["MyEnum"](my_subsystem.enum_opt)
         assert_type["MyEnum | None"](my_subsystem.optional_enum_opt)
+        assert_type["Any"](my_subsystem.enum_opt_bad)
         assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt1)
         assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt2)
+        assert_type["tuple[Any, ...]"](my_subsystem.enum_list_bad_opt)
 
         assert_type["dict[str, str]"](my_subsystem.dict_opt1)
         assert_type["dict[str, Any]"](my_subsystem.dict_opt2)
