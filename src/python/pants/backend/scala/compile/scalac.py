@@ -24,12 +24,14 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
@@ -56,22 +58,13 @@ async def compile_scala_source(
     scala: ScalaSubsystem,
     scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
-    union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
+
     # Request classpath entries for our direct dependencies.
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(
-                FallibleClasspathEntry,
-                ClasspathEntryRequest,
-                ClasspathEntryRequest.for_targets(
-                    union_membership, component=coarsened_dep, resolve=request.resolve
-                ),
-            )
-            for coarsened_dep in request.component.dependencies
-        )
-    )
+    dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()
+
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
