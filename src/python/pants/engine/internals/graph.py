@@ -124,20 +124,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending target.
-class _WarnDeprecatedTarget:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedTargetRequest:
-    tgt_type: type[Target]
-
-
-@rule
-def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnDeprecatedTarget:
-    tgt_type = request.tgt_type
+def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=tgt_type.deprecated_alias_removal_version,
@@ -147,23 +134,9 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedTarget()
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending field.
-class _WarnDeprecatedField:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedFieldRequest:
-    field_type: type[Field]
-
-
-@rule
-def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDeprecatedField:
-    field_type = request.field_type
+def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=field_type.deprecated_alias_removal_version,
@@ -173,7 +146,6 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedField()
 
 
 @dataclass(frozen=True)
@@ -228,7 +200,7 @@ async def resolve_target_parametrizations(
         and target_type.deprecated_alias == target_adaptor.type_alias
         and not address.is_generated_target
     ):
-        await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
+        warn_deprecated_target_type(target_type)
 
     target: Target | None
     generate_request = target_types_to_generate_requests.request_for(target_type)
@@ -324,7 +296,7 @@ async def resolve_target_parametrizations(
             field_type.deprecated_alias is not None
             and field_type.deprecated_alias in target_adaptor.kwargs
         ):
-            await Get(_WarnDeprecatedField, _WarnDeprecatedFieldRequest(field_type))
+            warn_deprecated_field_type(field_type)
 
     return _TargetParametrizations(target, generated)
 
