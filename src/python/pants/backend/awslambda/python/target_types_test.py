@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import re
 from textwrap import dedent
 from typing import List, Optional
 
@@ -16,9 +16,15 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PexCompletePlatformsField,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
+from pants.core.target_types import FileTarget
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -32,7 +38,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
         ],
-        target_types=[PythonAWSLambda, PythonRequirementTarget, PythonSourcesGeneratorTarget],
+        target_types=[
+            FileTarget,
+            PythonAWSLambda,
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+        ],
     )
 
 
@@ -217,3 +228,62 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+
+
+def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/platform-py37.json": "",
+            "project/BUILD": dedent(
+                """\
+                python_awslambda(
+                    name='runtime',
+                    handler='project.app:func',
+                    runtime='python3.7',
+                )
+                file(name="python37", source="platform-py37.json")
+                python_awslambda(
+                    name='complete_platforms',
+                    handler='project.app:func',
+                    complete_platforms=[':python37'],
+                )
+                python_awslambda(
+                    name='both',
+                    handler='project.app:func',
+                    runtime='python3.7',
+                    complete_platforms=[':python37'],
+                )
+                python_awslambda(
+                    name='neither',
+                    handler='project.app:func',
+                )
+                """
+            ),
+        }
+    )
+
+    runtime = rule_runner.get_target(Address("project", target_name="runtime"))
+    assert "python3.7" == runtime[PythonAwsLambdaRuntime].value
+    assert runtime[PexCompletePlatformsField].value is None
+
+    complete_platforms = rule_runner.get_target(
+        Address("project", target_name="complete_platforms")
+    )
+    assert complete_platforms[PythonAwsLambdaRuntime].value is None
+    assert (":python37",) == complete_platforms[PexCompletePlatformsField].value
+
+    both = rule_runner.get_target(Address("project", target_name="both"))
+    assert "python3.7" == both[PythonAwsLambdaRuntime].value
+    assert (":python37",) == both[PexCompletePlatformsField].value
+
+    with pytest.raises(
+        ExecutionError,
+        match=r".*{}.*".format(
+            re.escape(
+                "InvalidTargetException: The `python_awslambda` target project:neither must "
+                "specify either a `runtime` or `complete_platforms` or both."
+            )
+        ),
+    ):
+        rule_runner.get_target(Address("project", target_name="neither"))
