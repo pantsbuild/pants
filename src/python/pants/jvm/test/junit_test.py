@@ -750,7 +750,7 @@ def test_vintage_relocated_files_dependency(rule_runner: RuleRunner) -> None:
                 )
                 relocated_files(
                     name="relocated_ducks",
-                    files_targest=[":ducks"],
+                    files_targets=[":ducks"],
                     src="",
                     dest="ducks",
                 )
