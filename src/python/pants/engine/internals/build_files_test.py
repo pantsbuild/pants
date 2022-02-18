@@ -599,7 +599,6 @@ def test_address_specs_parametrize(
         Address("demo", generated_name="f.txt", parameters={"resolve": "b"}),
         Address("demo", relative_file_path="f.txt", parameters={"resolve": "a"}),
         Address("demo", relative_file_path="f.txt", parameters={"resolve": "b"}),
-        # TODO: This needs further work: in order for aliases to be useful, they will need to
-        # include some parameters. But exactly what to do about overrides is an open question.
-        Address("demo"),
+        Address("demo", parameters={"resolve": "a"}),
+        Address("demo", parameters={"resolve": "b"}),
     }

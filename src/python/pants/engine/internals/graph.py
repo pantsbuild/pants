@@ -202,7 +202,8 @@ async def resolve_target_parametrizations(
     ):
         await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
 
-    parametrizations = []
+    target = None
+    parametrizations: list[_TargetParametrization] = []
     generate_request = target_types_to_generate_requests.request_for(target_type)
     if generate_request:
         # Split out the `propagated_fields` before construction.
@@ -234,48 +235,50 @@ async def resolve_target_parametrizations(
                 f"parametrize the {generator_fields_parametrized} {noun}."
             )
 
-        target = target_type(generator_fields, address, union_membership)
+        base_generator = target_type(generator_fields, address, union_membership)
 
         overrides = {}
-        if target.has_field(OverridesField):
-            overrides_field = target[OverridesField]
+        if base_generator.has_field(OverridesField):
+            overrides_field = base_generator[OverridesField]
             overrides_flattened = overrides_field.flatten()
             if issubclass(target_type, TargetFilesGenerator):
                 override_globs = OverridesField.to_path_globs(
-                    target.address, overrides_flattened, files_not_found_behavior
+                    address, overrides_flattened, files_not_found_behavior
                 )
                 override_paths = await MultiGet(
                     Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
                 )
                 overrides = OverridesField.flatten_paths(
-                    target.address,
+                    address,
                     zip(override_paths, override_globs, overrides_flattened.values()),
                 )
             else:
                 overrides = overrides_field.flatten()
 
+        generators = [
+            (target_type(generator_fields, address, union_membership), template)
+            for address, template in Parametrize.expand(address, template_fields)
+        ]
         all_generated = await MultiGet(
             Get(
                 GeneratedTargets,
                 GenerateTargetsRequest,
                 generate_request(
-                    target,
-                    template_address=address,
+                    generator,
+                    template_address=generator.address,
                     template=template,
                     overrides={
-                        name: dict(Parametrize.expand(address, override))
+                        name: dict(Parametrize.expand(generator.address, override))
                         for name, override in overrides.items()
                     },
                 ),
             )
-            for address, template in Parametrize.expand(address, template_fields)
+            for generator, template in generators
         )
-        generated = FrozenDict(
-            GeneratedTargets(
-                target, (t for generated_batch in all_generated for t in generated_batch.values())
-            )
+        parametrizations.extend(
+            _TargetParametrization(generator, generated_batch)
+            for generated_batch, (generator, _) in zip(all_generated, generators)
         )
-        parametrizations.append(_TargetParametrization(target, generated))
     else:
         first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
         if rest:
