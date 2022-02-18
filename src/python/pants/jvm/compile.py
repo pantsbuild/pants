@@ -11,8 +11,10 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
+from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget, FieldSet
@@ -311,6 +313,21 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         return self.exit_code == 0
 
 
+class ClasspathEntryRequests(Collection[ClasspathEntryRequest]):
+    pass
+
+
+class FallibleClasspathEntries(Collection[FallibleClasspathEntry]):
+    def if_all_succeeded(self) -> tuple[ClasspathEntry, ...] | None:
+        return FallibleClasspathEntry.if_all_succeeded(self)
+
+
+@dataclass(frozen=True)
+class ClasspathDependenciesRequest:
+    request: ClasspathEntryRequest
+    ignore_generated: bool = False
+
+
 @rule
 def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEntry:
     if fallible_result.result == CompileResult.SUCCEEDED:
@@ -319,6 +336,35 @@ def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEnt
     # NB: The compile outputs will already have been streamed as FallibleClasspathEntries finish.
     raise Exception(
         f"Compile failed:\nstdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}"
+    )
+
+
+@rule
+def classpath_dependency_requests(
+    union_membership: UnionMembership, request: ClasspathDependenciesRequest
+) -> ClasspathEntryRequests:
+    def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
+        if len(coarsened_dep.members) == 1:
+            return False
+        us = request.request.component.representative.address
+        them = coarsened_dep.representative.address
+        return us.spec_path == them.spec_path and us.target_name == them.target_name
+
+    return ClasspathEntryRequests(
+        ClasspathEntryRequest.for_targets(
+            union_membership, component=coarsened_dep, resolve=request.request.resolve
+        )
+        for coarsened_dep in request.request.component.dependencies
+        if request.ignore_generated or not ignore_because_generated(coarsened_dep)
+    )
+
+
+@rule
+async def compile_classpath_entries(requests: ClasspathEntryRequests) -> FallibleClasspathEntries:
+    return FallibleClasspathEntries(
+        await MultiGet(
+            Get(FallibleClasspathEntry, ClasspathEntryRequest, request) for request in requests
+        )
     )
 
 
