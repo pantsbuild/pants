@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import Enum
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, call
 
 import pytest
@@ -36,6 +36,9 @@ from pants.option.option_types import (
     TargetOption,
 )
 from pants.option.subsystem import Subsystem
+
+if TYPE_CHECKING:
+    from mypy_typing_asserts import assert_type
 
 
 class MyEnum(Enum):
@@ -180,26 +183,99 @@ def test_subsystem_option_ordering() -> None:
     ]
 
 
-def test_dict_option_valuetype() -> None:
+def test_property_types() -> None:
+    # NB: This test has no runtime assertions
+
     class MySubsystem(Subsystem):
         def __init__(self):
-            self.options = SimpleNamespace()
-            self.options.opt = None
+            pass
 
-        d1 = DictOption[str]("--opt", help="")
-        d2 = DictOption[Any]("--opt", default=dict(key="val"), help="")
+        str_opt = StrOption("--opt", default="", help="")
+        optional_str_opt = StrOption("--opt", help="")
+        int_opt = IntOption("--opt", default=0, help="")
+        optional_int_opt = IntOption("--opt", help="")
+        float_opt = FloatOption("--opt", default=1.0, help="")
+        optional_float_opt = FloatOption("--opt", help="")
+        bool_opt = BoolOption("--opt", default=True, help="")
+        optional_bool_opt = BoolOption("--opt", help="")
+        target_opt = TargetOption("--opt", default="", help="")
+        optional_target_opt = TargetOption("--opt", help="")
+        dir_opt = DirOption("--opt", default="", help="")
+        optional_dir_opt = DirOption("--opt", help="")
+        file_opt = FileOption("--opt", default="", help="")
+        optional_file_opt = FileOption("--opt", help="")
+        shellstr_opt = ShellStrOption("--opt", default="", help="")
+        optional_shellstr_opt = ShellStrOption("--opt", help="")
+        memorysize_opt = MemorySizeOption("--opt", default=1, help="")
+        optional_memorysize_opt = MemorySizeOption("--opt", help="")
+
+        # List opts
+        str_list_opt = StrListOption("--opt", help="")
+        int_list_opt = IntListOption("--opt", help="")
+        float_list_opt = FloatListOption("--opt", help="")
+        bool_list_opt = BoolListOption("--opt", help="")
+        target_list_opt = TargetListOption("--opt", help="")
+        dir_list_opt = DirListOption("--opt", help="")
+        file_list_opt = FileListOption("--opt", help="")
+        shellstr_list_opt = ShellStrListOption("--opt", help="")
+        memorysize_list_opt = MemorySizeListOption("--opt", help="")
+
+        # Enum opts
+        enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
+        optional_enum_opt = EnumOption("--opt", option_type=MyEnum, help="")
+        enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
+        enum_list_opt2 = EnumListOption("--opt", member_type=MyEnum, help="")
+
+        # Dict opts
+        dict_opt1 = DictOption[str]("--opt", help="")
+        dict_opt2 = DictOption[Any]("--opt", default=dict(key="val"), help="")
         # mypy correctly complains about needing a type annotation
-        d3 = DictOption("--opt", help="")  # type: ignore[var-annotated]
-        d4 = DictOption("--opt", default={"key": "val"}, help="")
-        d5 = DictOption("--opt", default=dict(key="val"), help="")
-        d6 = DictOption("--opt", default=dict(key=1), help="")
-        d7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
+        dict_opt3 = DictOption("--opt", help="")  # type: ignore[var-annotated]
+        dict_opt4 = DictOption("--opt", default={"key": "val"}, help="")
+        dict_opt5 = DictOption("--opt", default=dict(key="val"), help="")
+        dict_opt6 = DictOption("--opt", default=dict(key=1), help="")
+        dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
 
     my_subsystem = MySubsystem()
-    d1: dict[str, str] = my_subsystem.d1  # noqa: F841
-    d2: dict[str, Any] = my_subsystem.d2  # noqa: F841
-    d3: dict[str, Any] = my_subsystem.d3  # noqa: F841
-    d4: dict[str, str] = my_subsystem.d4  # noqa: F841
-    d5: dict[str, str] = my_subsystem.d5  # noqa: F841
-    d6: dict[str, int] = my_subsystem.d6  # noqa: F841
-    d7: dict[str, Any] = my_subsystem.d7  # noqa: F841
+    if TYPE_CHECKING:
+        assert_type["str"](my_subsystem.str_opt)
+        assert_type["str | None"](my_subsystem.optional_str_opt)
+        assert_type["int"](my_subsystem.int_opt)
+        assert_type["int | None"](my_subsystem.optional_int_opt)
+        assert_type["float"](my_subsystem.float_opt)
+        assert_type["float | None"](my_subsystem.optional_float_opt)
+        assert_type["bool"](my_subsystem.bool_opt)
+        assert_type["bool | None"](my_subsystem.optional_bool_opt)
+        assert_type["str"](my_subsystem.target_opt)
+        assert_type["str | None"](my_subsystem.optional_target_opt)
+        assert_type["str"](my_subsystem.dir_opt)
+        assert_type["str | None"](my_subsystem.optional_dir_opt)
+        assert_type["str"](my_subsystem.file_opt)
+        assert_type["str | None"](my_subsystem.optional_file_opt)
+        assert_type["str"](my_subsystem.shellstr_opt)
+        assert_type["str | None"](my_subsystem.optional_shellstr_opt)
+        assert_type["int"](my_subsystem.memorysize_opt)
+        assert_type["int | None"](my_subsystem.optional_memorysize_opt)
+
+        assert_type["tuple[str, ...]"](my_subsystem.str_list_opt)
+        assert_type["tuple[int, ...]"](my_subsystem.int_list_opt)
+        assert_type["tuple[float, ...]"](my_subsystem.float_list_opt)
+        assert_type["tuple[bool, ...]"](my_subsystem.bool_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.target_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.dir_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.file_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.shellstr_list_opt)
+        assert_type["tuple[int, ...]"](my_subsystem.memorysize_list_opt)
+
+        assert_type["MyEnum"](my_subsystem.enum_opt)
+        assert_type["MyEnum | None"](my_subsystem.optional_enum_opt)
+        assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt1)
+        assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt2)
+
+        assert_type["dict[str, str]"](my_subsystem.dict_opt1)
+        assert_type["dict[str, Any]"](my_subsystem.dict_opt2)
+        assert_type["dict[str, Any]"](my_subsystem.dict_opt3)
+        assert_type["dict[str, str]"](my_subsystem.dict_opt4)
+        assert_type["dict[str, str]"](my_subsystem.dict_opt5)
+        assert_type["dict[str, int]"](my_subsystem.dict_opt6)
+        assert_type["dict[str, object]"](my_subsystem.dict_opt7)
