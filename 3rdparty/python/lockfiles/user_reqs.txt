@@ -16,6 +16,7 @@
 #     "freezegun==1.1.0",
 #     "humbug==0.2.7",
 #     "ijson==3.1.4",
+#     "mypy-typing-asserts==0.1.1",
 #     "packaging==21.3",
 #     "pex==2.1.66",
 #     "psutil==5.9.0",
@@ -79,7 +80,6 @@ ijson==3.1.4 \
     --hash=sha256:fa10a1d88473303ec97aae23169d77c5b92657b7fb189f9c584974c00a79f383 \
     --hash=sha256:9a5bf5b9d8f2ceaca131ee21fc7875d0f34b95762f4f32e4d65109ca46472147 \
     --hash=sha256:81cc8cee590c8a70cca3c9aefae06dd7cb8e9f75f3a7dc12b340c2e332d33a2a \
-    --hash=sha256:4ea5fc50ba158f72943d5174fbc29ebefe72a2adac051c814c87438dc475cf78 \
     --hash=sha256:3b98861a4280cf09d267986cefa46c3bd80af887eae02aba07488d80eb798afa \
     --hash=sha256:068c692efba9692406b86736dcc6803e4a0b6280d7f0b7534bff3faec677ff38 \
     --hash=sha256:86884ac06ac69cea6d89ab7b84683b3b4159c4013e4a20276d3fc630fe9b7588 \
@@ -138,6 +138,9 @@ importlib-metadata==4.11.1; python_version < "3.8" and python_version >= "3.7" \
 iniconfig==1.1.1; python_version >= "3.6" \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
+mypy-typing-asserts==0.1.1; python_version >= "3.7" and python_version < "4.0" \
+    --hash=sha256:917da6d572f187f72d6dfb4b1108c50a3d8edd8e5ccd1a0f0c576fe0a4819cda \
+    --hash=sha256:a93087a4242b660ae567463f93cab2673304bd0820172268f488248bf3b0fa40
 packaging==21.3; python_version >= "3.6" \
     --hash=sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522 \
     --hash=sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb

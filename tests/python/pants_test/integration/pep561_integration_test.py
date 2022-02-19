@@ -7,16 +7,19 @@ from textwrap import dedent
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 
-def typecheck_file(filename: str) -> PantsResult:
+def typecheck_file(path: str, filename: str) -> PantsResult:
     return run_pants(
         [
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
             "check",
-            filename,
+            f"{path}/{filename}",
         ],
         # Match the wheel_config_settings --python-tag of src/python/pants/testutil:testutil_wheel.
-        config={"python": {"interpreter_constraints": ["CPython>=3.7<=3.9"]}},
+        config={
+            "python": {"interpreter_constraints": ["CPython>=3.7<=3.9"]},
+            "mypy": {"config": f"{path}/mypy.ini"},
+        },
     )
 
 
@@ -58,7 +61,15 @@ def test_typechecking() -> None:
             RuleRunner(bad_kwargs="foo")
             """
         ),
+        "mypy.ini": dedent(
+            """\
+            [mypy]
+            namespace_packages = true
+            explicit_package_bases = true
+            mypy_path = "src/python:tests/python:testprojects/src/python"
+            """
+        ),
     }
     with setup_tmpdir(project) as tmpdir:
-        typecheck_file(f"{tmpdir}/ok.py").assert_success()
-        typecheck_file(f"{tmpdir}/err.py").assert_failure()
+        typecheck_file(tmpdir, "ok.py").assert_success()
+        typecheck_file(tmpdir, "err.py").assert_failure()
