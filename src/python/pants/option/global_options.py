@@ -1444,11 +1444,11 @@ class GlobalOptions(Subsystem):
         "--streaming-workunits-level",
         default=LogLevel.DEBUG,
         help=(
-            "The Level of workunits that will be reported to streaming workunit event "
+            "The level of workunits that will be reported to streaming workunit event "
             "receivers.\n\n"
-            "The filtering of workunits that occurs at higher levels is tree-aware: parent "
-            "pointers are fixed up when workunits are filtered such that the resulting workunits "
-            "always form a tree."
+            "Workunits form a tree, and even when workunits are filtered out by this setting, the "
+            "workunit tree structure will be preserved (by adjusting the parent pointers of the "
+            "remaining workunits)."
         ),
         advanced=True,
     )
