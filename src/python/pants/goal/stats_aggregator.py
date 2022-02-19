@@ -57,14 +57,11 @@ class StatsAggregatorCallback(WorkunitsCallback):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        # Aggregate counters on completed workunits.
-        for workunit in completed_workunits:
-            if "counters" in workunit:
-                for name, value in workunit["counters"].items():
-                    self.counters[name] += value
-
         if not finished:
             return
+
+        # Capture global counters.
+        self.counters = Counter(context.get_metrics())
 
         # Add any counters with a count of 0.
         for counter in context.run_tracker.counter_names:
