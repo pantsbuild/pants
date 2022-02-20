@@ -8,11 +8,11 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.codegen.wsdl.java.jaxws import JaxWsTools
-from pants.backend.codegen.wsdl.java.rules import GenerateJavaFromWsdlRequest
-from pants.backend.codegen.wsdl.java.rules import rules as java_wsdl_rules
-from pants.backend.codegen.wsdl.rules import rules as wsdl_rules
-from pants.backend.codegen.wsdl.target_types import WsdlSourceField, WsdlSourcesGeneratorTarget
+from pants.backend.codegen.soap.java.jaxws import JaxWsTools
+from pants.backend.codegen.soap.java.rules import GenerateJavaFromWsdlRequest
+from pants.backend.codegen.soap.java.rules import rules as java_wsdl_rules
+from pants.backend.codegen.soap.rules import rules as wsdl_rules
+from pants.backend.codegen.soap.target_types import WsdlSourceField, WsdlSourcesGeneratorTarget
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
@@ -78,58 +78,61 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+_FOO_SERVICE_WSDL = dedent(
+    """\
+  <?xml version="1.0" encoding="UTF-8"?>
+  <wsdl:definition name="FooService"
+      targetNamespace="http://www.example.com/wsdl/FooService"
+      xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+      xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+      xmlns:tns="http://www.examples.com/wsdl/HelloService/"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+    <wsdl:types />
+
+    <wsdl:message name="FooRequest">
+      <wsdl:part name="arg0" type="xsd:int" />
+    </wsdl:message>
+
+    <wsdl:message name="FooResponse">
+      <wsdl:part name="ret0" type="xsd:boolean" />
+    </wsdl:message>
+
+    <wsdl:portType name="FooPortType">
+      <wsdl:operation name="doSomething">
+        <wsdl:input message="tns:FooRequest" />
+        <wsdl:output message="tns:RooResponse" />
+      </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="FooBinding" type="tns:FooPortType">
+      <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc"/>
+      <wsdl:operation name="doSomething">
+        <soap:operation soapAction="" />
+        <wsdl:input>
+          <soap:body use="literal" namespace="http://www.example.com/wsdl/FooService" />
+        </wsdl:input>
+        <wsdl:output>
+          <soap:body use="literal" namespace="http://www.example.com/wsdl/FooService" />
+        </wsdl:output>
+      </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:service name="FooService">
+      <wsdl:port name="FooPort" binding="tns:FooBinding">
+        <soap:address location="http://www.example.com/FooService/" />
+      </wsdl:port>
+    </wsdl:service>
+  </wsdl:definition>
+  """
+)
+
+
 def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/wsdl/BUILD": "wsdl_sources()",
-            "src/wsdl/FooService.wsdl": dedent(
-                """\
-        <?xml version="1.0" encoding="UTF-8"?>
-        <wsdl:definition name="FooService"
-            targetNamespace="http://www.example.com/wsdl/FooService"
-            xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
-            xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-            xmlns:tns="http://www.examples.com/wsdl/HelloService/"
-            xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-
-          <wsdl:types />
-
-          <wsdl:message name="FooRequest">
-            <wsdl:part name="arg0" type="xsd:int" />
-          </wsdl:message>
-
-          <wsdl:message name="FooResponse">
-            <wsdl:part name="ret0" type="xsd:boolean" />
-          </wsdl:message>
-
-          <wsdl:portType name="FooPortType">
-            <wsdl:operation name="doSomething">
-              <wsdl:input message="tns:FooRequest" />
-              <wsdl:output message="tns:RooResponse" />
-            </wsdl:operation>
-          </wsdl:portType>
-
-          <wsdl:binding name="FooBinding" type="tns:FooPortType">
-            <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc"/>
-            <wsdl:operation name="doSomething">
-              <soap:operation soapAction="" />
-              <wsdl:input>
-                <soap:body use="literal" namespace="http://www.example.com/wsdl/FooService" />
-              </wsdl:input>
-              <wsdl:output>
-                <soap:body use="literal" namespace="http://www.example.com/wsdl/FooService" />
-              </wsdl:output>
-            </wsdl:operation>
-          </wsdl:binding>
-
-          <wsdl:service name="FooService">
-            <wsdl:port name="FooPort" binding="tns:FooBinding">
-              <soap:address location="http://www.example.com/FooService/" />
-            </wsdl:port>
-          </wsdl:service>
-        </wsdl:definition>
-        """
-            ),
+            "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
         }
     )
 
@@ -143,6 +146,51 @@ def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
         (
             "src/wsdl/com/example/wsdl/fooservice/FooPortType.java",
             "src/wsdl/com/example/wsdl/fooservice/FooService.java",
+        ),
+    )
+
+
+def test_generate_java_module_from_wsdl(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/wsdl/BUILD": "wsdl_sources(module='foo')",
+            "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
+        }
+    )
+
+    def assert_gen(addr: Address, expected: Iterable[str]) -> None:
+        assert_files_generated(
+            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+        )
+
+    assert_gen(
+        Address("src/wsdl/dir1", relative_file_path="HelloService.wsdl"),
+        (
+            "src/wsdl/com/example/wsdl/fooservice/FooPortType.java",
+            "src/wsdl/com/example/wsdl/fooservice/FooService.java",
+            "src/wsdl/com/example/wsdl/fooservice/module-info.java",
+        ),
+    )
+
+
+def test_generate_java_from_wsdl_using_custom_package(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/wsdl/BUILD": "wsdl_sources(package='fooservice')",
+            "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
+        }
+    )
+
+    def assert_gen(addr: Address, expected: Iterable[str]) -> None:
+        assert_files_generated(
+            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+        )
+
+    assert_gen(
+        Address("src/wsdl/dir1", relative_file_path="HelloService.wsdl"),
+        (
+            "src/wsdl/fooservice/FooPortType.java",
+            "src/wsdl/fooservice/FooService.java",
         ),
     )
 

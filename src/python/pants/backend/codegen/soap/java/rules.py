@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.codegen.wsdl.java import extra_fields
-from pants.backend.codegen.wsdl.java.extra_fields import ModuleField, PackageField
-from pants.backend.codegen.wsdl.java.jaxws import JaxWsTools
-from pants.backend.codegen.wsdl.target_types import WsdlCatalogSourceField, WsdlSourceField
+from pants.backend.codegen.soap.java import extra_fields
+from pants.backend.codegen.soap.java.extra_fields import JavaModuleField, JavaPackageField
+from pants.backend.codegen.soap.java.jaxws import JaxWsTools
+from pants.backend.codegen.soap.target_types import WsdlCatalogSourceField, WsdlSourceField
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -78,7 +78,7 @@ async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> Gener
         Digest, MergeDigests([sources.snapshot.digest, catalog.snapshot.digest])
     )
 
-    target_package = request.protocol_target[PackageField].value
+    target_package = request.protocol_target[JavaPackageField].value
     compile_results = await MultiGet(
         Get(
             CompiledWsdlSource,
@@ -86,7 +86,7 @@ async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> Gener
                 merged_sources,
                 path=path,
                 catalog=catalog.snapshot.files[0] if catalog.snapshot.files else None,
-                module=request.protocol_target[ModuleField].value,
+                module=request.protocol_target[JavaModuleField].value,
                 package=target_package,
             ),
         )

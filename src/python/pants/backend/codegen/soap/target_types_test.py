@@ -6,8 +6,8 @@ from __future__ import annotations
 import os
 from textwrap import dedent
 
-from pants.backend.codegen.wsdl import target_types
-from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget, WsdlSourceTarget
+from pants.backend.codegen.soap import target_types
+from pants.backend.codegen.soap.target_types import WsdlSourcesGeneratorTarget, WsdlSourceTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import SingleSourceField, Tags

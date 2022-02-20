@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
+from pants.backend.codegen.soap.target_types import WsdlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,

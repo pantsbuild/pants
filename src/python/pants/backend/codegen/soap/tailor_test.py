@@ -3,9 +3,9 @@
 
 import pytest
 
-from pants.backend.codegen.wsdl.tailor import PutativeWsdlTargetsRequest
-from pants.backend.codegen.wsdl.tailor import rules as tailor_rules
-from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
+from pants.backend.codegen.soap.tailor import PutativeWsdlTargetsRequest
+from pants.backend.codegen.soap.tailor import rules as tailor_rules
+from pants.backend.codegen.soap.target_types import WsdlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
