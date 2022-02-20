@@ -16,9 +16,7 @@ class JaxWsTools(JvmToolBase):
         "pants.backend.codegen.wsdl.java",
         "jaxws.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "pants/backend/codegen/wsdl/java/jaxws.default.lockfile.txt"
-    )
+    default_lockfile_path = "pants/backend/codegen/wsdl/java/jaxws.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod

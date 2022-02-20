@@ -1,7 +1,11 @@
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -9,16 +13,11 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
     group_by_dir,
 )
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-
-from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
 
 
 @dataclass(frozen=True)

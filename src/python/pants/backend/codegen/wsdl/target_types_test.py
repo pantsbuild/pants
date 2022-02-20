@@ -6,23 +6,19 @@ from __future__ import annotations
 import os
 from textwrap import dedent
 
-from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets, SingleSourceField, Tags
-from pants.testutil.rule_runner import QueryRule, RuleRunner
-
 from pants.backend.codegen.wsdl import target_types
-from pants.backend.codegen.wsdl.target_types import (
-    GenerateTargetsFromWsdlSources,
-    WsdlSourcesGeneratorTarget,
-    WsdlSourceTarget,
-)
+from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget, WsdlSourceTarget
+from pants.engine.addresses import Address
+from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.target import SingleSourceField, Tags
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 def test_generate_source_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromWsdlSources]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[WsdlSourcesGeneratorTarget],
     )
@@ -43,8 +39,6 @@ def test_generate_source_targets() -> None:
         }
     )
 
-    generator = rule_runner.get_target(Address(source_root, target_name="lib"))
-
     def gen_tgt(rel_fp: str, tags: list[str] | None = None) -> WsdlSourceTarget:
         return WsdlSourceTarget(
             {SingleSourceField.alias: rel_fp, Tags.alias: tags},
@@ -52,11 +46,10 @@ def test_generate_source_targets() -> None:
             residence_dir=os.path.dirname(os.path.join(source_root, rel_fp)),
         )
 
-    generated = rule_runner.request(GeneratedTargets, [GenerateTargetsFromWsdlSources(generator)])
-    assert generated == GeneratedTargets(
-        generator,
-        {
-            gen_tgt("f1.wsdl"),
-            gen_tgt("sub/f2.wsdl"),
-        },
-    )
+    generated = rule_runner.request(
+        _TargetParametrizations, [Address(source_root, target_name="lib")]
+    ).parametrizations
+    assert set(generated.values()) == {
+        gen_tgt("f1.wsdl"),
+        gen_tgt("sub/f2.wsdl"),
+    }

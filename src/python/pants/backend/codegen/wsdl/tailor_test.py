@@ -2,6 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+
+from pants.backend.codegen.wsdl.tailor import PutativeWsdlTargetsRequest
+from pants.backend.codegen.wsdl.tailor import rules as tailor_rules
+from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -10,10 +14,6 @@ from pants.core.goals.tailor import (
 )
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
-
-from pants.backend.codegen.wsdl.tailor import PutativeWsdlTargetsRequest
-from pants.backend.codegen.wsdl.tailor import rules as tailor_rules
-from pants.backend.codegen.wsdl.target_types import WsdlSourcesGeneratorTarget
 
 
 @pytest.fixture

@@ -1,24 +1,38 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     Dependencies,
-    GeneratedTargets,
-    GenerateTargetsRequest,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
     Target,
-    generate_file_level_targets,
+    TargetFilesGenerator,
+    Targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.logging import LogLevel
 
 
 class WsdlDependenciesField(Dependencies):
     pass
+
+
+class WsdlCatalogSourceField(OptionalSingleSourceField):
+    alias = "catalog"
+    expected_file_extensions = (".xml",)
+    help = "Catalog file to resolve external entity references."
+
+
+class AllWsdlTargets(Targets):
+    pass
+
+
+@rule(desc="Find all WSDL sources in a project", level=LogLevel.DEBUG)
+def find_all_wsdl_targets(all_targets: AllTargets) -> AllWsdlTargets:
+    return AllWsdlTargets([tgt for tgt in all_targets if tgt.has_field(WsdlSourceField)])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -36,6 +50,7 @@ class WsdlSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         WsdlDependenciesField,
         WsdlSourceField,
+        WsdlCatalogSourceField,
     )
     help = "A single WSDL file used to generate various languages."
 
@@ -50,36 +65,18 @@ class WsdlSourcesGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (".wsdl",)
 
 
-class WsdlSourcesGeneratorTarget(Target):
+class WsdlSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "wsdl_sources"
-    core_fields = (*COMMON_TARGET_FIELDS, WsdlDependenciesField, WsdlSourcesGeneratingSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        WsdlDependenciesField,
+        WsdlSourcesGeneratingSourcesField,
+        WsdlCatalogSourceField,
+    )
+    generated_target_cls = WsdlSourceTarget
+    copied_fields = (*COMMON_TARGET_FIELDS, WsdlDependenciesField, WsdlCatalogSourceField)
     help = "Generate a `wsdl_source` target for each file in the `sources` field."
 
 
-class GenerateTargetsFromWsdlSources(GenerateTargetsRequest):
-    generate_from = WsdlSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_wsdl_sources(
-    request: GenerateTargetsFromWsdlSources, union_memership: UnionMembership
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[WsdlSourcesGeneratingSourcesField])
-    )
-
-    return generate_file_level_targets(
-        WsdlSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_memership,
-        add_dependencies_on_all_siblings=False,
-        use_source_field=True,
-    )
-
-
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromWsdlSources),
-    )
+    return collect_rules()

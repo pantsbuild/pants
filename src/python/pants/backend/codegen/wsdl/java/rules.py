@@ -5,6 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.wsdl.java import extra_fields
+from pants.backend.codegen.wsdl.java.extra_fields import ModuleField, PackageField
+from pants.backend.codegen.wsdl.java.jaxws import JaxWsTools
+from pants.backend.codegen.wsdl.target_types import WsdlCatalogSourceField, WsdlSourceField
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -30,17 +34,12 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
-
-from pants.backend.codegen.wsdl.java import extra_fields
-from pants.backend.codegen.wsdl.java.extra_fields import PackageField
-from pants.backend.codegen.wsdl.java.jaxws import JaxWsTools
-from pants.backend.codegen.wsdl.target_types import WsdlSourceField
 
 
 class GenerateJavaFromWsdlRequest(GenerateSourcesRequest):
@@ -56,6 +55,8 @@ class JaxWsToolsLockfileSentinel(GenerateToolLockfileSentinel):
 class CompileWsdlSourceRequest:
     digest: Digest
     path: str
+    catalog: str | None = None
+    module: str | None = None
     package: str | None = None
 
 
@@ -66,15 +67,28 @@ class CompiledWsdlSource:
 
 @rule(desc="Generate Java sources from WSDL", level=LogLevel.DEBUG)
 async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> GeneratedSources:
-    sources = await Get(
-        HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlSourceField])
+    sources, catalog = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlSourceField])),
+        Get(
+            HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlCatalogSourceField])
+        ),
     )
 
-    target_package = request.protocol_target.get(PackageField).value
+    merged_sources = await Get(
+        Digest, MergeDigests([sources.snapshot.digest, catalog.snapshot.digest])
+    )
+
+    target_package = request.protocol_target[PackageField].value
     compile_results = await MultiGet(
         Get(
             CompiledWsdlSource,
-            CompileWsdlSourceRequest(sources.snapshot.digest, path=path, package=target_package),
+            CompileWsdlSourceRequest(
+                merged_sources,
+                path=path,
+                catalog=catalog.snapshot.files[0] if catalog.snapshot.files else None,
+                module=request.protocol_target[ModuleField].value,
+                package=target_package,
+            ),
         )
         for path in sources.snapshot.files
     )
@@ -95,6 +109,7 @@ async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> Gener
 @rule(level=LogLevel.DEBUG)
 async def compile_wsdl_source(
     request: CompileWsdlSourceRequest,
+    jdk: InternalJdk,
     jaxws: JaxWsTools,
 ) -> CompiledWsdlSource:
     output_dir = "_generated_files"
@@ -133,17 +148,19 @@ async def compile_wsdl_source(
         "-encoding",
         "utf8",
         "-keep",
-        "-extension",
-        "-XadditionalHeaders",
         "-Xnocompile",
         "-B-XautoNameResolution",
     ]
-    if request.package is not None:
-        jaxws_args.append("-p")
-        jaxws_args.append(request.package)
+    if request.catalog:
+        jaxws_args.extend(["-catalog", request.catalog])
+    if request.module:
+        jaxws_args.extend(["-m", request.module])
+    if request.package:
+        jaxws_args.extend(["-p", request.package])
 
     jaxws_process = JvmProcess(
-        [
+        jdk=jdk,
+        argv=[
             "com.sun.tools.ws.WsImport",
             *jaxws_args,
             request.path,
