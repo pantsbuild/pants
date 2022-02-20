@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pants.backend.codegen.soap.java import extra_fields
 from pants.backend.codegen.soap.java.extra_fields import JavaModuleField, JavaPackageField
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
-from pants.backend.codegen.soap.target_types import WsdlCatalogSourceField, WsdlSourceField
+from pants.backend.codegen.soap.target_types import WsdlSourceField
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -55,7 +55,6 @@ class JaxWsToolsLockfileSentinel(GenerateToolLockfileSentinel):
 class CompileWsdlSourceRequest:
     digest: Digest
     path: str
-    catalog: str | None = None
     module: str | None = None
     package: str | None = None
 
@@ -67,15 +66,8 @@ class CompiledWsdlSource:
 
 @rule(desc="Generate Java sources from WSDL", level=LogLevel.DEBUG)
 async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> GeneratedSources:
-    sources, catalog = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlSourceField])),
-        Get(
-            HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlCatalogSourceField])
-        ),
-    )
-
-    merged_sources = await Get(
-        Digest, MergeDigests([sources.snapshot.digest, catalog.snapshot.digest])
+    sources = await Get(
+        HydratedSources, HydrateSourcesRequest(request.protocol_target[WsdlSourceField])
     )
 
     target_package = request.protocol_target[JavaPackageField].value
@@ -83,9 +75,8 @@ async def generate_java_from_wsdl(request: GenerateJavaFromWsdlRequest) -> Gener
         Get(
             CompiledWsdlSource,
             CompileWsdlSourceRequest(
-                merged_sources,
+                sources.snapshot.digest,
                 path=path,
-                catalog=catalog.snapshot.files[0] if catalog.snapshot.files else None,
                 module=request.protocol_target[JavaModuleField].value,
                 package=target_package,
             ),
@@ -151,8 +142,6 @@ async def compile_wsdl_source(
         "-Xnocompile",
         "-B-XautoNameResolution",
     ]
-    if request.catalog:
-        jaxws_args.extend(["-catalog", request.catalog])
     if request.module:
         jaxws_args.extend(["-m", request.module])
     if request.package:

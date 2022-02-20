@@ -7,7 +7,6 @@ from pants.engine.target import (
     AllTargets,
     Dependencies,
     MultipleSourcesField,
-    OptionalSingleSourceField,
     SingleSourceField,
     Target,
     TargetFilesGenerator,
@@ -18,12 +17,6 @@ from pants.util.logging import LogLevel
 
 class WsdlDependenciesField(Dependencies):
     pass
-
-
-class WsdlCatalogSourceField(OptionalSingleSourceField):
-    alias = "catalog"
-    expected_file_extensions = (".xml",)
-    help = "Catalog file to resolve external entity references."
 
 
 class AllWsdlTargets(Targets):
@@ -50,7 +43,6 @@ class WsdlSourceTarget(Target):
         *COMMON_TARGET_FIELDS,
         WsdlDependenciesField,
         WsdlSourceField,
-        WsdlCatalogSourceField,
     )
     help = "A single WSDL file used to generate various languages."
 
@@ -71,10 +63,9 @@ class WsdlSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         WsdlDependenciesField,
         WsdlSourcesGeneratingSourcesField,
-        WsdlCatalogSourceField,
     )
     generated_target_cls = WsdlSourceTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, WsdlDependenciesField, WsdlCatalogSourceField)
+    copied_fields = (*COMMON_TARGET_FIELDS, WsdlDependenciesField)
     help = "Generate a `wsdl_source` target for each file in the `sources` field."
 
 
