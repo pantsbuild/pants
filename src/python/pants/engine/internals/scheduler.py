@@ -616,7 +616,10 @@ class SchedulerSession:
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
 
-    def get_observation_histograms(self) -> dict:
+    def get_metrics(self) -> dict[str, int]:
+        return native_engine.session_get_metrics(self.py_session)
+
+    def get_observation_histograms(self) -> dict[str, Any]:
         return native_engine.session_get_observation_histograms(self.py_scheduler, self.py_session)
 
     def record_test_observation(self, value: int) -> None:
