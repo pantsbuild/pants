@@ -11,7 +11,7 @@ from typing import Any, ClassVar, TypeVar
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import _OptionBase
+from pants.option.option_types import OptionsInfo
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 
@@ -104,8 +104,10 @@ class Subsystem(metaclass=ABCMeta):
         # NB: Since registration ordering matters (it impacts `help` output), we register these in
         # class attribute order, starting from the base class down.
         for class_ in reversed(inspect.getmro(cls)):
-            for attr in class_.__dict__.values():
-                if isinstance(attr, _OptionBase):
+            for attrname in class_.__dict__.keys():
+                # NB: We use attrname and getattr to trigger descriptors
+                attr = getattr(cls, attrname)
+                if isinstance(attr, OptionsInfo):
                     register(*attr.flag_names, **attr.flag_options)
 
     @classmethod

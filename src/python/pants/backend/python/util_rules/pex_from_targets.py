@@ -24,6 +24,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
 from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
     OptionalPex,
     OptionalPexRequest,
     PexPlatforms,
@@ -59,6 +60,7 @@ class PexFromTargetsRequest:
     layout: PexLayout | None
     main: MainSpecification | None
     platforms: PexPlatforms
+    complete_platforms: CompletePlatforms
     additional_args: tuple[str, ...]
     additional_lockfile_args: tuple[str, ...]
     include_source_files: bool
@@ -80,6 +82,7 @@ class PexFromTargetsRequest:
         layout: PexLayout | None = None,
         main: MainSpecification | None = None,
         platforms: PexPlatforms = PexPlatforms(),
+        complete_platforms: CompletePlatforms = CompletePlatforms(),
         additional_args: Iterable[str] = (),
         additional_lockfile_args: Iterable[str] = (),
         include_source_files: bool = True,
@@ -131,6 +134,7 @@ class PexFromTargetsRequest:
         self.layout = layout
         self.main = main
         self.platforms = platforms
+        self.complete_platforms = complete_platforms
         self.additional_args = tuple(additional_args)
         self.additional_lockfile_args = tuple(additional_lockfile_args)
         self.include_source_files = include_source_files
@@ -336,6 +340,7 @@ class _RepositoryPexRequest:
     requirements: PexRequirements
     hardcoded_interpreter_constraints: InterpreterConstraints | None
     platforms: PexPlatforms
+    complete_platforms: CompletePlatforms
     internal_only: bool
     additional_lockfile_args: tuple[str, ...]
 
@@ -347,6 +352,7 @@ class _RepositoryPexRequest:
         internal_only: bool,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
         platforms: PexPlatforms = PexPlatforms(),
+        complete_platforms: CompletePlatforms = CompletePlatforms(),
         additional_lockfile_args: tuple[str, ...] = (),
     ) -> None:
         self.addresses = Addresses(addresses)
@@ -354,6 +360,7 @@ class _RepositoryPexRequest:
         self.internal_only = internal_only
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.platforms = platforms
+        self.complete_platforms = complete_platforms
         self.additional_lockfile_args = additional_lockfile_args
 
     def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
@@ -431,6 +438,7 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
                 requirements=requirements,
                 hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
                 platforms=request.platforms,
+                complete_platforms=request.complete_platforms,
                 internal_only=request.internal_only,
                 additional_lockfile_args=request.additional_lockfile_args,
             ),
@@ -444,6 +452,7 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
+        complete_platforms=request.complete_platforms,
         main=request.main,
         sources=merged_sources_digest,
         additional_inputs=additional_inputs,
@@ -498,6 +507,7 @@ async def get_repository_pex(
             ),
             interpreter_constraints=interpreter_constraints,
             platforms=request.platforms,
+            complete_platforms=request.complete_platforms,
             additional_args=request.additional_lockfile_args,
         )
     return OptionalPexRequest(repository_pex_request)
@@ -512,7 +522,7 @@ async def _setup_constraints_repository_pex(
     request = constraints_request.repository_pex_request
     # NB: it isn't safe to resolve against the whole constraints file if
     # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if not python_setup.resolve_all_constraints or request.platforms:
+    if not python_setup.resolve_all_constraints or request.platforms or request.complete_platforms:
         return OptionalPexRequest(None)
 
     constraints_path = python_setup.requirement_constraints
@@ -586,6 +596,7 @@ async def _setup_constraints_repository_pex(
         ),
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
+        complete_platforms=request.complete_platforms,
         additional_args=request.additional_lockfile_args,
     )
     return OptionalPexRequest(repository_pex)

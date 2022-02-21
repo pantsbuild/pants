@@ -18,15 +18,17 @@ from pants.core.util_rules.archive import ZipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Dependencies
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm import classpath
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.target_types import JvmJdkField, JvmMainClassNameField
@@ -62,7 +64,6 @@ class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
 @rule
 async def deploy_jar_classpath(
     request: DeployJarClasspathEntryRequest,
-    union_membership: UnionMembership,
 ) -> FallibleClasspathEntry:
     if len(request.component.members) > 1:
         # If multiple DeployJar targets were coarsened into a single instance, it's because they
@@ -72,18 +73,8 @@ async def deploy_jar_classpath(
             "`deploy_jar` targets should not depend on one another:\n"
             f"{request.component.bullet_list()}"
         )
-    classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(
-                FallibleClasspathEntry,
-                ClasspathEntryRequest,
-                ClasspathEntryRequest.for_targets(
-                    union_membership, component=coarsened_dep, resolve=request.resolve
-                ),
-            )
-            for coarsened_dep in request.component.dependencies
-        )
-    )
+    fallible_entries = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    classpath_entries = fallible_entries.if_all_succeeded()
     if classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),

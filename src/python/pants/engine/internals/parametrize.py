@@ -9,7 +9,11 @@ from typing import Any, Iterator
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
+from pants.engine.target import Target
+from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list
 
 
 @frozen_after_init
@@ -104,3 +108,81 @@ class Parametrize:
         strs = [str(s) for s in self.args]
         strs.extend(f"{alias}={value}" for alias, value in self.kwargs.items())
         return f"parametrize({', '.join(strs)}"
+
+
+@dataclass(frozen=True)
+class _TargetParametrization:
+    original_target: Target | None
+    parametrization: FrozenDict[Address, Target]
+
+
+# TODO: This is not the right name for this class, nor the best place for it to live. But it is
+# consumed by both `pants.engine.internals.graph` and `pants.engine.internals.build_files`, and
+# shouldn't live in `pants.engine.target` (yet? needs more stabilization).
+class _TargetParametrizations(Collection[_TargetParametrization]):
+    """All parametrizations and generated targets for a single input Address.
+
+    If a Target has been parametrized, the input Address might _not_ be present in this output, due
+    to no Target being addressable at the un-parameterized Address.
+    """
+
+    @property
+    def all(self) -> Iterator[Target]:
+        """Iterates over all Target instances which are valid after parametrization."""
+        for parametrization in self:
+            if parametrization.original_target:
+                yield parametrization.original_target
+            yield from parametrization.parametrization.values()
+
+    @property
+    def parametrizations(self) -> dict[Address, Target]:
+        """Returns a merged dict of all generated/parametrized instances, excluding originals."""
+        return {
+            a: t for parametrization in self for a, t in parametrization.parametrization.items()
+        }
+
+    def parametrization_for(self, address: Address) -> FrozenDict[Address, Target]:
+        for parametrization in self:
+            if (
+                parametrization.original_target
+                and parametrization.original_target.address == address
+            ):
+                return parametrization.parametrization
+
+        raise self._bare_address_error(address)
+
+    def get(self, address: Address) -> Target | None:
+        for parametrization in self:
+            if (
+                parametrization.original_target
+                and parametrization.original_target.address == address
+            ):
+                return parametrization.original_target
+            instance = parametrization.parametrization.get(address)
+            if instance is not None:
+                return instance
+        return None
+
+    def generated_or_generator(self, maybe_generator: Address) -> Iterator[Target]:
+        for parametrization in self:
+            if (
+                not parametrization.original_target
+                or parametrization.original_target.address != maybe_generator
+            ):
+                continue
+            if parametrization.parametrization:
+                # Generated Targets.
+                yield from parametrization.parametrization.values()
+            else:
+                # Did not generate targets.
+                yield parametrization.original_target
+            return
+
+        raise self._bare_address_error(maybe_generator)
+
+    def _bare_address_error(self, address) -> ValueError:
+        return ValueError(
+            "A `parametrized` target cannot be consumed without its parameters specified.\n"
+            f"Target `{address}` can be addressed as:\n"
+            f"{bullet_list(str(t.address) for t in self.all)}"
+        )

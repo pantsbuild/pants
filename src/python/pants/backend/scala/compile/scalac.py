@@ -24,12 +24,14 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
@@ -56,22 +58,13 @@ async def compile_scala_source(
     scala: ScalaSubsystem,
     scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
-    union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
+
     # Request classpath entries for our direct dependencies.
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(
-                FallibleClasspathEntry,
-                ClasspathEntryRequest,
-                ClasspathEntryRequest.for_targets(
-                    union_membership, component=coarsened_dep, resolve=request.resolve
-                ),
-            )
-            for coarsened_dep in request.component.dependencies
-        )
-    )
+    dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()
+
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
@@ -80,7 +73,6 @@ async def compile_scala_source(
             exit_code=1,
         )
 
-    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
     scala_version = scala.version_for_resolve(request.resolve.name)
 
     component_members_with_sources = tuple(
@@ -137,7 +129,7 @@ async def compile_scala_source(
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
 
-    tool_classpath, sources_digest = await MultiGet(
+    tool_classpath, sources_digest, jdk = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
@@ -163,6 +155,7 @@ async def compile_scala_source(
                 (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
             ),
         ),
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
 
     extra_immutable_input_digests = {
