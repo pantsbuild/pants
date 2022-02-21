@@ -432,7 +432,7 @@ async def merge_coverage_data(
                     "coverage": {
                         "run": {
                             "relative_files": True,
-                            "source": [root.path for root in source_roots],
+                            "source": [source_root.path for source_root in source_roots],
                             "branch": branch,
                         }
                     }
