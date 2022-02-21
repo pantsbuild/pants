@@ -11,38 +11,15 @@ from pants.backend.shell.target_types import (
     Shunit2TestTarget,
 )
 from pants.backend.shell.target_types import rules as target_types_rules
-from pants.base.deprecated import deprecated
-
-
-@deprecated(
-    removal_version="2.12.0.dev0",
-    hint=(
-        "The `experimental_run_shell_command` target has migrated to the "
-        "`pants.backend.experimental.shell` backend and renamed to `run_shell_command`."
-    ),
-)
-class ExperimentalShellCommandRunTarget(ShellCommandRunTarget):
-    pass
-
-
-@deprecated(
-    removal_version="2.12.0.dev0",
-    hint=(
-        "The `experimental_shell_command` target has migrated to the "
-        "`pants.backend.experimental.shell` backend and renamed to `shell_command`."
-    ),
-)
-class ExperimentalShellCommandTarget(ShellCommandTarget):
-    pass
 
 
 def target_types():
     return [
-        ExperimentalShellCommandRunTarget,
-        ExperimentalShellCommandTarget,
+        ShellCommandRunTarget,
+        ShellCommandTarget,
         ShellSourcesGeneratorTarget,
-        Shunit2TestsGeneratorTarget,
         ShellSourceTarget,
+        Shunit2TestsGeneratorTarget,
         Shunit2TestTarget,
     ]
 

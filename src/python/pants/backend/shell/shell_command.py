@@ -21,6 +21,7 @@ from pants.backend.shell.target_types import (
     ShellCommandTimeoutField,
     ShellCommandToolsField,
 )
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
@@ -57,6 +58,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -104,8 +106,22 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
 
 @rule
 async def prepare_shell_command_process(
-    request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
+    request: ShellCommandProcessRequest,
+    shell_setup: ShellSetup,
+    bash: BashBinary,
+    global_options: GlobalOptions,
 ) -> Process:
+    if "pants.backend.experimental.shell" not in global_options.options.backend_packages:
+        warn_or_error(
+            removal_version="2.12.0.dev0",
+            entity=f"The `{request.target.alias}` target in the `pants.backend.shell` backend",
+            hint=(
+                "The target migrated to the `pants.backend.experimental.shell` backend. Add that "
+                "backend to the list of enabled backends in order to continue using this "
+                "experimental target."
+            ),
+        )
+
     shell_command = request.target
     interactive = shell_command.has_field(ShellCommandRunWorkdirField)
     if interactive:
