@@ -42,9 +42,9 @@ class PexCli(TemplatedExternalTool):
     deprecated_options_scope = "download-pex-bin"
     deprecated_options_scope_removal_version = "2.11.0.dev0"
 
-    default_version = "v2.1.66"
+    default_version = "v2.1.67"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.66,<3.0"
+    version_constraints = ">=2.1.67,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -53,8 +53,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "d3f985ab510a3a9442ae33d1e13277e29ab4d32c948800edf546f4f8bd7ca470",
-                    "3722278",
+                    "3f376dba013a6f1a810bfb59fd56a7d95a5ad297f04f57011d0b96cb1624676f",
+                    "3726119",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
