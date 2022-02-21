@@ -16,17 +16,64 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LocalDistWheels:
+    """Contains the wheels isolated from a single local Python distribution."""
+
+    wheel_paths: list[str]
+    wheels_digest: Digest
+    provided_files: set[str]
+
+
+@rule
+async def isolate_local_dist_wheels(
+    dist_field_set: PythonDistributionFieldSet,
+) -> LocalDistWheels:
+    dist = await Get(BuiltPackage, PythonDistributionFieldSet, dist_field_set)
+    wheels_digest = await Get(Digest, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
+    wheels_contents = await Get(DigestContents, Digest, wheels_digest)
+
+    # A given local dist might build a wheel and an sdist (and maybe other artifacts -
+    # we don't know what setup command was run...)
+    # As long as there is a wheel, we can ignore the other artifacts.
+    artifacts = {(a.relpath or "") for a in dist.artifacts}
+    wheels = []
+    provided_files = set()
+    for wheel_content in wheels_contents:
+        if wheel_content.path not in artifacts:
+            continue
+        wheels.append(wheel_content.path)
+        buf = BytesIO()
+        buf.write(wheel_content.content)
+        buf.seek(0)
+        with zipfile.ZipFile(buf) as zf:
+            provided_files.update(zf.namelist())
+
+    if not wheels:
+        tgt = await Get(WrappedTarget, Address, dist_field_set.address)
+        logger.warning(
+            f"Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address}, "
+            "but this target does not produce a Python wheel artifact. Therefore this target's "
+            "code will be used directly from sources, without a distribution being built, "
+            "and any native extensions in it will not be built.\n\n"
+            f"See {doc_url('python-distributions')} for details on how to set up a "
+            f"{tgt.target.alias} target to produce a wheel."
+        )
+
+    return LocalDistWheels(wheels, wheels_digest, provided_files)
 
 
 @frozen_after_init
@@ -81,18 +128,14 @@ class LocalDistsPex:
 async def build_local_dists(
     request: LocalDistsPexRequest,
 ) -> LocalDistsPex:
-
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
     applicable_targets = [
         tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
     ]
 
-    python_dist_field_sets = [
-        PythonDistributionFieldSet.create(target) for target in applicable_targets
-    ]
-
-    dists = await MultiGet(
-        [Get(BuiltPackage, PackageFieldSet, field_set) for field_set in python_dist_field_sets]
+    local_dists_wheels = await MultiGet(
+        Get(LocalDistWheels, PythonDistributionFieldSet, PythonDistributionFieldSet.create(target))
+        for target in applicable_targets
     )
 
     # The primary use-case of the "local dists" feature is to support consuming native extensions
@@ -103,34 +146,13 @@ async def build_local_dists(
     # So for now we simply ignore sdists, with a warning if necessary.
     provided_files = set()
     wheels = []
+    wheels_digests = []
+    for local_dist_wheels in local_dists_wheels:
+        wheels.extend(local_dist_wheels.wheel_paths)
+        wheels_digests.append(local_dist_wheels.wheels_digest)
+        provided_files.update(local_dist_wheels.provided_files)
 
-    all_contents = await MultiGet(Get(DigestContents, Digest, dist.digest) for dist in dists)
-    for dist, contents, tgt in zip(dists, all_contents, applicable_targets):
-        artifacts = {(a.relpath or "") for a in dist.artifacts}
-        # A given local dist might build a wheel and an sdist (and maybe other artifacts -
-        # we don't know what setup command was run...)
-        # As long as there is a wheel, we can ignore the other artifacts.
-        wheel = next((art for art in artifacts if art.endswith(".whl")), None)
-        if wheel:
-            wheel_content = next(content for content in contents if content.path == wheel)
-            wheels.append(wheel)
-            buf = BytesIO()
-            buf.write(wheel_content.content)
-            buf.seek(0)
-            with zipfile.ZipFile(buf) as zf:
-                provided_files.update(zf.namelist())
-        else:
-            logger.warning(
-                f"Encountered a dependency on the {tgt.alias} target at {tgt.address.spec}, but "
-                "this target does not produce a Python wheel artifact. Therefore this target's "
-                "code will be used directly from sources, without a distribution being built, "
-                "and therefore any native extensions in it will not be built.\n\n"
-                f"See {doc_url('python-distributions')} for details on how to set up a {tgt.alias} "
-                "target to produce a wheel."
-            )
-
-    dists_digest = await Get(Digest, MergeDigests([dist.digest for dist in dists]))
-    wheels_digest = await Get(Digest, DigestSubset(dists_digest, PathGlobs(["**/*.whl"])))
+    wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
 
     dists_pex = await Get(
         Pex,
