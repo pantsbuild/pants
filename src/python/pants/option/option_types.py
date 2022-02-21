@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Generic, TypeVar, cast, overload
+from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
 
@@ -14,6 +15,11 @@ _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
+_HelpT = Union[Callable[[Any], str], str]
+
+
+def _eval_maybe_helpt(help: _HelpT, subsystem_cls: Any) -> str:
+    return help(subsystem_cls) if inspect.isfunction(help) else help  # type: ignore
 
 
 @dataclass(frozen=True)
@@ -42,7 +48,7 @@ class _OptionBase(Generic[_PropType]):
 
     _flag_names: tuple[str, ...]
     _default: Any
-    _help: str
+    _help: _HelpT
     _extra_kwargs: dict[str, Any]
 
     # NB: Due to https://github.com/python/mypy/issues/5146, we try to keep the parameter list as
@@ -56,7 +62,7 @@ class _OptionBase(Generic[_PropType]):
         cls,
         *flag_names: str,
         default: Any,
-        help: str,
+        help: _HelpT,
     ):
         self = super().__new__(cls)
         self._flag_names = flag_names
@@ -69,9 +75,9 @@ class _OptionBase(Generic[_PropType]):
     def get_option_type(self):
         return type(self).option_type
 
-    def get_flag_options(self) -> dict:
+    def get_flag_options(self, subsystem_cls) -> dict:
         return dict(
-            help=self._help,
+            help=_eval_maybe_helpt(self._help, subsystem_cls),
             default=self._default,
             type=self.get_option_type(),
             **self._extra_kwargs,
@@ -87,7 +93,7 @@ class _OptionBase(Generic[_PropType]):
 
     def __get__(self, obj, objtype):
         if obj is None:
-            return OptionsInfo(self._flag_names, self.get_flag_options())
+            return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
         if option_value is None:
@@ -152,7 +158,7 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
         *flag_names: str,
         member_type: _ListMemberType | None = None,
         default: list[_ListMemberType] | None = None,
-        help: str,
+        help: _HelpT,
     ):
         default = default or []
         instance = super().__new__(
@@ -163,10 +169,10 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
         )
         return instance
 
-    def get_flag_options(self) -> dict[str, Any]:
+    def get_flag_options(self, subsystem_cls) -> dict[str, Any]:
         return dict(
             member_type=self.get_member_type(),
-            **super().get_flag_options(),
+            **super().get_flag_options(subsystem_cls),
         )
 
     # Override if necessary
@@ -188,11 +194,11 @@ class StrOption(_OptionBase[_PropType]):
     option_type: Any = str
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> StrOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> StrOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> StrOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> StrOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -205,11 +211,11 @@ class IntOption(_OptionBase[_PropType]):
     option_type: Any = int
 
     @overload
-    def __new__(cls, *flag_names: str, default: int, help: str) -> IntOption[int]:
+    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> IntOption[int]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> IntOption[int | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> IntOption[int | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -222,11 +228,11 @@ class FloatOption(_OptionBase[_PropType]):
     option_type: Any = float
 
     @overload
-    def __new__(cls, *flag_names: str, default: float, help: str) -> FloatOption[float]:
+    def __new__(cls, *flag_names: str, default: float, help: _HelpT) -> FloatOption[float]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> FloatOption[float | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> FloatOption[float | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -243,11 +249,11 @@ class BoolOption(_OptionBase[_PropType]):
     option_type: Any = bool
 
     @overload
-    def __new__(cls, *flag_names: str, default: bool, help: str) -> BoolOption[bool]:
+    def __new__(cls, *flag_names: str, default: bool, help: _HelpT) -> BoolOption[bool]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> BoolOption[bool | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> BoolOption[bool | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -268,13 +274,13 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: _EnumT, help: str) -> EnumOption[_EnumT]:
+    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
         ...
 
     # N.B. This has an additional param for the no-default-provided case: `option_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, option_type: type[_EnumT], help: str
+        cls, *flag_names: str, option_type: type[_EnumT], help: _HelpT
     ) -> EnumOption[_EnumT | None]:
         ...
 
@@ -343,11 +349,11 @@ class TargetOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.target_option
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> TargetOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> TargetOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> TargetOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> TargetOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -360,11 +366,11 @@ class DirOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.dir_option
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> DirOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> DirOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> DirOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> DirOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -377,11 +383,11 @@ class FileOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.file_option
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> FileOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> FileOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> FileOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> FileOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -394,11 +400,11 @@ class ShellStrOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.shell_str
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> ShellStrOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> ShellStrOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> ShellStrOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> ShellStrOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -411,11 +417,11 @@ class WorkspacePathOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.workspace_path
 
     @overload
-    def __new__(cls, *flag_names: str, default: str, help: str) -> WorkspacePathOption[str]:
+    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> WorkspacePathOption[str]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> WorkspacePathOption[str | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> WorkspacePathOption[str | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -428,11 +434,11 @@ class MemorySizeOption(_OptionBase[_PropType]):
     option_type: Any = custom_types.memory_size
 
     @overload
-    def __new__(cls, *flag_names: str, default: int, help: str) -> MemorySizeOption[int]:
+    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> MemorySizeOption[int]:
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: str) -> MemorySizeOption[int | None]:
+    def __new__(cls, *flag_names: str, help: _HelpT) -> MemorySizeOption[int | None]:
         ...
 
     def __new__(cls, *flag_names, default=None, help):
@@ -480,13 +486,15 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: list[_EnumT], help: str) -> EnumListOption[_EnumT]:
+    def __new__(
+        cls, *flag_names: str, default: list[_EnumT], help: _HelpT
+    ) -> EnumListOption[_EnumT]:
         ...
 
     # N.B. This has an additional param for the no-default-provided case: `member_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, member_type: type[_EnumT], help: str
+        cls, *flag_names: str, member_type: type[_EnumT], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -550,7 +558,7 @@ class ArgsListOption(ShellStrListOption):
     Clients can call `passthrough()` to set the "passthrough" flag. See `passthrough` for more info.
     """
 
-    def __new__(cls, help: str):
+    def __new__(cls, help: _HelpT):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
