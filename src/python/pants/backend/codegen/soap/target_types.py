@@ -66,6 +66,7 @@ class WsdlSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = WsdlSourceTarget
     copied_fields = (*COMMON_TARGET_FIELDS, WsdlDependenciesField)
+    moved_fields = ()
     help = "Generate a `wsdl_source` target for each file in the `sources` field."
 
 
