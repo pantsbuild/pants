@@ -4,9 +4,8 @@
 from __future__ import annotations
 
 import logging
-import zipfile
+import shlex
 from dataclasses import dataclass
-from io import BytesIO
 from typing import Iterable
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
@@ -17,9 +16,12 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
+from pants.core.util_rules import archive
+from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.util.dirutil import fast_relpath_optional
@@ -41,26 +43,17 @@ class LocalDistWheels:
 @rule
 async def isolate_local_dist_wheels(
     dist_field_set: PythonDistributionFieldSet,
+    bash: BashBinary,
+    unzip_binary: UnzipBinary,
 ) -> LocalDistWheels:
     dist = await Get(BuiltPackage, PythonDistributionFieldSet, dist_field_set)
-    wheels_digest = await Get(Digest, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
-    wheels_contents = await Get(DigestContents, Digest, wheels_digest)
+    wheels_snapshot = await Get(Snapshot, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
 
     # A given local dist might build a wheel and an sdist (and maybe other artifacts -
     # we don't know what setup command was run...)
     # As long as there is a wheel, we can ignore the other artifacts.
     artifacts = {(a.relpath or "") for a in dist.artifacts}
-    wheels = []
-    provided_files = set()
-    for wheel_content in wheels_contents:
-        if wheel_content.path not in artifacts:
-            continue
-        wheels.append(wheel_content.path)
-        buf = BytesIO()
-        buf.write(wheel_content.content)
-        buf.seek(0)
-        with zipfile.ZipFile(buf) as zf:
-            provided_files.update(zf.namelist())
+    wheels = [wheel for wheel in wheels_snapshot.files if wheel in artifacts]
 
     if not wheels:
         tgt = await Get(WrappedTarget, Address, dist_field_set.address)
@@ -73,7 +66,26 @@ async def isolate_local_dist_wheels(
             f"{tgt.target.alias} target to produce a wheel."
         )
 
-    return LocalDistWheels(wheels, wheels_digest, provided_files)
+    wheels_listing_result = await Get(
+        ProcessResult,
+        Process(
+            argv=[
+                bash.path,
+                "-c",
+                f"""
+                set -ex
+                for f in {' '.join(shlex.quote(f) for f in wheels)}; do
+                  {unzip_binary.path} -Z1 "$f"
+                done
+                """,
+            ],
+            input_digest=wheels_snapshot.digest,
+            description=f"List contents of artifacts produced by {dist_field_set.address}",
+        ),
+    )
+    provided_files = set(wheels_listing_result.stdout.decode().splitlines())
+
+    return LocalDistWheels(wheels, wheels_snapshot.digest, provided_files)
 
 
 @frozen_after_init
@@ -192,4 +204,8 @@ async def build_local_dists(
 
 
 def rules():
-    return (*collect_rules(), *pex_rules())
+    return (
+        *collect_rules(),
+        *pex_rules(),
+        *archive.rules(),
+    )

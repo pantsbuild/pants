@@ -87,7 +87,13 @@ class Directory:
 
 
 class DigestContents(Collection[FileContent]):
-    """The file contents of a Digest."""
+    """The file contents of a Digest.
+
+    Although the contents of the Digest are not memoized across `@rules` or across runs (each
+    request for `DigestContents` will load the file content from disk), this API should still
+    generally only be used for small inputs, since concurrency might mean that very many `@rule`s
+    are holding `DigestContents` simultaneously.
+    """
 
 
 class DigestEntries(Collection[Union[FileEntry, Directory]]):
