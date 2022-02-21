@@ -336,6 +336,7 @@ def _update_config(fc: FileContent) -> FileContent:
 
 
 def get_branch_value_from_config(fc: FileContent) -> bool:
+    # Note that coverage's default value for the branch setting is False, which we mirror here.
     if PurePath(fc.path).suffix == ".toml":
         all_config = _parse_toml_config(fc)
         return bool(
@@ -344,7 +345,6 @@ def get_branch_value_from_config(fc: FileContent) -> bool:
 
     cp = _parse_ini_config(fc)
     run_section = "coverage:run" if fc.path in ("tox.ini", "setup.cfg") else "run"
-    # Note that coverage's default value for the branch setting is False, which we mirror here.
     if not cp.has_section(run_section):
         return False
     return cp.getboolean(run_section, "branch", fallback=False)
