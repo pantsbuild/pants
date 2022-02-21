@@ -81,11 +81,11 @@ def assert_files_generated(
 _FOO_SERVICE_WSDL = dedent(
     """\
   <?xml version="1.0" encoding="UTF-8"?>
-  <wsdl:definition name="FooService"
+  <wsdl:definitions name="FooService"
       targetNamespace="http://www.example.com/wsdl/FooService"
       xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
       xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-      xmlns:tns="http://www.examples.com/wsdl/HelloService/"
+      xmlns:tns="http://www.example.com/wsdl/FooService"
       xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 
     <wsdl:types />
@@ -101,7 +101,7 @@ _FOO_SERVICE_WSDL = dedent(
     <wsdl:portType name="FooPortType">
       <wsdl:operation name="doSomething">
         <wsdl:input message="tns:FooRequest" />
-        <wsdl:output message="tns:RooResponse" />
+        <wsdl:output message="tns:FooResponse" />
       </wsdl:operation>
     </wsdl:portType>
 
@@ -120,10 +120,10 @@ _FOO_SERVICE_WSDL = dedent(
 
     <wsdl:service name="FooService">
       <wsdl:port name="FooPort" binding="tns:FooBinding">
-        <soap:address location="http://www.example.com/FooService/" />
+        <soap:address location="http://www.example.com/FooService" />
       </wsdl:port>
     </wsdl:service>
-  </wsdl:definition>
+  </wsdl:definitions>
   """
 )
 
@@ -138,11 +138,11 @@ def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
 
     def assert_gen(addr: Address, expected: Iterable[str]) -> None:
         assert_files_generated(
-            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+            rule_runner, addr, source_roots=["src/wsdl"], expected_files=list(expected)
         )
 
     assert_gen(
-        Address("src/wsdl/dir1", relative_file_path="HelloService.wsdl"),
+        Address("src/wsdl", relative_file_path="FooService.wsdl"),
         (
             "src/wsdl/com/example/wsdl/fooservice/FooPortType.java",
             "src/wsdl/com/example/wsdl/fooservice/FooService.java",
@@ -160,15 +160,15 @@ def test_generate_java_module_from_wsdl(rule_runner: RuleRunner) -> None:
 
     def assert_gen(addr: Address, expected: Iterable[str]) -> None:
         assert_files_generated(
-            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+            rule_runner, addr, source_roots=["src/wsdl"], expected_files=list(expected)
         )
 
     assert_gen(
-        Address("src/wsdl/dir1", relative_file_path="HelloService.wsdl"),
+        Address("src/wsdl", relative_file_path="FooService.wsdl"),
         (
             "src/wsdl/com/example/wsdl/fooservice/FooPortType.java",
             "src/wsdl/com/example/wsdl/fooservice/FooService.java",
-            "src/wsdl/com/example/wsdl/fooservice/module-info.java",
+            "src/wsdl/module-info.java",
         ),
     )
 
@@ -183,11 +183,11 @@ def test_generate_java_from_wsdl_using_custom_package(rule_runner: RuleRunner) -
 
     def assert_gen(addr: Address, expected: Iterable[str]) -> None:
         assert_files_generated(
-            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+            rule_runner, addr, source_roots=["src/wsdl"], expected_files=list(expected)
         )
 
     assert_gen(
-        Address("src/wsdl/dir1", relative_file_path="HelloService.wsdl"),
+        Address("src/wsdl", relative_file_path="FooService.wsdl"),
         (
             "src/wsdl/fooservice/FooPortType.java",
             "src/wsdl/fooservice/FooService.java",
@@ -206,26 +206,24 @@ def test_generate_java_from_wsdl_with_embedded_xsd(rule_runner: RuleRunner) -> N
                     targetNamespace="http://www.example.com/wsdl/HelloService/"
                     xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
                     xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-                    xmlns:tns="http://www.examples.com/wsdl/HelloService/"
+                    xmlns:tns="http://www.example.com/wsdl/HelloService/"
                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 
                   <wsdl:types>
                     <xsd:schema targetNamespace="http://www.example.com/wsdl/HelloService/">
-                      <xsd:element name="Greeter">
-                        <xsd:complexType>
-                          <xsd:sequence>
-                            <xsd:element name="name" type="xsd:string" />
-                          </xsd:sequence>
-                        </xsd:complexType>
-                      </xsd:element>
+                      <xsd:element name="Greeter" type="tns:Greeter" />
+                      <xsd:complexType name="Greeter">
+                        <xsd:sequence>
+                          <xsd:element name="name" type="xsd:string" />
+                        </xsd:sequence>
+                      </xsd:complexType>
 
-                      <xsd:element name="Greeting">
-                        <xsd:complexType>
-                          <xsd:sequence>
-                            <xsd:element name="message" type="xsd:string" />
-                          </xsd:sequence>
-                        </xsd:complexType>
-                      </xsd:element>
+                      <xsd:element name="Greeting" type="tns:Greeting" />
+                      <xsd:complexType name="Greeting">
+                        <xsd:sequence>
+                          <xsd:element name="message" type="xsd:string" />
+                        </xsd:sequence>
+                      </xsd:complexType>
                     </xsd:schema>
                   </wsdl:types>
 
@@ -245,7 +243,7 @@ def test_generate_java_from_wsdl_with_embedded_xsd(rule_runner: RuleRunner) -> N
                   </wsdl:portType>
 
                   <wsdl:binding name="HelloBinding" type="tns:HelloPortType">
-                     <soap:binding transport="http://schemas.xmlsoap.org/soap/http"/>
+                     <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc"/>
                      <wsdl:operation name="sayHello">
                         <soap:operation soapAction="http://www.example.com/wsdl/HelloService/sayHello" />
                         <wsdl:input>
@@ -262,7 +260,7 @@ def test_generate_java_from_wsdl_with_embedded_xsd(rule_runner: RuleRunner) -> N
                      <wsdl:documentation>WSDL File for HelloService</wsdl:documentation>
 
                      <wsdl:port name="HelloPort" binding="tns:HelloBinding">
-                        <soap:address location="http://www.example.com/HelloService/" />
+                        <soap:address location="http://www.example.com/HelloService" />
                      </wsdl:port>
                   </wsdl:service>
                 </wsdl:definitions>
@@ -273,7 +271,7 @@ def test_generate_java_from_wsdl_with_embedded_xsd(rule_runner: RuleRunner) -> N
 
     def assert_gen(addr: Address, expected: Iterable[str]) -> None:
         assert_files_generated(
-            rule_runner, addr, source_roots=["src/java", "src/wsdl"], expected_files=list(expected)
+            rule_runner, addr, source_roots=["src/wsdl"], expected_files=list(expected)
         )
 
     assert_gen(
@@ -281,6 +279,8 @@ def test_generate_java_from_wsdl_with_embedded_xsd(rule_runner: RuleRunner) -> N
         (
             "src/wsdl/com/example/wsdl/helloservice/Greeter.java",
             "src/wsdl/com/example/wsdl/helloservice/Greeting.java",
+            "src/wsdl/com/example/wsdl/helloservice/HelloPortType.java",
+            "src/wsdl/com/example/wsdl/helloservice/HelloService.java",
             "src/wsdl/com/example/wsdl/helloservice/ObjectFactory.java",
             "src/wsdl/com/example/wsdl/helloservice/package-info.java",
         ),

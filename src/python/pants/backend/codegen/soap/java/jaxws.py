@@ -13,10 +13,10 @@ class JaxWsTools(JvmToolBase):
     default_version = "2.3.5"
     default_artifacts = ("com.sun.xml.ws:jaxws-tools:{version}",)
     default_lockfile_resource = (
-        "pants.backend.codegen.wsdl.java",
+        "pants.backend.codegen.soap.java",
         "jaxws.default.lockfile.txt",
     )
-    default_lockfile_path = "pants/backend/codegen/wsdl/java/jaxws.default.lockfile.txt"
+    default_lockfile_path = "pants/backend/codegen/soap/java/jaxws.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
     @classmethod
