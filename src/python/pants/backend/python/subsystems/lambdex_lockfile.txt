@@ -17,6 +17,6 @@
 lambdex==0.1.6; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.6.0" and python_version < "3.10") \
     --hash=sha256:cb685b106617fbd1afd26d6e9472b2e0c99df8574c6d358aee4e6c13aeef8eb1 \
     --hash=sha256:6d1a95c8a31baa703edece8e36a705045b0203c7e886812c27a4dd945aa694e0
-pex==2.1.66; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "3.10" \
-    --hash=sha256:a6543af27bdfef2b8c88a92765f25bb30178a91d1fcda5963475d1719bd65dae \
-    --hash=sha256:1580ee7680a0c64db09233d55d39f31f3090470b479a0252fb69b0a0a6e3dccb
+pex==2.1.67; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "3.10" \
+    --hash=sha256:9ebd76d04f1b9f576c38639197b0c93d41d7b1359f2917663951f8fda89d9436 \
+    --hash=sha256:aedc4746e677d12f35a5d594bd09d22267045fafef098fe9bca14d63bb09681c

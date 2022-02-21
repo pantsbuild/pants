@@ -303,18 +303,20 @@ class PexPlatformsField(StringSequenceField):
         "meaning that the PEX will be executable in all of the supported environments.\n\n"
         "Platforms should be in the format defined by Pex "
         "(https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e. "
-        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
-        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n'
+        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m", '
+        '"macosx_10.12_x86_64-cp-310-cp310"):\n\n'
         "  - PLATFORM: the host platform, e.g. "
-        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
-        'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
-        'the Python version, e.g. "27", "36".\n  - ABI: the ABI tag, e.g. "cp36m", '
-        '"cp27mu", "abi3", "none".\n\nNote that using an abbreviated platform means that certain '
-        "resolves will fail when they contain environment markers that cannot be deduced from the "
-        "abbreviated platform string. A common example of this is 'python_full_version' which "
-        "requires knowing the patch level version of the foreign platform. If your resolves fail "
-        "due to undefined environment markers like this, you should switch to specifying "
-        "`complete_platforms` instead."
+        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation abbreviation, '
+        'e.g. "cp" or "pp".\n  - PYVER: a two or more digit string representing the python '
+        'major/minor version (e.g., "37" or "310") or else a component dotted version string (e.g.,'
+        '"3.7" or "3.10.1").\n  - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".\n\nNote '
+        "that using an abbreviated platform means that certain resolves will fail when they "
+        "encounter environment markers that cannot be deduced from the abbreviated platform "
+        "string. A common example of this is 'python_full_version' which requires knowing the "
+        "patch level version of the foreign Python interpreter. To remedy this you should use a "
+        "3-component dotted version for PYVER. If your resolves fail due to more esoteric "
+        "undefined environment markers, you should switch to specifying `complete_platforms` "
+        "instead."
     )
 
 
