@@ -44,11 +44,11 @@ class NoopClasspathEntryRequest(ClasspathEntryRequest):
 
 @rule(desc="Compile with javac")
 async def noop_classpath_entry(
-    _: NoopClasspathEntryRequest,
+    request: NoopClasspathEntryRequest,
 ) -> FallibleClasspathEntry:
 
     return FallibleClasspathEntry(
-        "Empty classpath for no-op classpath target",
+        f"Empty classpath for no-op classpath target {request.component}",
         CompileResult.SUCCEEDED,
         ClasspathEntry(EMPTY_DIGEST, [], []),
         exit_code=0,
