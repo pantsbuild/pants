@@ -273,12 +273,18 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    if options.build_verbose:
-        logger.info(
-            f"Docker build output for {tags[0]}:\n"
-            f"{result.stdout.decode()}\n"
-            f"{result.stderr.decode()}"
+    docker_build_output = "\n".join(
+        (
+            f"Docker build output for {tags[0]}:",
+            "stdout:",
+            result.stdout.decode(),
+            "stderr:",
+            result.stderr.decode(),
         )
+    )
+
+    if options.build_verbose:
+        logger.info(docker_build_output)
         image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
         image_id_match = next(
             (
@@ -290,6 +296,7 @@ async def build_docker_image(
         )
         image_id = image_id_match.group(1) if image_id_match else "<unknown>"
     else:
+        logger.debug(docker_build_output)
         image_id = result.stdout.decode().strip()
 
     return BuiltPackage(

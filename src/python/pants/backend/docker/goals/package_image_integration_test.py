@@ -53,10 +53,7 @@ def test_docker_build(rule_runner) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": "docker_image(name='test-image', image_tags=['1.0'])",
-            "src/Dockerfile": (
-                "FROM python:3.8@"
-                "sha256:eb6bb612babb3bcb3b846e27904807f0fd2322b8d3d832b84dbc244f8fb25068"
-            ),
+            "src/Dockerfile": "FROM python:3.8",
         }
     )
     target = rule_runner.get_target(Address("src", target_name="test-image"))
@@ -64,7 +61,4 @@ def test_docker_build(rule_runner) -> None:
     assert len(result.artifacts) == 1
     assert len(result.artifacts[0].extra_log_lines) == 2
     assert "Built docker image: test-image:1.0" == result.artifacts[0].extra_log_lines[0]
-    assert (
-        "image id: sha256:1616abae1b35b87b30eb913008b4a3a7028d1c803d1e895acfa1df44afb5929f"
-        in result.artifacts[0].extra_log_lines[1]
-    )
+    assert "Docker image ID: sha256:" in result.artifacts[0].extra_log_lines[1]

@@ -21,6 +21,6 @@ class BuiltDockerImage(BuiltPackageArtifact):
             relpath=None,
             extra_log_lines=(
                 f"Built docker {pluralize(len(tags), 'image', False)}: {tags_string}",
-                f"image id: {image_id}",
+                f"Docker image ID: {image_id}",
             ),
         )

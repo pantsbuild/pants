@@ -125,10 +125,7 @@ class DockerOptions(Subsystem):
     build_verbose = BoolOption(
         "--build-verbose",
         default=False,
-        help=(
-            "Prints build output to console when `--build-verbose` is true, otherwise only the "
-            "image ID (digest) is printed on success."
-        ),
+        help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
     )
     _env_vars = ShellStrListOption(
         "--env-vars",
