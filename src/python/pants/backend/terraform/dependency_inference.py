@@ -34,7 +34,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==3.0.1"
+    default_version = "python-hcl2==3.0.3"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
