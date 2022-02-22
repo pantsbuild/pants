@@ -20,11 +20,13 @@ from pants.backend.scala.test.scalatest import ScalatestTestFieldSet
 from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
+from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
+from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -46,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
             *jdk_util_rules(),
+            *non_jvm_dependencies_rules(),
             *scalac_rules(),
             *scalatest_rules(),
             *scala_target_types_rules(),
@@ -59,6 +62,9 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             JvmArtifactTarget,
+            FileTarget,
+            FilesGeneratorTarget,
+            RelocatedFiles,
             ScalaSourcesGeneratorTarget,
             ScalatestTestsGeneratorTarget,
         ],
@@ -107,6 +113,66 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+        }
+    )
+
+    test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
+
+    assert test_result.exit_code == 0
+    assert "Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0" in test_result.stdout
+    assert test_result.xml_results and test_result.xml_results.files
+
+
+@maybe_skip_jdk_test
+def test_file_deps_success(rule_runner: RuleRunner) -> None:
+    scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": importlib.resources.read_text(
+                *Scalatest.default_lockfile_resource
+            ),
+            "BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                  name = 'org.scalatest_scalatest',
+                  group = '{scalatest_coord.group}',
+                  artifact = '{scalatest_coord.artifact}',
+                  version = '{scalatest_coord.version}',
+                )
+
+                scalatest_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':org.scalatest_scalatest',
+                        ':ducks',
+                    ],
+                )
+
+                file(
+                    name="ducks",
+                    source="ducks.txt",
+                )
+
+                """
+            ),
+            "SimpleSpec.scala": dedent(
+                """
+                package org.pantsbuild.example;
+
+                import org.scalatest.funspec.AnyFunSpec
+                import java.nio.file.Files
+                import java.nio.file.Path
+
+                class SimpleSpec extends AnyFunSpec {
+                  describe("Ducks") {
+                    it("should be ducks") {
+                      assert(Files.readString(Path.of("ducks.txt")) == "lol ducks")
+                    }
+                  }
+                }
+                """
+            ),
+            "ducks.txt": "lol ducks",
         }
     )
 
