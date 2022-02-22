@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from functools import partial
-from textwrap import dedent
 from typing import Iterator
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
@@ -170,7 +170,11 @@ def get_build_options(
     field_set: DockerFieldSet,
     global_target_stage_option: str | None,
     target: Target,
+    verbose: bool,
 ) -> Iterator[str]:
+    if not verbose:
+        yield "--quiet"
+
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
@@ -244,6 +248,7 @@ async def build_docker_image(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
+                verbose=options.build_verbose,
                 target=wrapped_target.target,
             )
         ),
@@ -268,22 +273,28 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    logger.debug(
-        dedent(
-            f"""\
-            Docker build output for {tags[0]}:
-            stdout:
-            {result.stdout.decode()}
-
-            stderr:
-            {result.stderr.decode()}
-            """
+    if options.build_verbose:
+        logger.info(
+            f"Docker build output for {tags[0]}:\n"
+            f"{result.stdout.decode()}\n"
+            f"{result.stderr.decode()}"
         )
-    )
+        image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
+        image_id_match = next(
+            (
+                re.search(image_id_regexp, line)
+                for line in reversed(result.stderr.decode().split("\n"))
+                if "writing image sha256:" in line
+            ),
+            None,
+        )
+        image_id = image_id_match.group(1) if image_id_match else "<unknown>"
+    else:
+        image_id = result.stdout.decode().strip()
 
     return BuiltPackage(
         result.output_digest,
-        (BuiltDockerImage.create(tags),),
+        (BuiltDockerImage.create(image_id, tags),),
     )
 
 

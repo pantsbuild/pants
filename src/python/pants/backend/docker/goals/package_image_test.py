@@ -128,6 +128,7 @@ def assert_build(
         opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
+        opts.setdefault("build_verbose", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -420,6 +421,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--tag",
             "env1:1.2.3",
             "--file",
@@ -456,6 +458,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--tag",
             "args1:1.2.3",
             "--build-arg",
@@ -549,6 +552,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -599,6 +603,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--secret",
             "id=system-secret,src=/var/run/secrets/mysecret",
             "--secret",
@@ -637,6 +642,7 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--ssh",
             "default",
             "--tag",
@@ -678,6 +684,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--label",
             "build.host=tbs06",
             "--label",
@@ -828,6 +835,7 @@ def test_build_target_stage(
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--quiet",
             "--target",
             expected_target,
             "--tag",
