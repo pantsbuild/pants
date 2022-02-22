@@ -100,7 +100,7 @@ def test_basic_bsp_protocol() -> None:
         raw_response = response_fut.result(timeout=15)
         response = InitializeBuildResult.from_json_dict(raw_response)
         assert response.display_name == "Pants"
-        assert response.bsp_version == "2.0.0-M15"
+        assert response.bsp_version == "2.0.0"
 
         build_targets_request = WorkspaceBuildTargetsParams()
         response_fut = endpoint.request(

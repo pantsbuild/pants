@@ -17,7 +17,7 @@ from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.version import VERSION
 
-BSP_VERSION = "2.0.0-M15"
+BSP_VERSION = "2.0.0"
 
 
 @union
