@@ -692,13 +692,12 @@ def test_counters(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
                 )
             ],
         )
+        metrics_info = scheduler.get_metrics()
         histograms_info = scheduler.get_observation_histograms()
 
-    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-    workunits_with_counters = [item for item in finished if "counters" in item]
-    assert workunits_with_counters[0]["counters"]["local_cache_requests"] == 1
-    assert workunits_with_counters[0]["counters"]["local_cache_requests_uncached"] == 1
-    assert workunits_with_counters[1]["counters"]["local_execution_requests"] == 1
+    assert metrics_info["local_cache_requests"] == 1
+    assert metrics_info["local_cache_requests_uncached"] == 1
+    assert metrics_info["local_execution_requests"] == 1
 
     assert histograms_info["version"] == 0
     assert "histograms" in histograms_info

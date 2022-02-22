@@ -14,9 +14,9 @@ humbug==0.2.7
 
 ijson==3.1.4
 packaging==21.3
-pex==2.1.66
+pex==2.1.67
 psutil==5.9.0
-pytest>=6.2.4,<8  # This should be compatible with pytest.py, although it can be looser so that we don't over-constrain pantsbuild.pants.testutil 
+pytest>=6.2.4,<8  # This should be compatible with pytest.py, although it can be looser so that we don't over-constrain pantsbuild.pants.testutil
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.25.1
@@ -29,3 +29,4 @@ types-requests==2.27.5
 types-setuptools==57.4.7
 types-toml==0.10.3
 typing-extensions==4.0.1
+mypy-typing-asserts==0.1.1

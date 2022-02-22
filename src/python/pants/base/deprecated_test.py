@@ -182,6 +182,26 @@ def test_deprecation_start_period(caplog) -> None:
     assert "DEPRECATED: demo will be removed in version 999.999.999.dev999." in caplog.text
 
 
+@unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
+def test_deprecation_memoization(caplog) -> None:
+    caplog.clear()
+    for i in range(3):
+        warn_or_error(
+            removal_version="999.999.999.dev999",
+            entity="memo",
+            hint=None,
+            start_version=_FAKE_CUR_VERSION,
+        )
+    assert len(caplog.records) == 1
+    warn_or_error(
+        removal_version="999.999.999.dev999",
+        entity="another",
+        hint=None,
+        start_version=_FAKE_CUR_VERSION,
+    )
+    assert len(caplog.records) == 2
+
+
 def test_resolve_conflicting_options() -> None:
     old_val = "ancient"
     new_val = "modern"

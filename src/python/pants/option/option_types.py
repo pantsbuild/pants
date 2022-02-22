@@ -337,40 +337,106 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
         return cast("dict[str, _ValueT]", val)
 
 
-class TargetOption(StrOption):
+class TargetOption(_OptionBase[_PropType]):
     """A Pants Target option."""
 
     option_type: Any = custom_types.target_option
 
+    @overload
+    def __new__(cls, *flag_names: str, default: str, help: str) -> TargetOption[str]:
+        ...
 
-class DirOption(StrOption):
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> TargetOption[str | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
+
+
+class DirOption(_OptionBase[_PropType]):
     """A directory option."""
 
     option_type: Any = custom_types.dir_option
 
+    @overload
+    def __new__(cls, *flag_names: str, default: str, help: str) -> DirOption[str]:
+        ...
 
-class FileOption(StrOption):
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> DirOption[str | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
+
+
+class FileOption(_OptionBase[_PropType]):
     """A file option."""
 
     option_type: Any = custom_types.file_option
 
+    @overload
+    def __new__(cls, *flag_names: str, default: str, help: str) -> FileOption[str]:
+        ...
 
-class ShellStrOption(StrOption):
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> FileOption[str | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
+
+
+class ShellStrOption(_OptionBase[_PropType]):
     """A shell string option."""
 
     option_type: Any = custom_types.shell_str
 
+    @overload
+    def __new__(cls, *flag_names: str, default: str, help: str) -> ShellStrOption[str]:
+        ...
 
-class WorkspacePathOption(StrOption):
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> ShellStrOption[str | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
+
+
+class WorkspacePathOption(_OptionBase[_PropType]):
     """A workspace path option."""
 
     option_type: Any = custom_types.workspace_path
 
+    @overload
+    def __new__(cls, *flag_names: str, default: str, help: str) -> WorkspacePathOption[str]:
+        ...
 
-class MemorySizeOption(IntOption):
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> WorkspacePathOption[str | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
+
+
+class MemorySizeOption(_OptionBase[_PropType]):
     """A memory size option."""
 
     option_type: Any = custom_types.memory_size
+
+    @overload
+    def __new__(cls, *flag_names: str, default: int, help: str) -> MemorySizeOption[int]:
+        ...
+
+    @overload
+    def __new__(cls, *flag_names: str, help: str) -> MemorySizeOption[int | None]:
+        ...
+
+    def __new__(cls, *flag_names, default=None, help):
+        return super().__new__(cls, *flag_names, default=default, help=help)
 
 
 class StrListOption(_ListOptionBase[str]):
