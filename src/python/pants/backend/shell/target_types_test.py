@@ -10,8 +10,6 @@ import pytest
 
 from pants.backend.shell import target_types
 from pants.backend.shell.target_types import (
-    GenerateTargetsFromShellSources,
-    GenerateTargetsFromShunit2Tests,
     ShellSourcesGeneratorTarget,
     ShellSourceTarget,
     Shunit2Shell,
@@ -19,7 +17,8 @@ from pants.backend.shell.target_types import (
     Shunit2TestTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets, SingleSourceField, Tags
+from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.target import SingleSourceField, Tags
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -69,8 +68,7 @@ def test_generate_source_and_test_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromShunit2Tests]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromShellSources]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[Shunit2TestsGeneratorTarget, ShellSourcesGeneratorTarget],
     )
@@ -100,9 +98,6 @@ def test_generate_source_and_test_targets() -> None:
         }
     )
 
-    sources_generator = rule_runner.get_target(Address("src/sh", target_name="lib"))
-    tests_generator = rule_runner.get_target(Address("src/sh", target_name="tests"))
-
     def gen_source_tgt(rel_fp: str, tags: list[str] | None = None) -> ShellSourceTarget:
         return ShellSourceTarget(
             {SingleSourceField.alias: rel_fp, Tags.alias: tags},
@@ -118,25 +113,19 @@ def test_generate_source_and_test_targets() -> None:
         )
 
     sources_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromShellSources(sources_generator)]
-    )
+        _TargetParametrizations, [Address("src/sh", target_name="lib")]
+    ).parametrizations
     tests_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromShunit2Tests(tests_generator)]
-    )
+        _TargetParametrizations, [Address("src/sh", target_name="tests")]
+    ).parametrizations
 
-    assert sources_generated == GeneratedTargets(
-        sources_generator,
-        {
-            gen_source_tgt("f1.sh", tags=["overridden"]),
-            gen_source_tgt("f2.sh"),
-            gen_source_tgt("subdir/f.sh"),
-        },
-    )
-    assert tests_generated == GeneratedTargets(
-        tests_generator,
-        {
-            gen_test_tgt("f1_test.sh", tags=["overridden"]),
-            gen_test_tgt("f2_test.sh"),
-            gen_test_tgt("subdir/f_test.sh"),
-        },
-    )
+    assert set(sources_generated.values()) == {
+        gen_source_tgt("f1.sh", tags=["overridden"]),
+        gen_source_tgt("f2.sh"),
+        gen_source_tgt("subdir/f.sh"),
+    }
+    assert set(tests_generated.values()) == {
+        gen_test_tgt("f1_test.sh", tags=["overridden"]),
+        gen_test_tgt("f2_test.sh"),
+        gen_test_tgt("subdir/f_test.sh"),
+    }

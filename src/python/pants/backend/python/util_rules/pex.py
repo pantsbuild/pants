@@ -19,7 +19,11 @@ from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import MainSpecification, PexLayout
+from pants.backend.python.target_types import (
+    MainSpecification,
+    PexCompletePlatformsField,
+    PexLayout,
+)
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
 from pants.backend.python.util_rules import pex_cli
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -36,6 +40,8 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
 from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
+from pants.core.target_types import FileSourceField
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -49,9 +55,12 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
+from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -74,6 +83,49 @@ class PexPlatforms(DeduplicatedCollection[str]):
         return args
 
 
+class CompletePlatforms(DeduplicatedCollection[str]):
+    sort_input = True
+
+    def __init__(self, iterable: Iterable[str] = (), *, digest: Digest = EMPTY_DIGEST):
+        super().__init__(iterable)
+        self._digest = digest
+
+    @classmethod
+    def from_snapshot(cls, snapshot: Snapshot) -> CompletePlatforms:
+        return cls(snapshot.files, digest=snapshot.digest)
+
+    @property
+    def digest(self) -> Digest:
+        return self._digest
+
+    def generate_pex_arg_list(self) -> Iterator[str]:
+        for path in self:
+            yield "--complete-platform"
+            yield path
+
+
+@rule
+async def digest_complete_platforms(
+    complete_platforms: PexCompletePlatformsField,
+) -> CompletePlatforms:
+    original_file_targets = await Get(
+        Targets,
+        UnparsedAddressInputs,
+        complete_platforms.to_unparsed_address_inputs(),
+    )
+    original_files_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
+        )
+        for tgt in original_file_targets
+    )
+    snapshot = await Get(
+        Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
+    )
+    return CompletePlatforms.from_snapshot(snapshot)
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexRequest(EngineAwareParameter):
@@ -84,6 +136,7 @@ class PexRequest(EngineAwareParameter):
     requirements: PexRequirements | Lockfile | LockfileContent
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
+    complete_platforms: CompletePlatforms
     sources: Digest | None
     additional_inputs: Digest | None
     main: MainSpecification | None
@@ -101,6 +154,7 @@ class PexRequest(EngineAwareParameter):
         requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
+        complete_platforms=CompletePlatforms(),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
@@ -121,9 +175,17 @@ class PexRequest(EngineAwareParameter):
             interpreter_constraints.
         :param requirements: The requirements that the PEX should contain.
         :param interpreter_constraints: Any constraints on which Python versions may be used.
-        :param platforms: Which platforms should be supported. Setting this value will cause
-            interpreter constraints to not be used because platforms already constrain the valid
-            Python versions, e.g. by including `cp36m` in the platform string.
+        :param platforms: Which abbreviated platforms should be supported. Setting this value will
+            cause interpreter constraints to not be used at PEX build time because platforms already
+            constrain the valid Python versions, e.g. by including `cp36m` in the platform string.
+            Unfortunately this also causes interpreter constraints to not be embedded in the built
+            PEX for use at runtime which can lead to problems.
+            See: https://github.com/pantsbuild/pants/issues/13904.
+        :param complete_platforms: Which complete platforms should be supported. Setting this value
+            will cause interpreter constraints to not be used at PEX build time because complete
+            platforms completely constrain the valid Python versions. Unfortunately this also causes
+            interpreter constraints to not be embedded in the built PEX for use at runtime which can
+            lead to problems. See: https://github.com/pantsbuild/pants/issues/13904.
         :param sources: Any source files that should be included in the Pex.
         :param additional_inputs: Any inputs that are not source files and should not be included
             directly in the Pex, but should be present in the environment when building the Pex.
@@ -141,6 +203,7 @@ class PexRequest(EngineAwareParameter):
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
+        self.complete_platforms = complete_platforms
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.main = main
@@ -165,6 +228,11 @@ class PexRequest(EngineAwareParameter):
             raise ValueError(
                 "Only one of platforms or a specific interpreter may be set. Got "
                 f"both {self.platforms} and {self.python}."
+            )
+        if self.python and self.complete_platforms:
+            raise ValueError(
+                "Only one of complete_platforms or a specific interpreter may be set. Got "
+                f"both {self.complete_platforms} and {self.python}."
             )
         if self.python and self.interpreter_constraints:
             raise ValueError(
@@ -295,10 +363,11 @@ async def build_pex(
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
-    if request.platforms:
+    if request.platforms or request.complete_platforms:
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
+        argv.extend(request.complete_platforms.generate_pex_arg_list())
     elif request.python:
         python = request.python
     elif request.internal_only:
@@ -390,6 +459,7 @@ async def build_pex(
         Digest,
         MergeDigests(
             (
+                request.complete_platforms.digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraints_file_digest,

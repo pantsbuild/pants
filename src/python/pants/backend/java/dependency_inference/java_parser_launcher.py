@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
-from pants.engine.process import BashBinary, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -54,9 +54,8 @@ class JavaParserCompiledClassfiles:
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserCompiledClassfiles:
+async def build_processors(jdk: InternalJdk) -> JavaParserCompiledClassfiles:
     dest_dir = "classfiles"
-
     materialized_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
@@ -91,7 +90,8 @@ async def build_processors(bash: BashBinary, jdk_setup: JdkSetup) -> JavaParserC
     process_result = await Get(
         ProcessResult,
         JvmProcess(
-            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
+            jdk=jdk,
+            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",
                 "-cp",

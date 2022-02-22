@@ -16,6 +16,7 @@ from pants.backend.python.macros.deprecation_fixers import (
     OptionsChecker,
     OptionsCheckerRequest,
     UpdatePythonMacrosRequest,
+    maybe_address,
 )
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
@@ -45,7 +46,9 @@ def rule_runner() -> RuleRunner:
         },
         use_deprecated_python_macros=True,
     )
-    rule_runner.set_options(["--update-build-files-fix-python-macros"])
+    rule_runner.set_options(
+        ["--use-deprecated-python-macros", "--update-build-files-fix-python-macros"]
+    )
     return rule_runner
 
 
@@ -273,3 +276,10 @@ def test_check_options(rule_runner: RuleRunner, caplog) -> None:
     assert "pylint" not in caplog.text
     assert "mypy" not in caplog.text
     assert "python-thrift" not in caplog.text
+
+
+def test_invalid_address() -> None:
+    assert (
+        maybe_address("no/address@here:123", MacroRenames((), FrozenDict()), relative_to=None)
+        is None
+    )

@@ -16,7 +16,7 @@ from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
-from pants.build_graph.address import InvalidAddress
+from pants.build_graph.address import AddressParseException, InvalidAddress
 from pants.core.goals.update_build_files import (
     DeprecationFixerRequest,
     RewrittenBuildFile,
@@ -170,7 +170,7 @@ def maybe_address(val: str, renames: MacroRenames, *, relative_to: str | None) -
         # we know that none of the generated targets will be file addresses. That is, we can
         # ignore file addresses.
         addr = AddressInput.parse(val, relative_to=relative_to).dir_to_address()
-    except InvalidAddress:
+    except (AddressParseException, InvalidAddress):
         return None
 
     return addr if addr in renames.generated else None

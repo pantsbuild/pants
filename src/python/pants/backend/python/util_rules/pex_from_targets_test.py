@@ -13,9 +13,9 @@ from typing import Any, Dict, Iterable, List, cast
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonResolveField,
@@ -47,6 +47,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_from_targets.rules(),
+            *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
@@ -61,13 +62,10 @@ def rule_runner() -> RuleRunner:
 
 
 def test_no_compatible_resolve_error() -> None:
-    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""})
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""}, enable_resolves=True)
     targets = [
         PythonRequirementTarget(
-            {
-                PythonRequirementsField.alias: [],
-                PythonRequirementCompatibleResolvesField.alias: ["a", "b"],
-            },
+            {PythonRequirementsField.alias: [], PythonResolveField.alias: "a"},
             Address("", target_name="t1"),
         ),
         PythonSourceTarget(
@@ -89,7 +87,6 @@ def test_no_compatible_resolve_error() -> None:
               * //:t2
 
             b:
-              * //:t1
               * //:t3
             """
         )
@@ -97,34 +94,40 @@ def test_no_compatible_resolve_error() -> None:
 
 
 def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
-    def create_build(*, req_resolves: list[str], source_resolve: str, test_resolve: str) -> str:
-        return dedent(
-            f"""\
-            python_source(name="dep", source="dep.py", resolve="{source_resolve}")
-            python_requirement(
-                name="req", requirements=[], compatible_resolves={repr(req_resolves)}
-            )
-            python_test(
-                name="test",
-                source="tests.py",
-                dependencies=[":dep", ":req"],
-                resolve="{test_resolve}",
-            )
-            """
-        )
+    def create_target_files(
+        directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
+    ) -> dict[str | PurePath, str | bytes]:
+        return {
+            f"{directory}/BUILD": dedent(
+                f"""\
+              python_source(name="dep", source="dep.py", resolve="{source_resolve}")
+              python_requirement(
+                  name="req", requirements=[], resolve="{req_resolve}"
+              )
+              python_test(
+                  name="test",
+                  source="tests.py",
+                  dependencies=[":dep", ":req"],
+                  resolve="{test_resolve}",
+              )
+              """
+            ),
+            f"{directory}/tests.py": "",
+            f"{directory}/dep.py": "",
+        }
 
-    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}"])
+    rule_runner.set_options(
+        ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"], env_inherit={"PATH"}
+    )
     rule_runner.write_files(
         {
             # Note that each of these BUILD files are entirely self-contained.
-            "valid/BUILD": create_build(
-                req_resolves=["a", "b"], source_resolve="a", test_resolve="a"
-            ),
-            "invalid_dep_resolve_field/BUILD": create_build(
-                req_resolves=["a"], source_resolve="a", test_resolve="b"
-            ),
-            "invalid_dep_compatible_resolves_field/BUILD": create_build(
-                req_resolves=["b"], source_resolve="a", test_resolve="a"
+            **create_target_files("valid", req_resolve="a", source_resolve="a", test_resolve="a"),
+            **create_target_files(
+                "invalid",
+                req_resolve="a",
+                source_resolve="a",
+                test_resolve="b",
             ),
         }
     )
@@ -136,21 +139,19 @@ def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
 
     assert choose_resolve([Address("valid", target_name="test")]) == "a"
     assert choose_resolve([Address("valid", target_name="dep")]) == "a"
+    assert choose_resolve([Address("valid", target_name="req")]) == "a"
 
     with engine_error(NoCompatibleResolveException, contains="its dependencies are not compatible"):
-        choose_resolve([Address("invalid_dep_resolve_field", target_name="test")])
+        choose_resolve([Address("invalid", target_name="test")])
+    with engine_error(NoCompatibleResolveException, contains="its dependencies are not compatible"):
+        choose_resolve([Address("invalid", target_name="dep")])
+
     with engine_error(
         NoCompatibleResolveException, contains="input targets did not have a resolve"
     ):
         choose_resolve(
-            [
-                Address("invalid_dep_resolve_field", target_name="test"),
-                Address("invalid_dep_resolve_field", target_name="dep"),
-            ]
+            [Address("invalid", target_name="req"), Address("invalid", target_name="dep")]
         )
-
-    with engine_error(NoCompatibleResolveException):
-        choose_resolve([Address("invalid_dep_compatible_resolves_field", target_name="test")])
 
 
 @dataclass(frozen=True)

@@ -15,9 +15,13 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 )
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
-from pants.bsp.spec import InitializeBuildParams, InitializeBuildResult
+from pants.bsp.spec import (
+    InitializeBuildParams,
+    InitializeBuildResult,
+    WorkspaceBuildTargetsParams,
+    WorkspaceBuildTargetsResult,
+)
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.util.frozendict import FrozenDict
 
 _logger = logging.getLogger(__name__)
 
@@ -32,6 +36,9 @@ class _HandlerMapping:
 BSP_HANDLER_MAPPING = {
     "build/initialize": _HandlerMapping(
         InitializeBuildParams.from_json_dict, InitializeBuildResult
+    ),
+    "workspace/buildTargets": _HandlerMapping(
+        WorkspaceBuildTargetsParams.from_json_dict, WorkspaceBuildTargetsResult
     ),
 }
 
@@ -97,6 +104,8 @@ class BSPConnection:
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:
+            if method_name == self._INITIALIZE_METHOD_NAME:
+                self._initialized = True
             return returns[0][1].value.to_json_dict()
         elif len(returns) == 0 and len(throws) == 1:
             raise throws[0][1].exc
@@ -113,21 +122,3 @@ class BSPConnection:
             return self._handle_inbound_message(method_name=method_name, params=params)
 
         return handler
-
-
-def _freeze(item: Any) -> Any:
-    if item is None:
-        return None
-    elif isinstance(item, list) or isinstance(item, tuple):
-        return tuple(_freeze(x) for x in item)
-    elif isinstance(item, dict):
-        result = {}
-        for k, v in item.items():
-            if not isinstance(k, str):
-                raise AssertionError("Got non-`str` key for _freeze.")
-            result[k] = _freeze(v)
-        return FrozenDict(result)
-    elif isinstance(item, str) or isinstance(item, int) or isinstance(item, float):
-        return item
-    else:
-        raise AssertionError(f"Unsupported value type for _freeze: {type(item)}")

@@ -6,14 +6,17 @@ from packaging.version import Version
 
 from pants.backend.plugin_development import pants_requirements
 from pants.backend.plugin_development.pants_requirements import (
-    GenerateFromPantsRequirementsRequest,
     PantsRequirementsTargetGenerator,
     determine_version,
 )
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.target_types import PythonRequirementModulesField, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+)
 from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets
+from pants.engine.internals.graph import _TargetParametrizations
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -34,7 +37,7 @@ def test_target_generator() -> None:
     rule_runner = RuleRunner(
         rules=(
             *pants_requirements.rules(),
-            QueryRule(GeneratedTargets, [GenerateFromPantsRequirementsRequest]),
+            QueryRule(_TargetParametrizations, [Address]),
         ),
         target_types=[PantsRequirementsTargetGenerator],
     )
@@ -43,15 +46,16 @@ def test_target_generator() -> None:
         {
             "BUILD": (
                 "pants_requirements(name='default')\n"
-                "pants_requirements(name='no_testutil', testutil=False)\n"
+                "pants_requirements(\n"
+                "  name='no_testutil', testutil=False, resolve='a'\n"
+                ")"
             )
         }
     )
 
-    generator = rule_runner.get_target(Address("", target_name="default"))
     result = rule_runner.request(
-        GeneratedTargets, [GenerateFromPantsRequirementsRequest(generator)]
-    )
+        _TargetParametrizations, [Address("", target_name="default")]
+    ).parametrizations
     assert len(result) == 2
     pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild.pants")
     testutil_req = next(
@@ -65,10 +69,13 @@ def test_target_generator() -> None:
     assert testutil_req[PythonRequirementsField].value == (
         PipRequirement.parse(f"pantsbuild.pants.testutil{determine_version()}"),
     )
+    for t in (pants_req, testutil_req):
+        assert not t[PythonRequirementResolveField].value
 
-    generator = rule_runner.get_target(Address("", target_name="no_testutil"))
     result = rule_runner.request(
-        GeneratedTargets, [GenerateFromPantsRequirementsRequest(generator)]
-    )
+        _TargetParametrizations, [Address("", target_name="no_testutil")]
+    ).parametrizations
     assert len(result) == 1
     assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
+    pants_req = next(iter(result.values()))
+    assert pants_req[PythonRequirementResolveField].value == "a"

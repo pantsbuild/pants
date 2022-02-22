@@ -17,9 +17,10 @@ from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_prefix
 
-# `:` and `#` used as delimiters already. Others are reserved for possible future needs.
+# `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
 BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":#!@?=")
+BANNED_CHARS_IN_PARAMETERS = frozenset(r":#!@?=, ")
 
 
 class InvalidAddress(ValueError):
@@ -170,7 +171,11 @@ class AddressInput:
                     f"`{self.path_component}:original_target`, but {self.path_component} did not "
                     f"have an address."
                 )
-            return Address(spec_path=spec_path, relative_file_path=relative_file_path)
+            return Address(
+                spec_path=spec_path,
+                relative_file_path=relative_file_path,
+                parameters=self.parameters,
+            )
 
         # The target component may be "above" (but not below) the file in the filesystem.
         # Determine how many levels above the file it is, and validate that the path is relative.
@@ -181,6 +186,7 @@ class AddressInput:
                 spec_path=spec_path,
                 relative_file_path=relative_file_path,
                 target_name=self.target_component,
+                parameters=self.parameters,
             )
 
         expected_prefix = f"..{os.path.sep}" * parent_count
@@ -204,7 +210,12 @@ class AddressInput:
         spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
         relative_file_path = os.path.join(*path_components[offset:])
         target_name = os.path.basename(self.target_component)
-        return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
+        return Address(
+            spec_path,
+            relative_file_path=relative_file_path,
+            target_name=target_name,
+            parameters=self.parameters,
+        )
 
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
@@ -212,6 +223,7 @@ class AddressInput:
             spec_path=self.path_component,
             target_name=self.target_component,
             generated_name=self.generated_component,
+            parameters=self.parameters,
         )
 
 
@@ -303,6 +315,10 @@ class Address(EngineAwareParameter):
         return self._target_name is None
 
     @property
+    def is_parametrized(self) -> bool:
+        return bool(self.parameters)
+
+    @property
     def filename(self) -> str:
         if self._relative_file_path is None:
             raise AssertionError(
@@ -317,6 +333,13 @@ class Address(EngineAwareParameter):
         return self._target_name
 
     @property
+    def parameters_repr(self) -> str:
+        if not self.parameters:
+            return ""
+        rhs = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+        return f"@{rhs}"
+
+    @property
     def spec(self) -> str:
         """The canonical string representation of the Address.
 
@@ -328,7 +351,11 @@ class Address(EngineAwareParameter):
         prefix = "//" if not self.spec_path else ""
         if self._relative_file_path is None:
             path = self.spec_path
-            target = "" if self._target_name is None and self.generated_name else self.target_name
+            target = (
+                ""
+                if self._target_name is None and (self.generated_name or self.parameters)
+                else self.target_name
+            )
         else:
             path = self.filename
             parent_prefix = "../" * self._relative_file_path.count(os.path.sep)
@@ -338,20 +365,8 @@ class Address(EngineAwareParameter):
                 else f"{parent_prefix}{self.target_name}"
             )
         target_sep = ":" if target else ""
-        if self.parameters:
-            params_sep = "@"
-            params = ",".join(f"{k}={v}" for k, v in self.parameters.items())
-        else:
-            params_sep = ""
-            params = ""
-        if self.generated_name is None:
-            generated_sep = ""
-            generated = ""
-        else:
-            generated_sep = "#"
-            generated = self.generated_name
-
-        return f"{prefix}{path}{target_sep}{target}{params_sep}{params}{generated_sep}{generated}"
+        generated = "" if self.generated_name is None else f"#{self.generated_name}"
+        return f"{prefix}{path}{target_sep}{target}{self.parameters_repr}{generated}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -384,40 +399,44 @@ class Address(EngineAwareParameter):
         prefix = sanitize(self.spec_path)
         return f"{prefix}{path}{target}{params}{generated}"
 
+    def parametrize(self, parameters: Mapping[str, str]) -> Address:
+        """Creates a new Address with the given `parameters` merged over self.parameters."""
+        merged_parameters = {**self.parameters, **parameters}
+        return self.__class__(
+            self.spec_path,
+            target_name=self._target_name,
+            generated_name=self.generated_name,
+            relative_file_path=self._relative_file_path,
+            parameters=merged_parameters,
+        )
+
     def maybe_convert_to_target_generator(self) -> Address:
-        """If this address is generated, convert it to its generator target.
+        """If this address is generated or parametrized, convert it to its generator target.
 
-        Otherwise, return itself unmodified.
+        Otherwise, return self unmodified.
         """
-        if self.is_generated_target:
-            return self.__class__(
-                self.spec_path, target_name=self._target_name, parameters=self.parameters
-            )
-        return self
-
-    def maybe_convert_to_generated_target(self) -> Address:
-        """If this address is for a file target, convert it into generated target syntax
-        (dir/f.ext:lib -> dir:lib#f.ext).
-
-        Otherwise, return itself unmodified.
-        """
-        if self.is_file_target:
-            return self.__class__(
-                self.spec_path,
-                target_name=self._target_name,
-                parameters=self.parameters,
-                generated_name=self._relative_file_path,
-            )
+        if self.is_generated_target or self.is_parametrized:
+            return self.__class__(self.spec_path, target_name=self._target_name)
         return self
 
     def create_generated(self, generated_name: str) -> Address:
         if self.is_generated_target:
-            raise AssertionError("Cannot call `create_generated` on `{self}`.")
+            raise AssertionError(f"Cannot call `create_generated` on `{self}`.")
         return self.__class__(
             self.spec_path,
             target_name=self._target_name,
             parameters=self.parameters,
             generated_name=generated_name,
+        )
+
+    def create_file(self, relative_file_path: str) -> Address:
+        if self.is_generated_target:
+            raise AssertionError(f"Cannot call `create_file` on `{self}`.")
+        return self.__class__(
+            self.spec_path,
+            target_name=self._target_name,
+            parameters=self.parameters,
+            relative_file_path=relative_file_path,
         )
 
     def __eq__(self, other):

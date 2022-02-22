@@ -39,6 +39,10 @@ from pants.engine.fs import (
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
+from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
+from pants.engine.internals.parametrize import (  # noqa: F401
+    _TargetParametrizations as _TargetParametrizations,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -64,7 +68,9 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    MultipleSourcesField,
     NoApplicableTargetsBehavior,
+    OverridesField,
     RegisteredTargetTypes,
     SecondaryOwnerMixin,
     SourcesField,
@@ -72,6 +78,10 @@ from pants.engine.target import (
     SourcesPathsRequest,
     SpecialCasedDependencies,
     Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
+    TargetGenerator,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -81,15 +91,16 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
+    _generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -116,106 +127,180 @@ def target_types_to_generate_targets_requests(
     )
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending target.
-class _WarnDeprecatedTarget:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedTargetRequest:
-    tgt_type: type[Target]
-
-
-@rule
-def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnDeprecatedTarget:
-    tgt_type = request.tgt_type
+def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=tgt_type.deprecated_alias_removal_version,
         entity=f"the target name {tgt_type.deprecated_alias}",
         hint=(
-            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `./pants "
+            f"Instead, use `{tgt_type.alias}`, which behaves the same. Run `{bin_name()} "
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedTarget()
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending field.
-class _WarnDeprecatedField:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedFieldRequest:
-    field_type: type[Field]
-
-
-@rule
-def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDeprecatedField:
-    field_type = request.field_type
+def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=field_type.deprecated_alias_removal_version,
         entity=f"the field name {field_type.deprecated_alias}",
         hint=(
-            f"Instead, use `{field_type.alias}`, which behaves the same. Run `./pants "
+            f"Instead, use `{field_type.alias}`, which behaves the same. Run `{bin_name()} "
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedField()
+
+
+@rule
+async def resolve_target_parametrizations(
+    address: Address,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    files_not_found_behavior: FilesNotFoundBehavior,
+) -> _TargetParametrizations:
+    assert not address.is_generated_target and not address.is_parametrized
+
+    target_adaptor = await Get(TargetAdaptor, Address, address)
+    target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
+    if target_type is None:
+        raise UnrecognizedTargetTypeException(
+            target_adaptor.type_alias, registered_target_types, address
+        )
+    if (
+        target_type.deprecated_alias is not None
+        and target_type.deprecated_alias == target_adaptor.type_alias
+        and not address.is_generated_target
+    ):
+        warn_deprecated_target_type(target_type)
+
+    target = None
+    parametrizations: list[_TargetParametrization] = []
+    generate_request = target_types_to_generate_requests.request_for(target_type)
+    if generate_request:
+        # Split out the `propagated_fields` before construction.
+        generator_fields = dict(target_adaptor.kwargs)
+        template_fields = {}
+        # TODO: Require for all instances before landing.
+        if issubclass(target_type, TargetGenerator):
+            copied_fields = (
+                *target_type.copied_fields,
+                *target_type._find_plugin_fields(union_membership),
+            )
+            for field_type in copied_fields:
+                field_value = generator_fields.get(field_type.alias, None)
+                if field_value is not None:
+                    template_fields[field_type.alias] = field_value
+            for field_type in target_type.moved_fields:
+                field_value = generator_fields.pop(field_type.alias, None)
+                if field_value is not None:
+                    template_fields[field_type.alias] = field_value
+
+        generator_fields_parametrized = {
+            name for name, field in generator_fields.items() if isinstance(field, Parametrize)
+        }
+        if generator_fields_parametrized:
+            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+            raise ValueError(
+                f"Only fields which will be moved to generated targets may be parametrized, "
+                f"so target generator {address} (with type {target_type.alias}) cannot "
+                f"parametrize the {generator_fields_parametrized} {noun}."
+            )
+
+        base_generator = target_type(generator_fields, address, union_membership)
+
+        overrides = {}
+        if base_generator.has_field(OverridesField):
+            overrides_field = base_generator[OverridesField]
+            overrides_flattened = overrides_field.flatten()
+            if issubclass(target_type, TargetFilesGenerator):
+                override_globs = OverridesField.to_path_globs(
+                    address, overrides_flattened, files_not_found_behavior
+                )
+                override_paths = await MultiGet(
+                    Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+                )
+                overrides = OverridesField.flatten_paths(
+                    address,
+                    zip(override_paths, override_globs, overrides_flattened.values()),
+                )
+            else:
+                overrides = overrides_field.flatten()
+
+        generators = [
+            (target_type(generator_fields, address, union_membership), template)
+            for address, template in Parametrize.expand(address, template_fields)
+        ]
+        all_generated = await MultiGet(
+            Get(
+                GeneratedTargets,
+                GenerateTargetsRequest,
+                generate_request(
+                    generator,
+                    template_address=generator.address,
+                    template=template,
+                    overrides={
+                        name: dict(Parametrize.expand(generator.address, override))
+                        for name, override in overrides.items()
+                    },
+                ),
+            )
+            for generator, template in generators
+        )
+        parametrizations.extend(
+            _TargetParametrization(generator, generated_batch)
+            for generated_batch, (generator, _) in zip(all_generated, generators)
+        )
+    else:
+        first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
+        if rest:
+            # The target was parametrized, and so the original target is not addressable.
+            generated = FrozenDict(
+                (
+                    parameterized_address,
+                    target_type(parameterized_fields, parameterized_address, union_membership),
+                )
+                for parameterized_address, parameterized_fields in (first, *rest)
+            )
+            parametrizations.append(_TargetParametrization(None, generated))
+        else:
+            # The target was not parametrized.
+            target = target_type(target_adaptor.kwargs, address, union_membership)
+            parametrizations.append(_TargetParametrization(target, FrozenDict()))
+
+    # TODO: Move to Target constructor.
+    for field_type in target.field_types if target else ():
+        if (
+            field_type.deprecated_alias is not None
+            and field_type.deprecated_alias in target_adaptor.kwargs
+        ):
+            warn_deprecated_field_type(field_type)
+
+    return _TargetParametrizations(parametrizations)
 
 
 @rule
 async def resolve_target(
     address: Address,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> WrappedTarget:
-    if not address.is_generated_target:
-        target_adaptor = await Get(TargetAdaptor, Address, address)
-        target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
-        if target_type is None:
-            raise UnrecognizedTargetTypeException(
-                target_adaptor.type_alias, registered_target_types, address
-            )
-        if (
-            target_type.deprecated_alias is not None
-            and target_type.deprecated_alias == target_adaptor.type_alias
-            and not address.is_generated_target
-        ):
-            await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
-        target = target_type(target_adaptor.kwargs, address, union_membership)
-        for field_type in target.field_types:
-            if (
-                field_type.deprecated_alias is not None
-                and field_type.deprecated_alias in target_adaptor.kwargs
-            ):
-                await Get(_WarnDeprecatedField, _WarnDeprecatedFieldRequest(field_type))
-        return WrappedTarget(target)
-
-    wrapped_generator_tgt = await Get(
-        WrappedTarget, Address, address.maybe_convert_to_target_generator()
-    )
-    generator_tgt = wrapped_generator_tgt.target
-    if not target_types_to_generate_requests.is_generator(generator_tgt):
-        # TODO: Error in this case. You should not use a generator address (or file address) if
-        #  the generator does not actually generate.
-        return wrapped_generator_tgt
-
-    generate_request = target_types_to_generate_requests[type(generator_tgt)]
-    generated = await Get(GeneratedTargets, GenerateTargetsRequest, generate_request(generator_tgt))
-    if address not in generated:
+    base_address = address.maybe_convert_to_target_generator()
+    parametrizations = await Get(_TargetParametrizations, Address, base_address)
+    if address.is_generated_target:
+        # TODO: This is an accommodation to allow using file/generator Addresses for
+        # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
+        original_target = parametrizations.get(base_address)
+        if original_target and not target_types_to_generate_requests.is_generator(original_target):
+            return WrappedTarget(original_target)
+    target = parametrizations.get(address)
+    if target is None:
         raise ValueError(
-            f"The address `{address}` is not generated by the `{generator_tgt.alias}` target "
-            f"`{generator_tgt.address}`, which only generates these addresses:\n\n"
-            f"{bullet_list(addr.spec for addr in generated)}\n\n"
+            f"The address `{address}` was not generated by the target `{base_address}`, which "
+            "only generated these addresses:\n\n"
+            f"{bullet_list(str(t.address) for t in parametrizations.all)}\n\n"
             "Did you mean to use one of those addresses?"
         )
-    return WrappedTarget(generated[address])
+    return WrappedTarget(target)
 
 
 @rule
@@ -223,30 +308,33 @@ async def resolve_targets(
     targets: UnexpandedTargets,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> Targets:
-    # Replace all generating targets with what it generates. Otherwise, keep it. If a target
+    # Replace all generating targets with what they generate. Otherwise, keep them. If a target
     # generator does not generate any targets, keep the target generator.
     # TODO: This method does not preserve the order of inputs.
     expanded_targets: OrderedSet[Target] = OrderedSet()
     generator_targets = []
-    generate_gets = []
+    parametrizations_gets = []
     for tgt in targets:
         if (
             target_types_to_generate_requests.is_generator(tgt)
             and not tgt.address.is_generated_target
         ):
             generator_targets.append(tgt)
-            generate_request = target_types_to_generate_requests[type(tgt)]
-            generate_gets.append(
-                Get(GeneratedTargets, GenerateTargetsRequest, generate_request(tgt))
+            parametrizations_gets.append(
+                Get(
+                    _TargetParametrizations,
+                    Address,
+                    tgt.address.maybe_convert_to_target_generator(),
+                )
             )
         else:
             expanded_targets.add(tgt)
 
-    all_generated_targets = await MultiGet(generate_gets)
+    all_generated_targets = await MultiGet(parametrizations_gets)
     expanded_targets.update(
         tgt
-        for generator, generated_targets in zip(generator_targets, all_generated_targets)
-        for tgt in (generated_targets.values() if generated_targets else {generator})
+        for generator, parametrizations in zip(generator_targets, all_generated_targets)
+        for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
 
@@ -627,7 +715,7 @@ def _log_or_raise_unmatched_owners(
         )
     msg = (
         f"{prefix} See {doc_url('targets')} for more information on target definitions."
-        f"\n\nYou may want to run `./pants tailor` to autogenerate your BUILD files. See "
+        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
@@ -989,11 +1077,10 @@ async def resolve_dependencies(
     # If it's a target generator, inject dependencies on all of its generated targets.
     generated_addresses: tuple[Address, ...] = ()
     if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
-        generate_request = target_types_to_generate_requests[type(tgt)]
-        generated_targets = await Get(
-            GeneratedTargets, GenerateTargetsRequest, generate_request(tgt)
+        parametrizations = await Get(
+            _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
         )
-        generated_addresses = tuple(generated_targets.keys())
+        generated_addresses = tuple(parametrizations.parametrization_for(tgt.address).keys())
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
@@ -1111,7 +1198,7 @@ class NoApplicableTargetsException(Exception):
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
         )
         pants_filter_command = (
-            f"./pants filter --target-type={','.join(applicable_target_aliases)} ::"
+            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
         )
         remedy = (
             f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
@@ -1119,7 +1206,7 @@ class NoApplicableTargetsException(Exception):
         )
         if filedeps_goal_works:
             remedy += (
-                f", or run `{pants_filter_command} | xargs ./pants filedeps` to find all "
+                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
                 "applicable files."
             )
         else:
@@ -1245,5 +1332,44 @@ def find_valid_field_sets(
     )
 
 
+class GenerateFileTargets(GenerateTargetsRequest):
+    generate_from = TargetFilesGenerator
+
+
+@rule
+async def generate_file_targets(
+    request: GenerateFileTargets,
+    files_not_found_behavior: FilesNotFoundBehavior,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    sources_paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+    )
+
+    add_dependencies_on_all_siblings = False
+    if request.generator.settings_request_cls:
+        generator_settings = await Get(
+            TargetFilesGeneratorSettings,
+            TargetFilesGeneratorSettingsRequest,
+            request.generator.settings_request_cls(),
+        )
+        add_dependencies_on_all_siblings = generator_settings.add_dependencies_on_all_siblings
+
+    return _generate_file_level_targets(
+        type(request.generator).generated_target_cls,
+        request.generator,
+        sources_paths.files,
+        request.template_address,
+        request.template,
+        request.overrides,
+        union_membership,
+        add_dependencies_on_all_siblings=add_dependencies_on_all_siblings,
+    )
+
+
 def rules():
-    return collect_rules()
+
+    return [
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFileTargets),
+    ]

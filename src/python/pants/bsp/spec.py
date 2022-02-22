@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pants.bsp.utils import freeze_json
+
 # -----------------------------------------------------------------------------------------------
 # Base types
 # -----------------------------------------------------------------------------------------------
@@ -27,6 +29,9 @@ class BuildTargetIdentifier:
     @classmethod
     def from_json_dict(cls, d):
         return cls(uri=d["uri"])
+
+    def to_json_dict(self):
+        return {"uri": self.uri}
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,14 @@ class BuildTargetCapabilities:
             can_run=d["canRun"],
             can_debug=d["canDebug"],
         )
+
+    def to_json_dict(self):
+        return {
+            "canCompile": self.can_compile,
+            "canTest": self.can_test,
+            "canRun": self.can_run,
+            "canDebug": self.can_debug,
+        }
 
 
 # Note: The BSP "build target" concept is _not_ the same as a Pants "target". They are similar but
@@ -98,6 +111,7 @@ class BuildTarget:
 
     # Language-specific metadata about this target.
     # See ScalaBuildTarget as an example.
+    # TODO: Figure out generic decode/encode of this field. Maybe use UnionRule to allow language backends to hook?
     data: Any | None
 
     @classmethod
@@ -115,6 +129,24 @@ class BuildTarget:
             data_kind=d.get("dataKind"),
             data=d.get("data"),
         )
+
+    def to_json_dict(self):
+        result = {
+            "id": self.id.to_json_dict(),
+            "capabilities": self.capabilities.to_json_dict(),
+            "tags": self.tags,
+            "languageIds": self.language_ids,
+            "dependencies": [dep.to_json_dict() for dep in self.dependencies],
+        }
+        if self.display_name is not None:
+            result["displayName"] = self.display_name
+        if self.base_directory is not None:
+            result["baseDirectory"] = self.base_directory
+        if self.data_kind is not None:
+            result["dataKind"] = self.data_kind
+        if self.data is not None:
+            result["data"] = self.data
+        return result
 
 
 class BuildTargetDataKind:
@@ -247,7 +279,7 @@ class InitializeBuildParams:
             bsp_version=d["bspVersion"],
             root_uri=d["rootUri"],
             capabilities=BuildClientCapabilities.from_json_dict(d["capabilities"]),
-            data=d.get("data"),
+            data=freeze_json(d.get("data")),
         )
 
     def to_json_dict(self):
@@ -442,3 +474,25 @@ class InitializeBuildResult:
             # TODO: Figure out whether to encode/decode data in a generic manner.
             result["data"] = self.data
         return result
+
+
+@dataclass(frozen=True)
+class WorkspaceBuildTargetsParams:
+    @classmethod
+    def from_json_dict(cls, _d):
+        return cls()
+
+    def to_json_dict(self):
+        return {}
+
+
+@dataclass(frozen=True)
+class WorkspaceBuildTargetsResult:
+    targets: tuple[BuildTarget, ...]
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(targets=tuple(BuildTarget.from_json_dict(tgt) for tgt in d["targets"]))
+
+    def to_json_dict(self):
+        return {"targets": [tgt.to_json_dict() for tgt in self.targets]}

@@ -17,7 +17,7 @@ import toml
 import yaml
 from packaging.version import Version
 
-from pants.base.deprecated import CodeRemovedError
+from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.config import Config
@@ -346,6 +346,7 @@ def test_deprecated_options(caplog) -> None:
         config: dict[str, dict[str, str]] | None = None,
     ) -> None:
         caplog.clear()
+        warn_or_error.clear()  # type: ignore[attr-defined]
         opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
         assert opts.for_scope(scope)[opt] == expected
         assert len(caplog.records) == 1
@@ -370,6 +371,7 @@ def test_deprecated_options(caplog) -> None:
 
     # Make sure the warnings don't come out for regular options.
     caplog.clear()
+    warn_or_error.clear()  # type: ignore[attr-defined]
     assert (
         create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"])
         .for_scope("scope")

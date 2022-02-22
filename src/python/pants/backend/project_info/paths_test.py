@@ -1,20 +1,30 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import json
-from typing import List
+from typing import ClassVar, List
 
 import pytest
 
 from pants.backend.project_info.paths import PathsGoal
 from pants.backend.project_info.paths import rules as paths_rules
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Dependencies, Target
+from pants.engine.target import Dependencies, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
+
+
+class MockSourceField(OptionalSingleSourceField):
+    expected_file_extensions: ClassVar[tuple[str, ...]] = (".txt",)
 
 
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (Dependencies,)
+    core_fields = (
+        MockSourceField,
+        Dependencies,
+    )
 
 
 @pytest.fixture
@@ -22,10 +32,13 @@ def rule_runner() -> RuleRunner:
     runner = RuleRunner(rules=paths_rules(), target_types=[MockTarget])
     runner.write_files(
         {
-            "base/BUILD": "tgt()",
-            "intermediate/BUILD": "tgt(dependencies=['base'])",
+            "base/base.txt": "",
+            "base/BUILD": "tgt(source='base.txt')",
+            "intermediate/intermediate.txt": "",
+            "intermediate/BUILD": "tgt(source='intermediate.txt', dependencies=['base'])",
             "intermediate2/BUILD": "tgt(dependencies=['base'])",
             "leaf/BUILD": "tgt(dependencies=['intermediate', 'intermediate2'])",
+            "island/BUILD": "tgt()",
         }
     )
     return runner
@@ -36,7 +49,7 @@ def assert_paths(
     *,
     path_from: str,
     path_to: str,
-    expected: List[List[str]],
+    expected: List[List[str]] | None = None,
 ) -> None:
     args = []
     if path_from:
@@ -46,15 +59,26 @@ def assert_paths(
 
     result = rule_runner.run_goal_rule(PathsGoal, args=[*args])
 
-    assert sorted(json.loads(result.stdout)) == sorted(expected)
+    if expected is not None:
+        assert sorted(json.loads(result.stdout)) == sorted(expected)
+
+
+def test_no_from(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError, match="Must set --from"):
+        assert_paths(rule_runner, path_from="", path_to="base:base")
+
+
+def test_no_to(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError, match="Must set --to"):
+        assert_paths(rule_runner, path_from="intermediate:intermediate", path_to="")
 
 
 @pytest.mark.parametrize(
-    "path_from,path_to", [["", ""], ["intermediate:intermediate", ""], ["", "base:base"]]
+    "path_from,path_to",
+    [["intermediate:intermediate", "island:island"], ["island:island", "base:base"]],
 )
-def test_no_targets(rule_runner: RuleRunner, path_from: str, path_to: str) -> None:
-    with pytest.raises(ExecutionError):
-        assert_paths(rule_runner, path_from=path_from, path_to=path_to, expected=[])
+def test_no_paths(rule_runner: RuleRunner, path_from: str, path_to: str) -> None:
+    assert_paths(rule_runner, path_from=path_from, path_to=path_to, expected=[])
 
 
 def test_normal(rule_runner: RuleRunner) -> None:
@@ -62,6 +86,15 @@ def test_normal(rule_runner: RuleRunner) -> None:
         rule_runner,
         path_from="intermediate:intermediate",
         path_to="base:base",
+        expected=[["intermediate:intermediate", "base:base"]],
+    )
+
+
+def test_normal_with_filesystem_specs(rule_runner: RuleRunner) -> None:
+    assert_paths(
+        rule_runner,
+        path_from="intermediate/intermediate.txt",
+        path_to="base/base.txt",
         expected=[["intermediate:intermediate", "base:base"]],
     )
 

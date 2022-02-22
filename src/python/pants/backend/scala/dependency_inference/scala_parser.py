@@ -24,7 +24,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
@@ -186,7 +186,7 @@ class ScalaSourceDependencyAnalysis:
                 for key, values in self.imports_by_scope.items()
             },
             "consumed_symbols_by_scope": {
-                k: sorted(list(v)) for k, v in self.consumed_symbols_by_scope.items()
+                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
             },
             "scopes": list(self.scopes),
         }
@@ -203,6 +203,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_scala_source_dependencies(
+    jdk: InternalJdk,
     processor_classfiles: ScalaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleScalaSourceDependencyAnalysisResult:
@@ -237,6 +238,7 @@ async def analyze_scala_source_dependencies(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
+            jdk=jdk,
             classpath_entries=[
                 *tool_classpath.classpath_entries(toolcp_relpath),
                 processorcp_relpath,
@@ -282,7 +284,7 @@ async def resolve_fallible_result_to_analysis(
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def setup_scala_parser_classfiles() -> ScalaParserCompiledClassfiles:
+async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
     parser_source_content = pkgutil.get_data(
@@ -342,6 +344,7 @@ async def setup_scala_parser_classfiles() -> ScalaParserCompiledClassfiles:
     process_result = await Get(
         ProcessResult,
         JvmProcess(
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(),
             argv=[
                 "scala.tools.nsc.Main",

@@ -3,7 +3,7 @@
 from typing import cast
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 
 
 class GoogleJavaFormatSubsystem(JvmToolBase):
@@ -26,10 +26,7 @@ class GoogleJavaFormatSubsystem(JvmToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=(
-                f"Don't use Google Java Format when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`"
-            ),
+            help=f"Don't use Google Java Format when running `{bin_name()} fmt` and `{bin_name()} lint`",
         )
         register(
             "--aosp",

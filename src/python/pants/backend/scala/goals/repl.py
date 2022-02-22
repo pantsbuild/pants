@@ -9,9 +9,10 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -23,33 +24,39 @@ class ScalaRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_scala_repl_request(
-    request: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
+    request: ScalaRepl, bash: BashBinary, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    user_classpath, tool_classpath = await MultiGet(
-        Get(Classpath, Addresses, request.addresses),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__toolcp",
-                artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=scala_subsystem.version,
-                        ),
-                    ]
-                ),
+    user_classpath = await Get(Classpath, Addresses, request.addresses)
+
+    roots = await Get(CoarsenedTargets, Addresses, request.addresses)
+    environs = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target)) for target in roots
+    )
+    jdk = max(environs, key=lambda j: j.jre_major_version)
+
+    scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            prefix="__toolcp",
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-compiler",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-reflect",
+                        version=scala_version,
+                    ),
+                ]
             ),
         ),
     )
@@ -61,28 +68,31 @@ async def create_scala_repl_request(
 
     # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
     # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
-    jdk_setup_digests = await MultiGet(
+    jdk_digests = await MultiGet(
         Get(Digest, AddPrefix(digest, relpath))
-        for relpath, digest in jdk_setup.immutable_input_digests.items()
+        for relpath, digest in jdk.immutable_input_digests.items()
     )
 
     repl_digest = await Get(
         Digest,
-        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_setup_digests]),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_digests]),
     )
 
     return ReplRequest(
         digest=repl_digest,
         args=[
-            *jdk_setup.args(bash, tool_classpath.classpath_entries()),
+            *jdk.args(bash, tool_classpath.classpath_entries()),
             "-Dscala.usejavacp=true",
             "scala.tools.nsc.MainGenericRunner",
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
-        extra_env=jdk_setup.env,
+        extra_env={
+            **jdk.env,
+            "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
+        },
         run_in_workspace=False,
-        append_only_caches=jdk_setup.append_only_caches,
+        append_only_caches=jdk.append_only_caches,
     )
 
 

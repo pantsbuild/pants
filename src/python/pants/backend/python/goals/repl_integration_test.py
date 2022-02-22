@@ -11,7 +11,12 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
 from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonSourcesGeneratorTarget, PythonSourceTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
+from pants.backend.python.target_types_rules import rules as target_types_rules
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.backend.python.util_rules.pex import PexProcess
 from pants.backend.python.util_rules.pex_from_targets import NoCompatibleResolveException
@@ -37,9 +42,15 @@ def rule_runner() -> RuleRunner:
             *python_repl.rules(),
             *pex_from_targets.rules(),
             *local_dists.rules(),
+            *target_types_rules(),
             QueryRule(Process, (PexProcess,)),
         ],
-        target_types=[PythonSourcesGeneratorTarget, ProtobufSourceTarget, PythonSourceTarget],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            ProtobufSourceTarget,
+            PythonSourceTarget,
+            PythonRequirementTarget,
+        ],
     )
     rule_runner.write_files(
         {
@@ -97,7 +108,7 @@ def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> 
         {
             "BUILD": dedent(
                 """\
-                python_source(name='t1', source='f.py', resolve='a')
+                python_requirement(name='t1', requirements=[], resolve='a')
                 python_source(name='t2', source='f.py', resolve='b')
                 """
             )
@@ -105,5 +116,7 @@ def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> 
     )
     with engine_error(NoCompatibleResolveException, contains="./pants peek"):
         run_repl(
-            rule_runner, ["//:t1", "//:t2"], global_args=["--python-resolves={'a': '', 'b': ''}"]
+            rule_runner,
+            ["//:t1", "//:t2"],
+            global_args=["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
         )

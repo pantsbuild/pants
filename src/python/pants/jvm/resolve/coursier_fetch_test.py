@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Sequence
 
 import pytest
 
@@ -55,7 +54,7 @@ def assert_resolve(
     rule_runner: RuleRunner,
     root_one_resolve: str,
     root_two_resolve: str,
-    leaf_resolves: Sequence[str],
+    leaf_resolve: str,
 ) -> None:
     rule_runner.write_files(
         {
@@ -68,7 +67,7 @@ def assert_resolve(
                   group='ex',
                   artifact='ex',
                   version='0.0.0',
-                  compatible_resolves={repr(list(leaf_resolves))},
+                  resolve='{leaf_resolve}',
                 )
                 """
             ),
@@ -94,24 +93,19 @@ def assert_resolve(
 
 @maybe_skip_jdk_test
 def test_all_matching(rule_runner: RuleRunner) -> None:
-    assert_resolve("one", rule_runner, "one", "one", ["one"])
-
-
-@maybe_skip_jdk_test
-def test_leaf_partial_matching(rule_runner: RuleRunner) -> None:
-    assert_resolve("one", rule_runner, "one", "one", ["two", "one"])
+    assert_resolve("one", rule_runner, "one", "one", "one")
 
 
 @maybe_skip_jdk_test
 def test_no_matching_for_root(rule_runner: RuleRunner) -> None:
     with engine_error(NoCompatibleResolve):
-        assert_resolve("n/a", rule_runner, "one", "two", ["two", "one"])
+        assert_resolve("n/a", rule_runner, "one", "two", "two")
 
 
 @maybe_skip_jdk_test
 def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
     with engine_error(NoCompatibleResolve):
-        assert_resolve("n/a", rule_runner, "one", "one", ["two"])
+        assert_resolve("n/a", rule_runner, "one", "one", "two")
 
 
 @pytest.mark.parametrize(

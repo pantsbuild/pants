@@ -3,6 +3,7 @@
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, repl, tailor
+from pants.backend.scala.resolve.lockfile import rules as scala_lockfile_rules
 from pants.backend.scala.target_types import (
     ScalacPluginTarget,
     ScalaJunitTestsGeneratorTarget,
@@ -57,4 +58,5 @@ def rules():
         *jvm_tool.rules(),
         *resources.rules(),
         *run_deploy_jar.rules(),
+        *scala_lockfile_rules(),
     ]
