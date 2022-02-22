@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage
+from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import UnzipBinary
 from pants.core.util_rules.source_files import SourceFiles
@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 class LocalDistWheels:
     """Contains the wheels isolated from a single local Python distribution."""
 
-    wheel_paths: list[str]
+    wheel_paths: tuple[str, ...]
     wheels_digest: Digest
-    provided_files: set[str]
+    provided_files: frozenset[str]
 
 
 @rule
@@ -46,7 +46,7 @@ async def isolate_local_dist_wheels(
     bash: BashBinary,
     unzip_binary: UnzipBinary,
 ) -> LocalDistWheels:
-    dist = await Get(BuiltPackage, PythonDistributionFieldSet, dist_field_set)
+    dist = await Get(BuiltPackage, PackageFieldSet, dist_field_set)
     wheels_snapshot = await Get(Snapshot, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
 
     # A given local dist might build a wheel and an sdist (and maybe other artifacts -
@@ -85,7 +85,7 @@ async def isolate_local_dist_wheels(
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
-    return LocalDistWheels(wheels, wheels_snapshot.digest, provided_files)
+    return LocalDistWheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
 
 
 @frozen_after_init
@@ -156,8 +156,8 @@ async def build_local_dists(
     # reason about possible sys.path collisions between the in-repo sources and whatever the
     # sdist will place on the sys.path when it's installed.
     # So for now we simply ignore sdists, with a warning if necessary.
-    provided_files = set()
-    wheels = []
+    provided_files: set[str] = set()
+    wheels: list[str] = []
     wheels_digests = []
     for local_dist_wheels in local_dists_wheels:
         wheels.extend(local_dist_wheels.wheel_paths)
