@@ -94,13 +94,13 @@ def test_basic_bsp_protocol() -> None:
             bsp_version="0.0.0",
             root_uri="https://example.com",
             capabilities=BuildClientCapabilities(language_ids=()),
-            data=None,
+            data={"test": "foo"},
         )
         response_fut = endpoint.request("build/initialize", init_request.to_json_dict())
         raw_response = response_fut.result(timeout=15)
         response = InitializeBuildResult.from_json_dict(raw_response)
         assert response.display_name == "Pants"
-        assert response.bsp_version == "0.0.1"
+        assert response.bsp_version == "2.0.0"
 
         build_targets_request = WorkspaceBuildTargetsParams()
         response_fut = endpoint.request(

@@ -17,6 +17,8 @@ from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.version import VERSION
 
+BSP_VERSION = "2.0.0"
+
 
 @union
 class BSPBuildTargetsRequest:
@@ -34,7 +36,7 @@ async def bsp_build_initialize(_request: InitializeBuildParams) -> InitializeBui
     return InitializeBuildResult(
         display_name="Pants",
         version=VERSION,
-        bsp_version="0.0.1",  # TODO: replace with an actual BSP version
+        bsp_version=BSP_VERSION,  # TODO: replace with an actual BSP version
         capabilities=BuildServerCapabilities(
             compile_provider=None,
             test_provider=None,
