@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pants.backend.scala.bsp.rules import rules as bsp_rules
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, repl, tailor
@@ -22,7 +23,6 @@ from pants.jvm.package import deploy_jar
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.test import junit
-from pants.backend.scala.bsp.rules import rules as bsp_rules
 
 
 def target_types():
