@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pants.bsp.utils import freeze_json
+
 # -----------------------------------------------------------------------------------------------
 # Base types
 # -----------------------------------------------------------------------------------------------
@@ -277,7 +279,7 @@ class InitializeBuildParams:
             bsp_version=d["bspVersion"],
             root_uri=d["rootUri"],
             capabilities=BuildClientCapabilities.from_json_dict(d["capabilities"]),
-            data=d.get("data"),
+            data=freeze_json(d.get("data")),
         )
 
     def to_json_dict(self):
