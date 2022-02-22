@@ -15,9 +15,12 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 )
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
+from pants.backend.scala.bsp.spec import ScalacOptionsParams, ScalacOptionsResult
 from pants.bsp.spec import (
     InitializeBuildParams,
     InitializeBuildResult,
+    SourcesParams,
+    SourcesResult,
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
@@ -39,6 +42,12 @@ BSP_HANDLER_MAPPING = {
     ),
     "workspace/buildTargets": _HandlerMapping(
         WorkspaceBuildTargetsParams.from_json_dict, WorkspaceBuildTargetsResult
+    ),
+    "buildTarget/sources": _HandlerMapping(SourcesParams.from_json_dict, SourcesResult),
+    # scala-specific methods
+    # TODO: Discover these via a union so they only load when Scala backend is loaded.
+    "buildTarget/scalacOptions": _HandlerMapping(
+        ScalacOptionsParams.from_json_dict, ScalacOptionsResult
     ),
 }
 
