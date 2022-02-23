@@ -15,6 +15,7 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
 from pants.bsp.context import BSPContext
+from pants.bsp.spec import BSPNotification
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.unions import UnionMembership, union
 
@@ -139,7 +140,7 @@ class BSPConnection:
             # Initialize the BSPContext with the client-supplied init parameters. See earlier comment on why this
             # call to `BSPContext.initialize_connection` is safe.
             if method_name == self._INITIALIZE_METHOD_NAME:
-                self._context.initialize_connection(request)
+                self._context.initialize_connection(request, self.notify_client)
             return returns[0][1].value.to_json_dict()
         elif len(returns) == 0 and len(throws) == 1:
             raise throws[0][1].exc
@@ -156,3 +157,9 @@ class BSPConnection:
             return self._handle_inbound_message(method_name=method_name, params=params)
 
         return handler
+
+    def notify_client(self, notification: BSPNotification) -> None:
+        try:
+            self._endpoint.notify(notification.notification_name, notification.to_json_dict())
+        except Exception as ex:
+            _logger.warning(f"Received exception while notifying BSP client: {ex}")

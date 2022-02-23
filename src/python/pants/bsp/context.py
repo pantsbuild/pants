@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import threading
+from pathlib import Path
+from typing import Callable
 
-from pants.bsp.spec import InitializeBuildParams
-
+from pants.bsp.spec import BSPNotification, InitializeBuildParams
 
 # Wrapper type to provide BSP rules with the ability to interact with the BSP protocol driver.
 #
@@ -19,17 +20,22 @@ from pants.bsp.spec import InitializeBuildParams
 #
 # Thus, while this class can mutate due to initialization, it is immutable after it has been initialized and
 # is thus compatible with use in the engine.
+from pants.util.dirutil import safe_mkdtemp
+
+
 class BSPContext:
     """Wrapper type to provide BSP rules with the ability to interact with the BSP protocol
     driver."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the context with an empty client params.
 
         This is the "connection uninitialized" state.
         """
-        self._client_params: InitializeBuildParams | None = None
         self._lock = threading.Lock()
+        self._client_params: InitializeBuildParams | None = None
+        self._notify_client: Callable[[BSPNotification], None] | None = None
+        self.tempdir: Path = Path(safe_mkdtemp(prefix="bsp"))
 
     @property
     def is_connection_initialized(self):
@@ -41,17 +47,26 @@ class BSPContext:
         with self._lock:
             if self._client_params is None:
                 raise AssertionError(
-                    "Attempt to access BSP client parameters on an uninitialized connection."
+                    "Attempt to access BSP context on an uninitialized connection."
                 )
             return self._client_params
 
-    def initialize_connection(self, client_params: InitializeBuildParams) -> None:
+    def initialize_connection(
+        self, client_params: InitializeBuildParams, notify_client: Callable[[BSPNotification], None]
+    ) -> None:
         with self._lock:
             if self._client_params is not None:
                 raise AssertionError(
                     "Attempted to set new BSP client parameters on an already-initialized connection."
                 )
             self._client_params = client_params
+            self._notify_client = notify_client
+
+    def notify_client(self, notification: BSPNotification) -> None:
+        if not self.is_connection_initialized:
+            return
+        assert self._notify_client is not None
+        self._notify_client(notification)
 
     def __hash__(self):
         return hash(self._client_params)

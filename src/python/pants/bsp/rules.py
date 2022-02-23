@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 from pants.base.build_root import BuildRoot
@@ -11,16 +12,29 @@ from pants.bsp.spec import (
     BuildServerCapabilities,
     BuildTarget,
     BuildTargetIdentifier,
+    CompileParams,
+    CompileProvider,
+    CompileReport,
+    CompileResult,
+    CompileTask,
+    DebugProvider,
     InitializeBuildParams,
     InitializeBuildResult,
+    RunProvider,
     SourceItem,
     SourceItemKind,
     SourcesItem,
     SourcesParams,
     SourcesResult,
+    StatusCode,
+    TaskFinishParams,
+    TaskId,
+    TaskStartParams,
+    TestProvider,
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
+from pants.bsp.types import BSPLanguageSupport
 from pants.build_graph.address import AddressInput
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.session import SessionValues
@@ -62,16 +76,35 @@ class InitializeBuildHandlerMapping(BSPHandlerMapping):
 
 
 @rule
-async def bsp_build_initialize(_request: InitializeBuildParams) -> InitializeBuildResult:
+async def bsp_build_initialize(
+    _request: InitializeBuildParams, union_membership: UnionMembership
+) -> InitializeBuildResult:
+    compile_provider_language_ids = []
+    test_provider_language_ids = []
+    run_provider_language_ids = []
+    debug_provider_language_ids = []
+    language_support_impls = union_membership.get(BSPLanguageSupport)
+    for lang in language_support_impls:
+        if lang.can_compile:
+            compile_provider_language_ids.append(lang.language_id)
+        if lang.can_test:
+            test_provider_language_ids.append(lang.language_id)
+        if lang.can_run:
+            run_provider_language_ids.append(lang.language_id)
+        if lang.can_debug:
+            debug_provider_language_ids.append(lang.language_id)
+
     return InitializeBuildResult(
         display_name="Pants",
         version=VERSION,
         bsp_version=BSP_VERSION,  # TODO: replace with an actual BSP version
         capabilities=BuildServerCapabilities(
-            compile_provider=None,
-            test_provider=None,
-            run_provider=None,
-            debug_provider=None,
+            compile_provider=CompileProvider(
+                language_ids=tuple(sorted(compile_provider_language_ids))
+            ),
+            test_provider=TestProvider(language_ids=tuple(sorted(test_provider_language_ids))),
+            run_provider=RunProvider(language_ids=tuple(sorted(run_provider_language_ids))),
+            debug_provider=DebugProvider(language_ids=tuple(sorted(debug_provider_language_ids))),
             inverse_sources_provider=None,
             dependency_sources_provider=None,
             dependency_modules_provider=None,
@@ -178,10 +211,52 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
     return SourcesResult(items=tuple(si.sources_item for si in sources_items))
 
 
+# -----------------------------------------------------------------------------------------------
+# Compile Request
+# See https://build-server-protocol.github.io/docs/specification.html#compile-request
+# -----------------------------------------------------------------------------------------------
+
+
+class CompileRequestHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/compile"
+    request_type = CompileParams
+    response_type = CompileResult
+
+
+@rule
+async def bsp_compile_request(request: CompileParams, bsp_context: BSPContext) -> CompileResult:
+    origin_id = request.origin_id or "compile-task"
+    for i, target in enumerate(request.targets):
+        task_id = TaskId(id=f"{origin_id}-{i}")
+        bsp_context.notify_client(
+            TaskStartParams(
+                task_id=task_id,
+                event_time=int(time.time() * 1000),
+                data=CompileTask(target=target),
+            )
+        )
+
+    for i, target in enumerate(request.targets):
+        task_id = TaskId(id=f"{origin_id}-{i}")
+        bsp_context.notify_client(
+            TaskFinishParams(
+                task_id=task_id,
+                status=StatusCode.ERROR,
+                data=CompileReport(target=target, origin_id=origin_id),
+            )
+        )
+
+    return CompileResult(
+        origin_id=request.origin_id,
+        status_code=1,
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(BSPHandlerMapping, InitializeBuildHandlerMapping),
         UnionRule(BSPHandlerMapping, WorkspaceBuildTargetsHandlerMapping),
         UnionRule(BSPHandlerMapping, BuildTargetSourcesHandlerMapping),
+        UnionRule(BSPHandlerMapping, CompileRequestHandlerMapping),
     )
