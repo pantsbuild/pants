@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.base.build_root import BuildRoot
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec import (
     BuildServerCapabilities,
     BuildTarget,
@@ -21,11 +22,12 @@ from pants.bsp.spec import (
 )
 from pants.build_graph.address import AddressInput
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.version import VERSION
 
+# Version of BSP supported by Pants.
 BSP_VERSION = "2.0.0"
 
 
@@ -38,6 +40,18 @@ class BSPBuildTargetsRequest:
 @dataclass(frozen=True)
 class BSPBuildTargets:
     targets: tuple[BuildTarget, ...]
+
+
+# -----------------------------------------------------------------------------------------------
+# Initialize Build Request
+# See https://build-server-protocol.github.io/docs/specification.html#initialize-build-request
+# -----------------------------------------------------------------------------------------------
+
+
+class InitializeBuildHandlerMapping(BSPHandlerMapping):
+    method_name = "build/initialize"
+    request_type = InitializeBuildParams
+    response_type = InitializeBuildResult
 
 
 @rule
@@ -68,6 +82,12 @@ async def bsp_build_initialize(_request: InitializeBuildParams) -> InitializeBui
 # -----------------------------------------------------------------------------------------------
 
 
+class WorkspaceBuildTargetsHandlerMapping(BSPHandlerMapping):
+    method_name = "workspace/buildTargets"
+    request_type = WorkspaceBuildTargetsParams
+    response_type = WorkspaceBuildTargetsResult
+
+
 @rule
 async def bsp_workspace_build_targets(
     _: WorkspaceBuildTargetsParams, union_membership: UnionMembership
@@ -90,6 +110,12 @@ async def bsp_workspace_build_targets(
 # Build Target Sources Request
 # See https://build-server-protocol.github.io/docs/specification.html#build-target-sources-request
 # -----------------------------------------------------------------------------------------------
+
+
+class BuildTargetSourcesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/sources"
+    request_type = SourcesParams
+    response_type = SourcesResult
 
 
 @dataclass(frozen=True)
@@ -148,7 +174,7 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
 def rules():
     return (
         *collect_rules(),
-        QueryRule(InitializeBuildResult, (InitializeBuildParams,)),
-        QueryRule(WorkspaceBuildTargetsResult, (WorkspaceBuildTargetsParams,)),
-        QueryRule(SourcesResult, (SourcesParams,)),
+        UnionRule(BSPHandlerMapping, InitializeBuildHandlerMapping),
+        UnionRule(BSPHandlerMapping, WorkspaceBuildTargetsHandlerMapping),
+        UnionRule(BSPHandlerMapping, BuildTargetSourcesHandlerMapping),
     )

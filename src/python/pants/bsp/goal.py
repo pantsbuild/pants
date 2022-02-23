@@ -36,6 +36,7 @@ class BSPGoal(BuiltinGoal):
             sys.stdin = os.fdopen(sys.stdin.fileno(), "rb", buffering=0)  # type: ignore[assignment]
             conn = BSPConnection(
                 graph_session.scheduler_session,
+                union_membership,
                 sys.stdin,  # type: ignore[arg-type]
                 sys.stdout,  # type: ignore[arg-type]
             )
