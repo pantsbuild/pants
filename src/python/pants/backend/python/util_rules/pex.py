@@ -847,7 +847,6 @@ class PexProcess:
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-        extra_append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
         self.pex = pex
         self.argv = tuple(argv)

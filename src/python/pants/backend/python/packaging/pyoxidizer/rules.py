@@ -58,6 +58,8 @@ class PyoxidizerRunnerScript:
     digest: Digest
     path: str
 
+    CACHE_PATH = os.path.join(".cache", "pyoxidizer")
+
 
 @rule
 async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
@@ -67,8 +69,8 @@ async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
     script = FileContent(
         "__run_pyoxidizer.sh",
         dedent(
-            """\
-            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/.cache/pyoxidizer"
+            f"""\
+            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/{PyoxidizerRunnerScript.CACHE_PATH}"
             exec "$@"
             """
         ).encode("utf-8"),
@@ -164,7 +166,7 @@ async def package_pyoxidizer_binary(
         argv=(bash.path, runner_script.path, *pex_process.argv),
         append_only_caches={
             **pex_process.append_only_caches,
-            "pyoxidizer": os.path.join(".cache", "pyoxidizer"),
+            "pyoxidizer": runner_script.CACHE_PATH,
         },
     )
 
