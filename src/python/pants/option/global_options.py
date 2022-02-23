@@ -13,7 +13,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Type, cast
 
 from pants.base.build_environment import (
@@ -36,7 +36,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classmethod
+from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
 from pants.version import VERSION
@@ -1609,6 +1609,10 @@ class GlobalOptions(Subsystem):
     def get_options_flags(cls) -> GlobalOptionsFlags:
         return GlobalOptionsFlags.create(cast("Type[GlobalOptions]", cls))
 
+    @memoized_property
+    def named_caches_dir(self) -> PurePath:
+        return Path(self.options.named_caches_dir).resolve()
+
 
 @dataclass(frozen=True)
 class GlobalOptionsFlags:
@@ -1640,3 +1644,13 @@ class ProcessCleanupOption:
     """
 
     val: bool
+
+
+@dataclass(frozen=True)
+class NamedCachesDirOption:
+    """A wrapper around the global option `named_caches_dir`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: PurePath
