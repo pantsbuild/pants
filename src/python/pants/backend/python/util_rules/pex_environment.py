@@ -208,9 +208,11 @@ class CompletePexEnvironment:
         d = dict(
             PATH=create_path_env_var(self._pex_environment.path),
             PEX_IGNORE_RCFILES="true",
-            PEX_ROOT=os.path.relpath(self.pex_root, self._working_directory)
-            if self._working_directory
-            else str(self.pex_root),
+            PEX_ROOT=(
+                os.path.relpath(self.pex_root, self._working_directory)
+                if self._working_directory
+                else str(self.pex_root)
+            ),
             **self._pex_environment.subprocess_environment_dict,
         )
         # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been

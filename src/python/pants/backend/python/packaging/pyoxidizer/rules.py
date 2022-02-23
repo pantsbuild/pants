@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from dataclasses import dataclass
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
@@ -106,6 +107,12 @@ async def package_pyoxidizer_binary(
         CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))]),
     )
 
+    # Note that unlike PexEnvironment, we don't need to worry about `in_sandbox` vs
+    # `in_workspace`. We can simply use this relative path, which will be relative to the sandbox.
+    # This is because we never plan to run PyOxidizer inside the workspace; at most, we will run
+    # the result of PyOxidizer in the workspace (`run` goal).
+    cache_dir = os.path.join(".cache", "pyoxidizer")
+
     input_digest = await Get(
         Digest,
         MergeDigests((config_digest, *(built_package.digest for built_package in built_packages))),
@@ -119,6 +126,8 @@ async def package_pyoxidizer_binary(
             input_digest=input_digest,
             level=LogLevel.INFO,
             output_directories=["build"],
+            extra_env={"PYOXIDIZER_CACHE_DIR": cache_dir},
+            extra_append_only_caches={"pyoxidizer": cache_dir},
         ),
     )
 
