@@ -12,12 +12,13 @@ from pants.backend.scala.bsp.spec import (
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.base.build_root import BuildRoot
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.rules import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, Target, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
@@ -82,6 +83,12 @@ async def bsp_resolve_all_scala_build_targets(
 # -----------------------------------------------------------------------------------------------
 
 
+class ScalacOptionsHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/scalacOptions"
+    request_type = ScalacOptionsParams
+    response_type = ScalacOptionsResult
+
+
 @dataclass(frozen=True)
 class HandleScalacOptionsRequest:
     bsp_target_id: BuildTargetIdentifier
@@ -123,5 +130,5 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(BSPBuildTargetsRequest, ScalaBSPBuildTargetsRequest),
-        QueryRule(ScalacOptionsResult, (ScalacOptionsParams,)),
+        UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
     )

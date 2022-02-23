@@ -62,7 +62,12 @@ def test_basic_bsp_protocol() -> None:
         # TODO: This code should be moved to a context manager. For now, only the pipes are managed
         # with a context manager.
         rule_runner = RuleRunner(rules=bsp_rules())
-        conn = BSPConnection(rule_runner.scheduler, pipes.inbound_reader, pipes.outbound_writer)
+        conn = BSPConnection(
+            rule_runner.scheduler,
+            rule_runner.union_membership,
+            pipes.inbound_reader,
+            pipes.outbound_writer,
+        )
 
         def run_bsp_server():
             conn.run()

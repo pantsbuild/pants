@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
@@ -265,7 +266,16 @@ class EngineInitializer:
                 *rules,
             )
         )
+
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+
+        union_membership = UnionMembership.from_rules(
+            (
+                *build_configuration.union_rules,
+                *(r for r in rules if isinstance(r, UnionRule)),
+            )
+        )
+
         rules = FrozenOrderedSet(
             (
                 *rules,
@@ -274,13 +284,14 @@ class EngineInitializer:
                     QueryRule(goal_type, GraphSession.goal_param_types)
                     for goal_type in goal_map.values()
                 ),
+                # Install queries for each request/response pair used by the BSP support.
+                # Note: These are necessary because the BSP support is a built-in goal and that makes
+                # synchronous requests into the engine.
+                *(
+                    QueryRule(impl.response_type, (impl.request_type,))
+                    for impl in union_membership.get(BSPHandlerMapping)
+                ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
-            )
-        )
-        union_membership = UnionMembership.from_rules(
-            (
-                *build_configuration.union_rules,
-                *(r for r in rules if isinstance(r, UnionRule)),
             )
         )
 

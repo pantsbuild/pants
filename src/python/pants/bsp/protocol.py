@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future
-from dataclasses import dataclass
-from typing import Any, BinaryIO, Callable, Type
+from typing import Any, BinaryIO, ClassVar
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
@@ -15,41 +14,47 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 )
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
-from pants.backend.scala.bsp.spec import ScalacOptionsParams, ScalacOptionsResult
-from pants.bsp.spec import (
-    InitializeBuildParams,
-    InitializeBuildResult,
-    SourcesParams,
-    SourcesResult,
-    WorkspaceBuildTargetsParams,
-    WorkspaceBuildTargetsResult,
-)
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.unions import UnionMembership, union
+
+try:
+    from typing import Protocol  # Python 3.8+
+except ImportError:
+    # See https://github.com/python/mypy/issues/4427 re the ignore
+    from typing_extensions import Protocol  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class _HandlerMapping:
-    request_decoder: Callable[[dict], Any] | None
-    response_type: Type
+class BSPRequestTypeProtocol(Protocol):
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        ...
+
+
+class BSPResponseTypeProtocol(Protocol):
+    def to_json_dict(self) -> dict[str, Any]:
+        ...
+
+
+@union
+class BSPHandlerMapping:
+    """Union type for rules to register handlers for BSP methods."""
+
+    # Name of the JSON-RPC method to be handled.
+    method_name: ClassVar[str]
+
+    # Type requested from the engine. This will be provided as the "subject" of an engine query.
+    # Must implement class method `from_json_dict`.
+    request_type: type[BSPRequestTypeProtocol]
+
+    # Type produced by the handler rule. This will be requested as the "product" of the engine query.
+    # Must implement instance method `to_json_dict`.
+    response_type: type[BSPResponseTypeProtocol]
+
+    # True if this handler is for a notification.
+    # TODO: Consider how to pass notifications (which do not have responses) to the engine rules.
     is_notification: bool = False
-
-
-BSP_HANDLER_MAPPING = {
-    "build/initialize": _HandlerMapping(
-        InitializeBuildParams.from_json_dict, InitializeBuildResult
-    ),
-    "workspace/buildTargets": _HandlerMapping(
-        WorkspaceBuildTargetsParams.from_json_dict, WorkspaceBuildTargetsResult
-    ),
-    "buildTarget/sources": _HandlerMapping(SourcesParams.from_json_dict, SourcesResult),
-    # scala-specific methods
-    # TODO: Discover these via a union so they only load when Scala backend is loaded.
-    "buildTarget/scalacOptions": _HandlerMapping(
-        ScalacOptionsParams.from_json_dict, ScalacOptionsResult
-    ),
-}
 
 
 def _make_error_future(exc: Exception) -> Future:
@@ -64,6 +69,7 @@ class BSPConnection:
     def __init__(
         self,
         scheduler_session: SchedulerSession,
+        union_membership: UnionMembership,
         inbound: BinaryIO,
         outbound: BinaryIO,
         max_workers: int = 5,
@@ -73,6 +79,11 @@ class BSPConnection:
         self._outbound = JsonRpcStreamWriter(outbound)
         self._initialized = False
         self._endpoint = Endpoint(self, self._send_outbound_message, max_workers=max_workers)
+
+        self._handler_mappings: dict[str, type[BSPHandlerMapping]] = {}
+        impls = union_membership.get(BSPHandlerMapping)
+        for impl in impls:
+            self._handler_mappings[impl.method_name] = impl
 
     def run(self) -> None:
         """Run the listener for inbound JSON-RPC messages."""
@@ -97,14 +108,12 @@ class BSPConnection:
                 )
             )
 
-        method_mapping = BSP_HANDLER_MAPPING.get(method_name)
+        method_mapping = self._handler_mappings.get(method_name)
         if not method_mapping:
             return _make_error_future(JsonRpcMethodNotFound.of(method_name))
 
-        request: Any | None = None
         try:
-            if method_mapping.request_decoder is not None:
-                request = method_mapping.request_decoder(params)
+            request = method_mapping.request_type.from_json_dict(params)
         except Exception:
             return _make_error_future(JsonRpcInvalidRequest())
 
