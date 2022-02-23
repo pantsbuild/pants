@@ -12,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
-from pants.bsp.protocol import BSPHandlerMapping
+from pants.bsp.protocol import BSPHandlerMapping, BSPContext
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
@@ -285,10 +285,10 @@ class EngineInitializer:
                     for goal_type in goal_map.values()
                 ),
                 # Install queries for each request/response pair used by the BSP support.
-                # Note: These are necessary because the BSP support is a built-in goal and that makes
+                # Note: These are necessary because the BSP support is a built-in goal that makes
                 # synchronous requests into the engine.
                 *(
-                    QueryRule(impl.response_type, (impl.request_type,))
+                    QueryRule(impl.response_type, (impl.request_type, BSPContext))
                     for impl in union_membership.get(BSPHandlerMapping)
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.

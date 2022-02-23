@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import logging
 from concurrent.futures import Future
-from typing import Any, BinaryIO, ClassVar
+from dataclasses import dataclass
+from typing import Any, BinaryIO, ClassVar, cast
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
@@ -14,6 +16,7 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 )
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
+from pants.bsp.spec import InitializeBuildParams
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.unions import UnionMembership, union
 
@@ -57,6 +60,12 @@ class BSPHandlerMapping:
     is_notification: bool = False
 
 
+@dataclass(frozen=True)
+class BSPContext:
+    """Wrapper type to provide rules with the ability to interact with the BSP protocol driver."""
+    client_params: InitializeBuildParams | None
+
+
 def _make_error_future(exc: Exception) -> Future:
     fut: Future = Future()
     fut.set_exception(exc)
@@ -78,6 +87,7 @@ class BSPConnection:
         self._inbound = JsonRpcStreamReader(inbound)
         self._outbound = JsonRpcStreamWriter(outbound)
         self._initialized = False
+        self._client_context: BSPContext = BSPContext(client_params=None)
         self._endpoint = Endpoint(self, self._send_outbound_message, max_workers=max_workers)
 
         self._handler_mappings: dict[str, type[BSPHandlerMapping]] = {}
@@ -118,12 +128,13 @@ class BSPConnection:
             return _make_error_future(JsonRpcInvalidRequest())
 
         execution_request = self._scheduler_session.execution_request(
-            products=[method_mapping.response_type], subjects=[request]
+            products=[method_mapping.response_type], subjects=[request, self._client_context]
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:
             if method_name == self._INITIALIZE_METHOD_NAME:
                 self._initialized = True
+                self._client_context = dataclasses.replace(self._client_context, client_params=cast(request, InitializeBuildParams))
             return returns[0][1].value.to_json_dict()
         elif len(returns) == 0 and len(throws) == 1:
             raise throws[0][1].exc

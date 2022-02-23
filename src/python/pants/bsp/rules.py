@@ -39,7 +39,7 @@ class BSPBuildTargetsRequest:
 
 @dataclass(frozen=True)
 class BSPBuildTargets:
-    targets: tuple[BuildTarget, ...]
+    targets: tuple[BuildTarget, ...] = ()
 
 
 # -----------------------------------------------------------------------------------------------
