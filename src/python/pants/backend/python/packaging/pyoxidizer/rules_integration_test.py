@@ -21,8 +21,6 @@ def test_end_to_end() -> None:
                 name="dist",
                 dependencies=[":lib"],
                 provides=python_artifact(name="dist", version="0.0.1"),
-                wheel=True,
-                sdist=False,
             )
 
             pyoxidizer_binary(

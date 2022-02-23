@@ -64,7 +64,7 @@ async def package_pyoxidizer_binary(
         artifact.relpath
         for built_pkg in built_packages
         for artifact in built_pkg.artifacts
-        if artifact.relpath is not None
+        if artifact.relpath is not None and artifact.relpath.endswith(".whl")
     ]
 
     pyoxidizer_pex = await Get(
