@@ -15,9 +15,10 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.rules import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.build_graph.address import AddressInput
+from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import QueryRule, collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import Dependencies, DependenciesRequest, Target, WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -27,19 +28,30 @@ class ScalaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
     pass
 
 
-def _pants_target_to_bsp_build_target(
-    resolve_field: JvmResolveField, jvm: JvmSubsystem, scala: ScalaSubsystem
+@dataclass(frozen=True)
+class ResolveScalaBSPBuildTargetRequest:
+    target: Target
+
+
+@rule
+async def bsp_resolve_one_scala_build_target(
+    request: ResolveScalaBSPBuildTargetRequest,
+    jvm: JvmSubsystem,
+    scala: ScalaSubsystem,
 ) -> BuildTarget:
-    resolve = resolve_field.normalized_value(jvm)
+    resolve = request.target[JvmResolveField].normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
+
+    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+
     return BuildTarget(
-        id=BuildTargetIdentifier(uri=f"pants:{resolve_field.address}"),
-        display_name=str(resolve_field.address),
+        id=BuildTargetIdentifier.from_address(request.target.address),
+        display_name=str(request.target.address),
         base_directory=None,
         tags=(),
         capabilities=BuildTargetCapabilities(),
         language_ids=("scala",),
-        dependencies=(),
+        dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
         data_kind="scala",
         data=ScalaBuildTarget(
             scala_organization="unknown",
@@ -52,17 +64,16 @@ def _pants_target_to_bsp_build_target(
 
 
 @rule
-async def determine_scala_bsp_build_targets(
+async def bsp_resolve_all_scala_build_targets(
     _: ScalaBSPBuildTargetsRequest,
     all_scala_targets: AllScalaTargets,
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
 ) -> BSPBuildTargets:
-    scala_bsp_build_targets = [
-        _pants_target_to_bsp_build_target(tgt[JvmResolveField], jvm, scala)
-        for tgt in all_scala_targets
-    ]
-    return BSPBuildTargets(targets=tuple(scala_bsp_build_targets))
+    build_targets = await MultiGet(
+        Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
+    )
+    return BSPBuildTargets(targets=tuple(build_targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -86,13 +97,8 @@ async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
 ) -> HandleScalacOptionsResult:
-    uri = request.bsp_target_id.uri
-    if not uri.startswith("pants:"):
-        raise ValueError(f"Unknown URI for Pants BSP: {uri}")
-    raw_addr = uri[len("pants:") :]
-
     # Verify the target exists by loading it. Exception will be thrown if it does not.
-    _ = await Get(WrappedTarget, AddressInput, AddressInput.parse(raw_addr))
+    _ = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(

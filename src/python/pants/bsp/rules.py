@@ -107,16 +107,13 @@ async def materialize_bsp_build_target_sources(
     request: MaterializeBuildTargetSourcesRequest,
     build_root: BuildRoot,
 ) -> MaterializeBuildTargetSourcesResult:
-    uri = request.bsp_target_id.uri
-    if not uri.startswith("pants:"):
-        raise ValueError(f"Unknown URI for Pants BSP: {uri}")
-    raw_addr = uri[len("pants:") :]
-
-    wrapped_target = await Get(WrappedTarget, AddressInput, AddressInput.parse(raw_addr))
+    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
     target = wrapped_target.target
 
     if not target.has_field(SourcesField):
-        raise AssertionError(f"BSP only handles targets with sources: uri={uri}")
+        raise AssertionError(
+            f"BSP only handles targets with sources: uri={request.bsp_target_id.uri}"
+        )
 
     sources_paths = await Get(SourcesPaths, SourcesPathsRequest(target[SourcesField]))
     sources_full_paths = [
