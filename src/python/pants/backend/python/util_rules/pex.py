@@ -830,7 +830,6 @@ class PexProcess:
     execution_slot_variable: str | None
     concurrency_available: int
     cache_scope: ProcessCacheScope
-    extra_append_only_caches: FrozenDict[str, str]
 
     def __init__(
         self,
@@ -863,7 +862,6 @@ class PexProcess:
         self.execution_slot_variable = execution_slot_variable
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
-        self.extra_append_only_caches = FrozenDict(extra_append_only_caches or {})
 
 
 @rule
@@ -889,10 +887,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches={
-            **complete_pex_env.append_only_caches,
-            **request.extra_append_only_caches,
-        },
+        append_only_caches=complete_pex_env.append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

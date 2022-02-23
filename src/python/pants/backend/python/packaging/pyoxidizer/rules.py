@@ -1,9 +1,13 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import dataclasses
 import logging
 import os
 from dataclasses import dataclass
+from textwrap import dedent
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
@@ -23,7 +27,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
+from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -49,9 +53,36 @@ class PyOxidizerFieldSet(PackageFieldSet):
     template: PyOxidizerConfigSourceField
 
 
+@dataclass(frozen=True)
+class PyoxidizerRunnerScript:
+    digest: Digest
+    path: str
+
+
+@rule
+async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
+    # Note: PyOxidizer expects an absolute path for its cache dir, which can only be resolved
+    # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
+    # absolute paths inside the sandbox.
+    script = FileContent(
+        "__run_pyoxidizer.sh",
+        dedent(
+            """\
+            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/.cache/pyoxidizer"
+            exec "$@"
+            """
+        ).encode("utf-8"),
+    )
+    digest = await Get(Digest, CreateDigest([script]))
+    return PyoxidizerRunnerScript(digest, script.path)
+
+
 @rule(level=LogLevel.DEBUG)
 async def package_pyoxidizer_binary(
-    pyoxidizer: PyOxidizer, field_set: PyOxidizerFieldSet
+    pyoxidizer: PyOxidizer,
+    field_set: PyOxidizerFieldSet,
+    runner_script: PyoxidizerRunnerScript,
+    bash: BashBinary,
 ) -> BuiltPackage:
     direct_deps, pyoxidizer_pex = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
@@ -107,18 +138,18 @@ async def package_pyoxidizer_binary(
         CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))]),
     )
 
-    # Note that unlike PexEnvironment, we don't need to worry about `in_sandbox` vs
-    # `in_workspace`. We can simply use this relative path, which will be relative to the sandbox.
-    # This is because we never plan to run PyOxidizer inside the workspace; at most, we will run
-    # the result of PyOxidizer in the workspace (`run` goal).
-    cache_dir = os.path.join(".cache", "pyoxidizer")
-
     input_digest = await Get(
         Digest,
-        MergeDigests((config_digest, *(built_package.digest for built_package in built_packages))),
+        MergeDigests(
+            (
+                config_digest,
+                runner_script.digest,
+                *(built_package.digest for built_package in built_packages),
+            )
+        ),
     )
-    result = await Get(
-        ProcessResult,
+    pex_process = await Get(
+        Process,
         PexProcess(
             pyoxidizer_pex,
             argv=["build", *pyoxidizer.args],
@@ -126,11 +157,18 @@ async def package_pyoxidizer_binary(
             input_digest=input_digest,
             level=LogLevel.INFO,
             output_directories=["build"],
-            extra_env={"PYOXIDIZER_CACHE_DIR": cache_dir},
-            extra_append_only_caches={"pyoxidizer": cache_dir},
         ),
     )
+    process_with_caching = dataclasses.replace(
+        pex_process,
+        argv=(bash.path, runner_script.path, *pex_process.argv),
+        append_only_caches={
+            **pex_process.append_only_caches,
+            "pyoxidizer": os.path.join(".cache", "pyoxidizer"),
+        },
+    )
 
+    result = await Get(ProcessResult, Process, process_with_caching)
     result_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return BuiltPackage(
         result.output_digest,
