@@ -268,7 +268,7 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    image_id = parse_image_id_from_docker_build_output(result.stderr)
+    image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
             f"Docker build output for {tags[0]}:",
@@ -290,18 +290,22 @@ async def build_docker_image(
     )
 
 
-def parse_image_id_from_docker_build_output(output: bytes) -> str:
+def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
     image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
-    image_id_match = next(
-        (
-            re.search(image_id_regexp, line)
-            for line in reversed(output.decode().split("\n"))
-            if "writing image sha256:" in line
-        ),
-        None,
-    )
-    image_id = image_id_match.group(1) if image_id_match else "<unknown>"
-    return image_id
+    for output in outputs:
+        image_id_match = next(
+            (
+                re.search(image_id_regexp, line)
+                for line in reversed(output.decode().split("\n"))
+                if "writing image sha256:" in line
+            ),
+            None,
+        )
+        if image_id_match:
+            image_id = image_id_match.group(1)
+            return image_id
+
+    return "<unknown>"
 
 
 def format_docker_build_context_help_message(
