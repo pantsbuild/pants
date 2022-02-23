@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.base.build_root import BuildRoot
-from pants.bsp.protocol import BSPHandlerMapping
+from pants.bsp.protocol import BSPContext, BSPHandlerMapping
 from pants.bsp.spec import (
     BuildServerCapabilities,
     BuildTarget,
@@ -22,6 +22,7 @@ from pants.bsp.spec import (
 )
 from pants.build_graph.address import AddressInput
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -29,6 +30,11 @@ from pants.version import VERSION
 
 # Version of BSP supported by Pants.
 BSP_VERSION = "2.0.0"
+
+
+@rule
+async def bsp_context(session_values: SessionValues) -> BSPContext:
+    return session_values[BSPContext]
 
 
 @union

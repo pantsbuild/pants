@@ -11,7 +11,7 @@ from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
-from pants.bsp.protocol import BSPConnection
+from pants.bsp.protocol import BSPConnection, BSPContext
 from pants.bsp.rules import rules as bsp_rules
 from pants.bsp.spec import (
     BuildClientCapabilities,
@@ -61,10 +61,12 @@ def test_basic_bsp_protocol() -> None:
     with setup_pipes() as pipes:
         # TODO: This code should be moved to a context manager. For now, only the pipes are managed
         # with a context manager.
-        rule_runner = RuleRunner(rules=bsp_rules())
+        context = BSPContext(None)
+        rule_runner = RuleRunner(rules=bsp_rules(), extra_session_values={BSPContext: context})
         conn = BSPConnection(
             rule_runner.scheduler,
             rule_runner.union_membership,
+            context,
             pipes.inbound_reader,
             pipes.outbound_writer,
         )
