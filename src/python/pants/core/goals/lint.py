@@ -162,9 +162,7 @@ class LintSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(LintTargetsRequest) or union_membership.has_members(
-            LintFilesRequest
-        )
+        return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

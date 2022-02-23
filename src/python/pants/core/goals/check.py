@@ -143,7 +143,7 @@ class CheckSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(CheckRequest)
+        return CheckRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

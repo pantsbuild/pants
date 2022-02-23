@@ -133,7 +133,7 @@ class FmtSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(FmtRequest)
+        return FmtRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

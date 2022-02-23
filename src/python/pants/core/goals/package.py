@@ -80,7 +80,7 @@ class PackageSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(PackageFieldSet)
+        return PackageFieldSet in union_membership
 
 
 class Package(Goal):

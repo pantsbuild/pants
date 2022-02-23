@@ -168,9 +168,7 @@ class PublishSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(PackageFieldSet) and union_membership.has_members(
-            PublishFieldSet
-        )
+        return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

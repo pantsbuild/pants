@@ -246,7 +246,7 @@ class TailorSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(PutativeTargetsRequest)
+        return PutativeTargetsRequest in union_membership
 
     check = BoolOption(
         "--check",

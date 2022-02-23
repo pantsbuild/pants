@@ -39,7 +39,7 @@ class GoalSubsystem(Subsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         """Return `False` if this goal should not show up in `./pants help`.
 
-        Usually this is determined by calling `union_membership.has_members()`.
+        Usually this is determined by checking `MyType in union_membership`.
         """
         return True
 

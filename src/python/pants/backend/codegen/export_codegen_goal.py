@@ -26,7 +26,7 @@ class ExportCodegenSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(GenerateSourcesRequest)
+        return GenerateSourcesRequest in union_membership
 
 
 class ExportCodegen(Goal):

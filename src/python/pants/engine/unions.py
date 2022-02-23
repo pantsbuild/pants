@@ -79,6 +79,9 @@ class UnionMembership:
             {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
         )
 
+    def __contains__(self, union_type: _T) -> bool:
+        return union_type in self.union_rules
+
     def __getitem__(self, union_type: _T) -> FrozenOrderedSet[_T]:
         """Get all members of this union type.
 

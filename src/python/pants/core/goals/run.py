@@ -79,7 +79,7 @@ class RunSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return union_membership.has_members(RunFieldSet)
+        return RunFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:
