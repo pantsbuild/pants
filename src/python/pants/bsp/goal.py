@@ -29,10 +29,6 @@ class BSPGoal(BuiltinGoal):
         specs: Specs,
         union_membership: UnionMembership
     ) -> ExitCode:
-        # scheduler_session = graph_session.scheduler_session.scheduler.new_session(
-        #     build_id="bsp", dynamic_ui=False
-        # )
-
         saved_stdout = sys.stdout
         saved_stdin = sys.stdin
         try:

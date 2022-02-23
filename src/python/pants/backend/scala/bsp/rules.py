@@ -17,7 +17,7 @@ from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIden
 from pants.build_graph.address import AddressInput
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import QueryRule, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -28,13 +28,13 @@ class ScalaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
 
 
 def _pants_target_to_bsp_build_target(
-    target: Target, jvm: JvmSubsystem, scala: ScalaSubsystem
+    resolve_field: JvmResolveField, jvm: JvmSubsystem, scala: ScalaSubsystem
 ) -> BuildTarget:
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = resolve_field.normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
     return BuildTarget(
-        id=BuildTargetIdentifier(uri=f"pants:{target.address}"),
-        display_name=str(target.address),
+        id=BuildTargetIdentifier(uri=f"pants:{resolve_field.address}"),
+        display_name=str(resolve_field.address),
         base_directory=None,
         tags=(),
         capabilities=BuildTargetCapabilities(),
@@ -59,7 +59,8 @@ async def determine_scala_bsp_build_targets(
     scala: ScalaSubsystem,
 ) -> BSPBuildTargets:
     scala_bsp_build_targets = [
-        _pants_target_to_bsp_build_target(tgt, jvm, scala) for tgt in all_scala_targets
+        _pants_target_to_bsp_build_target(tgt[JvmResolveField], jvm, scala)
+        for tgt in all_scala_targets
     ]
     return BSPBuildTargets(targets=tuple(scala_bsp_build_targets))
 

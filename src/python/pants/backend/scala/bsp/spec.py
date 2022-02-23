@@ -13,6 +13,12 @@ class JvmBuildTarget:
     pass
 
 
+# -----------------------------------------------------------------------------------------------
+# Scala-specific Build Target
+# See https://build-server-protocol.github.io/docs/extensions/scala.html#scala-build-target
+# -----------------------------------------------------------------------------------------------
+
+
 class ScalaPlatform:
     JVM = 1
     JS = 2
