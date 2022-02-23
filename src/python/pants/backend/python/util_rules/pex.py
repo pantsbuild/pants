@@ -823,7 +823,7 @@ class PexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -854,7 +854,7 @@ class PexProcess:
         self.level = level
         self.input_digest = input_digest
         self.working_directory = working_directory
-        self.extra_env = FrozenDict(extra_env) if extra_env else None
+        self.extra_env = FrozenDict(extra_env or {})
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
@@ -870,7 +870,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
-        **(request.extra_env or {}),
+        **request.extra_env,
     }
     input_digest = (
         await Get(Digest, MergeDigests((pex.digest, request.input_digest)))
