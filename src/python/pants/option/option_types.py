@@ -6,20 +6,23 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
+
+if TYPE_CHECKING:
+    from pants.option.subsystem import Subsystem
 
 _PropType = TypeVar("_PropType")
 _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
-_HelpT = Union[Callable[[Any], str], str]
+_HelpT = Union[Callable[["type[Subsystem]"], str], str]
 
 
-def _eval_maybe_helpt(help: _HelpT, subsystem_cls: Any) -> str:
-    return help(subsystem_cls) if inspect.isfunction(help) else help  # type: ignore
+def _eval_maybe_helpt(help: _HelpT, subsystem_cls: "type[Subsystem]") -> str:
+    return help(subsystem_cls) if inspect.isfunction(help) else help  # type: ignore[operator,return-value]
 
 
 @dataclass(frozen=True)
