@@ -7,6 +7,7 @@ from enum import IntEnum
 from typing import Any
 
 from pants.bsp.utils import freeze_json
+from pants.build_graph.address import Address, AddressInput
 
 # -----------------------------------------------------------------------------------------------
 # Base types
@@ -33,6 +34,19 @@ class BuildTargetIdentifier:
 
     def to_json_dict(self):
         return {"uri": self.uri}
+
+    @classmethod
+    def from_address(cls, addr: Address) -> BuildTargetIdentifier:
+        return cls(uri=f"pants:{str(addr)}")
+
+    @property
+    def address_input(self) -> AddressInput:
+        if not self.uri.startswith("pants:"):
+            raise ValueError(
+                f"Unknown URI scheme for BSP BuildTargetIdentifier. Expected scheme `pants`, but URI was: {self.uri}"
+            )
+        raw_addr = self.uri[len("pants:") :]
+        return AddressInput.parse(raw_addr)
 
 
 @dataclass(frozen=True)
