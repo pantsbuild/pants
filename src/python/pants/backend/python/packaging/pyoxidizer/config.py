@@ -25,8 +25,6 @@ def make_exe():
         config=python_config,
     )
 
-    # pip_download requires that wheels are available for each dep
-    # exe.add_python_resources(exe.pip_download($WHEELS))
     exe.add_python_resources(exe.pip_install($WHEELS))
     $UNCLASSIFIED_RESOURCE_INSTALLATION
 
