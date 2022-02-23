@@ -20,7 +20,7 @@ from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    PythonRequirementCompatibleResolvesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -44,6 +44,7 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -125,7 +126,7 @@ def maybe_warn_python_repos(
 
     if python_repos.repos:
         warn_python_repos("repos")
-    if python_repos.indexes != [python_repos.pypi_index]:
+    if python_repos.indexes != (python_repos.pypi_index,):
         warn_python_repos("indexes")
     return MaybeWarnPythonRepos()
 
@@ -233,7 +234,7 @@ async def generate_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
             generate_lockfiles_subsystem.custom_command
-            or f"./pants generate-lockfiles --resolve={req.resolve_name}"
+            or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
         ),
     )
     final_lockfile_digest = await Get(
@@ -270,10 +271,10 @@ async def setup_user_lockfile_requests(
 
     resolve_to_requirements_fields = defaultdict(set)
     for tgt in all_targets:
-        if not tgt.has_fields((PythonRequirementCompatibleResolvesField, PythonRequirementsField)):
+        if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
-        for resolve in tgt[PythonRequirementCompatibleResolvesField].normalized_value(python_setup):
-            resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
+        resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(

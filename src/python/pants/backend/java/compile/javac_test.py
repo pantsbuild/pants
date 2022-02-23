@@ -80,6 +80,20 @@ JAVA_LIB_SOURCE = dedent(
     """
 )
 
+
+JAVA_LIB_JDK12_SOURCE = dedent(
+    """
+    package org.pantsbuild.example.lib;
+
+    public class ExampleLib {
+        public static String hello() {
+            return "Hello!".indent(4);
+        }
+    }
+    """
+)
+
+
 JAVA_LIB_MAIN_SOURCE = dedent(
     """
     package org.pantsbuild.example;
@@ -164,6 +178,62 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.12',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    classpath = rule_runner.request(RenderedClasspath, [request])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+    }
+
+
+@maybe_skip_jdk_test
+def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.11',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    with pytest.raises(ExecutionError):
+        rule_runner.request(RenderedClasspath, [request])
+
+
+@maybe_skip_jdk_test
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -206,7 +276,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
     coarsened_targets_sorted = sorted(
-        list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
+        coarsened_targets, key=lambda ctgt: str(list(ctgt.members)[0].address)
     )
 
     request0 = CompileJavaSourceRequest(

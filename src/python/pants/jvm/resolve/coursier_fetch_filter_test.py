@@ -84,8 +84,9 @@ def test_filter_transitive_includes_transitive_deps(lockfile: CoursierResolvedLo
 
 def filter(coordinate, lockfile, transitive) -> Sequence[Coordinate]:
     key = CoursierResolveKey("example", "example.json", EMPTY_DIGEST)
-    if transitive:
-        root, deps = lockfile.dependencies(key, coordinate)
-    else:
-        root, deps = lockfile.direct_dependencies(key, coordinate)
-    return list(i.coord for i in (root, *deps))
+    root, deps = (
+        lockfile.dependencies(key, coordinate)
+        if transitive
+        else lockfile.direct_dependencies(key, coordinate)
+    )
+    return [i.coord for i in (root, *deps)]

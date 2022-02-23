@@ -8,11 +8,11 @@ import sys
 import unittest
 import unittest.mock
 from contextlib import contextmanager
+from pathlib import Path
 from textwrap import dedent
 
 import psutil
 import pytest
-from _pytest.tmpdir import TempdirFactory
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import temporary_dir
@@ -339,14 +339,16 @@ class TestProcessManager(unittest.TestCase):
         self.pm.post_fork_parent()
 
 
-def test_process_name_setproctitle_integration(tmpdir_factory: TempdirFactory) -> None:
+def test_process_name_setproctitle_integration(tmp_path: Path) -> None:
     # NB: This test forks and then loads this module: we declare it so that it is inferred.
     import setproctitle  # noqa: F401
 
-    buildroot = tmpdir_factory.mktemp("buildroot")
+    buildroot = tmp_path / "buildroot"
+    buildroot.mkdir()
     manager_name = "Bob"
     process_name = f"{manager_name} [{buildroot}]"
-    metadata_base_dir = tmpdir_factory.mktemp(".pids")
+    metadata_base_dir = tmp_path / ".pids"
+    metadata_base_dir.mkdir()
 
     subprocess.check_call(
         args=[

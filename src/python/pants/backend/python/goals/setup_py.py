@@ -19,6 +19,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     GenerateSetupField,
+    LongDescriptionPathField,
     PythonDistributionEntryPointsField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
@@ -46,6 +47,7 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -67,6 +69,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    InvalidFieldException,
     SourcesField,
     Target,
     Targets,
@@ -75,6 +78,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import BoolOption, EnumOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -304,46 +308,37 @@ class SetupPyGeneration(Subsystem):
     options_scope = "setup-py-generation"
     help = "Options to control how setup.py is generated from a `python_distribution` target."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        # Generating setup is the more aggressive thing to do, so we'd prefer that the default
-        # be False. However that would break widespread existing usage, so we'll make that
-        # change in a future deprecation cycle.
-        register(
-            "--generate-setup-default",
-            type=bool,
-            default=True,
-            help=(
-                "The default value for the `generate_setup` field on `python_distribution` targets."
-                "Can be overridden per-target by setting that field explicitly. Set this to False "
-                "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
-                "Leave as True if you mostly rely on Pants generating setup files for you."
-            ),
-        )
+    # Generating setup is the more aggressive thing to do, so we'd prefer that the default
+    # be False. However that would break widespread existing usage, so we'll make that
+    # change in a future deprecation cycle.
+    generate_setup_default = BoolOption(
+        "--generate-setup-default",
+        default=True,
+        help=(
+            "The default value for the `generate_setup` field on `python_distribution` targets."
+            "Can be overridden per-target by setting that field explicitly. Set this to False "
+            "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
+            "Leave as True if you mostly rely on Pants generating setup files for you."
+        ),
+    )
 
-        register(
-            "--first-party-dependency-version-scheme",
-            type=FirstPartyDependencyVersionScheme,
-            default=FirstPartyDependencyVersionScheme.EXACT,
-            help=(
-                "What version to set in `install_requires` when a `python_distribution` depends on "
-                "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
-                "use `~=`. If `any`, will leave off the version. See "
-                "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
-            ),
-        )
-
-    @property
-    def generate_setup_default(self) -> bool:
-        return cast(bool, self.options.generate_setup_default)
+    first_party_dependency_version_scheme = EnumOption(
+        "--first-party-dependency-version-scheme",
+        default=FirstPartyDependencyVersionScheme.EXACT,
+        help=(
+            "What version to set in `install_requires` when a `python_distribution` depends on "
+            "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
+            "use `~=`. If `any`, will leave off the version. See "
+            "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+        ),
+    )
 
     def first_party_dependency_version(self, version: str) -> str:
         """Return the version string (e.g. '~=4.0') for a first-party dependency.
 
         If the user specified to use "any" version, then this will return an empty string.
         """
-        scheme = self.options.first_party_dependency_version_scheme
+        scheme = self.first_party_dependency_version_scheme
         if scheme == FirstPartyDependencyVersionScheme.ANY:
             return ""
         specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="
@@ -440,7 +435,7 @@ setup(**{setup_kwargs_str})
 
 
 @rule
-async def determine_setup_kwargs(
+async def determine_explicitly_provided_setup_kwargs(
     exported_target: ExportedTarget, union_membership: UnionMembership
 ) -> SetupKwargs:
     target = exported_target.target
@@ -529,7 +524,7 @@ async def generate_setup_py(request: GenerateSetupPyRequest) -> GeneratedSetupPy
 
 
 @rule
-async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
+async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> FinalizedSetupKwargs:
     exported_target = request.exported_target
     sources = request.sources
     requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
@@ -555,6 +550,32 @@ async def generate_setup_py_kwargs(request: GenerateSetupPyRequest) -> Finalized
             "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
+
+    long_description_path = exported_target.target.get(LongDescriptionPathField).value
+
+    if "long_description" in setup_kwargs and long_description_path:
+        raise InvalidFieldException(
+            f"The {repr(LongDescriptionPathField.alias)} field of the "
+            f"target {exported_target.target.address} is set, but "
+            f"'long_description' is already provided explicitly in "
+            f"the provides=setup_py() field. You may only set one "
+            f"of these two values."
+        )
+
+    if long_description_path:
+        digest_contents = await Get(
+            DigestContents,
+            PathGlobs(
+                [long_description_path],
+                description_of_origin=(
+                    f"the {LongDescriptionPathField.alias} "
+                    f"field of {exported_target.target.address}"
+                ),
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            ),
+        )
+        long_description_content = digest_contents[0].content.decode()
+        setup_kwargs.update({"long_description": long_description_content})
 
     # Resolve entry points from python_distribution(entry_points=...) and from
     # python_distribution(provides=setup_py(entry_points=...)

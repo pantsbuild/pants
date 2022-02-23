@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar, cast
 
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
@@ -95,10 +96,10 @@ class LockfileMetadata:
 
         error_suffix = (
             "To resolve this error, you will need to regenerate the lockfile by running "
-            "`./pants generate-lockfiles"
+            f"`{bin_name()} generate-lockfiles"
         )
         if resolve_name:
-            error_suffix += " --resolve={tool_name}"
+            error_suffix += f" --resolve={resolve_name}"
         error_suffix += "`."
 
         if lockfile_path is not None and resolve_name is not None:

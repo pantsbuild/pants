@@ -17,9 +17,12 @@ python_tests(name="export_integration_test", sources=["export_integration_test.p
 
 python_tests(name="lockfile_test", sources=["lockfile_test.py"])
 
+resources(name="platforms", sources=["platform*.json"])
+
 python_tests(
     name="package_pex_binary_integration",
     sources=["package_pex_binary_integration_test.py"],
+    dependencies=[":platforms"],
     timeout=120,
 )
 

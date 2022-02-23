@@ -29,17 +29,13 @@ class BSPGoal(BuiltinGoal):
         specs: Specs,
         union_membership: UnionMembership
     ) -> ExitCode:
-        scheduler_session = graph_session.scheduler_session.scheduler.new_session(
-            build_id="bsp", dynamic_ui=False
-        )
-
         saved_stdout = sys.stdout
         saved_stdin = sys.stdin
         try:
             sys.stdout = os.fdopen(sys.stdout.fileno(), "wb", buffering=0)  # type: ignore[assignment]
             sys.stdin = os.fdopen(sys.stdin.fileno(), "rb", buffering=0)  # type: ignore[assignment]
             conn = BSPConnection(
-                scheduler_session,
+                graph_session.scheduler_session,
                 sys.stdin,  # type: ignore[arg-type]
                 sys.stdout,  # type: ignore[arg-type]
             )

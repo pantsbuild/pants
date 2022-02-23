@@ -203,6 +203,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
 + Sameer Brenn
@@ -217,6 +218,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
++ Suresh Joshi
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai

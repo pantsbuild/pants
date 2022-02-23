@@ -46,7 +46,6 @@ class HelpBuiltinGoalBase(BuiltinGoal):
         )
         global_options = options.for_global_scope()
         help_printer = HelpPrinter(
-            bin_name=global_options.pants_bin_name,
             help_request=self.create_help_request(options),
             all_help_info=all_help_info,
             color=global_options.colors,

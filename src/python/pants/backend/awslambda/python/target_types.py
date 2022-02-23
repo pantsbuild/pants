@@ -12,7 +12,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
+from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -20,12 +20,14 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    InvalidTargetException,
     SecondaryOwnerMixin,
     StringField,
     Target,
@@ -176,20 +178,31 @@ async def inject_lambda_handler_dependency(
     return InjectedDependencies(unambiguous_owners)
 
 
+class PythonAwsLambdaIncludeRequirements(BoolField):
+    alias = "include_requirements"
+    default = True
+    help = (
+        "Whether to resolve requirements and include them in the Pex. This is "
+        "most useful with Lambda Layers to make code uploads smaller when "
+        "deps are in layers. https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html"
+    )
+
+
 class PythonAwsLambdaRuntime(StringField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
     alias = "runtime"
-    required = True
-    value: str
+    default = None
     help = (
         "The identifier of the AWS Lambda runtime to target (pythonX.Y). See "
         "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must be of the form pythonX.Y, "
@@ -197,8 +210,10 @@ class PythonAwsLambdaRuntime(StringField):
             )
         return value
 
-    def to_interpreter_version(self) -> Tuple[int, int]:
+    def to_interpreter_version(self) -> Optional[Tuple[int, int]]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
+        if self.value is None:
+            return None
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
@@ -210,13 +225,23 @@ class PythonAWSLambda(Target):
         OutputPathField,
         PythonAwsLambdaDependencies,
         PythonAwsLambdaHandlerField,
+        PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
+        PexCompletePlatformsField,
         PythonResolveField,
     )
     help = (
         "A self-contained Python function suitable for uploading to AWS Lambda.\n\n"
         f"See {doc_url('awslambda-python')}."
     )
+
+    def validate(self) -> None:
+        if self[PythonAwsLambdaRuntime].value is None and not self[PexCompletePlatformsField].value:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target {self.address} must specify either a "
+                f"`{self[PythonAwsLambdaRuntime].alias}` or "
+                f"`{self[PexCompletePlatformsField].alias}` or both."
+            )
 
 
 def rules():

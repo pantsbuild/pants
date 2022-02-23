@@ -137,7 +137,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    assert sorted(list(analysis.provided_symbols)) == [
+    assert sorted(analysis.provided_symbols) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.Functions",
@@ -169,7 +169,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.OuterTrait.NestedVar",
     ]
 
-    assert sorted(list(analysis.provided_symbols_encoded)) == [
+    assert sorted(analysis.provided_symbols_encoded) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.Functions",

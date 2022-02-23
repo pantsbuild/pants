@@ -10,7 +10,7 @@ from pants.engine.target import (
     StringField,
     Target,
 )
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 
 
 class DebianControlFile(MultipleSourcesField):
@@ -40,11 +40,11 @@ class DebianPackageDependencies(SpecialCasedDependencies):
     alias = "packages"
     required = True
     help = (
-        "Addresses to any targets that can be built with `./pants package`, e.g. "
-        '`["project:app"]`.\n\nPants will build the assets as if you had run `./pants package`. '
+        f"Addresses to any targets that can be built with `{bin_name()} package`, e.g. "
+        f'`["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`. '
         "It will include the results in your Debian package using the same name they would normally have, "
         "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
-        "be built by `./pants package`, e.g. a `pex_binary`, a `python_distribution`, or an `archive`."
+        f"be built by `{bin_name()} package`, e.g. a `pex_binary`, a `python_distribution`, or an `archive`."
     )
 
 

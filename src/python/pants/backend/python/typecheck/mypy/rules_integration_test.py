@@ -31,7 +31,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.util_rules import config_files, pants_bin
+from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.rules import QueryRule
@@ -53,7 +53,6 @@ def rule_runner() -> RuleRunner:
             *mypy_rules(),
             *mypy_subystem_rules(),
             *dependency_inference_rules.rules(),  # Used for import inference.
-            *pants_bin.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(CheckResults, (MyPyRequest,)),
