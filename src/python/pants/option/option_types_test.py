@@ -71,14 +71,19 @@ class MyEnum(Enum):
     ],
 )
 def test_option_typeclasses(option_type, default, option_value, expected_register_kwargs) -> None:
-    class MySubsystem(Subsystem):
+    class MyBaseSubsystem(Subsystem):
         def __init__(self):
             self.options = SimpleNamespace()
             self.options.opt = option_value
             self.options.opt_no_default = option_value
+            self.options.dyn_opt = option_value
 
         prop = option_type("--opt", default=default, help="")
         prop_no_default = option_type("--opt-no-default", help="")
+        dyn_prop = option_type("--dyn-opt", default=default, help=lambda cls: cls.dyn_help)
+
+    class MySubsystem(MyBaseSubsystem):
+        dyn_help = "Dynamic Help"
 
     register = Mock()
     MySubsystem.register_options(register)
@@ -89,9 +94,11 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
     assert register.call_args_list == [
         call("--opt", default=default, help="", **expected_register_kwargs),
         call("--opt-no-default", default=default_if_not_given, help="", **expected_register_kwargs),
+        call("--dyn-opt", default=default, help="Dynamic Help", **expected_register_kwargs),
     ]
     assert my_subsystem.prop == transform_opt(option_value)
     assert my_subsystem.prop_no_default == transform_opt(option_value)
+    assert my_subsystem.dyn_prop == transform_opt(option_value)
 
 
 def test_other_options():
