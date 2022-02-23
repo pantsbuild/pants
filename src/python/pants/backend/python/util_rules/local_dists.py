@@ -178,6 +178,12 @@ async def build_local_dists(
         ),
     )
 
+    if not wheels:
+        # The source calculations below are not (always) cheap, so we skip them if no wheels were
+        # produced. See https://github.com/pantsbuild/pants/issues/14561 for one possible approach
+        # to sharing the cost of these calculations.
+        return LocalDistsPex(dists_pex, request.sources)
+
     # We check source roots in reverse lexicographic order,
     # so we'll find the innermost root that matches.
     source_roots = list(reversed(sorted(request.sources.source_roots)))
