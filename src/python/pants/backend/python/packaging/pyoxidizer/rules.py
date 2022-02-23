@@ -8,6 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import ClassVar
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
@@ -27,7 +28,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import ENSURE_ABSOLUTE_BASH_FUNCTION, BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -58,22 +59,27 @@ class PyoxidizerRunnerScript:
     digest: Digest
     path: str
 
-    CACHE_PATH = os.path.join(".cache", "pyoxidizer")
+    CACHE_PATH: ClassVar[str] = os.path.join(".cache", "pyoxidizer")
 
 
 @rule
-async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
+async def create_pyoxidizer_runner_script(bash: BashBinary) -> PyoxidizerRunnerScript:
     # Note: PyOxidizer expects an absolute path for its cache dir, which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
     script = FileContent(
         "__run_pyoxidizer.sh",
-        dedent(
-            f"""\
-            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/{PyoxidizerRunnerScript.CACHE_PATH}"
-            exec "$@"
-            """
+        (
+            f"#!{bash.path}\n"
+            + ENSURE_ABSOLUTE_BASH_FUNCTION
+            + dedent(
+                f"""\
+                export PYOXIDIZER_CACHE_DIR="$(ensure_absolute {PyoxidizerRunnerScript.CACHE_PATH})"
+                exec "$@"
+                """
+            )
         ).encode("utf-8"),
+        is_executable=True,
     )
     digest = await Get(Digest, CreateDigest([script]))
     return PyoxidizerRunnerScript(digest, script.path)
@@ -84,7 +90,6 @@ async def package_pyoxidizer_binary(
     pyoxidizer: PyOxidizer,
     field_set: PyOxidizerFieldSet,
     runner_script: PyoxidizerRunnerScript,
-    bash: BashBinary,
 ) -> BuiltPackage:
     direct_deps, pyoxidizer_pex = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
@@ -163,7 +168,7 @@ async def package_pyoxidizer_binary(
     )
     process_with_caching = dataclasses.replace(
         pex_process,
-        argv=(bash.path, runner_script.path, *pex_process.argv),
+        argv=(f"./{runner_script.path}", *pex_process.argv),
         append_only_caches={
             **pex_process.append_only_caches,
             "pyoxidizer": runner_script.CACHE_PATH,

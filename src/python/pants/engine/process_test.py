@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -18,6 +19,8 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
+    ENSURE_ABSOLUTE_BASH_FUNCTION,
+    BashBinary,
     BinaryPathRequest,
     BinaryPaths,
     FallibleProcessResult,
@@ -34,6 +37,7 @@ from pants.util.contextutil import environment_as
 def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            QueryRule(BashBinary, []),
             QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
@@ -375,3 +379,32 @@ def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_pat
     assert [str(p) for p in (binary_path_abs1, binary_path_abs2, binary_path_abs3)] == [
         binary_path.path for binary_path in binary_paths.paths
     ]
+
+
+def test_ensure_absolute_bash_function(rule_runner: RuleRunner) -> None:
+    bash_bin = rule_runner.request(BashBinary, [])
+    script = FileContent(
+        "script.sh",
+        (
+            f"#!{bash_bin.path}\n"
+            + ENSURE_ABSOLUTE_BASH_FUNCTION
+            + dedent(
+                """\
+                echo "$(ensure_absolute some/rel_path)"
+                echo "$(ensure_absolute /some/absolute_path)"
+                """
+            )
+        ).encode(),
+        is_executable=True,
+    )
+    digest = rule_runner.request(Digest, [CreateDigest([script])])
+    process = Process(argv=(f"./{script.path}",), description="foo", input_digest=digest)
+    lines = rule_runner.request(ProcessResult, [process]).stdout.splitlines()
+    assert len(lines) == 2
+
+    # First path should be absolutified.
+    assert lines[0].startswith(b"/")
+    assert b"process-execution" in lines[0]
+
+    # But second is already good.
+    assert lines[1] == b"/some/absolute_path"

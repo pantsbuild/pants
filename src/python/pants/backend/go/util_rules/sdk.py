@@ -12,7 +12,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem, GoRoot
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import ENSURE_ABSOLUTE_BASH_FUNCTION, BashBinary, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -58,49 +58,51 @@ class GoSdkProcess:
 @dataclass(frozen=True)
 class GoSdkRunSetup:
     digest: Digest
-    script: FileContent
+    path: str
 
     CHDIR_ENV = "__PANTS_CHDIR_TO"
 
 
 @rule
-async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
+async def go_sdk_invoke_setup(goroot: GoRoot, bash: BashBinary) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
     go_run_script = FileContent(
         "__run_go.sh",
-        textwrap.dedent(
-            f"""\
-            export GOROOT={goroot.path}
-            export GOPATH="$(/bin/pwd)/gopath"
-            export GOCACHE="$(/bin/pwd)/cache"
-            /bin/mkdir -p "$GOPATH" "$GOCACHE"
-            if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
-              cd "${GoSdkRunSetup.CHDIR_ENV}"
-            fi
-            exec "{goroot.path}/bin/go" "$@"
-            """
+        (
+            f"#!{bash.path}\n"
+            + ENSURE_ABSOLUTE_BASH_FUNCTION
+            + textwrap.dedent(
+                f"""\
+                export GOROOT={goroot.path}
+                export GOPATH="$(ensure_absolute gopath)"
+                export GOCACHE="$(ensure_absolute cache)"
+                /bin/mkdir -p "$GOPATH" "$GOCACHE"
+                if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
+                  cd "${GoSdkRunSetup.CHDIR_ENV}"
+                fi
+                exec "{goroot.path}/bin/go" "$@"
+                """
+            )
         ).encode("utf-8"),
+        is_executable=True,
     )
 
     digest = await Get(Digest, CreateDigest([go_run_script]))
-    return GoSdkRunSetup(digest, go_run_script)
+    return GoSdkRunSetup(digest, go_run_script.path)
 
 
 @rule
 async def setup_go_sdk_process(
-    request: GoSdkProcess,
-    go_sdk_run: GoSdkRunSetup,
-    bash: BashBinary,
-    golang_subsystem: GolangSubsystem,
+    request: GoSdkProcess, go_sdk_run: GoSdkRunSetup, golang_subsystem: GolangSubsystem
 ) -> Process:
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
         Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
     )
     return Process(
-        argv=[bash.path, go_sdk_run.script.path, *request.command],
+        argv=[go_sdk_run.path, *request.command],
         env={
             **env_vars,
             **request.env,

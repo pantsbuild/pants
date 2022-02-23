@@ -676,5 +676,38 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     )
 
 
+"""Defines a bash function `ensure_absolute` to absolutify the input path.
+
+This can be particularly useful when you need to set environment variables to use an absolute 
+path. Define a Bash runner script that calls `export` on each env var, calling the 
+`ensure_absolute` function. Then `exec` the underlying process.
+
+Be careful to follow these assumptions:
+
+* You must run the Bash script directly. That is, set a shebang to `#!{BashBinary.path}`, and run 
+  as `./script.sh`. That's because this relies on BASH_SOURCE.
+* When concatenating, use `+` rather than an f-string, otherwise indentation is likely to break
+  with `textwrap.dedent()`.
+
+Note that BASH_SOURCE has been available since bash-3.0, released in 2004. In turn, our use of
+BASH_SOURCE relies on the fact that this script is executed by the engine via its absolute path.
+"""
+ENSURE_ABSOLUTE_BASH_FUNCTION = dedent(
+    """\
+    ABS_SANDBOX_ROOT="${BASH_SOURCE%/*}"
+
+    function ensure_absolute() {
+        local value0="$1"
+        shift
+        if [ "${value0:0:1}" == "/" ]; then
+            echo "${value0}" "$@"
+        else
+            echo "${ABS_SANDBOX_ROOT}/${value0}" "$@"
+        fi
+    }
+    """
+)
+
+
 def rules():
     return collect_rules()

@@ -58,7 +58,13 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import (
+    ENSURE_ABSOLUTE_BASH_FUNCTION,
+    BashBinary,
+    Process,
+    ProcessCacheScope,
+    ProcessResult,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
@@ -619,51 +625,34 @@ class VenvScriptWriter:
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
-        script = dedent(
-            f"""\
-            #!{bash.path}
-            set -euo pipefail
+        script = (
+            f"#!{bash.path}\nset -euo pipefail\n"
+            + ENSURE_ABSOLUTE_BASH_FUNCTION
+            + dedent(
+                f"""\
+                export {" ".join(env_vars)}
+                export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
 
-            # N.B.: We convert all sandbox root relative paths to absolute paths so this script
-            # works when run with a cwd set elsewhere.
+                execute_pex_args="{execute_pex_args}"
+                target_venv_executable="$(ensure_absolute {target_venv_executable})"
+                venv_dir="$(ensure_absolute {venv_dir})"
 
-            # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
-            # 2004. In turn, our use of BASH_SOURCE relies on the fact that this script is executed
-            # by the engine via its absolute path.
-            ABS_SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
-
-            function ensure_absolute() {{
-                local value0="$1"
-                shift
-                if [ "${{value0:0:1}}" == "/" ]; then
-                    echo "${{value0}}" "$@"
-                else
-                    echo "${{ABS_SANDBOX_ROOT}}/${{value0}}" "$@"
+                # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
+                # with tools support.
+                if [ -n "${{PEX_TOOLS:-}}" ]; then
+                  exec ${{execute_pex_args}} "$@"
                 fi
-            }}
 
-            export {" ".join(env_vars)}
-            export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
+                # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
+                # `--venv` mode PEX file.
+                if [ ! -e "${{target_venv_executable}}" ]; then
+                    rm -rf "${{venv_dir}}" || true
+                    PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
+                fi
 
-            execute_pex_args="{execute_pex_args}"
-            target_venv_executable="$(ensure_absolute {target_venv_executable})"
-            venv_dir="$(ensure_absolute {venv_dir})"
-
-            # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
-            # with tools support.
-            if [ -n "${{PEX_TOOLS:-}}" ]; then
-              exec ${{execute_pex_args}} "$@"
-            fi
-
-            # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
-            # `--venv` mode PEX file.
-            if [ ! -e "${{target_venv_executable}}" ]; then
-                rm -rf "${{venv_dir}}" || true
-                PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
-            fi
-
-            exec "${{target_venv_executable}}" "$@"
-            """
+                exec "${{target_venv_executable}}" "$@"
+                """
+            )
         )
         return VenvScript(
             script=Script(script_path),
