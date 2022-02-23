@@ -20,7 +20,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,9 @@ class PackageSubsystem(GoalSubsystem):
     name = "package"
     help = "Create a distributable package."
 
-    required_union_implementations = (PackageFieldSet,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PackageFieldSet in union_membership
 
 
 class Package(Goal):

@@ -244,7 +244,9 @@ class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = "Auto-generate BUILD file targets for new source files."
 
-    required_union_implementations = (PutativeTargetsRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PutativeTargetsRequest in union_membership
 
     check = BoolOption(
         "--check",
