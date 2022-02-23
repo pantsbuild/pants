@@ -289,10 +289,12 @@ class TestSubsystem(GoalSubsystem):
     name = "test"
     help = "Run tests."
 
-    required_union_implementations = (TestFieldSet,)
-
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return TestFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

@@ -110,7 +110,9 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         "project."
     )
 
-    required_union_implementations = (RewrittenBuildFileRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RewrittenBuildFileRequest in union_membership
 
     @classmethod
     def register_options(cls, register):
