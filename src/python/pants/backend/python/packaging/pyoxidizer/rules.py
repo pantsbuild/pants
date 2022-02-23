@@ -53,24 +53,24 @@ async def package_pyoxidizer_binary(
     pyoxidizer: PyOxidizer, field_set: PyOxidizerFieldSet
 ) -> BuiltPackage:
     direct_deps, pyoxidizer_pex = await MultiGet(
-         Get(Targets, DependenciesRequest(field_set.dependencies)),
-         Get(
-             Pex,
-             PexRequest(
-                 output_filename="pyoxidizer.pex",
-                 internal_only=True,
-                 requirements=pyoxidizer.pex_requirements(),
-                 interpreter_constraints=pyoxidizer.interpreter_constraints,
-                 main=pyoxidizer.main,
-             ),
-         )
-     )
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(
+            Pex,
+            PexRequest(
+                output_filename="pyoxidizer.pex",
+                internal_only=True,
+                requirements=pyoxidizer.pex_requirements(),
+                interpreter_constraints=pyoxidizer.interpreter_constraints,
+                main=pyoxidizer.main,
+            ),
+        ),
+    )
 
     deps_field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [direct_deps[0]])
     )
     built_packages = await MultiGet(
-         Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
     )
     wheel_paths = [
         artifact.relpath
