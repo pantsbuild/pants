@@ -170,11 +170,7 @@ def get_build_options(
     field_set: DockerFieldSet,
     global_target_stage_option: str | None,
     target: Target,
-    verbose: bool,
 ) -> Iterator[str]:
-    if not verbose:
-        yield "--quiet"
-
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildOptionFieldMixin):
@@ -248,7 +244,6 @@ async def build_docker_image(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
-                verbose=options.build_verbose,
                 target=wrapped_target.target,
             )
         ),
@@ -273,7 +268,8 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    docker_build_output = "\n".join(
+    image_id = parse_image_id_from_docker_build_output(result.stderr)
+    docker_build_output_msg = "\n".join(
         (
             f"Docker build output for {tags[0]}:",
             "stdout:",
@@ -284,25 +280,28 @@ async def build_docker_image(
     )
 
     if options.build_verbose:
-        logger.info(docker_build_output)
-        image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
-        image_id_match = next(
-            (
-                re.search(image_id_regexp, line)
-                for line in reversed(result.stderr.decode().split("\n"))
-                if "writing image sha256:" in line
-            ),
-            None,
-        )
-        image_id = image_id_match.group(1) if image_id_match else "<unknown>"
+        logger.info(docker_build_output_msg)
     else:
-        logger.debug(docker_build_output)
-        image_id = result.stdout.decode().strip()
+        logger.debug(docker_build_output_msg)
 
     return BuiltPackage(
         result.output_digest,
         (BuiltDockerImage.create(image_id, tags),),
     )
+
+
+def parse_image_id_from_docker_build_output(output: bytes) -> str:
+    image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
+    image_id_match = next(
+        (
+            re.search(image_id_regexp, line)
+            for line in reversed(output.decode().split("\n"))
+            if "writing image sha256:" in line
+        ),
+        None,
+    )
+    image_id = image_id_match.group(1) if image_id_match else "<unknown>"
+    return image_id
 
 
 def format_docker_build_context_help_message(
