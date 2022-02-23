@@ -52,23 +52,13 @@ class PyOxidizerFieldSet(PackageFieldSet):
 async def package_pyoxidizer_binary(
     pyoxidizer: PyOxidizer, field_set: PyOxidizerFieldSet
 ) -> BuiltPackage:
-    direct_deps, pyoxidizer_pex = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(
-            Pex,
-            PexRequest(
-                output_filename="pyoxidizer.pex",
-                internal_only=True,
-                requirements=pyoxidizer.pex_requirements(),
-                interpreter_constraints=pyoxidizer.interpreter_constraints,
-                main=pyoxidizer.main,
-            ),
-        )
-    )
+    targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
+    target = targets[0]
 
-    deps_field_sets = await Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps))
+    packages = await Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [target]))
+
     built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in packages.field_sets
     )
     wheel_paths = [
         artifact.relpath
@@ -76,6 +66,17 @@ async def package_pyoxidizer_binary(
         for artifact in built_pkg.artifacts
         if artifact.relpath is not None and artifact.relpath.endswith(".whl")
     ]
+
+    pyoxidizer_pex = await Get(
+        Pex,
+        PexRequest(
+            output_filename="pyoxidizer.pex",
+            internal_only=True,
+            requirements=pyoxidizer.pex_requirements(),
+            interpreter_constraints=pyoxidizer.interpreter_constraints,
+            main=pyoxidizer.main,
+        ),
+    )
 
     config_template = None
     if field_set.template.value is not None:
