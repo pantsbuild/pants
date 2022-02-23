@@ -43,7 +43,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -166,10 +166,9 @@ class PublishSubsystem(GoalSubsystem):
     name = "publish"
     help = "Publish deliverables (assets, distributions, images, etc)."
 
-    required_union_implementations = (
-        PackageFieldSet,
-        PublishFieldSet,
-    )
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

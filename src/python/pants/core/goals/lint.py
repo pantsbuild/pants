@@ -160,7 +160,9 @@ class LintSubsystem(GoalSubsystem):
     name = "lint"
     help = "Run all linters and/or formatters in check mode."
 
-    required_union_implementations = (LintTargetsRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

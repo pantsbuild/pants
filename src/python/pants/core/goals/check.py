@@ -141,7 +141,9 @@ class CheckSubsystem(GoalSubsystem):
     name = "check"
     help = "Run type checking or the lightest variant of compilation available for a language."
 
-    required_union_implementations = (CheckRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return CheckRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:
