@@ -1,10 +1,14 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::{thread, time};
 
 use nix::sys::signal;
 use nix::unistd::getpgid;
 use nix::unistd::Pid;
 use tokio::process::{Child, Command};
+
+const GRACEFUL_SHUTDOWN_WAIT_TIME: time::Duration = time::Duration::from_secs(5);
+const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(50);
 
 /// A child process running in its own PGID, with a drop implementation that will kill that
 /// PGID.
@@ -54,21 +58,55 @@ impl ManagedChild {
     Ok(pgid)
   }
 
-  /// Send an interrupt signal to the process group
-  // fn send_interrupt(&mut self) -> Result<(), String> {
-  //   let pgid = self.get_pgid()?;
-  //   // Kill the negative PGID to kill the entire process group.
-  //   signal::kill(Pid::from_raw(-pgid.as_raw()), signal::Signal::SIGINT)
-  //     .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;
-  //   Ok(())
-  // }
+  /// Send a signal to the child process group.
+  fn signal_pg<T: Into<Option<signal::Signal>>>(&mut self, signal: T) -> Result<(), String> {
+    let pgid = self.get_pgid()?;
+    // the negative PGID will signal the entire process group.
+    signal::kill(Pid::from_raw(-pgid.as_raw()), signal)
+      .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;
+    Ok(())
+  }
+
+  fn has_child_exited(&mut self) -> bool {
+    match self.child.try_wait() {
+      Ok(Some(_)) => true,
+      Ok(None) => false,
+      Err(_) => false,
+    }
+  }
+
+  /// Attempt to gracefully shutdown the process.
+  ///
+  /// This will send a SIGINT to the process and give it a chance to shutdown gracefully. If the
+  /// process does not respond to the SIGINT within a fixed interval, a SIGKILL will be sent.
+  ///
+  /// This method *will* block the current thread but will do so for a bounded amount of time.
+  pub fn graceful_shutdown(&mut self) -> Result<(), String> {
+    // send sigint
+    self.signal_pg(signal::Signal::SIGINT)?;
+
+    let deadline = time::Instant::now() + GRACEFUL_SHUTDOWN_WAIT_TIME;
+    loop {
+      if self.has_child_exited() {
+        // process terminated gracefully, mark this as killed to avoid unecessary additional cleanup
+        self.killed.store(true, Ordering::SeqCst);
+        break;
+      }
+
+      if time::Instant::now() >= deadline {
+        // we passed the deadline and process still has not shut down, so kill it
+        self.kill_pgid()?;
+        break;
+      }
+
+      thread::sleep(GRACEFUL_SHUTDOWN_POLL_TIME);
+    }
+    Ok(())
+  }
 
   /// Kill the process's unique PGID or return an error if we don't have a PID or cannot kill.
   pub fn kill_pgid(&mut self) -> Result<(), String> {
-    let pgid = self.get_pgid()?;
-    // Kill the negative PGID to kill the entire process group.
-    signal::kill(Pid::from_raw(-pgid.as_raw()), signal::Signal::SIGKILL)
-      .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;
+    self.signal_pg(signal::Signal::SIGKILL)?;
     self.killed.store(true, Ordering::SeqCst);
     Ok(())
   }
@@ -92,7 +130,7 @@ impl DerefMut for ManagedChild {
 impl Drop for ManagedChild {
   fn drop(&mut self) {
     if !self.killed.load(Ordering::SeqCst) {
-      let _ = self.kill_pgid();
+      let _ = self.graceful_shutdown();
     }
   }
 }

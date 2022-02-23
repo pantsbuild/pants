@@ -102,7 +102,6 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
-env_logger = "0.6"
 async_latch = { path = "async_latch" }
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"

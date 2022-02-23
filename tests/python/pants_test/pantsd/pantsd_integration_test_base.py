@@ -56,7 +56,7 @@ def attempts(
 
 
 def launch_waiter(
-    *, workdir: str, config: Mapping | None = None
+    *, workdir: str, config: Mapping | None = None, cleanup_wait_time: int = 0
 ) -> tuple[PantsJoinHandle, int, int, str]:
     """Launch a process that will wait forever for a file to be created.
 
@@ -74,6 +74,7 @@ def launch_waiter(
         file_to_make,
         waiter_pid_file,
         child_pid_file,
+        str(cleanup_wait_time),
     ]
     client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
     waiter_pid = -1

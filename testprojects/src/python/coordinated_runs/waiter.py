@@ -18,6 +18,7 @@ def main():
     waiting_for_file = sys.argv[1]
     pid_file = sys.argv[2]
     child_pid_file = sys.argv[3]
+    cleanup_wait_time = int(sys.argv[4])
     attempts = 60
 
     child = Process(target=run_child, daemon=True)
@@ -43,13 +44,14 @@ def main():
         sys.stderr.flush()
 
     finally:
-        sys.stderr.write("cleaning up\n")
+        sys.stderr.write("waiter cleaning up\n")
         sys.stderr.flush()
 
         child.terminate()
-        time.sleep(10)
+        if cleanup_wait_time > 0:
+            time.sleep(cleanup_wait_time)
 
-        sys.stderr.write("cleaning complete\n")
+        sys.stderr.write("waiter cleanup complete\n")
         sys.stderr.flush()
 
 
