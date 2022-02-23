@@ -1,23 +1,25 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+import subprocess
+from pathlib import Path
 from textwrap import dedent
 
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 
-def test_local_dist(caplog) -> None:
-    caplog.set_level(logging.DEBUG)
+def test_end_to_end() -> None:
     sources = {
-        "hellotest/main.py": "print('Hello test')",
+        "hellotest/main.py": "import colors; print('Hello test')",
         "hellotest/BUILD": dedent(
             """\
-            python_sources(name="libtest")
+            python_requirement(name="req", requirements=["ansicolors==1.1.8"])
+
+            python_sources(name="lib")
 
             python_distribution(
                 name="dist",
-                dependencies=[":libtest"],
+                dependencies=[":lib"],
                 provides=python_artifact(name="dist", version="0.0.1"),
                 wheel=True,
                 sdist=False,
@@ -39,4 +41,9 @@ def test_local_dist(caplog) -> None:
             f"{tmpdir}/hellotest:bin",
         ]
         result = run_pants(args)
-        result.assert_success(f"{result.command} failed with {result.exit_code} -> {result.stderr}")
+        result.assert_success()
+
+        # Check that the binary is executable.
+        bin_path = next(Path("dist", "build").glob("*/debug/install/bin"))
+        bin_stdout = subprocess.run([bin_path], check=True, stdout=subprocess.PIPE).stdout
+        assert bin_stdout == b"Hello test\n"
