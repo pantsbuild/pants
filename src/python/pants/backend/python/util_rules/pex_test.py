@@ -78,6 +78,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
+            QueryRule(GlobalOptions, []),
             QueryRule(Pex, (PexRequest,)),
             QueryRule(VenvPex, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
