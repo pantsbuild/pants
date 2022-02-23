@@ -42,6 +42,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.option.global_options import GlobalOptions
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
@@ -315,9 +316,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
-    named_caches_dir = (
-        rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-    )
+    named_caches_dir = rule_runner.request(GlobalOptions, []).named_caches_dir
     sources = rule_runner.request(
         Digest,
         [

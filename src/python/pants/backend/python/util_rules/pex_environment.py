@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import Mapping
 
 from pants.core.util_rules import subprocess_environment
@@ -15,7 +15,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment
 from pants.engine.process import BinaryPath
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.python import binaries as python_binaries
@@ -159,15 +159,13 @@ async def find_pex_python(
     python_binary: PythonBinary,
     pex_runtime_env: PexRuntimeEnvironment,
     subprocess_env_vars: SubprocessEnvironmentVars,
-    global_options: GlobalOptions,
+    named_caches_dir: NamedCachesDirOption,
 ) -> PexEnvironment:
     return PexEnvironment(
         path=pex_runtime_env.path(python_bootstrap.environment),
         interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
         subprocess_environment_dict=subprocess_env_vars.vars,
-        # TODO: This path normalization is duplicated with `engine_initializer.py`. How can we do
-        #  the normalization only once, via the options system?
-        named_caches_dir=Path(global_options.options.named_caches_dir).resolve(),
+        named_caches_dir=named_caches_dir.val,
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),
         venv_use_symlinks=pex_runtime_env.venv_use_symlinks,
     )
