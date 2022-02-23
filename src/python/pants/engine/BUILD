@@ -19,3 +19,9 @@ python_tests(
     ],
     timeout=120,
 )
+
+pex_binary(
+    name="fs_benchmark",
+    entry_point="fs_benchmark.py",
+    dependencies=[":engine"],
+)

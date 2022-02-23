@@ -10,6 +10,7 @@ import ssl
 import sys
 import tempfile
 import threading
+import time
 import zipfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -242,6 +243,21 @@ def open_zip(path_or_file: str | Any, *args, **kwargs) -> Iterator[zipfile.ZipFi
         yield zf
     finally:
         zf.close()
+
+
+class Timer:
+    def __init__(self):
+        self.millis = 0
+
+
+@contextmanager
+def timed() -> Iterator[Timer]:
+    """A timer that measures the execution time of the code in context, in milliseconds."""
+    timer = Timer()
+    start = time.time()
+    yield timer
+    end = time.time()
+    timer.millis = int((end - start) * 1000)
 
 
 @contextmanager

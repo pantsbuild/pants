@@ -197,9 +197,7 @@ async def build_local_dists(
                     remaining_sources.remove(source)
     remaining_sources_snapshot = await Get(
         Snapshot,
-        DigestSubset(
-            request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
-        ),
+        DigestSubset(request.sources.source_files.snapshot.digest, PathGlobs(remaining_sources)),
     )
     subtracted_sources = PythonSourceFiles(
         SourceFiles(remaining_sources_snapshot, request.sources.source_files.unrooted_files),
