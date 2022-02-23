@@ -1,10 +1,11 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from string import Template
 from textwrap import indent
-from typing import List, Optional
 
 DEFAULT_TEMPLATE = """
 def make_exe():
@@ -24,8 +25,6 @@ def make_exe():
         config=python_config,
     )
 
-    # pip_download requires that wheels are available for each dep
-    # exe.add_python_resources(exe.pip_download($WHEELS))
     exe.add_python_resources(exe.pip_install($WHEELS))
     $UNCLASSIFIED_RESOURCE_INSTALLATION
 
@@ -54,13 +53,13 @@ for resource in exe.pip_install($UNCLASSIFIED_RESOURCES):
 """
 
 
-@dataclass(frozen=True, unsafe_hash=True)
+@dataclass(frozen=True)
 class PyOxidizerConfig:
     executable_name: str
-    wheels: List[str]
-    entry_point: Optional[str] = None
-    template: Optional[str] = None
-    unclassified_resources: Optional[List[str]] = None
+    wheels: list[str]
+    entry_point: str | None = None
+    template: str | None = None
+    unclassified_resources: list[str] | None = None
 
     @property
     def run_module(self) -> str:
