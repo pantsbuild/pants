@@ -16,6 +16,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
 
@@ -304,10 +305,10 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
                 "Only generate lockfiles for the specified resolve(s).\n\n"
                 "Resolves are the logical names for the different lockfiles used in your project. "
                 "For your own code's dependencies, these come from the option "
-                "`[python].experimental_resolves`. For tool lockfiles, resolve "
+                "`[python].resolves`. For tool lockfiles, resolve "
                 "names are the options scope for that tool such as `black`, `pytest`, and "
                 "`mypy-protobuf`.\n\n"
-                "For example, you can run `./pants generate-lockfiles --resolve=black "
+                f"For example, you can run `{bin_name()} generate-lockfiles --resolve=black "
                 "--resolve=pytest --resolve=data-science` to only generate lockfiles for those "
                 "two tools and your resolve named `data-science`.\n\n"
                 "If you specify an invalid resolve name, like 'fake', Pants will output all "
@@ -322,7 +323,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             default=None,
             help=(
                 "If set, lockfile headers will say to run this command to regenerate the lockfile, "
-                "rather than running `./pants generate-lockfiles --resolve=<name>` like normal."
+                f"rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal."
             ),
         )
 

@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
-from pants.core.goals.style_request import StyleRequest, write_reports
+from pants.core.goals.style_request import (
+    StyleRequest,
+    determine_specified_tool_names,
+    only_option_help,
+    write_reports,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -140,6 +145,21 @@ class CheckSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return union_membership.has_members(CheckRequest)
 
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--only",
+            type=list,
+            member_type=str,
+            default=[],
+            help=only_option_help("check", "checkers", "mypy", "javac"),
+        )
+
+    @property
+    def only(self) -> tuple[str, ...]:
+        return tuple(self.options.only)
+
 
 class Check(Goal):
     subsystem_cls = CheckSubsystem
@@ -152,15 +172,21 @@ async def check(
     targets: Targets,
     dist_dir: DistDir,
     union_membership: UnionMembership,
+    check_subsystem: CheckSubsystem,
 ) -> Check:
-    typecheck_request_types = cast("Iterable[type[StyleRequest]]", union_membership[CheckRequest])
+    request_types = cast("Iterable[type[StyleRequest]]", union_membership[CheckRequest])
+    specified_names = determine_specified_tool_names("check", check_subsystem.only, request_types)
+
     requests = tuple(
-        typecheck_request_type(
-            typecheck_request_type.field_set_type.create(target)
+        request_type(
+            request_type.field_set_type.create(target)
             for target in targets
-            if typecheck_request_type.field_set_type.is_applicable(target)
+            if (
+                request_type.name in specified_names
+                and request_type.field_set_type.is_applicable(target)
+            )
         )
-        for typecheck_request_type in typecheck_request_types
+        for request_type in request_types
     )
     all_results = await MultiGet(
         Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets

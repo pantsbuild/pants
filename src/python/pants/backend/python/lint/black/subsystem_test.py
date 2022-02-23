@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black import skip_field
 from pants.backend.python.lint.black.subsystem import Black, BlackLockfileSentinel
@@ -20,6 +21,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
+            *target_types_rules.rules(),
             QueryRule(GeneratePythonLockfile, [BlackLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget],

@@ -24,6 +24,44 @@ logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
 
 
+def only_option_help(goal_name: str, tool_description: str, example1: str, example2: str) -> str:
+    return (
+        f"Only run these {tool_description}s and skip all others.\n\n"
+        f"The {tool_description} names are outputted at the final summary of running this goal, "
+        f"e.g. `{example1}` and `{example2}`. You can also run `{goal_name} --only=fake` to "
+        f"get a list of all activated {tool_description}s.\n\n"
+        f"You can repeat this option, e.g. `{goal_name} --only={example1} --only={example2}` or "
+        f"`{goal_name} --only=['{example1}', '{example2}']`."
+    )
+
+
+def determine_specified_tool_names(
+    goal_name: str,
+    only_option: Iterable[str],
+    all_style_requests: Iterable[type[StyleRequest]],
+    *,
+    extra_valid_names: Iterable[str] = (),
+) -> set[str]:
+    target_request_names = {request.name for request in all_style_requests}
+    all_valid_names = {*target_request_names, *extra_valid_names}
+    if not only_option:
+        return all_valid_names
+
+    specified = set(only_option)
+    unrecognized_names = specified - all_valid_names
+    if unrecognized_names:
+        plural = (
+            ("s", repr(sorted(unrecognized_names)))
+            if len(unrecognized_names) > 1
+            else ("", repr(next(iter(unrecognized_names))))
+        )
+        raise ValueError(
+            f"Unrecognized name{plural[0]} with the option `--{goal_name}-only`: {plural[1]}\n\n"
+            f"All valid names: {sorted(all_valid_names)}"
+        )
+    return specified
+
+
 def style_batch_size_help(uppercase: str, lowercase: str) -> str:
     return (
         f"The target number of files to be included in each {lowercase} batch.\n"

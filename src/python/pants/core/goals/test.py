@@ -41,6 +41,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -560,11 +561,11 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
     help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
+        f"Addresses to targets that can be built with the `{bin_name()} package` goal and whose "
         "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
+        f"as if you had run `{bin_name()} package`. It will include the results in your test's chroot, "
         "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
+        f"`dist/`).\n\nYou can include anything that can be built by `{bin_name()} package`, e.g. a "
         "`pex_binary`, `python_awslambda`, or an `archive`."
     )
 

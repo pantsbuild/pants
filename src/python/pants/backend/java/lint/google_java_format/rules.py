@@ -9,7 +9,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
@@ -17,7 +17,7 @@ from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -38,9 +38,9 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(FmtRequest, LintRequest):
+class GoogleJavaFormatRequest(FmtRequest, LintTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    name = "Google Java Format"
+    name = GoogleJavaFormatSubsystem.options_scope
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -63,7 +63,7 @@ class Setup:
 async def setup_google_java_format(
     setup_request: SetupRequest,
     tool: GoogleJavaFormatSubsystem,
-    jdk_setup: JdkSetup,
+    jdk: InternalJdk,
 ) -> Setup:
 
     lockfile_request = await Get(
@@ -89,7 +89,7 @@ async def setup_google_java_format(
     }
 
     maybe_java11_or_higher_options = []
-    if jdk_setup.jre_major_version >= 11:
+    if jdk.jre_major_version >= 11:
         maybe_java11_or_higher_options = [
             "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
@@ -107,6 +107,7 @@ async def setup_google_java_format(
     ]
 
     process = JvmProcess(
+        jdk=jdk,
         argv=args,
         classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
         input_digest=source_files_snapshot.digest,
@@ -168,6 +169,6 @@ def rules():
         *collect_rules(),
         *jvm_tool.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
-        UnionRule(LintRequest, GoogleJavaFormatRequest),
+        UnionRule(LintTargetsRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

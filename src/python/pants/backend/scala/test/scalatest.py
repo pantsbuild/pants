@@ -8,6 +8,8 @@ from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
@@ -18,13 +20,15 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -32,9 +36,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ScalatestTestFieldSet(TestFieldSet):
-    required_fields = (ScalatestTestSourceField,)
+    required_fields = (
+        ScalatestTestSourceField,
+        JvmJdkField,
+    )
 
     sources: ScalatestTestSourceField
+    jdk_version: JvmJdkField
+    dependencies: Dependencies
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -61,13 +70,26 @@ async def setup_scalatest_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
-    classpath, scalatest_classpath = await MultiGet(
-        Get(Classpath, Addresses([request.field_set.address])),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
+    jdk, dependencies = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
+        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
     )
 
-    merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
+    classpath, scalatest_classpath, files = await MultiGet(
+        Get(Classpath, Addresses([request.field_set.address])),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                (dep.get(SourcesField) for dep in dependencies),
+                for_sources_types=(FileSourceField,),
+                enable_codegen=True,
+            ),
+        ),
+    )
+
+    input_digest = await Get(Digest, MergeDigests((*classpath.digests(), files.snapshot.digest)))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -90,6 +112,7 @@ async def setup_scalatest_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     process = JvmProcess(
+        jdk=jdk,
         classpath_entries=[
             *classpath.args(),
             *scalatest_classpath.classpath_entries(toolcp_relpath),
@@ -106,7 +129,7 @@ async def setup_scalatest_for_target(
             reports_dir,
             *scalatest.options.args,
         ],
-        input_digest=merged_classpath_digest,
+        input_digest=input_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run Scalatest runner for {request.field_set.address}",

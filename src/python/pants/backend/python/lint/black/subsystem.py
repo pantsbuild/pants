@@ -19,7 +19,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 from pants.util.logging import LogLevel
 
 
@@ -27,7 +27,7 @@ class Black(PythonToolBase):
     options_scope = "black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==21.12b0"
+    default_version = "black==22.1.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
@@ -37,6 +37,7 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     @classmethod
     def register_options(cls, register):
@@ -45,10 +46,7 @@ class Black(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=(
-                f"Don't use Black when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`"
-            ),
+            help=f"Don't use Black when running `{bin_name()} fmt` and `{bin_name()} lint`",
         )
         register(
             "--args",

@@ -13,7 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -30,7 +30,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.jdk_rules import JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.frozendict import FrozenDict
@@ -51,9 +51,9 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(FmtRequest, LintRequest):
+class ScalafmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    name = "scalafmt"
+    name = ScalafmtSubsystem.options_scope
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -148,7 +148,10 @@ async def gather_scalafmt_config_files(
 
 
 @rule
-async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition:
+async def setup_scalafmt_partition(
+    request: SetupScalafmtPartition,
+    jdk: InternalJdk,
+) -> Partition:
     sources_digest = await Get(
         Digest,
         DigestSubset(
@@ -174,6 +177,7 @@ async def setup_scalafmt_partition(request: SetupScalafmtPartition) -> Partition
     args.extend(request.files)
 
     process = JvmProcess(
+        jdk=jdk,
         argv=args,
         classpath_entries=request.classpath_entries,
         input_digest=sources_digest,
@@ -315,6 +319,6 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(FmtRequest, ScalafmtRequest),
-        UnionRule(LintRequest, ScalafmtRequest),
+        UnionRule(LintTargetsRequest, ScalafmtRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

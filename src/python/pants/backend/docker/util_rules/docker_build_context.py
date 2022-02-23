@@ -118,14 +118,14 @@ class DockerBuildContext:
         # Go over all FROM tags and names for all stages.
         stage_names: set[str] = set()
         stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        tags_values: dict[str, str] = {}
         for idx, (stage, tag) in enumerate(stage_tags):
             if stage != f"stage{idx}":
                 stage_names.add(stage)
-            value = {"tag": tag}
-            if not interpolation_context:
+            if idx == 0:
                 # Expose the first (stage0) FROM directive as the "baseimage".
-                interpolation_context["baseimage"] = value
-            interpolation_context[stage] = value
+                tags_values["baseimage"] = tag
+            tags_values[stage] = tag
 
         if build_args:
             # Extract default arg values from the parsed Dockerfile.
@@ -171,6 +171,9 @@ class DockerBuildContext:
             # Present hash for all inputs that can be used for image tagging.
             "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
         }
+
+        # Base image tags values for all stages (as parsed from the Dockerfile instructions).
+        interpolation_context["tags"] = tags_values
 
         return cls(
             build_args=build_args,

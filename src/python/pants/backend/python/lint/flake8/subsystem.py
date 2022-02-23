@@ -20,7 +20,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
@@ -41,7 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -77,7 +77,7 @@ class Flake8(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use Flake8 when running `{register.bootstrap.pants_bin_name} lint`",
+            help=f"Don't use Flake8 when running `{bin_name()} lint`",
         )
         register(
             "--args",
@@ -133,8 +133,14 @@ class Flake8(PythonToolBase):
                 "```\n\n"
                 "While your plugin's code can depend on other first-party code and third-party "
                 "requirements, all first-party dependencies of the plugin must live in the same "
-                "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
-                "option `[flake8].extra_requirements`."
+                "directory or a subdirectory.\n\n"
+                "To instead load third-party plugins, set the option "
+                "`[flake8].extra_requirements`.\n\n"
+                "Tip: it's often helpful to define a dedicated 'resolve' via "
+                "`[python].resolves` for your Flake8 plugins such as 'flake8-plugins' "
+                "so that the third-party requirements used by your plugin, like `flake8`, do not "
+                "mix with the rest of your project. Read that option's help message for more info "
+                "on resolves."
             ),
         )
 

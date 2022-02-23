@@ -8,13 +8,13 @@ import importlib.resources
 import json
 import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
 
 import toml
 
-from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -51,11 +51,16 @@ from pants.jvm.resolve.common import (
 )
 from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JvmArtifactFieldSet,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+    JvmResolveField,
+)
 from pants.jvm.util_rules import ExtractFileDigest
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
 
@@ -76,17 +81,22 @@ class CoursierError(Exception):
 class NoCompatibleResolve(Exception):
     """No compatible resolve could be found for a set of targets."""
 
-    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
-        targets_and_resolves_str = bullet_list(
-            f"{t.address.spec}\t{jvm.resolves_for_target(t)}" for t in incompatible_targets
+    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, relevant_targets: Iterable[Target]):
+        resolves_to_addresses = defaultdict(list)
+        for tgt in relevant_targets:
+            if tgt.has_field(JvmResolveField):
+                resolve = tgt[JvmResolveField].normalized_value(jvm)
+                resolves_to_addresses[resolve].append(tgt.address.spec)
+
+        formatted_resolve_lists = "\n\n".join(
+            f"{resolve}:\n{bullet_list(sorted(addresses))}"
+            for resolve, addresses in sorted(resolves_to_addresses.items())
         )
         super().__init__(
-            f"{msg_prefix}:\n"
-            f"{targets_and_resolves_str}\n"
-            "Targets which will be merged onto the same classpath must have at least one compatible "
-            f"resolve (from the [resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) or "
-            f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
-            "fields) in common."
+            f"{msg_prefix}:\n\n"
+            f"{formatted_resolve_lists}\n\n"
+            "Targets which will be merged onto the same classpath must share a resolve (from the "
+            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
         )
 
 
@@ -219,14 +229,6 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
-
-        return cls(
-            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
-        )
-
-    @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
         """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
 
@@ -258,15 +260,7 @@ class CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
         attached metadata, or old-style JSON.)."""
 
-        try:
-            return cls.from_toml(lockfile)
-        except toml.TomlDecodeError:
-            deprecated.warn_or_error(
-                "2.11.0.dev0",
-                "JSON-encoded JVM lockfile",
-                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
-            )
-            return cls.from_json_dicts(json.loads(lockfile))
+        return cls.from_toml(lockfile)
 
     def to_serialized(self) -> bytes:
         """Export this CoursierResolvedLockfile to a human-readable serialized form.
@@ -449,10 +443,12 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
 
     requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
 
-    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(
+        [requirement], LockfileContext.USER
+    ):
         raise ValueError(
             f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
-            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
             "lockfile based on the new requirements."
         )
 
@@ -594,41 +590,25 @@ async def select_coursier_resolve_for_targets(
     resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
     in that case there might be multiple CoarsenedTargets.
     """
-    root_targets = [t for ct in coarsened_targets for t in ct.members]
+    targets = [t for ct in coarsened_targets.closure() for t in ct.members]
 
-    # Find the set of resolves that are compatible with all roots by ANDing them all together.
-    compatible_resolves: set[str] | None = None
-    for tgt in root_targets:
-        current_resolves = set(jvm.resolves_for_target(tgt))
-        if compatible_resolves is None:
-            compatible_resolves = current_resolves
-        else:
-            compatible_resolves &= current_resolves
+    # Find a single resolve that is compatible with all targets in the closure.
+    compatible_resolve: str | None = None
+    all_compatible = True
+    for tgt in targets:
+        if not tgt.has_field(JvmResolveField):
+            continue
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
+        if compatible_resolve is None:
+            compatible_resolve = resolve
+        elif resolve != compatible_resolve:
+            all_compatible = False
 
-    # Select a resolve from the compatible set.
-    if not compatible_resolves:
+    if not compatible_resolve or not all_compatible:
         raise NoCompatibleResolve(
-            jvm, "The selected targets did not have a resolve in common", root_targets
+            jvm, "The selected targets did not have a resolve in common", targets
         )
-    # Take the first compatible resolve.
-    resolve = min(compatible_resolves)
-
-    # Validate that the selected resolve is compatible with all transitive dependencies.
-    incompatible_targets = []
-    for ct in coarsened_targets.closure():
-        for t in ct.members:
-            if not jvm.is_jvm_target(t):
-                continue
-            target_resolves = jvm.resolves_for_target(t)
-            if target_resolves is not None and resolve not in target_resolves:
-                incompatible_targets.append(t)
-    if incompatible_targets:
-        raise NoCompatibleResolve(
-            jvm,
-            f"The resolve chosen for the root targets was {resolve}, but some of their "
-            "dependencies were not compatible with that resolve",
-            incompatible_targets,
-        )
+    resolve = compatible_resolve
 
     # Load the resolve.
     resolve_path = jvm.resolves[resolve]
@@ -739,7 +719,9 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 lockfile_req.artifact_inputs, lockfile_req.artifact_option_name
             ),
         )
-        if resolution.metadata and not resolution.metadata.is_valid_for(lockfile_inputs):
+        if resolution.metadata and not resolution.metadata.is_valid_for(
+            lockfile_inputs, LockfileContext.TOOL
+        ):
             raise ValueError(
                 f"The lockfile {lockfile_req.lockfile_dest} (configured by the option "
                 f"{lockfile_req.lockfile_option_name}) was generated with different requirements "

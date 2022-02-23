@@ -1569,6 +1569,32 @@ impl Node for NodeKey {
       _ => true,
     }
   }
+
+  fn cyclic_error(path: &[&NodeKey]) -> Failure {
+    let mut path = path.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+    if !path.is_empty() {
+      path[0] += " <-";
+      path.push(path[0].clone());
+    }
+    let gil = Python::acquire_gil();
+    let url = externs::doc_url(
+      gil.python(),
+      "targets#dependencies-and-dependency-inference",
+    );
+    throw(format!(
+      "The dependency graph contained a cycle:\
+      \n\n  \
+      {}\
+      \n\n\
+      If the dependencies in the above path are for your BUILD targets, you may need to use more \
+      granular targets or replace BUILD target dependencies with file dependencies. If they are \
+      not for your BUILD targets, then please file a Github issue!\
+      \n\n\
+      See {} for more information.",
+      path.join("\n  "),
+      url
+    ))
+  }
 }
 
 impl Display for NodeKey {
@@ -1612,32 +1638,6 @@ impl Display for NodeKey {
 impl NodeError for Failure {
   fn invalidated() -> Failure {
     Failure::Invalidated
-  }
-
-  fn cyclic(mut path: Vec<String>) -> Failure {
-    let path_len = path.len();
-    if path_len > 1 {
-      path[0] += " <-";
-      path[path_len - 1] += " <-"
-    }
-    let gil = Python::acquire_gil();
-    let url = externs::doc_url(
-      gil.python(),
-      "targets#dependencies-and-dependency-inference",
-    );
-    throw(format!(
-      "The dependency graph contained a cycle:\
-      \n\n  \
-      {}\
-      \n\n\
-      If the dependencies in the above path are for your BUILD targets, you may need to use more \
-      granular targets or replace BUILD target dependencies with file dependencies. If they are \
-      not for your BUILD targets, then please file a Github issue!\
-      \n\n\
-      See {} for more information.",
-      path.join("\n  "),
-      url
-    ))
   }
 }
 

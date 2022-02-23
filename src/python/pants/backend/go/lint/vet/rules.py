@@ -16,7 +16,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -39,9 +39,9 @@ class GoVetFieldSet(FieldSet):
         return tgt.get(SkipGoVetField).value
 
 
-class GoVetRequest(LintRequest):
+class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
-    name = "go vet"
+    name = GoVetSubsystem.options_scope
 
 
 @rule(level=LogLevel.DEBUG)
@@ -87,5 +87,5 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintRequest, GoVetRequest),
+        UnionRule(LintTargetsRequest, GoVetRequest),
     ]

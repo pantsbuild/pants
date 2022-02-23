@@ -13,6 +13,7 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
     GoImportPathField,
+    GoModSourcesField,
     GoModTarget,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
@@ -206,7 +207,7 @@ async def generate_targets_from_go_mod(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(generator_addr))
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(request.generator[GoModSourcesField]))
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(go_mod_info.digest, go_mod_info.mod_path),

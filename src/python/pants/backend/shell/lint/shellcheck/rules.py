@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -39,9 +39,9 @@ class ShellcheckFieldSet(FieldSet):
         return tgt.get(SkipShellcheckField).value
 
 
-class ShellcheckRequest(LintRequest):
+class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
-    name = "Shellcheck"
+    name = Shellcheck.options_scope
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
@@ -110,4 +110,4 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintRequest, ShellcheckRequest)]
+    return [*collect_rules(), UnionRule(LintTargetsRequest, ShellcheckRequest)]

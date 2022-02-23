@@ -10,9 +10,9 @@ from typing import List, Tuple
 from pants.base.build_root import BuildRoot
 from pants.core.goals.export import (
     Export,
-    ExportableData,
-    ExportableDataRequest,
-    ExportSubsystem,
+    ExportRequest,
+    ExportResult,
+    ExportResults,
     Symlink,
     export,
 )
@@ -22,7 +22,7 @@ from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeD
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 
 
@@ -35,14 +35,12 @@ def make_target(path: str, target_name: str) -> Target:
     return MockTarget({}, Address(path, target_name=target_name))
 
 
-class MockExportableDataRequest(ExportableDataRequest):
+class MockExportRequest(ExportRequest):
     pass
 
 
-def mock_export(
-    edr: ExportableDataRequest, digest: Digest, symlinks: tuple[Symlink, ...]
-) -> ExportableData:
-    return ExportableData(
+def mock_export(edr: ExportRequest, digest: Digest, symlinks: tuple[Symlink, ...]) -> ExportResult:
+    return ExportResult(
         description=f"mock export for {','.join(t.address.spec for t in edr.targets)}",
         reldir="mock",
         digest=digest,
@@ -51,7 +49,7 @@ def mock_export(
 
 
 def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int, str]:
-    union_membership = UnionMembership({ExportableDataRequest: [MockExportableDataRequest]})
+    union_membership = UnionMembership({ExportRequest: [MockExportRequest]})
     with open(os.path.join(rule_runner.build_root, "somefile"), "wb") as fp:
         fp.write(b"SOMEFILE")
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
@@ -61,7 +59,6 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
             rule_args=[
                 console,
                 Targets(targets),
-                create_goal_subsystem(ExportSubsystem),
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 union_membership,
                 BuildRoot(),
@@ -69,10 +66,10 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
             ],
             mock_gets=[
                 MockGet(
-                    output_type=ExportableData,
-                    input_type=ExportableDataRequest,
-                    mock=lambda edr: mock_export(
-                        edr, digest, (Symlink("somefile", "link_to_somefile"),)
+                    output_type=ExportResults,
+                    input_type=ExportRequest,
+                    mock=lambda req: ExportResults(
+                        (mock_export(req, digest, (Symlink("somefile", "link_to_somefile"),)),),
                     ),
                 ),
                 MockGet(
@@ -94,7 +91,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
 def test_run_export_rule() -> None:
     rule_runner = RuleRunner(
         rules=[
-            UnionRule(ExportableDataRequest, MockExportableDataRequest),
+            UnionRule(ExportRequest, MockExportRequest),
             QueryRule(Digest, [CreateDigest]),
         ],
         target_types=[MockTarget],

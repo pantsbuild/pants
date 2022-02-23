@@ -22,7 +22,7 @@ from pants.option.arg_splitter import (
     VersionHelp,
 )
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.docutil import terminal_width
+from pants.util.docutil import bin_name, terminal_width
 from pants.util.strutil import first_paragraph, hard_wrap, pluralize
 
 
@@ -32,13 +32,11 @@ class HelpPrinter(MaybeColor):
     def __init__(
         self,
         *,
-        bin_name: str,
         help_request: HelpRequest,
         all_help_info: AllHelpInfo,
         color: bool,
     ) -> None:
         super().__init__(color)
-        self._bin_name = bin_name
         self._help_request = help_request
         self._all_help_info = all_help_info
         self._width = terminal_width()
@@ -47,8 +45,8 @@ class HelpPrinter(MaybeColor):
         """Print help to the console."""
 
         def print_hint() -> None:
-            print(f"Use `{self.maybe_green(self._bin_name + ' help')}` to get help.")
-            print(f"Use `{self.maybe_green(self._bin_name + ' help goals')}` to list goals.")
+            print(f"Use `{self.maybe_green(bin_name() + ' help')}` to get help.")
+            print(f"Use `{self.maybe_green(bin_name() + ' help goals')}` to list goals.")
 
         if isinstance(self._help_request, VersionHelp):
             print(pants_version())
@@ -150,16 +148,16 @@ class HelpPrinter(MaybeColor):
 
         for name, description in sorted(goal_descriptions.items()):
             print(format_goal(name, first_paragraph(description)))
-        specific_help_cmd = f"{self._bin_name} help $goal"
+        specific_help_cmd = f"{bin_name()} help $goal"
         print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
 
     def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")
 
         subsystem_description: Dict[str, str] = {}
-        for alias, help_info in self._all_help_info.scope_to_help_info.items():
-            if not help_info.is_goal and alias:
-                subsystem_description[alias] = first_paragraph(help_info.description)
+        for help_info in self._all_help_info.non_deprecated_option_scope_help_infos():
+            if not help_info.is_goal and help_info.scope:
+                subsystem_description[help_info.scope] = first_paragraph(help_info.description)
 
         longest_subsystem_alias = max(len(alias) for alias in subsystem_description.keys())
         chars_before_description = longest_subsystem_alias + 2
@@ -168,7 +166,7 @@ class HelpPrinter(MaybeColor):
             description = self._format_summary_description(description, chars_before_description)
             print(f"{alias}{description}\n")
 
-        specific_help_cmd = f"{self._bin_name} help $subsystem"
+        specific_help_cmd = f"{bin_name()} help $subsystem"
         print(
             f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a "
             f"specific subsystem.\n"
@@ -189,7 +187,7 @@ class HelpPrinter(MaybeColor):
                 target_type_info.summary, chars_before_description
             )
             print(f"{alias_str}{summary}\n")
-        specific_help_cmd = f"{self._bin_name} help $target_type"
+        specific_help_cmd = f"{bin_name()} help $target_type"
         print(
             f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific "
             f"target type.\n"
@@ -198,7 +196,7 @@ class HelpPrinter(MaybeColor):
     def _print_all_tools(self) -> None:
         self._print_title("External Tools")
         ToolHelpInfo.print_all(ToolHelpInfo.iter(self._all_help_info), self)
-        tool_help_cmd = f"{self._bin_name} help $tool"
+        tool_help_cmd = f"{bin_name()} help $tool"
         print(f"Use `{self.maybe_green(tool_help_cmd)}` to get help for a specific tool.\n")
 
     def _print_all_api_types(self) -> None:
@@ -214,12 +212,12 @@ class HelpPrinter(MaybeColor):
             name = self.maybe_cyan(api_type.ljust(chars_before_description))
             description = self._format_summary_description(description, chars_before_description)
             print(f"{name}{description}\n")
-        api_help_cmd = f"{self._bin_name} help $api_type"
+        api_help_cmd = f"{bin_name()} help $api_type"
         print(f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type.\n")
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
-            cmd = self.maybe_green(f"{self._bin_name} {args}".ljust(50))
+            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(50))
             print(f"  {cmd}  {desc}")
 
         print(f"\nPants {pants_version()}")

@@ -12,7 +12,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -36,9 +36,9 @@ class BlackFieldSet(FieldSet):
         return tgt.get(SkipBlackField).value
 
 
-class BlackRequest(FmtRequest, LintRequest):
+class BlackRequest(FmtRequest, LintTargetsRequest):
     field_set_type = BlackFieldSet
-    name = "Black"
+    name = Black.options_scope
 
 
 @dataclass(frozen=True)
@@ -164,6 +164,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, BlackRequest),
-        UnionRule(LintRequest, BlackRequest),
+        UnionRule(LintTargetsRequest, BlackRequest),
         *pex.rules(),
     ]

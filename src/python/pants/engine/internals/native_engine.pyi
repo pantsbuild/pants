@@ -18,6 +18,15 @@ from pants.engine.process import InteractiveProcessResult
 # flake8: noqa: E302
 
 # ------------------------------------------------------------------------------
+# Address (parsing)
+# ------------------------------------------------------------------------------
+
+class AddressParseException(Exception):
+    pass
+
+def address_parse(spec: str) -> tuple[str, str | None, tuple[tuple[str, str], ...], str | None]: ...
+
+# ------------------------------------------------------------------------------
 # Scheduler
 # ------------------------------------------------------------------------------
 
@@ -267,7 +276,10 @@ def session_poll_workunits(
 def session_run_interactive_process(
     session: PySession, InteractiveProcess
 ) -> InteractiveProcessResult: ...
-def session_get_observation_histograms(scheduler: PyScheduler, session: PySession) -> dict: ...
+def session_get_metrics(session: PySession) -> dict[str, int]: ...
+def session_get_observation_histograms(
+    scheduler: PyScheduler, session: PySession
+) -> dict[str, Any]: ...
 def session_record_test_observation(
     scheduler: PyScheduler, session: PySession, value: int
 ) -> None: ...

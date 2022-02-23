@@ -21,9 +21,9 @@ from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.alias import CliAlias
 from pants.option.config import _ChainedConfig
+from pants.option.option_types import DictOption
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.util.frozendict import FrozenDict
 from pants.version import PANTS_SEMVER, VERSION
 
 
@@ -31,18 +31,10 @@ class PantsReleases(Subsystem):
     options_scope = "pants-releases"
     help = "Options for Pants's release process."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--release-notes",
-            type=dict,
-            help="A dict from branch name to release notes rst-file location.",
-        )
-
-    @property
-    def _release_notes(self) -> FrozenDict[str, str]:
-        return FrozenDict(self.options.release_notes)
+    _release_notes = DictOption[str](
+        "--release-notes",
+        help="A dict from branch name to release notes rst-file location.",
+    )
 
     @classmethod
     def _branch_name(cls, version: Version) -> str:

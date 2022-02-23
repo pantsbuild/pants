@@ -26,11 +26,9 @@ def calculate_specs(
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
-    *,
-    build_root: str,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
-    specs = SpecsParser(build_root).parse_specs(options.specs)
+    specs = SpecsParser().parse_specs(options.specs)
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
     logger.debug("specs are: %s", specs)

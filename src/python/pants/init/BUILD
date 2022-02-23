@@ -3,22 +3,16 @@
 
 python_sources(dependencies=[":plugins"])
 
-# NOTE: When adding a new backend, add it `generate_docs.py` too! (If stable enough for docs)
+# NOTE: When adding a new backend, add it to `generate_docs.py` too! (If stable enough for docs)
 target(
     name="plugins",
     dependencies=[
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/codegen/protobuf/python",
-        "src/python/pants/backend/experimental/codegen/avro/java",
-        "src/python/pants/backend/experimental/codegen/protobuf/java",
-        "src/python/pants/backend/experimental/codegen/protobuf/scala",
-        "src/python/pants/backend/experimental/codegen/thrift/apache/java",
-        "src/python/pants/backend/experimental/codegen/thrift/apache/python",
-        "src/python/pants/backend/experimental/codegen/thrift/scrooge/java",
-        "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
+        "src/python/pants/backend/codegen/thrift/apache/python",
+        "src/python/pants/backend/docker",
+        "src/python/pants/backend/docker/lint/hadolint",
         "src/python/pants/backend/experimental/debian",
-        "src/python/pants/backend/experimental/docker",
-        "src/python/pants/backend/experimental/docker/lint/hadolint",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
         "src/python/pants/backend/experimental/java",
@@ -27,6 +21,7 @@ target(
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
+        "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",

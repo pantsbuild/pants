@@ -17,7 +17,7 @@ from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 
 
 class TwineSubsystem(PythonToolBase):
@@ -48,7 +48,7 @@ class TwineSubsystem(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use Twine when running `./pants publish`.",
+            help=f"Don't use Twine when running `{bin_name()} publish`.",
         )
         register(
             "--args",

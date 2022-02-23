@@ -8,7 +8,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TypeVar, cast
 
-from pants.core.goals.style_request import StyleRequest, style_batch_size_help
+from pants.core.goals.style_request import (
+    StyleRequest,
+    determine_specified_tool_names,
+    only_option_help,
+    style_batch_size_help,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -134,28 +139,11 @@ class FmtSubsystem(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--per-file-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Formatters are now broken into multiple batches by default using the "
-                "`--batch-size` argument.\n"
-                "\n"
-                "To keep (roughly) this option's behavior, set [fmt].batch_size = 1. However, "
-                "you'll likely get better performance by using a larger batch size because of "
-                "reduced overhead launching processes."
-            ),
-            help=(
-                "Rather than formatting all files in a single batch, format each file as a "
-                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
-                "this? Formatters both have substantial startup overhead and are cheap to add one "
-                "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
-                "are using a remote cache or if you have benchmarked that this option will be "
-                "faster than `--no-per-file-caching` for your use case."
-            ),
+            "--only",
+            type=list,
+            member_type=str,
+            default=[],
+            help=only_option_help("fmt", "formatter", "isort", "shfmt"),
         )
         register(
             "--batch-size",
@@ -166,8 +154,8 @@ class FmtSubsystem(GoalSubsystem):
         )
 
     @property
-    def per_file_caching(self) -> bool:
-        return cast(bool, self.options.per_file_caching)
+    def only(self) -> tuple[str, ...]:
+        return tuple(self.options.only)
 
     @property
     def batch_size(self) -> int:
@@ -186,40 +174,34 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
+    request_types = union_membership[FmtRequest]
+    specified_names = determine_specified_tool_names("fmt", fmt_subsystem.only, request_types)
+
     # Group targets by the sequence of FmtRequests that apply to them.
     targets_by_fmt_request_order = defaultdict(list)
     for target in targets:
         fmt_requests = []
-        for fmt_request in union_membership[FmtRequest]:
-            if fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
+        for fmt_request in request_types:
+            valid_name = fmt_request.name in specified_names
+            if valid_name and fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
                 fmt_requests.append(fmt_request)
         if fmt_requests:
             targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
 
     # Spawn sequential formatting per unique sequence of FmtRequests.
-    if fmt_subsystem.per_file_caching:
-        per_language_results = await MultiGet(
-            Get(
-                _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets([target])),
-            )
-            for fmt_requests, targets in targets_by_fmt_request_order.items()
-            for target in targets
+    per_language_results = await MultiGet(
+        Get(
+            _LanguageFmtResults,
+            _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
         )
-    else:
-        per_language_results = await MultiGet(
-            Get(
-                _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
-            )
-            for fmt_requests, targets in targets_by_fmt_request_order.items()
-            for target_batch in partition_sequentially(
-                targets,
-                key=lambda t: t.address.spec,
-                size_target=fmt_subsystem.batch_size,
-                size_max=4 * fmt_subsystem.batch_size,
-            )
+        for fmt_requests, targets in targets_by_fmt_request_order.items()
+        for target_batch in partition_sequentially(
+            targets,
+            key=lambda t: t.address.spec,
+            size_target=fmt_subsystem.batch_size,
+            size_max=4 * fmt_subsystem.batch_size,
         )
+    )
 
     individual_results = list(
         itertools.chain.from_iterable(

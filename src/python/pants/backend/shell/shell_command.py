@@ -51,6 +51,7 @@ from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
     SourcesField,
+    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
     WrappedTarget,
@@ -67,8 +68,8 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 
 @dataclass(frozen=True)
-class ShellCommandProcessRequest(WrappedTarget):
-    pass
+class ShellCommandProcessRequest:
+    target: Target
 
 
 class RunShellCommand(RunFieldSet):

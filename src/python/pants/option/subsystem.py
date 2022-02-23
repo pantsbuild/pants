@@ -11,6 +11,7 @@ from typing import Any, ClassVar, TypeVar
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
+from pants.option.option_types import OptionsInfo
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 
@@ -100,6 +101,14 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses may override and call register(*args, **kwargs).
         """
+        # NB: Since registration ordering matters (it impacts `help` output), we register these in
+        # class attribute order, starting from the base class down.
+        for class_ in reversed(inspect.getmro(cls)):
+            for attrname in class_.__dict__.keys():
+                # NB: We use attrname and getattr to trigger descriptors
+                attr = getattr(cls, attrname)
+                if isinstance(attr, OptionsInfo):
+                    register(*attr.flag_names, **attr.flag_options)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -119,9 +128,9 @@ class Subsystem(metaclass=ABCMeta):
         return bool(self.options == other.options)
 
 
-_T = TypeVar("_T", bound=Subsystem)
+_SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
 
 
-async def _construct_subsytem(subsystem_typ: type[_T]) -> _T:
+async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)

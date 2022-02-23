@@ -8,5 +8,5 @@ python_tests(name="tests", timeout=240)
 # Targets for developing on the Java parser outside of engine rules.
 java_sources(
     name="java_parser",
-    compatible_resolves=["java_parser"],
+    resolve="java_parser",
 )
