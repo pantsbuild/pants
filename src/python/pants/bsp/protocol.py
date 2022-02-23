@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future
-from typing import Any, BinaryIO, ClassVar, Type
+from typing import Any, BinaryIO, ClassVar
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
@@ -17,7 +17,24 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.unions import UnionMembership, union
 
+try:
+    from typing import Protocol  # Python 3.8+
+except ImportError:
+    # See https://github.com/python/mypy/issues/4427 re the ignore
+    from typing_extensions import Protocol  # type: ignore
+
 _logger = logging.getLogger(__name__)
+
+
+class BSPRequestTypeProtocol(Protocol):
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        ...
+
+
+class BSPResponseTypeProtocol(Protocol):
+    def to_json_dict(self) -> dict[str, Any]:
+        ...
 
 
 @union
@@ -29,11 +46,11 @@ class BSPHandlerMapping:
 
     # Type requested from the engine. This will be provided as the "subject" of an engine query.
     # Must implement class method `from_json_dict`.
-    request_type: Type
+    request_type: type[BSPRequestTypeProtocol]
 
     # Type produced by the handler rule. This will be requested as the "product" of the engine query.
     # Must implement instance method `to_json_dict`.
-    response_type: Type
+    response_type: type[BSPResponseTypeProtocol]
 
     # True if this handler is for a notification.
     # TODO: Consider how to pass notifications (which do not have responses) to the engine rules.
