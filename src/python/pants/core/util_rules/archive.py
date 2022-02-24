@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from collections import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -42,8 +43,10 @@ SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 
 
 class ZipBinary(BinaryPath):
-    def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
-        return (self.path, request.output_filename, *request.snapshot.files)
+    def create_archive_argv(
+        self, output_filename: str, input_files: Sequence[str]
+    ) -> tuple[str, ...]:
+        return (self.path, output_filename, *input_files)
 
 
 class UnzipBinary(BinaryPath):
@@ -74,16 +77,18 @@ class Gunzip:
 
 
 class TarBinary(BinaryPath):
-    def create_archive_argv(self, request: CreateArchive) -> tuple[str, ...]:
+    def create_archive_argv(
+        self, output_filename: str, input_files: Sequence[str], tar_format: ArchiveFormat
+    ) -> tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
         #
         # We do not use `-a` (auto-set compression) because it does not work with older tar
         # versions. Not all tar implementations will support these compression formats - in that
         # case, the user will need to choose a different format.
         compression = {ArchiveFormat.TGZ: "z", ArchiveFormat.TBZ2: "j", ArchiveFormat.TXZ: "J"}.get(
-            request.format, ""
+            tar_format, ""
         )
-        return (self.path, f"c{compression}f", request.output_filename, *request.snapshot.files)
+        return (self.path, f"c{compression}f", output_filename, *input_files)
 
     def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
@@ -188,12 +193,14 @@ class CreateArchive:
 async def create_archive(request: CreateArchive) -> Digest:
     if request.format == ArchiveFormat.ZIP:
         zip_binary = await Get(ZipBinary, _ZipBinaryRequest())
-        argv = zip_binary.create_archive_argv(request)
+        argv = zip_binary.create_archive_argv(request.output_filename, request.snapshot.files)
         env = {}
         input_digest = request.snapshot.digest
     else:
         tar_binary = await Get(TarBinary, _TarBinaryRequest())
-        argv = tar_binary.create_archive_argv(request)
+        argv = tar_binary.create_archive_argv(
+            request.output_filename, request.snapshot.files, request.format
+        )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
         # `tar` requires that the output filename's parent directory exists.
