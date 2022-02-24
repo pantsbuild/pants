@@ -615,7 +615,7 @@ class VenvScriptWriter:
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            f"$(ensure_absolute {shlex.quote(arg)})"
+            f"$(relativize_path {shlex.quote(arg)})"
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
@@ -624,30 +624,29 @@ class VenvScriptWriter:
             #!{bash.path}
             set -euo pipefail
 
-            # N.B.: We convert all sandbox root relative paths to absolute paths so this script
-            # works when run with a cwd set elsewhere.
+            # N.B.: We relative all paths to the sandbox root so that this script works when run
+            # with a cwd set elsewhere.
 
             # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
-            # 2004. In turn, our use of BASH_SOURCE relies on the fact that this script is executed
-            # by the engine via its absolute path.
-            ABS_SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
+            # 2004. This will be a value like `.`, per https://github.com/pantsbuild/pants/issues/14586.
+            SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
 
-            function ensure_absolute() {{
+            function relativize_path() {{
                 local value0="$1"
                 shift
                 if [ "${{value0:0:1}}" == "/" ]; then
                     echo "${{value0}}" "$@"
                 else
-                    echo "${{ABS_SANDBOX_ROOT}}/${{value0}}" "$@"
+                    echo "${{SANDBOX_ROOT}}/${{value0}}" "$@"
                 fi
             }}
 
             export {" ".join(env_vars)}
-            export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
+            export PEX_ROOT="$(relativize_path ${{PEX_ROOT}})"
 
             execute_pex_args="{execute_pex_args}"
-            target_venv_executable="$(ensure_absolute {target_venv_executable})"
-            venv_dir="$(ensure_absolute {venv_dir})"
+            target_venv_executable="$(relativize_path {target_venv_executable})"
+            venv_dir="$(relativize_path {venv_dir})"
 
             # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
             # with tools support.

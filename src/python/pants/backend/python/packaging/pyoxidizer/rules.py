@@ -27,7 +27,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -38,6 +38,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -64,14 +65,14 @@ class PyoxidizerRunnerScript:
 @rule
 async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
     # Note: PyOxidizer expects an absolute path for its cache dir, which can only be resolved
-    # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
-    # absolute paths inside the sandbox.
+    # from within the execution sandbox. Thus, this code uses a script to resolve absolute paths.
     script = FileContent(
-        "__run_pyoxidizer.sh",
+        "__run_pyoxidizer.py",
         dedent(
             f"""\
-            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/{PyoxidizerRunnerScript.CACHE_PATH}"
-            exec "$@"
+            import os, sys
+            os.environ["PYOXIDIZER_CACHE_DIR"] = os.path.join(os.getcwd(), "{PyoxidizerRunnerScript.CACHE_PATH}")
+            os.execv(sys.argv[1], sys.argv[1:])
             """
         ).encode("utf-8"),
     )
@@ -84,7 +85,7 @@ async def package_pyoxidizer_binary(
     pyoxidizer: PyOxidizer,
     field_set: PyOxidizerFieldSet,
     runner_script: PyoxidizerRunnerScript,
-    bash: BashBinary,
+    python: PythonBinary,
 ) -> BuiltPackage:
     direct_deps, pyoxidizer_pex = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
@@ -163,7 +164,7 @@ async def package_pyoxidizer_binary(
     )
     process_with_caching = dataclasses.replace(
         pex_process,
-        argv=(bash.path, runner_script.path, *pex_process.argv),
+        argv=(python.path, runner_script.path, *pex_process.argv),
         append_only_caches={
             **pex_process.append_only_caches,
             "pyoxidizer": runner_script.CACHE_PATH,
