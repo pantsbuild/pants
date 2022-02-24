@@ -7,6 +7,7 @@ import os
 import shlex
 import textwrap
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import ClassVar, Iterable, Tuple
 
 from pants.core.util_rules import external_tool
@@ -21,6 +22,8 @@ from pants.engine.process import BashBinary, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
+
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -140,6 +143,7 @@ class Coursier:
 
     coursier: DownloadedExternalTool
     _digest: Digest
+    repos: FrozenOrderedSet[str]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -158,12 +162,25 @@ class Coursier:
         )
 
     @property
+    def _coursier_cache_prefix(self) -> str:
+        """Returns a key for `COURSIER_CACHE` determined by the configured repositories.
+
+        This helps us avoid a cache poisoning issue that we uncovered in #14577.
+        """
+        sha = sha256()
+        for repo in self.repos:
+            sha.update(repo.encode("utf-8"))
+        return sha.digest().hex()
+
+    @property
     def env(self) -> dict[str, str]:
         # NB: These variables have changed a few times, and they change again on `main`. But as of
         # `v2.0.16+73-gddc6d9cc9` they are accurate. See:
         #  https://github.com/coursier/coursier/blob/v2.0.16+73-gddc6d9cc9/modules/paths/src/main/java/coursier/paths/CoursierPaths.java#L38-L48
         return {
-            "COURSIER_CACHE": f"{self.cache_dir}/jdk",
+            # Maven artifacts and JDK tarballs go here
+            "COURSIER_CACHE": f"{self.cache_dir}/{self._coursier_cache_prefix}/jdk",
+            # extracted JDK tarballs go here
             "COURSIER_ARCHIVE_CACHE": f"{self.cache_dir}/arc",
             "COURSIER_JVM_CACHE": f"{self.cache_dir}/v1",
         }
@@ -178,7 +195,7 @@ class Coursier:
 
 
 @dataclass(frozen=True)
-class CoursierWrapperProcess:
+class CoursierFetchProcess:
 
     args: Tuple[str, ...]
     input_digest: Digest
@@ -191,7 +208,7 @@ class CoursierWrapperProcess:
 async def invoke_coursier_wrapper(
     bash: BashBinary,
     coursier: Coursier,
-    request: CoursierWrapperProcess,
+    request: CoursierFetchProcess,
 ) -> Process:
 
     return Process(
@@ -271,6 +288,7 @@ async def setup_coursier(
                 ]
             ),
         ),
+        repos=FrozenOrderedSet(coursier_subsystem.options.repos),
     )
 
 
