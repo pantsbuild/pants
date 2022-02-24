@@ -5,9 +5,9 @@ import logging
 from itertools import chain
 
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
-from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.system_binaries import ZipBinary
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessResult

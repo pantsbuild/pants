@@ -15,7 +15,7 @@ from pants.backend.java.target_types import (
     JunitTestsGeneratorTarget,
 )
 from pants.backend.java.target_types import rules as java_target_rules
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *java_util_rules(),
             *javac_rules(),
             *source_files.rules(),
+            *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ThirdPartyPackageToArtifactMapping, []),
