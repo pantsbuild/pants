@@ -13,7 +13,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.context import BSPContext
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
