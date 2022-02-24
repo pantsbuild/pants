@@ -22,6 +22,7 @@ from pants.engine.process import BashBinary, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -166,7 +167,7 @@ class Coursier:
             *args,
         )
 
-    @property
+    @memoized_property
     def _coursier_cache_prefix(self) -> str:
         """Returns a key for `COURSIER_CACHE` determined by the configured repositories.
 
