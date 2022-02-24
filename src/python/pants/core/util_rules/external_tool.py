@@ -13,7 +13,7 @@ from typing import Dict, Optional, cast
 
 from pkg_resources import Requirement
 
-from pants.core.util_rules import archive
+from pants.core.util_rules import archive, system_binaries
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
 from pants.engine.platform import Platform
@@ -358,4 +358,4 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
 
 
 def rules():
-    return (*collect_rules(), *archive.rules())
+    return (*collect_rules(), *archive.rules(), *system_binaries.rules())
