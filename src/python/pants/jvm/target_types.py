@@ -271,9 +271,10 @@ class JvmWarDependenciesField(Dependencies):
     pass
 
 
-class JvmWarDescriptorAddressField(StringField):
+class JvmWarDescriptorAddressField(SingleSourceField):
     alias = "descriptor"
-    help = "Address of a `file` target containing the descriptor (i.e., web.xml) for this WAR file."
+    default = "web.xml"
+    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
 
 
 class JvmWarContentField(SpecialCasedDependencies):

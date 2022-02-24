@@ -75,11 +75,10 @@ def test_basic_war_packaging(rule_runner: RuleRunner) -> None:
             jvm_war(
               name="war",
               dependencies=[":javax.servlet_servlet-api"],
-              descriptor=":webxml",
+              descriptor="web.xml",
               content=[":html"],
             )
 
-            file(name="webxml", source="web.xml")
             files(name="orig_html", sources=["*.html"])
             relocated_files(
               name="html",
@@ -135,6 +134,7 @@ def test_basic_war_packaging(rule_runner: RuleRunner) -> None:
     filenames = [f.filename for f in files]
     assert sorted(filenames) == [
         "WEB-INF/",
+        "WEB-INF/classes/",
         "WEB-INF/lib/",
         "WEB-INF/lib/javax.servlet_servlet-api_2.5.jar",
         "WEB-INF/web.xml",

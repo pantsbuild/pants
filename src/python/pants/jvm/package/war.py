@@ -21,14 +21,12 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestEntries,
     Directory,
     FileContent,
     FileEntry,
     MergeDigests,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -38,7 +36,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     SourcesField,
     Targets,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
@@ -162,39 +159,27 @@ async def package_war(
 async def render_war_deployment_descriptor(
     request: RenderWarDeploymentDescriptorRequest,
 ) -> RenderedWarDeploymentDescriptor:
-    if not request.descriptor.value:
-        return RenderedWarDeploymentDescriptor(EMPTY_DIGEST)
-
-    descriptor_addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs([request.descriptor.value], owning_address=request.owning_address),
-    )
-    if not descriptor_addresses:
-        return RenderedWarDeploymentDescriptor(EMPTY_DIGEST)
-
-    wrapped_descriptor_target = await Get(WrappedTarget, Address, descriptor_addresses[0])
-    descriptor_target = wrapped_descriptor_target.target
-
     descriptor_sources = await Get(
         HydratedSources,
-        HydrateSourcesRequest(
-            descriptor_target[SourcesField],
-            for_sources_types=(FileSourceField, ResourceSourceField),
-            enable_codegen=True,
-        ),
+        HydrateSourcesRequest(request.descriptor),
     )
 
-    descriptor_sources_contents = await Get(
-        DigestContents, Digest, descriptor_sources.snapshot.digest
+    descriptor_sources_entries = await Get(
+        DigestEntries, Digest, descriptor_sources.snapshot.digest
     )
-    if len(descriptor_sources_contents) != 1:
-        raise AssertionError("num source != 1")
+    if len(descriptor_sources_entries) != 1:
+        raise AssertionError(
+            f"Expected `descriptor` field for {request.descriptor.address} to only refer to one file."
+        )
+    descriptor_entry = descriptor_sources_entries[0]
+    if not isinstance(descriptor_entry, FileEntry):
+        raise AssertionError(
+            f"Expected `descriptor` field for {request.descriptor.address} to produce a file."
+        )
 
     descriptor_digest = await Get(
         Digest,
-        CreateDigest(
-            [FileContent("__war__/WEB-INF/web.xml", descriptor_sources_contents[0].content)]
-        ),
+        CreateDigest([FileEntry("__war__/WEB-INF/web.xml", descriptor_entry.file_digest)]),
     )
 
     return RenderedWarDeploymentDescriptor(descriptor_digest)
