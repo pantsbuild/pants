@@ -376,8 +376,8 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         # situations where a PEX creation hits the process cache, while venv seeding misses the PEX
         # cache.
         if isinstance(pex_data.pex, VenvPex):
-            # Request once to ensure that the directory is seeded, and then start a new session so that
-            # the second run happens as well.
+            # Request once to ensure that the directory is seeded, and then start a new session so
+            # that the second run happens as well.
             _ = rule_runner.request(ProcessResult, [process])
             rule_runner.new_session("re-run-for-venv-pex")
             rule_runner.set_options(
