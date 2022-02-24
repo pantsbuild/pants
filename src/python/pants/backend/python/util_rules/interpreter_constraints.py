@@ -16,6 +16,7 @@ from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -339,7 +340,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 "interpreter versions from `[python].interpreter_versions_universe`.\n\n"
                 "Please either change these interpreter constraints or update the "
                 "`interpreter_versions_universe` to include the interpreters set in these "
-                "constraints. Run `./pants help-advanced python` for more information on the "
+                f"constraints. Run `{bin_name()} help-advanced python` for more information on the "
                 "`interpreter_versions_universe` option."
             )
 

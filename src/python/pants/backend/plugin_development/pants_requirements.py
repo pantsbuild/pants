@@ -3,6 +3,7 @@
 
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementTarget,
 )
@@ -41,7 +42,11 @@ class PantsRequirementsTargetGenerator(Target):
         "also invite you to share your ideas at "
         "https://github.com/pantsbuild/pants/issues/new/choose)"
     )
-    core_fields = (*COMMON_TARGET_FIELDS, PantsRequirementsTestutilField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PantsRequirementsTestutilField,
+        PythonRequirementResolveField,
+    )
 
 
 class GenerateFromPantsRequirementsRequest(GenerateTargetsRequest):
@@ -83,6 +88,7 @@ def generate_from_pants_requirements(
             {
                 PythonRequirementsField.alias: (f"{dist}{version}",),
                 PythonRequirementModulesField.alias: (module,),
+                PythonRequirementResolveField.alias: generator[PythonRequirementResolveField].value,
             },
             generator.address.create_generated(dist),
         )

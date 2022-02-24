@@ -8,6 +8,7 @@ from textwrap import dedent
 from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     create_or_update_coverage_config,
+    get_branch_value_from_config,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import (
@@ -223,4 +224,114 @@ def test_update_run_section() -> None:
 
             """  # noqa: W291
         )
+    )
+
+
+def branch(path: str, content: str) -> bool:
+    fc = FileContent(path, content.encode())
+    return get_branch_value_from_config(fc)
+
+
+def test_get_branch_value_from_config() -> None:
+    assert (
+        branch(
+            "pyproject.toml",
+            dedent(
+                """\
+        [tool.coverage.run]
+        relative_files = false
+        foo = "bar"
+        """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        branch(
+            "pyproject.toml",
+            dedent(
+                """\
+        [tool.coverage.run]
+        relative_files = false
+        branch = true
+        foo = "bar"
+        """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        branch(
+            "pyproject.toml",
+            dedent(
+                """\
+            [tool.coverage]
+                [tool.coverage.run]
+                branch = true
+            """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        branch(
+            ".coveragerc",
+            dedent(
+                """\
+                [run]
+                relative_files: False
+                branch: False
+                foo: bar
+                """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        branch(
+            ".coveragerc",
+            dedent(
+                """\
+                    [run]
+                    relative_files: False
+                    branch: True
+                    foo: bar
+                    """
+            ),
+        )
+        is True
+    )
+
+    assert (
+        branch(
+            "setup.cfg",
+            dedent(
+                """\
+                [coverage:run]
+                relative_files: False
+                branch: False
+                foo: bar
+                """
+            ),
+        )
+        is False
+    )
+
+    assert (
+        branch(
+            "setup.cfg",
+            dedent(
+                """\
+                    [coverage:run]
+                    relative_files: False
+                    branch: True
+                    foo: bar
+                    """
+            ),
+        )
+        is True
     )

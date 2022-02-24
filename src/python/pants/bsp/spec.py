@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Any
+
+from pants.bsp.utils import freeze_json
+from pants.build_graph.address import Address, AddressInput
 
 # -----------------------------------------------------------------------------------------------
 # Base types
@@ -28,20 +32,36 @@ class BuildTargetIdentifier:
     def from_json_dict(cls, d):
         return cls(uri=d["uri"])
 
+    def to_json_dict(self):
+        return {"uri": self.uri}
+
+    @classmethod
+    def from_address(cls, addr: Address) -> BuildTargetIdentifier:
+        return cls(uri=f"pants:{str(addr)}")
+
+    @property
+    def address_input(self) -> AddressInput:
+        if not self.uri.startswith("pants:"):
+            raise ValueError(
+                f"Unknown URI scheme for BSP BuildTargetIdentifier. Expected scheme `pants`, but URI was: {self.uri}"
+            )
+        raw_addr = self.uri[len("pants:") :]
+        return AddressInput.parse(raw_addr)
+
 
 @dataclass(frozen=True)
 class BuildTargetCapabilities:
     # This target can be compiled by the BSP server.
-    can_compile: bool
+    can_compile: bool = False
 
     # This target can be tested by the BSP server.
-    can_test: bool
+    can_test: bool = False
 
     # This target can be run by the BSP server.
-    can_run: bool
+    can_run: bool = False
 
     # This target can be debugged by the BSP server.
-    can_debug: bool
+    can_debug: bool = False
 
     @classmethod
     def from_json_dict(cls, d):
@@ -51,6 +71,14 @@ class BuildTargetCapabilities:
             can_run=d["canRun"],
             can_debug=d["canDebug"],
         )
+
+    def to_json_dict(self):
+        return {
+            "canCompile": self.can_compile,
+            "canTest": self.can_test,
+            "canRun": self.can_run,
+            "canDebug": self.can_debug,
+        }
 
 
 # Note: The BSP "build target" concept is _not_ the same as a Pants "target". They are similar but
@@ -98,6 +126,7 @@ class BuildTarget:
 
     # Language-specific metadata about this target.
     # See ScalaBuildTarget as an example.
+    # TODO: Figure out generic decode/encode of this field. Maybe use UnionRule to allow language backends to hook?
     data: Any | None
 
     @classmethod
@@ -115,6 +144,27 @@ class BuildTarget:
             data_kind=d.get("dataKind"),
             data=d.get("data"),
         )
+
+    def to_json_dict(self):
+        result = {
+            "id": self.id.to_json_dict(),
+            "capabilities": self.capabilities.to_json_dict(),
+            "tags": self.tags,
+            "languageIds": self.language_ids,
+            "dependencies": [dep.to_json_dict() for dep in self.dependencies],
+        }
+        if self.display_name is not None:
+            result["displayName"] = self.display_name
+        if self.base_directory is not None:
+            result["baseDirectory"] = self.base_directory
+        if self.data_kind is not None:
+            result["dataKind"] = self.data_kind
+        if self.data is not None:
+            if hasattr(self.data, "to_json_dict"):
+                result["data"] = self.data.to_json_dict()
+            else:
+                result["data"] = self.data
+        return result
 
 
 class BuildTargetDataKind:
@@ -247,7 +297,7 @@ class InitializeBuildParams:
             bsp_version=d["bspVersion"],
             root_uri=d["rootUri"],
             capabilities=BuildClientCapabilities.from_json_dict(d["capabilities"]),
-            data=d.get("data"),
+            data=freeze_json(d.get("data")),
         )
 
     def to_json_dict(self):
@@ -442,3 +492,104 @@ class InitializeBuildResult:
             # TODO: Figure out whether to encode/decode data in a generic manner.
             result["data"] = self.data
         return result
+
+
+# -----------------------------------------------------------------------------------------------
+# Workspace Build Targets Request
+# See https://build-server-protocol.github.io/docs/specification.html#workspace-build-targets-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class WorkspaceBuildTargetsParams:
+    @classmethod
+    def from_json_dict(cls, _d):
+        return cls()
+
+    def to_json_dict(self):
+        return {}
+
+
+@dataclass(frozen=True)
+class WorkspaceBuildTargetsResult:
+    targets: tuple[BuildTarget, ...]
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(targets=tuple(BuildTarget.from_json_dict(tgt) for tgt in d["targets"]))
+
+    def to_json_dict(self):
+        return {"targets": [tgt.to_json_dict() for tgt in self.targets]}
+
+
+# -----------------------------------------------------------------------------------------------
+# Build Target Sources Request
+# See https://build-server-protocol.github.io/docs/specification.html#build-target-sources-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SourcesParams:
+    targets: tuple[BuildTargetIdentifier, ...]
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
+        )
+
+    def to_json_dict(self):
+        return {
+            "targets": [tgt.to_json_dict() for tgt in self.targets],
+        }
+
+
+class SourceItemKind(IntEnum):
+    FILE = 1
+    DIRECTORY = 2
+
+
+@dataclass(frozen=True)
+class SourceItem:
+    uri: Uri
+    kind: SourceItemKind
+    generated: bool = False
+
+    @classmethod
+    def from_json_dict(cls, d: Any):
+        return cls(
+            uri=d["uri"],
+            kind=SourceItemKind(d["kind"]),
+            generated=d["generated"],
+        )
+
+    def to_json_dict(self):
+        return {
+            "uri": self.uri,
+            "kind": self.kind.value,
+            "generated": self.generated,
+        }
+
+
+@dataclass(frozen=True)
+class SourcesItem:
+    target: BuildTargetIdentifier
+    sources: tuple[SourceItem, ...]
+    roots: tuple[Uri, ...] | None
+
+    def to_json_dict(self):
+        result = {
+            "target": self.target.to_json_dict(),
+            "sources": [src.to_json_dict() for src in self.sources],
+        }
+        if self.roots is not None:
+            result["roots"] = list(self.roots)
+        return result
+
+
+@dataclass(frozen=True)
+class SourcesResult:
+    items: tuple[SourcesItem, ...]
+
+    def to_json_dict(self):
+        return {"items": [item.to_json_dict() for item in self.items]}

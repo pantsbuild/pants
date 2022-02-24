@@ -74,7 +74,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         args = ["--foo"]
         kwargs = {"advanced": True}
         lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 8
+        assert len(lines) == 9
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, False, args, kwargs)
         assert len(lines) == 18

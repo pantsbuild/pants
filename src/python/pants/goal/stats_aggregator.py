@@ -6,7 +6,6 @@ from __future__ import annotations
 import base64
 import logging
 from collections import Counter
-from typing import cast
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -17,6 +16,7 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
@@ -26,24 +26,16 @@ class StatsAggregatorSubsystem(Subsystem):
     options_scope = "stats"
     help = "An aggregator for Pants stats, such as cache metrics."
 
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--log",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                "At the end of the Pants run, log all counter metrics and summaries of "
-                "observation histograms, e.g. the number of cache hits and the time saved by "
-                "caching.\n\nFor histogram summaries to work, you must add `hdrhistogram` to "
-                "`[GLOBAL].plugins`."
-            ),
-        )
-
-    @property
-    def log(self) -> bool:
-        return cast(bool, self.options.log)
+    log = BoolOption(
+        "--log",
+        default=False,
+        help=(
+            "At the end of the Pants run, log all counter metrics and summaries of "
+            "observation histograms, e.g. the number of cache hits and the time saved by "
+            "caching.\n\nFor histogram summaries to work, you must add `hdrhistogram` to "
+            "`[GLOBAL].plugins`."
+        ),
+    ).advanced()
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
@@ -65,14 +57,11 @@ class StatsAggregatorCallback(WorkunitsCallback):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        # Aggregate counters on completed workunits.
-        for workunit in completed_workunits:
-            if "counters" in workunit:
-                for name, value in workunit["counters"].items():
-                    self.counters[name] += value
-
         if not finished:
             return
+
+        # Capture global counters.
+        self.counters = Counter(context.get_metrics())
 
         # Add any counters with a count of 0.
         for counter in context.run_tracker.counter_names:

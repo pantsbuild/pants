@@ -35,7 +35,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FmtRequest, LintTargetsRequest):
     field_set_type = AutoflakeFieldSet
-    name = "autoflake"
+    name = Autoflake.options_scope
 
 
 @dataclass(frozen=True)

@@ -21,7 +21,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
@@ -77,7 +77,9 @@ class RunSubsystem(GoalSubsystem):
         "useful for server applications."
     )
 
-    required_union_implementations = (RunFieldSet,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RunFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:

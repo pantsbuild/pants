@@ -11,6 +11,7 @@ But this module should include `@rules` for multiple languages, even though the 
 
 from __future__ import annotations
 
+import textwrap
 from textwrap import dedent
 from typing import Sequence, cast
 
@@ -36,6 +37,7 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.target import CoarsenedTarget, Target, UnexpandedTargets
 from pants.engine.unions import UnionMembership
 from pants.jvm import classpath, jdk_rules, testutil
@@ -46,9 +48,15 @@ from pants.jvm.compile import (
     ClasspathSourceMissing,
 )
 from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import (
+    CoursierFetchRequest,
+    CoursierLockfileEntry,
+    CoursierResolvedLockfile,
+)
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
@@ -58,6 +66,43 @@ from pants.jvm.testutil import (
 )
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+
+DEFAULT_LOCKFILE = TestCoursierWrapper(
+    CoursierResolvedLockfile(
+        (
+            CoursierLockfileEntry(
+                coord=Coordinate(
+                    group="org.scala-lang", artifact="scala-library", version="2.13.6"
+                ),
+                file_name="org.scala-lang_scala-library_2.13.6.jar",
+                direct_dependencies=Coordinates(),
+                dependencies=Coordinates(),
+                file_digest=FileDigest(
+                    "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a", 5955737
+                ),
+            ),
+        )
+    )
+).serialize(
+    [
+        ArtifactRequirement(
+            coordinate=Coordinate(
+                group="org.scala-lang", artifact="scala-library", version="2.13.6"
+            )
+        )
+    ]
+)
+
+DEFAULT_SCALA_LIBRARY_TARGET = textwrap.dedent(
+    """\
+    jvm_artifact(
+      name="org.scala-lang_scala-library_2.13.6",
+      group="org.scala-lang",
+      artifact="scala-library",
+      version="2.13.6",
+    )
+    """
+).replace("\n", " ")
 
 
 @pytest.fixture
@@ -157,12 +202,14 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                """\
+                f"""\
                 scala_sources(name='scala')
                 java_sources(name='java')
                 jvm_artifact(name='jvm_artifact', group='ex', artifact='ex', version='0.0.0')
+                {DEFAULT_SCALA_LIBRARY_TARGET}
                 """
             ),
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
         }
     )
     scala, java, jvm_artifact = rule_runner.request(
@@ -207,7 +254,8 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "scala_sources(name='main')",
-            "3rdparty/jvm/default.lock": "[]",
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.scala": scala_main_source(),
             "lib/BUILD": "java_sources()",
             "lib/C.java": java_lib_source(),
@@ -216,16 +264,19 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
     rendered_classpath = rule_runner.request(
         RenderedClasspath, [Addresses([Address(spec_path="", target_name="main")])]
     )
-    assert rendered_classpath.content == {
-        ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
-            "org/pantsbuild/example/Main$.class",
-            "org/pantsbuild/example/Main.class",
-        },
-        "lib.C.java.javac.jar": {
-            "org/pantsbuild/example/lib/C.class",
-        },
+
+    assert rendered_classpath.content[".Example.scala.main.scalac.jar"] == {
+        "META-INF/MANIFEST.MF",
+        "org/pantsbuild/example/Main$.class",
+        "org/pantsbuild/example/Main.class",
     }
+    assert rendered_classpath.content["lib.C.java.javac.jar"] == {
+        "org/pantsbuild/example/lib/C.class",
+    }
+    assert any(
+        key.startswith("org.scala-lang_scala-library_") for key in rendered_classpath.content.keys()
+    )
+    assert len(rendered_classpath.content.keys()) == 3
 
 
 @maybe_skip_jdk_test
@@ -234,7 +285,8 @@ def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "scala_sources(name='main')",
-            "3rdparty/jvm/default.lock": "[]",
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.scala": scala_main_source(),
             "lib/BUILD": "java_sources()",
             "lib/C.java": java_lib_source(["org.pantsbuild.example.Main"]),

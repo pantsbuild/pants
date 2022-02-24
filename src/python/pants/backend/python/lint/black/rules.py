@@ -38,7 +38,7 @@ class BlackFieldSet(FieldSet):
 
 class BlackRequest(FmtRequest, LintTargetsRequest):
     field_set_type = BlackFieldSet
-    name = "Black"
+    name = Black.options_scope
 
 
 @dataclass(frozen=True)

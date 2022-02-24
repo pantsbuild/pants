@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from pathlib import PurePath
-from typing import cast
+from typing import Any, MutableMapping, cast
 
 import toml
 
@@ -276,7 +276,7 @@ def _validate_and_update_config(
             f"file {config_path}"
         )
     coverage_config.set("run", "relative_files", "True")
-    omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
+    omit_elements = list(run_section.get("omit", "").split("\n")) or ["\n"]
     if "pytest.pex/*" not in omit_elements:
         omit_elements.append("pytest.pex/*")
     run_section["omit"] = "\n".join(omit_elements)
@@ -286,16 +286,33 @@ class InvalidCoverageConfigError(Exception):
     pass
 
 
+def _parse_toml_config(fc: FileContent) -> MutableMapping[str, Any]:
+    try:
+        return toml.loads(fc.content.decode())
+    except toml.TomlDecodeError as exc:
+        raise InvalidCoverageConfigError(
+            f"Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix "
+            f"the config or update `[coverage-py].config` and/or "
+            f"`[coverage-py].config_discovery`.\n\nParse error: {repr(exc)}"
+        )
+
+
+def _parse_ini_config(fc: FileContent) -> configparser.ConfigParser:
+    cp = configparser.ConfigParser()
+    try:
+        cp.read_string(fc.content.decode())
+        return cp
+    except configparser.Error as exc:
+        raise InvalidCoverageConfigError(
+            f"Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix "
+            f"the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`."
+            f"\n\nParse error: {repr(exc)}"
+        )
+
+
 def _update_config(fc: FileContent) -> FileContent:
     if PurePath(fc.path).suffix == ".toml":
-        try:
-            all_config = toml.loads(fc.content.decode())
-        except toml.TomlDecodeError as exc:
-            raise InvalidCoverageConfigError(
-                f"Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix "
-                f"the config or update `[coverage-py].config` and/or "
-                f"`[coverage-py].config_discovery`.\n\nParse error: {repr(exc)}"
-            )
+        all_config = _parse_toml_config(fc)
         tool = all_config.setdefault("tool", {})
         coverage = tool.setdefault("coverage", {})
         run = coverage.setdefault("run", {})
@@ -304,15 +321,7 @@ def _update_config(fc: FileContent) -> FileContent:
             run["omit"] = [*run.get("omit", []), "pytest.pex/*"]
         return FileContent(fc.path, toml.dumps(all_config).encode())
 
-    cp = configparser.ConfigParser()
-    try:
-        cp.read_string(fc.content.decode())
-    except configparser.Error as exc:
-        raise InvalidCoverageConfigError(
-            f"Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix "
-            f"the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`."
-            f"\n\nParse error: {repr(exc)}"
-        )
+    cp = _parse_ini_config(fc)
     run_section = "coverage:run" if fc.path in ("tox.ini", "setup.cfg") else "run"
     if not cp.has_section(run_section):
         cp.add_section(run_section)
@@ -324,6 +333,21 @@ def _update_config(fc: FileContent) -> FileContent:
     stream = StringIO()
     cp.write(stream)
     return FileContent(fc.path, stream.getvalue().encode())
+
+
+def get_branch_value_from_config(fc: FileContent) -> bool:
+    # Note that coverage's default value for the branch setting is False, which we mirror here.
+    if PurePath(fc.path).suffix == ".toml":
+        all_config = _parse_toml_config(fc)
+        return bool(
+            all_config.get("tool", {}).get("coverage", {}).get("run", {}).get("branch", False)
+        )
+
+    cp = _parse_ini_config(fc)
+    run_section = "coverage:run" if fc.path in ("tox.ini", "setup.cfg") else "run"
+    if not cp.has_section(run_section):
+        return False
+    return cp.getboolean(run_section, "branch", fallback=False)
 
 
 @rule
@@ -374,6 +398,7 @@ class MergedCoverageData:
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
+    coverage_config: CoverageConfig,
     coverage: CoverageSubsystem,
     source_roots: AllSourceRoots,
 ) -> MergedCoverageData:
@@ -393,8 +418,13 @@ async def merge_coverage_data(
         addresses.append(data.address)
 
     if coverage.global_report:
+        # It's important to set the `branch` value in the empty base report to the value it will
+        # have when running on real inputs, so that the reports are of the same type, and can be
+        # merged successfully. Otherwise we may get "Can't combine arc data with line data" errors.
+        # See https://github.com/pantsbuild/pants/issues/14542 .
+        config_contents = await Get(DigestContents, Digest, coverage_config.digest)
+        branch = get_branch_value_from_config(config_contents[0]) if config_contents else False
         global_coverage_base_dir = PurePath("__global_coverage__")
-
         global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
         global_coverage_config_content = toml.dumps(
             {
@@ -402,7 +432,8 @@ async def merge_coverage_data(
                     "coverage": {
                         "run": {
                             "relative_files": True,
-                            "source": list(source_root.path for source_root in source_roots),
+                            "source": [source_root.path for source_root in source_roots],
+                            "branch": branch,
                         }
                     }
                 }
@@ -460,7 +491,8 @@ async def merge_coverage_data(
         ProcessResult,
         VenvPexProcess(
             coverage_setup.pex,
-            argv=("combine", *sorted(coverage_data_file_paths)),
+            # We tell combine to keep the original input files, to aid debugging in the sandbox.
+            argv=("combine", "--keep", *sorted(coverage_data_file_paths)),
             input_digest=input_digest,
             output_files=(".coverage",),
             description=f"Merge {len(coverage_data_file_paths)} Pytest coverage reports.",

@@ -60,7 +60,7 @@ class SchedulerTestBase:
             with temporary_file_path(cleanup=False, suffix=".dot") as dot_file:
                 scheduler.visualize_graph_to_file(dot_file)
                 raise ValueError(f"At least one root failed: {throws}. Visualized as {dot_file}")
-        return list(state.value for _, state in returns)
+        return [state.value for _, state in returns]
 
     def execute_expecting_one_result(self, scheduler, product, subject):
         request = scheduler.execution_request([product], [subject])

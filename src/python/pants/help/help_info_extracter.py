@@ -15,7 +15,7 @@ from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import TaskRule
-from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target
+from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
@@ -225,6 +225,12 @@ class TargetTypeHelpInfo:
         union_membership: UnionMembership,
         get_field_type_provider: Callable[[type[Field]], str] | None,
     ) -> TargetTypeHelpInfo:
+        fields = list(target_type.class_field_types(union_membership=union_membership))
+        if issubclass(target_type, TargetGenerator):
+            # NB: Even though the moved_fields will never be present on a constructed
+            # TargetGenerator, they are legal arguments... and that is what most help consumers
+            # are interested in.
+            fields.extend(target_type.moved_fields)
         return cls(
             alias=target_type.alias,
             provider=provider,
@@ -237,7 +243,7 @@ class TargetTypeHelpInfo:
                     if get_field_type_provider is None
                     else get_field_type_provider(field),
                 )
-                for field in target_type.class_field_types(union_membership=union_membership)
+                for field in fields
                 if not field.alias.startswith("_") and field.removal_version is None
             ),
         )
@@ -338,14 +344,11 @@ class HelpInfoExtracter:
                         build_configuration.subsystem_to_providers.get(subsystem_cls)
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
-                is_implemented = union_membership.has_members_for_all(
-                    goal_subsystem_cls.required_union_implementations
-                )
                 return GoalHelpInfo(
                     goal_subsystem_cls.name,
                     scope_info.description,
                     provider,
-                    is_implemented,
+                    goal_subsystem_cls.activated(union_membership),
                     consumed_scopes_mapper(scope_info.scope),
                 )
 

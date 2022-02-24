@@ -24,7 +24,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 from pants.util.logging import LogLevel
 
 
@@ -68,7 +68,7 @@ class Bandit(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use Bandit when running `{register.bootstrap.pants_bin_name} lint`",
+            help=f"Don't use Bandit when running `{bin_name()} lint`",
         )
         register(
             "--args",

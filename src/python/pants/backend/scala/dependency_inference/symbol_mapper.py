@@ -11,6 +11,8 @@ from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.util.logging import LogLevel
 
 
@@ -33,19 +35,23 @@ def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
 async def map_first_party_scala_targets_to_symbols(
     _: FirstPartyScalaTargetsMappingRequest,
     scala_targets: AllScalaTargets,
+    jvm: JvmSubsystem,
 ) -> SymbolMap:
     source_analysis = await MultiGet(
         Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([target[ScalaSourceField]]))
         for target in scala_targets
     )
-    address_and_analysis = zip([t.address for t in scala_targets], source_analysis)
+    address_and_analysis = zip(
+        [(tgt.address, tgt[JvmResolveField].normalized_value(jvm)) for tgt in scala_targets],
+        source_analysis,
+    )
 
     symbol_map = SymbolMap()
-    for address, analysis in address_and_analysis:
+    for (address, resolve), analysis in address_and_analysis:
         for symbol in analysis.provided_symbols:
-            symbol_map.add_symbol(symbol, address)
+            symbol_map.add_symbol(symbol, address, resolve=resolve)
         for symbol in analysis.provided_symbols_encoded:
-            symbol_map.add_symbol(symbol, address)
+            symbol_map.add_symbol(symbol, address, resolve=resolve)
 
     return symbol_map
 

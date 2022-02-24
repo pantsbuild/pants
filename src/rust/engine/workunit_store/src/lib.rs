@@ -98,7 +98,6 @@ pub struct Workunit {
   pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
-  pub counters: HashMap<Metric, u64>,
 }
 
 impl Workunit {
@@ -224,12 +223,7 @@ impl UserMetadataPyValue {
 
 enum StoreMsg {
   Started(Workunit),
-  Completed(
-    SpanId,
-    Option<WorkunitMetadata>,
-    SystemTime,
-    HashMap<Metric, u64>,
-  ),
+  Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
   Canceled(SpanId),
 }
 
@@ -238,7 +232,7 @@ pub struct WorkunitStore {
   log_starting_workunits: bool,
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
-  observation_data: ObservationsData,
+  metrics_data: Arc<MetricsData>,
 }
 
 #[derive(Clone)]
@@ -268,8 +262,8 @@ impl StreamingWorkunitData {
       while let Ok(msg) = receiver.try_recv() {
         match msg {
           StoreMsg::Started(started) => started_messages.push(started),
-          StoreMsg::Completed(span, metadata, time, new_counters) => {
-            completed_messages.push((span, metadata, time, new_counters))
+          StoreMsg::Completed(span, metadata, time) => {
+            completed_messages.push((span, metadata, time))
           }
           StoreMsg::Canceled(..) => (),
         }
@@ -290,7 +284,7 @@ impl StreamingWorkunitData {
     }
 
     let mut completed_workunits: Vec<Workunit> = vec![];
-    for (span_id, new_metadata, end_time, new_counters) in completed_messages.into_iter() {
+    for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
       match workunit_records.entry(span_id) {
         Entry::Vacant(_) => {
           log::warn!("No previously-started workunit found for id: {}", span_id);
@@ -312,7 +306,6 @@ impl StreamingWorkunitData {
           if let Some(metadata) = new_metadata {
             workunit.metadata = metadata;
           }
-          workunit.counters = new_counters;
           workunit_records.insert(span_id, workunit.clone());
 
           if should_emit(&workunit) {
@@ -371,7 +364,6 @@ impl HeavyHittersData {
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
-    new_counters: HashMap<Metric, u64>,
     inner_store: &mut HeavyHittersInnerStore,
   ) {
     if let Some(node) = inner_store.span_id_to_graph.remove(&span_id) {
@@ -396,7 +388,6 @@ impl HeavyHittersData {
         if let Some(metadata) = new_metadata {
           workunit.metadata = metadata;
         }
-        workunit.counters = new_counters;
       }
     }
   }
@@ -407,14 +398,8 @@ impl HeavyHittersData {
     while let Ok(msg) = receiver.try_recv() {
       match msg {
         StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
-        StoreMsg::Completed(span_id, new_metadata, time, new_counters) => {
-          Self::add_completed_workunit_to_store(
-            span_id,
-            new_metadata,
-            time,
-            new_counters,
-            &mut inner,
-          )
+        StoreMsg::Completed(span_id, new_metadata, time) => {
+          Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
         }
         StoreMsg::Canceled(span_id) => {
           inner.workunit_records.remove(&span_id);
@@ -576,7 +561,7 @@ impl WorkunitStore {
       // installed.
       streaming_workunit_data: StreamingWorkunitData::new(),
       heavy_hitters_data: HeavyHittersData::new(),
-      observation_data: ObservationsData::default(),
+      metrics_data: Arc::default(),
     }
   }
 
@@ -619,7 +604,6 @@ impl WorkunitStore {
         blocked: Arc::new(AtomicBool::new(false)),
       },
       metadata,
-      counters: HashMap::new(),
     };
 
     self
@@ -661,24 +645,14 @@ impl WorkunitStore {
     let new_metadata = Some(workunit.metadata.clone());
 
     let tx = self.streaming_workunit_data.msg_tx.lock();
-    tx.send(StoreMsg::Completed(
-      span_id,
-      new_metadata.clone(),
-      end_time,
-      workunit.counters.clone(),
-    ))
-    .unwrap();
+    tx.send(StoreMsg::Completed(span_id, new_metadata.clone(), end_time))
+      .unwrap();
 
     self
       .heavy_hitters_data
       .msg_tx
       .lock()
-      .send(StoreMsg::Completed(
-        span_id,
-        new_metadata,
-        end_time,
-        workunit.counters.clone(),
-      ))
+      .send(StoreMsg::Completed(span_id, new_metadata, end_time))
       .unwrap();
 
     let start_time = match workunit.state {
@@ -713,7 +687,6 @@ impl WorkunitStore {
         blocked: Arc::new(AtomicBool::new(false)),
       },
       metadata,
-      counters: HashMap::new(),
     };
 
     self
@@ -736,11 +709,29 @@ impl WorkunitStore {
     self.streaming_workunit_data.latest_workunits(max_verbosity)
   }
 
+  pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
+    self
+      .metrics_data
+      .counters
+      .lock()
+      .entry(counter_name)
+      .and_modify(|e| *e += change)
+      .or_insert(change);
+  }
+
+  pub fn get_metrics(&self) -> HashMap<&'static str, u64> {
+    let counters = self.metrics_data.counters.lock();
+    counters
+      .iter()
+      .map(|(metric, value)| (metric.into(), *value))
+      .collect()
+  }
+
   ///
   /// Records an observation of a time-like metric into a histogram.
   ///
   pub fn record_observation(&self, metric: ObservationMetric, value: u64) {
-    let mut histograms_by_metric = self.observation_data.observations.lock();
+    let mut histograms_by_metric = self.metrics_data.observations.lock();
     histograms_by_metric
       .entry(metric)
       .and_modify(|h| {
@@ -756,28 +747,22 @@ impl WorkunitStore {
   ///
   /// Return all observations in binary encoded format.
   ///
-  pub fn encode_observations(&self) -> Result<HashMap<String, Bytes>, String> {
+  pub fn encode_observations(&self) -> Result<HashMap<&'static str, Bytes>, String> {
     use hdrhistogram::serialization::V2DeflateSerializer;
 
     let mut serializer = V2DeflateSerializer::new();
 
     let mut result = HashMap::new();
 
-    let histograms_by_metric = self.observation_data.observations.lock();
+    let histograms_by_metric = self.metrics_data.observations.lock();
     for (metric, histogram) in histograms_by_metric.iter() {
       let mut writer = BytesMut::new().writer();
 
       serializer
         .serialize(histogram, &mut writer)
-        .map_err(|err| {
-          format!(
-            "Failed to encode histogram for key `{}`: {}",
-            metric.as_ref(),
-            err
-          )
-        })?;
+        .map_err(|err| format!("Failed to encode histogram for key `{metric:?}`: {err}",))?;
 
-      result.insert(metric.as_ref().to_owned(), writer.into_inner().freeze());
+      result.insert(metric.into(), writer.into_inner().freeze());
     }
 
     Ok(result)
@@ -904,13 +889,7 @@ impl RunningWorkunit {
   }
 
   pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
-    if let Some(ref mut workunit) = self.workunit {
-      workunit
-        .counters
-        .entry(counter_name)
-        .and_modify(|e| *e += change)
-        .or_insert(change);
-    }
+    self.store.increment_counter(counter_name, change);
   }
 
   pub fn update_metadata<F>(&mut self, f: F)
@@ -961,18 +940,10 @@ impl Drop for BlockingWorkunitToken {
   }
 }
 
-#[derive(Clone)]
-struct ObservationsData {
-  /// Histograms for supported observation metrics.
-  observations: Arc<Mutex<HashMap<ObservationMetric, hdrhistogram::Histogram<u64>>>>,
-}
-
-impl Default for ObservationsData {
-  fn default() -> Self {
-    ObservationsData {
-      observations: Arc::new(Mutex::new(HashMap::new())),
-    }
-  }
+#[derive(Default)]
+struct MetricsData {
+  counters: Mutex<HashMap<Metric, u64>>,
+  observations: Mutex<HashMap<ObservationMetric, hdrhistogram::Histogram<u64>>>,
 }
 
 ///

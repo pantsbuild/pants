@@ -42,6 +42,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.option.global_options import GlobalOptions
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
@@ -77,6 +78,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_rules(),
+            QueryRule(GlobalOptions, []),
             QueryRule(Pex, (PexRequest,)),
             QueryRule(VenvPex, (PexRequest,)),
             QueryRule(Process, (PexProcess,)),
@@ -315,9 +317,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
 def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
-    named_caches_dir = (
-        rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-    )
+    named_caches_dir = rule_runner.request(GlobalOptions, []).named_caches_dir
     sources = rule_runner.request(
         Digest,
         [
@@ -618,8 +618,8 @@ def test_build_pex_description() -> None:
     assert_description(
         LockfileContent(
             file_content=FileContent("lock.txt", b""),
-            lockfile_hex_digest=None,
-            req_strings=None,
+            resolve_name="a",
+            req_strings=FrozenOrderedSet(),
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -628,8 +628,8 @@ def test_build_pex_description() -> None:
         Lockfile(
             file_path="lock.txt",
             file_path_description_of_origin="foo",
-            lockfile_hex_digest=None,
-            req_strings=None,
+            resolve_name="a",
+            req_strings=FrozenOrderedSet(),
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -652,7 +652,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     lockfile = Lockfile(
         "lock.txt",
         file_path_description_of_origin="a test",
-        lockfile_hex_digest=None,
+        resolve_name="a",
         req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):
@@ -660,7 +660,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
 
     lockfile_content = LockfileContent(
         FileContent("lock.txt", lock_content),
-        lockfile_hex_digest=None,
+        resolve_name="a",
         req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):

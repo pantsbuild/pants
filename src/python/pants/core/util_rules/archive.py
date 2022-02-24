@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 
+from pants.engine import process
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import (
     BinaryPath,
@@ -290,4 +291,5 @@ def rules():
     return [
         *collect_rules(),
         *python_binaries.rules(),
+        *process.rules(),
     ]

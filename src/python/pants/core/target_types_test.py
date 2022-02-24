@@ -13,7 +13,6 @@ from pants.backend.python import target_types_rules as python_target_type_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
-from pants.core import target_types as core_target_types
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     ArchiveFieldSet,
@@ -21,8 +20,6 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileSourceField,
     FileTarget,
-    GenerateTargetsFromFiles,
-    GenerateTargetsFromResources,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
     ResourcesGeneratorTarget,
@@ -34,9 +31,9 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
+from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import (
     GeneratedSources,
-    GeneratedTargets,
     SingleSourceField,
     SourcesField,
     Tags,
@@ -266,10 +263,7 @@ def test_archive() -> None:
 def test_generate_file_and_resource_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
-            core_target_types.generate_targets_from_files,
-            core_target_types.generate_targets_from_resources,
-            QueryRule(GeneratedTargets, [GenerateTargetsFromFiles]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromResources]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[FilesGeneratorTarget, ResourcesGeneratorTarget],
     )
@@ -296,9 +290,6 @@ def test_generate_file_and_resource_targets() -> None:
         }
     )
 
-    files_generator = rule_runner.get_target(Address("assets", target_name="files"))
-    resources_generator = rule_runner.get_target(Address("assets", target_name="resources"))
-
     def gen_file_tgt(rel_fp: str, tags: list[str] | None = None) -> FileTarget:
         return FileTarget(
             {SingleSourceField.alias: rel_fp, Tags.alias: tags},
@@ -314,25 +305,19 @@ def test_generate_file_and_resource_targets() -> None:
         )
 
     generated_files = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromFiles(files_generator)]
-    )
+        _TargetParametrizations, [Address("assets", target_name="files")]
+    ).parametrizations
     generated_resources = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromResources(resources_generator)]
-    )
+        _TargetParametrizations, [Address("assets", target_name="resources")]
+    ).parametrizations
 
-    assert generated_files == GeneratedTargets(
-        files_generator,
-        {
-            gen_file_tgt("f1.ext", tags=["overridden"]),
-            gen_file_tgt("f2.ext"),
-            gen_file_tgt("subdir/f.ext"),
-        },
-    )
-    assert generated_resources == GeneratedTargets(
-        resources_generator,
-        {
-            gen_resource_tgt("f1.ext", tags=["overridden"]),
-            gen_resource_tgt("f2.ext"),
-            gen_resource_tgt("subdir/f.ext"),
-        },
-    )
+    assert set(generated_files.values()) == {
+        gen_file_tgt("f1.ext", tags=["overridden"]),
+        gen_file_tgt("f2.ext"),
+        gen_file_tgt("subdir/f.ext"),
+    }
+    assert set(generated_resources.values()) == {
+        gen_resource_tgt("f1.ext", tags=["overridden"]),
+        gen_resource_tgt("f2.ext"),
+        gen_resource_tgt("subdir/f.ext"),
+    }

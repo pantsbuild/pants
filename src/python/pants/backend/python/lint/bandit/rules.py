@@ -22,7 +22,7 @@ from pants.util.strutil import pluralize
 
 class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
-    name = "Bandit"
+    name = Bandit.options_scope
 
 
 @dataclass(frozen=True)

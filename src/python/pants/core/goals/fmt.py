@@ -131,7 +131,9 @@ class FmtSubsystem(GoalSubsystem):
     name = "fmt"
     help = "Autoformat source code."
 
-    required_union_implementations = (FmtRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return FmtRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -144,30 +146,6 @@ class FmtSubsystem(GoalSubsystem):
             help=only_option_help("fmt", "formatter", "isort", "shfmt"),
         )
         register(
-            "--per-file-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Formatters are now broken into multiple batches by default using the "
-                "`--batch-size` argument.\n"
-                "\n"
-                "To keep (roughly) this option's behavior, set [fmt].batch_size = 1. However, "
-                "you'll likely get better performance by using a larger batch size because of "
-                "reduced overhead launching processes."
-            ),
-            help=(
-                "Rather than formatting all files in a single batch, format each file as a "
-                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
-                "this? Formatters both have substantial startup overhead and are cheap to add one "
-                "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
-                "are using a remote cache or if you have benchmarked that this option will be "
-                "faster than `--no-per-file-caching` for your use case."
-            ),
-        )
-        register(
             "--batch-size",
             advanced=True,
             type=int,
@@ -178,10 +156,6 @@ class FmtSubsystem(GoalSubsystem):
     @property
     def only(self) -> tuple[str, ...]:
         return tuple(self.options.only)
-
-    @property
-    def per_file_caching(self) -> bool:
-        return cast(bool, self.options.per_file_caching)
 
     @property
     def batch_size(self) -> int:
@@ -215,29 +189,19 @@ async def fmt(
             targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
 
     # Spawn sequential formatting per unique sequence of FmtRequests.
-    if fmt_subsystem.per_file_caching:
-        per_language_results = await MultiGet(
-            Get(
-                _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets([target])),
-            )
-            for fmt_requests, targets in targets_by_fmt_request_order.items()
-            for target in targets
+    per_language_results = await MultiGet(
+        Get(
+            _LanguageFmtResults,
+            _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
         )
-    else:
-        per_language_results = await MultiGet(
-            Get(
-                _LanguageFmtResults,
-                _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
-            )
-            for fmt_requests, targets in targets_by_fmt_request_order.items()
-            for target_batch in partition_sequentially(
-                targets,
-                key=lambda t: t.address.spec,
-                size_target=fmt_subsystem.batch_size,
-                size_max=4 * fmt_subsystem.batch_size,
-            )
+        for fmt_requests, targets in targets_by_fmt_request_order.items()
+        for target_batch in partition_sequentially(
+            targets,
+            key=lambda t: t.address.spec,
+            size_target=fmt_subsystem.batch_size,
+            size_max=4 * fmt_subsystem.batch_size,
         )
+    )
 
     individual_results = list(
         itertools.chain.from_iterable(
