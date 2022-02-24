@@ -47,6 +47,7 @@ class AnonymousTelemetry(Subsystem):
     ).advanced()
     repo_id = StrOption(
         "--repo-id",
+        default=None,
         help=(
             f"An anonymized ID representing this repo.\nFor private repos, you likely want the "
             f"ID to not be derived from, or algorithmically convertible to, anything "
