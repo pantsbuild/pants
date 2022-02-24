@@ -143,6 +143,13 @@ class DockerOptions(Subsystem):
         )
 
         register(
+            "--build-verbose",
+            type=bool,
+            default=False,
+            help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
+        )
+
+        register(
             "--env-vars",
             type=list,
             member_type=shell_str,
@@ -194,6 +201,10 @@ class DockerOptions(Subsystem):
     @property
     def build_target_stage(self) -> str | None:
         return cast("str | None", self.options.build_target_stage)
+
+    @property
+    def build_verbose(self) -> bool:
+        return cast("bool", self.options.build_verbose)
 
     @property
     def run_args(self) -> tuple[str, ...]:
