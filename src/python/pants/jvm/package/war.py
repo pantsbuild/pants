@@ -23,6 +23,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     DigestEntries,
+    Directory,
     FileContent,
     FileEntry,
     MergeDigests,
@@ -59,7 +60,7 @@ class PackageWarFileFieldSet(PackageFieldSet):
 
     output_path: OutputPathField
     dependencies: JvmWarDependenciesField
-    descriptor: JvmWarDescriptorAddressField  # TODO: make required
+    descriptor: JvmWarDescriptorAddressField
     content: JvmWarContentField
 
 
@@ -93,7 +94,7 @@ async def package_war(
     classpath = await Get(Classpath, DependenciesRequest(field_set.dependencies))
     all_jar_files_digest = await Get(Digest, MergeDigests(classpath.digests()))
 
-    prefixed_jars_digest, content, descriptor, make_archive_script_digest = await MultiGet(
+    prefixed_jars_digest, content, descriptor, input_setup_digest = await MultiGet(
         Get(Digest, AddPrefix(all_jar_files_digest, "__war__/WEB-INF/lib")),
         Get(RenderedWarContent, RenderWarContentRequest(field_set.content)),
         Get(
@@ -108,13 +109,14 @@ async def package_war(
                         "make_war.sh",
                         textwrap.dedent(
                             f"""\
-                    mkdir -p __war__/WEB-INF/classes
                     cd __war__
                     {zip.path} ../output.war -r .
                     """
                         ).encode(),
                         is_executable=True,
-                    )
+                    ),
+                    Directory("__war__/WEB-INF/classes"),
+                    Directory("__war__/WEB-INF/lib"),
                 ]
             ),
         ),
@@ -127,7 +129,7 @@ async def package_war(
                 prefixed_jars_digest,
                 descriptor.digest,
                 content.digest,
-                make_archive_script_digest,
+                input_setup_digest,
             ]
         ),
     )
