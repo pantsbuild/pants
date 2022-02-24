@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.base.build_root import BuildRoot
-from pants.bsp.protocol import BSPContext, BSPHandlerMapping
+from pants.bsp.context import BSPContext
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec import (
     BuildServerCapabilities,
     BuildTarget,

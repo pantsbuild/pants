@@ -12,7 +12,8 @@ from pants.backend.scala.bsp.spec import (
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.base.build_root import BuildRoot
-from pants.bsp.protocol import BSPContext, BSPHandlerMapping
+from pants.bsp.context import BSPContext
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.rules import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.build_graph.address import AddressInput
