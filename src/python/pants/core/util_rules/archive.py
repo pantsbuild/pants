@@ -9,14 +9,14 @@ from dataclasses import dataclass
 from pants.core.util_rules.system_binaries import SEARCH_PATHS
 from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
 from pants.core.util_rules.system_binaries import (
-    Gunzip,
+    GunzipBinary,
+    GunzipBinaryRequest,
     TarBinary,
+    TarBinaryRequest,
     UnzipBinary,
+    UnzipBinaryRequest,
     ZipBinary,
-    _GunzipRequest,
-    _TarBinaryRequest,
-    _UnzipBinaryRequest,
-    _ZipBinaryRequest,
+    ZipBinaryRequest,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -39,12 +39,12 @@ class CreateArchive:
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
 async def create_archive(request: CreateArchive) -> Digest:
     if request.format == ArchiveFormat.ZIP:
-        zip_binary = await Get(ZipBinary, _ZipBinaryRequest())
+        zip_binary = await Get(ZipBinary, ZipBinaryRequest())
         argv = zip_binary.create_archive_argv(request.output_filename, request.snapshot.files)
         env = {}
         input_digest = request.snapshot.digest
     else:
-        tar_binary = await Get(TarBinary, _TarBinaryRequest())
+        tar_binary = await Get(TarBinary, TarBinaryRequest())
         argv = tar_binary.create_archive_argv(
             request.output_filename, request.snapshot.files, request.format
         )
@@ -101,14 +101,14 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
-            Get(UnzipBinary, _UnzipBinaryRequest()),
+            Get(UnzipBinary, UnzipBinaryRequest()),
         )
         argv = unzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
         env = {}
     elif is_tar:
         input_digest, tar_binary = await MultiGet(
             merge_digest_get,
-            Get(TarBinary, _TarBinaryRequest()),
+            Get(TarBinary, TarBinaryRequest()),
         )
         argv = tar_binary.extract_archive_argv(archive_path, extract_archive_dir)
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
@@ -116,7 +116,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     else:
         input_digest, gunzip = await MultiGet(
             merge_digest_get,
-            Get(Gunzip, _GunzipRequest()),
+            Get(GunzipBinary, GunzipBinaryRequest()),
         )
         argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
         env = {}

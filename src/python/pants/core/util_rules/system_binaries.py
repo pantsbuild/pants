@@ -17,8 +17,12 @@ from pants.python import binaries as python_binaries
 from pants.python.binaries import PythonBinary
 from pants.util.logging import LogLevel
 
-# TODO: Should this be configurable?
+# TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
+
+# -------------------------------------------------------------------------------------------
+# Binaries
+# -------------------------------------------------------------------------------------------
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -45,7 +49,7 @@ class UnzipBinary(BinaryPath):
 
 
 @dataclass(frozen=True)
-class Gunzip:
+class GunzipBinary:
     python: PythonBinary
 
     def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
@@ -84,6 +88,11 @@ class TarBinary(BinaryPath):
         return (self.path, "xf", archive_path, "-C", extract_path)
 
 
+# -------------------------------------------------------------------------------------------
+# Rules to find binaries
+# -------------------------------------------------------------------------------------------
+
+
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_zip() -> ZipBinary:
     request = BinaryPathRequest(
@@ -107,8 +116,8 @@ async def find_unzip() -> UnzipBinary:
 
 
 @rule
-def prepare_gunzip(python: PythonBinary) -> Gunzip:
-    return Gunzip(python)
+def find_gunzip(python: PythonBinary) -> GunzipBinary:
+    return GunzipBinary(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -123,42 +132,45 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+# -------------------------------------------------------------------------------------------
+# Rules for lazy requests
 # TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
+# -------------------------------------------------------------------------------------------
 
 
-class _ZipBinaryRequest:
+class ZipBinaryRequest:
     pass
 
 
-class _UnzipBinaryRequest:
+class UnzipBinaryRequest:
     pass
 
 
-class _GunzipRequest:
+class GunzipBinaryRequest:
     pass
 
 
-class _TarBinaryRequest:
+class TarBinaryRequest:
     pass
 
 
 @rule
-async def find_zip_wrapper(_: _ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
+async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
     return zip_binary
 
 
 @rule
-async def find_unzip_wrapper(_: _UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
+async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
     return unzip_binary
 
 
 @rule
-async def find_gunzip_wrapper(_: _GunzipRequest, gunzip: Gunzip) -> Gunzip:
+async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
     return gunzip
 
 
 @rule
-async def find_tar_wrapper(_: _TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
+async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
     return tar_binary
 
 
