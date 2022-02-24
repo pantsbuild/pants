@@ -34,6 +34,7 @@ import requests
 from common import die
 from readme_api import DocRef, ReadmeAPI
 
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
 from pants.version import MAJOR_MINOR
 
@@ -347,6 +348,16 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
+            # Some option defaults are paths under the buildroot, and we don't want the paths
+            # of the environment in which we happened to run the doc generator to leak into the
+            # published docs. So we replace with a placeholder string.
+            default_str = default_str.replace(get_buildroot(), "<buildroot>")
+            # Similarly, some option defaults are paths under the user's cache dir, so we replace
+            # with a placeholder for the same reason.  Using $XDG_CACHE_HOME as the placeholder is
+            # a useful hint to how the cache dir may be set, even though in practice the user may
+            # not have this env var set. But googling XDG_CACHE_HOME will bring up documentation
+            # of the ~/.cache fallback, so this seems like a sensible placeholder.
+            default_str = default_str.replace(get_pants_cachedir(), "$XDG_CACHE_HOME")
             escaped_default_str = (
                 html.escape(default_str, quote=False).replace("*", "&ast;").replace("_", "&lowbar;")
             )
