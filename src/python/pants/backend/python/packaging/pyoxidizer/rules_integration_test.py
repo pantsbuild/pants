@@ -42,6 +42,6 @@ def test_end_to_end() -> None:
         result.assert_success()
 
         # Check that the binary is executable.
-        bin_path = next(Path("dist", "build").glob("*/debug/install/bin"))
+        bin_path = next(Path("dist", f"{tmpdir}.hellotest", "bin").glob("*/debug/install/bin"))
         bin_stdout = subprocess.run([bin_path], check=True, stdout=subprocess.PIPE).stdout
         assert bin_stdout == b"Hello test\n"
