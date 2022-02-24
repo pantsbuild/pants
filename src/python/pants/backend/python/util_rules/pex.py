@@ -626,9 +626,9 @@ class VenvScriptWriter:
             set -euo pipefail
 
             # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
-            # 2004. It will either contain either the absolute path of the venv script or the
-            # relative path from the CWD to the venv script. Either way, we know the venv script
-            # path parent directory is the sandbox root directory.
+            # 2004. It will either contain the absolute path of the venv script or it will contain
+            # the relative path from the CWD to the venv script. Either way, we know the venv script
+            # parent directory is the sandbox root directory.
             SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
 
             function adjust_relative_paths() {{
