@@ -189,6 +189,7 @@ class RuleRunner:
         ca_certs_path: str | None = None,
         bootstrap_args: Iterable[str] = (),
         use_deprecated_python_macros: bool = False,
+        extra_session_values: dict[Any, Any] | None = None,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -268,6 +269,7 @@ class RuleRunner:
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironment: self.environment,
+                    **(extra_session_values or {}),
                 }
             ),
         )

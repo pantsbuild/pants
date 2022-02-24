@@ -384,6 +384,11 @@ impl PySession {
   fn is_cancelled(&self) -> bool {
     self.0.is_cancelled()
   }
+
+  #[getter]
+  fn session_values(&self) -> PyObject {
+    self.0.session_values()
+  }
 }
 
 #[pyclass]
