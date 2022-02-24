@@ -11,6 +11,7 @@ from typing import Any
 from pants.backend.docker.registries import DockerRegistries
 from pants.engine.environment import Environment
 from pants.option.option_types import (
+    BoolOption,
     DictOption,
     ShellStrListOption,
     StrListOption,
@@ -120,6 +121,11 @@ class DockerOptions(Subsystem):
             "This is useful to provide from the command line, to specify the target stage to "
             "build for at execution time."
         ),
+    )
+    build_verbose = BoolOption(
+        "--build-verbose",
+        default=False,
+        help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
     )
     _env_vars = ShellStrListOption(
         "--env-vars",
