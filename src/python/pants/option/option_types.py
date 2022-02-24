@@ -266,13 +266,13 @@ class BoolOption(_OptionBase[_PropType]):
 class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     """An Enum option.
 
-    If you provide a `default` parameter, the `option_type` parameter will be inferred from the type
-    of the default. Otherwise, you'll need to provide the `option_type`.
+    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
+    of the default. Otherwise, you'll need to provide the `enum_type`.
     In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
     provide it.
 
     E.g.
-        EnumOption(..., option_type=MyEnum)  # property type is deduced as `MyEnum | None`
+        EnumOption(..., enum_type=MyEnum)  # property type is deduced as `MyEnum | None`
         EnumOption(..., default=MyEnum.Value)  # property type is deduced as `MyEnum`
     """
 
@@ -280,34 +280,34 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `option_type`.
+    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, option_type: type[_EnumT], help: _HelpT
+        cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
     ) -> EnumOption[_EnumT | None]:
         ...
 
     def __new__(
         cls,
         *flag_names,
-        option_type=None,
+        enum_type=None,
         default=None,
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)
-        instance._option_type = option_type
+        instance._enum_type = enum_type
         return instance
 
     def get_option_type(self):
-        option_type = self._option_type
+        enum_type = self._enum_type
         default = self._default
-        if option_type is None:
+        if enum_type is None:
             if default is None:
                 raise ValueError(
                     "`enum_type` must be provided to the constructor if `default` isn't provided."
                 )
             return type(default)
-        return option_type
+        return enum_type
 
 
 class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
@@ -478,13 +478,13 @@ class BoolListOption(_ListOptionBase[bool]):
 class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     """An homogenous list of Enum options.
 
-    If you provide a `default` parameter, the `member_type` parameter will be inferred from the type
+    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
     of the first element of the default. Otherwise, you'll need to provide the `option_type`.
     In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
     provide it.
 
     E.g.
-        EnumListOption(..., member_type=MyEnum)  # property type is deduced as `[MyEnum]`
+        EnumListOption(..., enum_type=MyEnum)  # property type is deduced as `[MyEnum]`
         EnumListOption(..., default=[MyEnum.Value])  # property type is deduced as `[MyEnum]`
     """
 
@@ -494,35 +494,35 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     ) -> EnumListOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `member_type`.
+    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, member_type: type[_EnumT], help: _HelpT
+        cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
     def __new__(
         cls,
         *flag_names,
-        member_type=None,
+        enum_type=None,
         default=None,
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)
-        instance._member_type = member_type
+        instance._enum_type = enum_type
         return instance
 
     def get_member_type(self):
-        member_type = self._member_type
+        enum_type = self._enum_type
         default = self._default
-        if member_type is None:
+        if enum_type is None:
             if not default:
                 raise ValueError(
                     "`enum_type` must be provided to the constructor if `default` isn't provided "
                     "or is empty."
                 )
             return type(default[0])
-        return member_type
+        return enum_type
 
 
 class TargetListOption(StrListOption):
