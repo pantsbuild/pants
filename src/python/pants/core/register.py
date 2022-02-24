@@ -43,7 +43,6 @@ from pants.core.util_rules import (
 )
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
-from pants.python import binaries as python_binaries
 from pants.source import source_root
 
 
@@ -67,7 +66,6 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *python_binaries.rules(),
         *distdir.rules(),
         *external_tool.rules(),
         *source_files.rules(),
