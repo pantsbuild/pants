@@ -445,6 +445,13 @@ class HelpPrinter(MaybeColor):
             }
         )
         print()
+        if not show_advanced:
+            print(
+                self.maybe_green(
+                    f"Include API types and rules dependency information by running "
+                    f"`{bin_name()} help-advanced {name}`.\n"
+                )
+            )
 
     def _print_rule_help(self, rule_name: str, show_advanced: bool) -> None:
         rule = self._all_help_info.name_to_rule_info[rule_name]

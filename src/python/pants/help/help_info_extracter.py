@@ -269,10 +269,10 @@ def maybe_cleandoc(doc: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class RuleInfo:
-    """Data about a rule.
+    """A container for help information for a rule.
 
-    The `description` is the `desc` provided to the `@rule` decorator, and `doc` is the rule's doc
-    string.
+    The `description` is the `desc` provided to the `@rule` decorator, and `documentation` is the
+    rule's doc string.
     """
 
     name: str
@@ -298,6 +298,11 @@ class RuleInfo:
 
 @dataclass(frozen=True)
 class PluginAPITypeInfo:
+    """A container for help information for a plugin API type.
+
+    Plugin API types are used as input parameters and output results for rules.
+    """
+
     name: str
     module: str
     documentation: str | None
