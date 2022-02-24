@@ -387,7 +387,7 @@ impl PySession {
 
   #[getter]
   fn session_values(&self) -> PyObject {
-    self.0.session_values().clone()
+    self.0.session_values()
   }
 }
 
