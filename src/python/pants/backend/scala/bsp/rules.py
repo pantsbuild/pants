@@ -12,6 +12,7 @@ from pants.backend.scala.bsp.spec import (
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.base.build_root import BuildRoot
+from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.rules import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
@@ -68,9 +69,11 @@ async def bsp_resolve_one_scala_build_target(
 async def bsp_resolve_all_scala_build_targets(
     _: ScalaBSPBuildTargetsRequest,
     all_scala_targets: AllScalaTargets,
-    jvm: JvmSubsystem,
-    scala: ScalaSubsystem,
+    bsp_context: BSPContext,
 ) -> BSPBuildTargets:
+    client_params = bsp_context.client_params
+    if not client_params or "scala" not in client_params.capabilities.language_ids:
+        return BSPBuildTargets()
     build_targets = await MultiGet(
         Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
     )

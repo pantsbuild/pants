@@ -285,7 +285,7 @@ class EngineInitializer:
                     for goal_type in goal_map.values()
                 ),
                 # Install queries for each request/response pair used by the BSP support.
-                # Note: These are necessary because the BSP support is a built-in goal and that makes
+                # Note: These are necessary because the BSP support is a built-in goal that makes
                 # synchronous requests into the engine.
                 *(
                     QueryRule(impl.response_type, (impl.request_type,))
