@@ -134,7 +134,8 @@ class CoursierSubsystem(TemplatedExternalTool):
                 "\n\n"
                 "Coursier will resolve these repositories in the order in which they are "
                 "specifed, and re-ordering repositories will cause artifacts to be "
-                "re-downloaded. This can result in artifacts in lockfiles becoming invalid."),
+                "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+            ),
         )
 
     def generate_exe(self, plat: Platform) -> str:
