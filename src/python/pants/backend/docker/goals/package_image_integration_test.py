@@ -61,4 +61,5 @@ def test_docker_build(rule_runner) -> None:
     assert len(result.artifacts) == 1
     assert len(result.artifacts[0].extra_log_lines) == 2
     assert "Built docker image: test-image:1.0" == result.artifacts[0].extra_log_lines[0]
-    assert "Docker image ID: sha256:" in result.artifacts[0].extra_log_lines[1]
+    assert "Docker image ID:" in result.artifacts[0].extra_log_lines[1]
+    assert "<unknown>" not in result.artifacts[0].extra_log_lines[1]
