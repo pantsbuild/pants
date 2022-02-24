@@ -73,6 +73,7 @@ class PythonSetup(Subsystem):
     requirement_constraints = (
         FileOption(
             "--requirement-constraints",
+            default=None,
             help=(
                 "When resolving third-party requirements for your own code (vs. tools you run), "
                 "use this constraints file to determine which versions to use.\n\n"

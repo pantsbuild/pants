@@ -266,6 +266,7 @@ class TailorSubsystem(GoalSubsystem):
     ).advanced()
     build_file_header = StrOption(
         "--build-file-header",
+        default=None,
         help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
     ).advanced()
     build_file_indent = StrOption(

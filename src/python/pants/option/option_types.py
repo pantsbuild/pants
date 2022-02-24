@@ -201,10 +201,10 @@ class StrOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> StrOption[str | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> StrOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -218,10 +218,10 @@ class IntOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> IntOption[int | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> IntOption[int | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -235,10 +235,10 @@ class FloatOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> FloatOption[float | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> FloatOption[float | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -256,10 +256,10 @@ class BoolOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> BoolOption[bool | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> BoolOption[bool | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -280,10 +280,10 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
+    # N.B. This has an additional param for the ndefault-is-None case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
+        cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
     ) -> EnumOption[_EnumT | None]:
         ...
 
@@ -291,7 +291,7 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
         cls,
         *flag_names,
         enum_type=None,
-        default=None,
+        default,
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)
@@ -356,10 +356,10 @@ class TargetOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> TargetOption[str | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> TargetOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -373,10 +373,10 @@ class DirOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> DirOption[str | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> DirOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -390,10 +390,10 @@ class FileOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> FileOption[str | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> FileOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -407,10 +407,10 @@ class ShellStrOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> ShellStrOption[str | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> ShellStrOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -424,10 +424,12 @@ class WorkspacePathOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> WorkspacePathOption[str | None]:
+    def __new__(
+        cls, *flag_names: str, default: None, help: _HelpT
+    ) -> WorkspacePathOption[str | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
@@ -441,10 +443,10 @@ class MemorySizeOption(_OptionBase[_PropType]):
         ...
 
     @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> MemorySizeOption[int | None]:
+    def __new__(cls, *flag_names: str, default: None, help: _HelpT) -> MemorySizeOption[int | None]:
         ...
 
-    def __new__(cls, *flag_names, default=None, help):
+    def __new__(cls, *flag_names, default, help):
         return super().__new__(cls, *flag_names, default=default, help=help)
 
 
