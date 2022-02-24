@@ -114,10 +114,10 @@ def test_other_options():
 
         dict_prop = DictOption[Any]("--dict-opt", help="")
         enum_prop = EnumOption("--enum-opt", default=MyEnum.Val1, help="")
-        optional_enum_prop = EnumOption("--optional-enum-opt", option_type=MyEnum, help="")
+        optional_enum_prop = EnumOption("--optional-enum-opt", enum_type=MyEnum, help="")
         enum_list_prop = EnumListOption("--enum-list-opt", default=[MyEnum.Val1], help="")
         defaultless_enum_list_prop = EnumListOption(
-            "--defaultless-enum-list-opt", member_type=MyEnum, help=""
+            "--defaultless-enum-list-opt", enum_type=MyEnum, help=""
         )
         args_prop = ArgsListOption(help="")
 
@@ -229,11 +229,11 @@ def test_property_types() -> None:
 
         # Enum opts
         enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
-        optional_enum_opt = EnumOption("--opt", option_type=MyEnum, help="")
+        optional_enum_opt = EnumOption("--opt", enum_type=MyEnum, help="")
         # mypy correctly complains about not matching any possibilities
         enum_opt_bad = EnumOption("--opt", help="")  # type: ignore[call-overload]
         enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
-        enum_list_opt2 = EnumListOption("--opt", member_type=MyEnum, help="")
+        enum_list_opt2 = EnumListOption("--opt", enum_type=MyEnum, help="")
         # mypy correctly complains about needing a type annotation
         enum_list_bad_opt = EnumListOption("--opt", default=[], help="")  # type: ignore[var-annotated]
 
