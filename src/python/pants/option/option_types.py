@@ -280,7 +280,7 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the ndefault-is-None case: `enum_type`.
+    # N.B. This has an additional param for the default-is-None case: `enum_type`.
     @overload
     def __new__(
         cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
