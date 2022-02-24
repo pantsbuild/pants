@@ -25,7 +25,6 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 
-
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
     import json
