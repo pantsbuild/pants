@@ -15,16 +15,19 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
     PyOxidizerConfigSourceField,
     PyOxidizerDependenciesField,
     PyOxidizerEntryPointField,
+    PyOxidizerOutputPathField,
     PyOxidizerUnclassifiedResources,
 )
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import (
+    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
     MergeDigests,
+    RemovePrefix,
     Snapshot,
 )
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -51,6 +54,7 @@ class PyOxidizerFieldSet(PackageFieldSet):
     dependencies: PyOxidizerDependenciesField
     unclassified_resources: PyOxidizerUnclassifiedResources
     template: PyOxidizerConfigSourceField
+    output_path: PyOxidizerOutputPathField
 
 
 @dataclass(frozen=True)
@@ -154,11 +158,11 @@ async def package_pyoxidizer_binary(
         Process,
         PexProcess(
             pyoxidizer_pex,
-            argv=["build", *pyoxidizer.args],
+            argv=("build", *pyoxidizer.args),
             description=f"Building {field_set.address} with PyOxidizer",
             input_digest=input_digest,
             level=LogLevel.INFO,
-            output_directories=["build"],
+            output_directories=("build",),
         ),
     )
     process_with_caching = dataclasses.replace(
@@ -171,10 +175,15 @@ async def package_pyoxidizer_binary(
     )
 
     result = await Get(ProcessResult, Process, process_with_caching)
-    result_snapshot = await Get(Snapshot, Digest, result.output_digest)
+
+    stripped_digest = await Get(Digest, RemovePrefix(result.output_digest, "build"))
+    final_snapshot = await Get(
+        Snapshot,
+        AddPrefix(stripped_digest, field_set.output_path.value_or_default(file_ending=None)),
+    )
     return BuiltPackage(
-        result.output_digest,
-        artifacts=tuple(BuiltPackageArtifact(file) for file in result_snapshot.files),
+        final_snapshot.digest,
+        artifacts=tuple(BuiltPackageArtifact(file) for file in final_snapshot.files),
     )
 
 
