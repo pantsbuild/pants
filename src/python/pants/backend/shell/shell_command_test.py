@@ -22,7 +22,7 @@ from pants.backend.shell.target_types import (
 from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
-from pants.core.util_rules import source_files, system_binaries
+from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
@@ -40,7 +40,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *system_binaries.rules(),
+            *archive.rules(),
             *shell_command_rules(),
             *source_files.rules(),
             *core_target_type_rules(),

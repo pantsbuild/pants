@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import SEARCH_PATHS
 from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
 from pants.core.util_rules.system_binaries import (
@@ -137,4 +138,4 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *system_binaries.rules())
