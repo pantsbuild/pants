@@ -15,11 +15,7 @@ from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import (
-    AuthPluginResult,
-    DynamicRemoteOptions,
-    maybe_warn_python_macros_deprecation,
-)
+from pants.option.global_options import AuthPluginResult, DynamicRemoteOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -170,7 +166,6 @@ class PantsDaemonCore:
                 # and services.
                 bootstrap_options = options.bootstrap_option_values()
                 assert bootstrap_options is not None
-                maybe_warn_python_macros_deprecation(bootstrap_options)
                 with self._handle_exceptions():
                     self._initialize(
                         options_fingerprint,

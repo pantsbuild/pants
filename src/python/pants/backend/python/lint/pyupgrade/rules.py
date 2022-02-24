@@ -10,7 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.process import FallibleProcessResult
@@ -32,8 +32,9 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(FmtRequest, LintRequest):
+class PyUpgradeRequest(FmtRequest, LintTargetsRequest):
     field_set_type = PyUpgradeFieldSet
+    name = PyUpgrade.options_scope
 
 
 @dataclass(frozen=True)
@@ -83,22 +84,22 @@ async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUp
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_fmt(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> FmtResult:
     if pyupgrade.skip:
-        return FmtResult.skip(formatter_name="pyupgrade")
+        return FmtResult.skip(formatter_name=PyUpgradeRequest.name)
 
     return FmtResult.from_process_result(
         result.process_result,
         original_digest=result.original_digest,
-        formatter_name="pyupgrade",
+        formatter_name=PyUpgradeRequest.name,
     )
 
 
 @rule(desc="Lint with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_lint(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> LintResults:
     if pyupgrade.skip:
-        return LintResults([], linter_name="pyupgrade")
+        return LintResults([], linter_name=PyUpgradeRequest.name)
     return LintResults(
         [LintResult.from_fallible_process_result(result.process_result)],
-        linter_name="pyupgrade",
+        linter_name=PyUpgradeRequest.name,
     )
 
 
@@ -106,6 +107,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, PyUpgradeRequest),
-        UnionRule(LintRequest, PyUpgradeRequest),
+        UnionRule(LintTargetsRequest, PyUpgradeRequest),
         *pex.rules(),
     ]

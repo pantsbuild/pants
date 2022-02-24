@@ -37,7 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import shell_str
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 
@@ -60,14 +60,10 @@ class PyTest(PythonToolBase):
     options_scope = "pytest"
     help = "The pytest Python test framework (https://docs.pytest.org/)."
 
-    # This should be kept in sync with `requirements.txt`.
+    # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
-    default_version = "pytest>=6.2.4,<6.3"
-    # N.B.: We avoid 2.12.1 since it switched from a `coverage[toml]` dependency introduced in
-    # 2.12.0 to a direct dependency on `toml`. This is broken for newer versions of `coverage` where
-    # the `toml` extra is mapped to `tomli`. This direct `toml` dependency was reverted in favor of
-    # `coverage[toml]` in 3.0.0.
+    default_version = "pytest>=7,<8"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
@@ -196,7 +192,7 @@ class PyTest(PythonToolBase):
             "`pytest-cov`, which is needed to collect coverage data.\n\nThis happens when "
             "overriding the `extra_requirements` option. Please either explicitly add back "
             "`pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than "
-            "overriding it. Run `./pants help-advanced pytest` to see the default version of "
+            f"overriding it. Run `{bin_name()} help-advanced pytest` to see the default version of "
             f"`pytest-cov` and see {doc_url('options#list-values')} for more on adding vs. "
             "overriding list options."
         )

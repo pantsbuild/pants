@@ -79,7 +79,7 @@ class PipenvRequirementsCAOF:
 
         requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
         for req, info in requirements.items():
-            extras = [x for x in info.get("extras", [])]
+            extras = list(info.get("extras", []))
             extras_str = f"[{','.join(extras)}]" if extras else ""
             req_str = f"{req}{extras_str}{info.get('version','')}"
             if info.get("markers"):

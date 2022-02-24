@@ -10,7 +10,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -33,8 +33,9 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest, LintRequest):
+class IsortRequest(FmtRequest, LintTargetsRequest):
     field_set_type = IsortFieldSet
+    name = Isort.options_scope
 
 
 @dataclass(frozen=True)
@@ -134,13 +135,13 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
-        return FmtResult.skip(formatter_name="isort")
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
-        formatter_name="isort",
+        formatter_name=request.name,
         strip_chroot_path=True,
     )
 
@@ -148,12 +149,12 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
 @rule(desc="Lint with isort", level=LogLevel.DEBUG)
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.skip:
-        return LintResults([], linter_name="isort")
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name="isort",
+        linter_name=request.name,
     )
 
 
@@ -161,6 +162,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, IsortRequest),
-        UnionRule(LintRequest, IsortRequest),
+        UnionRule(LintTargetsRequest, IsortRequest),
         *pex.rules(),
     ]

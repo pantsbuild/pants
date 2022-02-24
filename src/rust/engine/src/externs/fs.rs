@@ -34,7 +34,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   Ok(())
 }
 
-#[pyclass]
+#[pyclass(name = "Digest")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyDigest(pub Digest);
 
@@ -85,7 +85,7 @@ impl PyDigest {
   }
 }
 
-#[pyclass]
+#[pyclass(name = "FileDigest")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PyFileDigest(pub Digest);
 
@@ -129,7 +129,7 @@ impl PyFileDigest {
   }
 }
 
-#[pyclass]
+#[pyclass(name = "Snapshot")]
 pub struct PySnapshot(pub Snapshot);
 
 #[pymethods]
@@ -208,7 +208,7 @@ impl PySnapshot {
   }
 }
 
-#[pyclass]
+#[pyclass(name = "MergeDigests")]
 #[derive(Debug, PartialEq)]
 pub struct PyMergeDigests(pub Vec<Digest>);
 
@@ -249,7 +249,7 @@ impl PyMergeDigests {
   }
 }
 
-#[pyclass]
+#[pyclass(name = "AddPrefix")]
 #[derive(Debug, PartialEq)]
 pub struct PyAddPrefix {
   pub digest: Digest,
@@ -290,7 +290,7 @@ impl PyAddPrefix {
   }
 }
 
-#[pyclass]
+#[pyclass(name = "RemovePrefix")]
 #[derive(Debug, PartialEq)]
 pub struct PyRemovePrefix {
   pub digest: Digest,

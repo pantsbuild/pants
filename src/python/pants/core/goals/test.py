@@ -41,6 +41,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -288,10 +289,12 @@ class TestSubsystem(GoalSubsystem):
     name = "test"
     help = "Run tests."
 
-    required_union_implementations = (TestFieldSet,)
-
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return TestFieldSet in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -438,6 +441,8 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
+        if result.skipped:
+            continue
         if result.exit_code != 0:
             exit_code = cast(int, result.exit_code)
 
@@ -515,29 +520,26 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    if result.result_metadata:
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-
-        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-        source_print = f" ({source})" if source else ""
-
-        elapsed_print = ""
-        total_elapsed_ms = result.result_metadata.total_elapsed_ms
-        if total_elapsed_ms is not None:
-            elapsed_secs = total_elapsed_ms / 1000
-            elapsed_print = f"in {elapsed_secs:.2f}s"
-
-        suffix = f" {elapsed_print}{source_print}"
+    assert (
+        result.result_metadata is not None
+    ), "Skipped test results should not be outputted in the test summary"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
     else:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        suffix = ""
+        sigil = console.sigil_failed()
+        status = "failed"
 
+    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+    source_print = f" ({source})" if source else ""
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_print}"
     return f"{sigil} {result.address} {status}{suffix}."
 
 
@@ -559,11 +561,11 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
     help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
+        f"Addresses to targets that can be built with the `{bin_name()} package` goal and whose "
         "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
+        f"as if you had run `{bin_name()} package`. It will include the results in your test's chroot, "
         "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
+        f"`dist/`).\n\nYou can include anything that can be built by `{bin_name()} package`, e.g. a "
         "`pex_binary`, `python_awslambda`, or an `archive`."
     )
 

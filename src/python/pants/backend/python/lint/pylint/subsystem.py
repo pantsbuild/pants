@@ -20,7 +20,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
@@ -43,7 +43,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -85,7 +85,7 @@ class Pylint(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help=f"Don't use Pylint when running `{register.bootstrap.pants_bin_name} lint`",
+            help=f"Don't use Pylint when running `{bin_name()} lint`",
         )
         register(
             "--args",
@@ -131,13 +131,19 @@ class Pylint(PythonToolBase):
                 "example, if your plugin is at `build-support/pylint/custom_plugin.py`, add "
                 "'build-support/pylint' to `[source].root_patterns` in `pants.toml`. This is "
                 "necessary for Pants to know how to tell Pylint to discover your plugin. See "
-                f"{doc_url('source-roots')}\n\nYou must also set `load-plugins=$module_name` in "
-                "your Pylint config file."
-                "\n\nWhile your plugin's code can depend on other first-party code and third-party "
+                f"{doc_url('source-roots')}\n\n"
+                f"You must also set `load-plugins=$module_name` in your Pylint config file.\n\n"
+                "While your plugin's code can depend on other first-party code and third-party "
                 "requirements, all first-party dependencies of the plugin must live in the same "
-                "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
+                "directory or a subdirectory.\n\n"
+                "To instead load third-party plugins, set the "
                 "option `[pylint].extra_requirements` and set the `load-plugins` option in your "
-                "Pylint config."
+                "Pylint config.\n\n"
+                "Tip: it's often helpful to define a dedicated 'resolve' via "
+                "`[python].resolves` for your Pylint plugins such as 'pylint-plugins' "
+                "so that the third-party requirements used by your plugin, like `pylint`, do not "
+                "mix with the rest of your project. Read that option's help message for more info "
+                "on resolves."
             ),
         )
 

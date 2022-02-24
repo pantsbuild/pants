@@ -9,10 +9,10 @@ publish = false
 bytes = "1.0"
 concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
-hdrhistogram = "7.2"
-parking_lot = "0.11"
+hdrhistogram = "7.4"
+parking_lot = "0.12"
 rand = "0.8"
-tokio = { version = "1.4", features = ["rt"] }
+tokio = { version = "1.16", features = ["rt"] }
 petgraph = "0.5"
 log = "0.4"
 strum = "0.20"

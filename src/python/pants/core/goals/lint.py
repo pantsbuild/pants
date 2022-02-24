@@ -6,13 +6,19 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, cast
+from typing import Any, ClassVar, Iterable, cast
 
-from pants.core.goals.style_request import StyleRequest, style_batch_size_help, write_reports
+from pants.core.goals.style_request import (
+    StyleRequest,
+    determine_specified_tool_names,
+    only_option_help,
+    style_batch_size_help,
+    write_reports,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -127,11 +133,21 @@ class LintResults(EngineAwareReturnType):
 
 
 @union
-class LintRequest(StyleRequest):
-    """A union for StyleRequests that should be lintable.
+class LintTargetsRequest(StyleRequest):
+    """AThe entry point for linters that need targets."""
 
-    Subclass and install a member of this type to provide a linter.
-    """
+
+@union
+@dataclass(frozen=True)
+class LintFilesRequest(EngineAwareParameter):
+    """The entry point for linters that do not use targets."""
+
+    name: ClassVar[str]
+
+    file_paths: tuple[str, ...]
+
+    def debug_hint(self) -> str:
+        return self.name
 
 
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
@@ -144,34 +160,19 @@ class LintSubsystem(GoalSubsystem):
     name = "lint"
     help = "Run all linters and/or formatters in check mode."
 
-    required_union_implementations = (LintRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
     @classmethod
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--per-file-caching",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="2.11.0.dev0",
-            removal_hint=(
-                "Linters are now broken into multiple batches by default using the "
-                "`--batch-size` argument.\n"
-                "\n"
-                "To keep (roughly) this option's behavior, set [lint].batch_size = 1. However, "
-                "you'll likely get better performance by using a larger batch size because of "
-                "reduced overhead launching processes."
-            ),
-            help=(
-                "Rather than linting all files in a single batch, lint each file as a "
-                "separate process.\n\nWhy do this? You'll get many more cache hits. Why not do "
-                "this? Linters both have substantial startup overhead and are cheap to add one "
-                "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-file-caching`.\n\nWe only recommend using `--per-file-caching` if you "
-                "are using a remote cache or if you have benchmarked that this option will be "
-                "faster than `--no-per-file-caching` for your use case."
-            ),
+            "--only",
+            type=list,
+            member_type=str,
+            default=[],
+            help=only_option_help("lint", "linter", "flake8", "shellcheck"),
         )
         register(
             "--batch-size",
@@ -182,8 +183,8 @@ class LintSubsystem(GoalSubsystem):
         )
 
     @property
-    def per_file_caching(self) -> bool:
-        return cast(bool, self.options.per_file_caching)
+    def only(self) -> tuple[str, ...]:
+        return tuple(self.options.only)
 
     @property
     def batch_size(self) -> int:
@@ -199,35 +200,45 @@ async def lint(
     console: Console,
     workspace: Workspace,
     targets: Targets,
+    specs_snapshot: SpecsSnapshot,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    request_types = cast("Iterable[type[LintRequest]]", union_membership[LintRequest])
-    requests = tuple(
+    target_request_types = cast(
+        "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
+    )
+    file_request_types = union_membership[LintFilesRequest]
+    specified_names = determine_specified_tool_names(
+        "lint",
+        lint_subsystem.only,
+        target_request_types,
+        extra_valid_names={request.name for request in file_request_types},
+    )
+    target_requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
-            if request_type.field_set_type.is_applicable(target)
+            if (
+                request_type.name in specified_names
+                and request_type.field_set_type.is_applicable(target)
+            )
         )
-        for request_type in request_types
+        for request_type in target_request_types
+    )
+    file_requests = tuple(
+        request_type(specs_snapshot.snapshot.files)
+        for request_type in file_request_types
+        if request_type.name in specified_names
     )
 
-    if lint_subsystem.per_file_caching:
-        all_batch_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__([field_set]))
-            for request in requests
-            if request.field_sets
-            for field_set in request.field_sets
-        )
-    else:
+    def address_str(fs: FieldSet) -> str:
+        return fs.address.spec
 
-        def address_str(fs: FieldSet) -> str:
-            return fs.address.spec
-
-        all_batch_results = await MultiGet(
-            Get(LintResults, LintRequest, request.__class__(field_set_batch))
-            for request in requests
+    all_requests = [
+        *(
+            Get(LintResults, LintTargetsRequest, request.__class__(field_set_batch))
+            for request in target_requests
             if request.field_sets
             for field_set_batch in partition_sequentially(
                 request.field_sets,
@@ -235,7 +246,13 @@ async def lint(
                 size_target=lint_subsystem.batch_size,
                 size_max=4 * lint_subsystem.batch_size,
             )
-        )
+        ),
+        *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
+    ]
+    all_batch_results = cast(
+        "tuple[LintResults, ...]",
+        await MultiGet(all_requests),  # type: ignore[arg-type]
+    )
 
     def key_fn(results: LintResults):
         return results.linter_name
@@ -248,7 +265,7 @@ async def lint(
             (
                 LintResults(
                     itertools.chain.from_iterable(
-                        per_file_results.results for per_file_results in all_linter_results
+                        batch_results.results for batch_results in all_linter_results
                     ),
                     linter_name=linter_name,
                 )
@@ -260,7 +277,7 @@ async def lint(
         )
     )
 
-    def get_tool_name(res: LintResults) -> str:
+    def get_name(res: LintResults) -> str:
         return res.linter_name
 
     write_reports(
@@ -268,7 +285,7 @@ async def lint(
         workspace,
         dist_dir,
         goal_name=LintSubsystem.name,
-        get_tool_name=get_tool_name,
+        get_name=get_name,
     )
 
     exit_code = 0
@@ -276,8 +293,7 @@ async def lint(
         console.print_stderr("")
     for results in all_results:
         if results.skipped:
-            sigil = console.sigil_skipped()
-            status = "skipped"
+            continue
         elif results.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "succeeded"

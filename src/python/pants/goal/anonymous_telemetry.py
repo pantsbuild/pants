@@ -21,6 +21,7 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 
@@ -35,40 +36,25 @@ class AnonymousTelemetry(Subsystem):
     options_scope = "anonymous-telemetry"
     help = "Options related to sending anonymous stats to the Pants project, to aid development."
 
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--enabled",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                f"Whether to send anonymous telemetry to the Pants project.\nTelemetry is sent "
-                f"asynchronously, with silent failure, and does not impact build times or "
-                f"outcomes.\n{_telemetry_docs_referral}."
-            ),
-        )
-        register(
-            "--repo-id",
-            advanced=True,
-            type=str,
-            default=None,
-            help=(
-                f"An anonymized ID representing this repo.\nFor private repos, you likely want the "
-                f"ID to not be derived from, or algorithmically convertible to, anything "
-                f"identifying the repo.\nFor public repos the ID may be visible in that repo's "
-                f"config file, so anonymity of the repo is not guaranteed (although user anonymity "
-                f"is always guaranteed).\n{_telemetry_docs_referral}."
-            ),
-        )
-
-    @property
-    def enabled(self) -> bool:
-        return cast(bool, self.options.enabled)
-
-    @property
-    def repo_id(self) -> str | None:
-        return cast("str | None", self.options.repo_id)
+    enabled = BoolOption(
+        "--enabled",
+        default=False,
+        help=(
+            f"Whether to send anonymous telemetry to the Pants project.\nTelemetry is sent "
+            f"asynchronously, with silent failure, and does not impact build times or "
+            f"outcomes.\n{_telemetry_docs_referral}."
+        ),
+    ).advanced()
+    repo_id = StrOption(
+        "--repo-id",
+        help=(
+            f"An anonymized ID representing this repo.\nFor private repos, you likely want the "
+            f"ID to not be derived from, or algorithmically convertible to, anything "
+            f"identifying the repo.\nFor public repos the ID may be visible in that repo's "
+            f"config file, so anonymity of the repo is not guaranteed (although user anonymity "
+            f"is always guaranteed).\n{_telemetry_docs_referral}."
+        ),
+    ).advanced()
 
 
 class AnonymousTelemetryCallback(WorkunitsCallback):

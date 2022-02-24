@@ -6,7 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest
 from pants.engine.process import (
     BinaryNotFoundError,
@@ -97,10 +99,14 @@ class DockerBinaryRequest:
 
 
 @rule(desc="Finding the `docker` binary", level=LogLevel.DEBUG)
-async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
+async def find_docker(
+    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+) -> DockerBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_path = docker_options.executable_search_path(env)
     request = BinaryPathRequest(
         binary_name="docker",
-        search_path=docker_request.search_path,
+        search_path=search_path or docker_request.search_path,
         test=BinaryPathTest(args=["-v"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)

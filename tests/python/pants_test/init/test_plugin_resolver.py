@@ -18,7 +18,8 @@ from pkg_resources import Distribution, Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules import archive, external_tool
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
@@ -185,17 +186,17 @@ def plugin_resolution(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
-        plugin_resolver = PluginResolver(bootstrap_scheduler)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         input_working_set = WorkingSet(entries=[])
         for dist in working_set_entries:
             input_working_set.add(dist)
+        plugin_resolver = PluginResolver(
+            bootstrap_scheduler, interpreter_constraints, input_working_set
+        )
         working_set = plugin_resolver.resolve(
             options_bootstrapper,
             complete_env,
-            interpreter_constraints,
-            input_working_set,
         )
         for dist in working_set:
             assert (

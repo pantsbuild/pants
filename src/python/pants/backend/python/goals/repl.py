@@ -1,14 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
+from typing import Iterable
 
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
+    NoCompatibleResolveException,
     RequirementsPexRequest,
 )
 from pants.backend.python.util_rules.python_sources import (
@@ -16,11 +23,39 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.repl import ReplImplementation, ReplRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+
+
+def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: PythonSetup) -> None:
+    """Eagerly validate that all roots are compatible.
+
+    We already end up checking this in pex_from_targets.py, but this is a more eager check so that
+    we have a better error message.
+    """
+    root_resolves = {
+        root[PythonResolveField].normalized_value(python_setup)
+        for root in root_targets
+        if root.has_field(PythonResolveField)
+    }
+    if len(root_resolves) > 1:
+        raise NoCompatibleResolveException(
+            python_setup,
+            "The input targets did not have a resolve in common",
+            root_targets,
+            (
+                "To work around this, choose which resolve you want to use from above. "
+                f'Then, run `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") | '
+                f'.["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the '
+                "resolve name, and possibly replace the specs `::` with what you were using "
+                "before. This will result in opening a REPL with only targets using the desired "
+                "resolve."
+            ),
+        )
 
 
 class PythonRepl(ReplImplementation):
@@ -28,25 +63,28 @@ class PythonRepl(ReplImplementation):
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) -> ReplRequest:
+async def create_python_repl_request(
+    request: PythonRepl, pex_env: PexEnvironment, python_setup: PythonSetup
+) -> ReplRequest:
+    validate_compatible_resolve(request.targets, python_setup)
 
-    addresses = tuple(tgt.address for tgt in repl.targets)
-    interpreter_constraints = await Get(
-        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
+    interpreter_constraints, transitive_targets = await MultiGet(
+        Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
+        Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
-    requirements_request = Get(Pex, RequirementsPexRequest(addresses, internal_only=True))
 
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
     local_dists_request = Get(
         LocalDistsPex,
         LocalDistsPexRequest(
-            Addresses(tgt.address for tgt in repl.targets),
+            request.addresses,
             internal_only=True,
             interpreter_constraints=interpreter_constraints,
         ),
     )
 
     sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
 
     requirements_pex, local_dists, sources = await MultiGet(
@@ -61,14 +99,14 @@ async def create_python_repl_request(repl: PythonRepl, pex_env: PexEnvironment) 
 
     complete_pex_env = pex_env.in_workspace()
     args = complete_pex_env.create_argv(
-        repl.in_chroot(requirements_pex.name), python=requirements_pex.python
+        request.in_chroot(requirements_pex.name), python=requirements_pex.python
     )
 
-    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
+    chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
-        "PEX_PATH": repl.in_chroot(local_dists.pex.name),
+        "PEX_PATH": request.in_chroot(local_dists.pex.name),
     }
 
     return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
@@ -80,16 +118,18 @@ class IPythonRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_ipython_repl_request(
-    repl: IPythonRepl, ipython: IPython, pex_env: PexEnvironment
+    request: IPythonRepl, ipython: IPython, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> ReplRequest:
-    addresses = tuple(tgt.address for tgt in repl.targets)
-    interpreter_constraints = await Get(
-        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
-    )
-    requirements_request = Get(Pex, RequirementsPexRequest(addresses, internal_only=True))
+    validate_compatible_resolve(request.targets, python_setup)
 
+    interpreter_constraints, transitive_targets = await MultiGet(
+        Get(InterpreterConstraints, InterpreterConstraintsRequest(request.addresses)),
+        Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
+    )
+
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
     sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )
 
     ipython_request = Get(
@@ -110,7 +150,7 @@ async def create_ipython_repl_request(
     local_dists = await Get(
         LocalDistsPex,
         LocalDistsPexRequest(
-            [tgt.address for tgt in repl.targets],
+            request.addresses,
             internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=sources,
@@ -131,18 +171,18 @@ async def create_ipython_repl_request(
 
     complete_pex_env = pex_env.in_workspace()
     args = list(
-        complete_pex_env.create_argv(repl.in_chroot(ipython_pex.name), python=ipython_pex.python)
+        complete_pex_env.create_argv(request.in_chroot(ipython_pex.name), python=ipython_pex.python)
     )
     if ipython.options.ignore_cwd:
         args.append("--ignore-cwd")
 
-    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
+    chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
         "PEX_PATH": os.pathsep.join(
             [
-                repl.in_chroot(requirements_pex.name),
-                repl.in_chroot(local_dists.pex.name),
+                request.in_chroot(requirements_pex.name),
+                request.in_chroot(local_dists.pex.name),
             ]
         ),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),

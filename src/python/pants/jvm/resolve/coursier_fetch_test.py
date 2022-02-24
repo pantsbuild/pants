@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Sequence
 
 import pytest
 
-from pants.backend.java.target_types import DeployJarTarget, JavaSourcesGeneratorTarget
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
@@ -16,7 +15,7 @@ from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
@@ -55,7 +54,7 @@ def assert_resolve(
     rule_runner: RuleRunner,
     root_one_resolve: str,
     root_two_resolve: str,
-    leaf_resolves: Sequence[str],
+    leaf_resolve: str,
 ) -> None:
     rule_runner.write_files(
         {
@@ -68,7 +67,7 @@ def assert_resolve(
                   group='ex',
                   artifact='ex',
                   version='0.0.0',
-                  compatible_resolves={repr(list(leaf_resolves))},
+                  resolve='{leaf_resolve}',
                 )
                 """
             ),
@@ -94,24 +93,19 @@ def assert_resolve(
 
 @maybe_skip_jdk_test
 def test_all_matching(rule_runner: RuleRunner) -> None:
-    assert_resolve("one", rule_runner, "one", "one", ["one"])
-
-
-@maybe_skip_jdk_test
-def test_leaf_partial_matching(rule_runner: RuleRunner) -> None:
-    assert_resolve("one", rule_runner, "one", "one", ["two", "one"])
+    assert_resolve("one", rule_runner, "one", "one", "one")
 
 
 @maybe_skip_jdk_test
 def test_no_matching_for_root(rule_runner: RuleRunner) -> None:
     with engine_error(NoCompatibleResolve):
-        assert_resolve("n/a", rule_runner, "one", "two", ["two", "one"])
+        assert_resolve("n/a", rule_runner, "one", "two", "two")
 
 
 @maybe_skip_jdk_test
 def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
     with engine_error(NoCompatibleResolve):
-        assert_resolve("n/a", rule_runner, "one", "one", ["two"])
+        assert_resolve("n/a", rule_runner, "one", "one", "two")
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,7 @@ use strum::IntoEnumIterator;
   Eq,
   Hash,
   Debug,
-  strum_macros::AsRefStr,
+  strum_macros::IntoStaticStr,
   strum_macros::EnumIter,
   strum_macros::Display,
 )]
@@ -61,7 +61,7 @@ impl Metric {
   }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, strum_macros::AsRefStr)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, strum_macros::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum ObservationMetric {
   TestObservation,

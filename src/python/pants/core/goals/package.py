@@ -20,7 +20,8 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
     help = (
         "Where the built asset should be located.\n\nIf undefined, this will use the path to the "
         "BUILD file, followed by the target name. For example, `src/python/project:app` would be "
-        "`src.python.project/app.ext`.\n\nWhen running `./pants package`, this path will be "
+        f"`src.python.project/app.ext`.\n\nWhen running `{bin_name()} package`, this path will be "
         "prefixed by `--distdir` (e.g. `dist/`).\n\nWarning: setting this value risks naming "
         "collisions with other package targets you may have."
     )
@@ -77,7 +78,9 @@ class PackageSubsystem(GoalSubsystem):
     name = "package"
     help = "Create a distributable package."
 
-    required_union_implementations = (PackageFieldSet,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PackageFieldSet in union_membership
 
 
 class Package(Goal):

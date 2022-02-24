@@ -36,7 +36,7 @@ from pants.core.goals.tailor import (
     make_content_str,
     specs_to_dirs,
 )
-from pants.core.util_rules import pants_bin, source_files
+from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.build_files import extract_build_file_options
 from pants.engine.rules import Get, QueryRule, rule
@@ -140,7 +140,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             *source_files.rules(),
-            *pants_bin.rules(),
             extract_build_file_options,
             find_fortran_targets,
             infer_fortran_module_dependency,
@@ -471,17 +470,14 @@ def test_specs_to_dirs() -> None:
     assert specs_to_dirs(
         Specs(AddressSpecs([]), FilesystemSpecs([DirLiteralSpec("src/python/foo")]))
     ) == ("src/python/foo",)
-    assert (
-        specs_to_dirs(
-            Specs(
-                AddressSpecs(
-                    [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
-                ),
-                FilesystemSpecs([]),
-            )
+    assert specs_to_dirs(
+        Specs(
+            AddressSpecs(
+                [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
+            ),
+            FilesystemSpecs([]),
         )
-        == ("src/python/foo", "src/python/bar")
-    )
+    ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
         specs_to_dirs(

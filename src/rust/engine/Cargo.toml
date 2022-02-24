@@ -20,6 +20,7 @@ resolver = "2"
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "address",
   "async_latch",
   "async_value",
   "cache",
@@ -60,6 +61,7 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "address",
   "async_latch",
   "async_value",
   "cache",
@@ -102,6 +104,7 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+address = { path = "address" }
 async_latch = { path = "async_latch" }
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"
@@ -128,7 +131,7 @@ log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.5"
-parking_lot = "0.11"
+parking_lot = "0.12"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
 pyo3 = "0.15.1"
@@ -144,7 +147,7 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
-tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }

@@ -23,6 +23,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,7 @@ async def py_constraints(
                 "(These are the constraints used if you were to depend on all of the input "
                 "files/targets together, even though they may end up never being used together in "
                 "the real world. Consider using a more precise query or running "
-                "`./pants py-constraints --summary`.)\n"
+                f"`{bin_name()} py-constraints --summary`.)\n"
             )
             output_stdout(indent(fill(merged_constraints_warning, 80), "  "))
 

@@ -12,18 +12,32 @@ from textwrap import dedent
 from typing import Any, Dict, Iterable, List, cast
 
 import pytest
-from _pytest.tmpdir import TempPathFactory
 
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python import target_types_rules
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import (
+    PythonRequirementsField,
+    PythonRequirementTarget,
+    PythonResolveField,
+    PythonSourceField,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+    PythonTestTarget,
+)
 from pants.backend.python.util_rules import pex_from_targets
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest, PexRequirements
+from pants.backend.python.util_rules.pex import Pex, PexPlatforms, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import (
+    ChosenPythonResolve,
+    ChosenPythonResolveRequest,
     GlobalRequirementConstraints,
+    NoCompatibleResolveException,
     PexFromTargetsRequest,
 )
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.build_graph.address import Address
-from pants.engine.internals.scheduler import ExecutionError
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.addresses import Addresses
+from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
 
@@ -33,11 +47,111 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *pex_from_targets.rules(),
+            *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
             QueryRule(GlobalRequirementConstraints, ()),
+            QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            PythonSourceTarget,
+            PythonTestTarget,
+        ],
     )
+
+
+def test_no_compatible_resolve_error() -> None:
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""}, enable_resolves=True)
+    targets = [
+        PythonRequirementTarget(
+            {PythonRequirementsField.alias: [], PythonResolveField.alias: "a"},
+            Address("", target_name="t1"),
+        ),
+        PythonSourceTarget(
+            {PythonSourceField.alias: "f.py", PythonResolveField.alias: "a"},
+            Address("", target_name="t2"),
+        ),
+        PythonSourceTarget(
+            {PythonSourceField.alias: "f.py", PythonResolveField.alias: "b"},
+            Address("", target_name="t3"),
+        ),
+    ]
+    assert str(NoCompatibleResolveException(python_setup, "Prefix", targets)).startswith(
+        dedent(
+            """\
+            Prefix:
+
+            a:
+              * //:t1
+              * //:t2
+
+            b:
+              * //:t3
+            """
+        )
+    )
+
+
+def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
+    def create_target_files(
+        directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
+    ) -> dict[str | PurePath, str | bytes]:
+        return {
+            f"{directory}/BUILD": dedent(
+                f"""\
+              python_source(name="dep", source="dep.py", resolve="{source_resolve}")
+              python_requirement(
+                  name="req", requirements=[], resolve="{req_resolve}"
+              )
+              python_test(
+                  name="test",
+                  source="tests.py",
+                  dependencies=[":dep", ":req"],
+                  resolve="{test_resolve}",
+              )
+              """
+            ),
+            f"{directory}/tests.py": "",
+            f"{directory}/dep.py": "",
+        }
+
+    rule_runner.set_options(
+        ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"], env_inherit={"PATH"}
+    )
+    rule_runner.write_files(
+        {
+            # Note that each of these BUILD files are entirely self-contained.
+            **create_target_files("valid", req_resolve="a", source_resolve="a", test_resolve="a"),
+            **create_target_files(
+                "invalid",
+                req_resolve="a",
+                source_resolve="a",
+                test_resolve="b",
+            ),
+        }
+    )
+
+    def choose_resolve(addresses: list[Address]) -> str:
+        return rule_runner.request(
+            ChosenPythonResolve, [ChosenPythonResolveRequest(Addresses(addresses))]
+        ).name
+
+    assert choose_resolve([Address("valid", target_name="test")]) == "a"
+    assert choose_resolve([Address("valid", target_name="dep")]) == "a"
+    assert choose_resolve([Address("valid", target_name="req")]) == "a"
+
+    with engine_error(NoCompatibleResolveException, contains="its dependencies are not compatible"):
+        choose_resolve([Address("invalid", target_name="test")])
+    with engine_error(NoCompatibleResolveException, contains="its dependencies are not compatible"):
+        choose_resolve([Address("invalid", target_name="dep")])
+
+    with engine_error(
+        NoCompatibleResolveException, contains="input targets did not have a resolve"
+    ):
+        choose_resolve(
+            [Address("invalid", target_name="req"), Address("invalid", target_name="dep")]
+        )
 
 
 @dataclass(frozen=True)
@@ -130,9 +244,11 @@ def requirements(rule_runner: RuleRunner, pex: Pex) -> list[str]:
     return cast(List[str], info(rule_runner, pex)["requirements"])
 
 
-def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: RuleRunner) -> None:
+def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None:
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
     find_links = create_dists(
-        tmp_path_factory.mktemp("sdists"),
+        sdists,
         Project("Foo-Bar", "1.0.0"),
         Project("Bar", "5.5.5"),
         Project("baz", "2.2.2"),
@@ -140,7 +256,9 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
     )
 
     # Turn the project dir into a git repo, so it can be cloned.
-    foorl_dir = create_project_dir(tmp_path_factory.mktemp("git"), Project("foorl", "9.8.7"))
+    gitdir = tmp_path / "git"
+    gitdir.mkdir()
+    foorl_dir = create_project_dir(gitdir, Project("foorl", "9.8.7"))
     with pushd(str(foorl_dir)):
         subprocess.check_call(["git", "init"])
         subprocess.check_call(["git", "config", "user.name", "dummy"])
@@ -191,7 +309,6 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         constraints_file: str | None,
         resolve_all_constraints: bool | None,
         *,
-        direct_deps_only: bool = False,
         additional_args: Iterable[str] = (),
         additional_lockfile_args: Iterable[str] = (),
     ) -> PexRequest:
@@ -200,7 +317,6 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
             [Address("", target_name="app")],
             output_filename="demo.pex",
             internal_only=True,
-            direct_deps_only=direct_deps_only,
             additional_args=additional_args,
             additional_lockfile_args=additional_lockfile_args,
         )
@@ -224,13 +340,6 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         constraints_strings=constraints1_strings,
     )
 
-    pex_req1_direct = get_pex_request(
-        constraints1_filename, resolve_all_constraints=False, direct_deps_only=True
-    )
-    assert pex_req1_direct.requirements == PexRequirements(
-        ["baz", url_req], constraints_strings=constraints1_strings
-    )
-
     pex_req2 = get_pex_request(
         constraints1_filename,
         resolve_all_constraints=True,
@@ -247,37 +356,14 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
         rule_runner, repository_pex
     )
 
-    pex_req2_direct = get_pex_request(
-        constraints1_filename,
-        resolve_all_constraints=True,
-        direct_deps_only=True,
-        additional_args=additional_args,
-        additional_lockfile_args=additional_lockfile_args,
-    )
-    pex_req2_reqs = pex_req2_direct.requirements
-    assert isinstance(pex_req2_reqs, PexRequirements)
-    assert list(pex_req2_reqs.req_strings) == ["baz", url_req]
-    assert pex_req2_reqs.repository_pex == repository_pex
-    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
-
-    pex_req3_direct = get_pex_request(
-        constraints1_filename, resolve_all_constraints=True, direct_deps_only=True
-    )
-    pex_req3_reqs = pex_req3_direct.requirements
-    assert isinstance(pex_req3_reqs, PexRequirements)
-    assert list(pex_req3_reqs.req_strings) == ["baz", url_req]
-    assert pex_req3_reqs.repository_pex is not None
-    assert pex_req3_reqs.repository_pex != repository_pex
-    assert info(rule_runner, pex_req3_reqs.repository_pex)["strip_pex_env"]
-
-    with pytest.raises(ExecutionError) as err:
+    with engine_error(
+        ValueError,
+        contains=(
+            "`[python].resolve_all_constraints` is enabled, so "
+            "`[python].requirement_constraints` must also be set."
+        ),
+    ):
         get_pex_request(None, resolve_all_constraints=True)
-    assert len(err.value.wrapped_exceptions) == 1
-    assert isinstance(err.value.wrapped_exceptions[0], ValueError)
-    assert (
-        "`[python].resolve_all_constraints` is enabled, so "
-        "`[python].requirement_constraints` must also be set."
-    ) in str(err.value)
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
     get_pex_request(None, resolve_all_constraints=None)
@@ -285,9 +371,11 @@ def test_constraints_validation(tmp_path_factory: TempPathFactory, rule_runner: 
 
 @pytest.mark.parametrize("include_requirements", [False, True])
 def test_exclude_requirements(
-    include_requirements: bool, tmp_path_factory: TempPathFactory, rule_runner: RuleRunner
+    include_requirements: bool, tmp_path: Path, rule_runner: RuleRunner
 ) -> None:
-    find_links = create_dists(tmp_path_factory.mktemp("sdists"), Project("baz", "2.2.2"))
+    sdists = tmp_path / "sdists"
+    sdists.mkdir()
+    find_links = create_dists(sdists, Project("baz", "2.2.2"))
 
     rule_runner.write_files(
         {

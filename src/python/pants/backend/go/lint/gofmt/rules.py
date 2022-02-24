@@ -13,7 +13,7 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
@@ -38,6 +38,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtRequest):
     field_set_type = GofmtFieldSet
+    name = GofmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -82,18 +83,18 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
     if gofmt.options.skip:
-        return FmtResult.skip(formatter_name="gofmt")
+        return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name="gofmt"
+        result, original_digest=setup.original_digest, formatter_name=request.name
     )
 
 
 @rule(desc="Lint with gofmt", level=LogLevel.DEBUG)
 async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResults:
     if gofmt.options.skip:
-        return LintResults([], linter_name="gofmt")
+        return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     lint_result = LintResult.from_fallible_process_result(result)
@@ -105,7 +106,7 @@ async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResult
             exit_code=1,
             stdout=f"The following Go files require formatting:\n{lint_result.stdout}\n",
         )
-    return LintResults([lint_result], linter_name="gofmt")
+    return LintResults([lint_result], linter_name=request.name)
 
 
 def rules():
@@ -113,5 +114,5 @@ def rules():
         *collect_rules(),
         *golang.rules(),
         UnionRule(FmtRequest, GofmtRequest),
-        UnionRule(LintRequest, GofmtRequest),
+        UnionRule(LintTargetsRequest, GofmtRequest),
     ]

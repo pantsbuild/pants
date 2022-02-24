@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Dict, Tuple
+from typing import Dict
 
 from pants.engine.rules import collect_rules
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
@@ -13,32 +14,17 @@ class PythonNativeCode(Subsystem):
     options_scope = "python-native-code"
     help = "Options for building native code using Python, e.g. when resolving distributions."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
-        register(
-            "--cpp-flags",
-            type=list,
-            default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
-            advanced=True,
-            help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
-        )
-        register(
-            "--ld-flags",
-            type=list,
-            default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
-            advanced=True,
-            help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
-        )
-
-    @property
-    def cpp_flags(self) -> Tuple[str, ...]:
-        return tuple(self.options.cpp_flags)
-
-    @property
-    def ld_flags(self) -> Tuple[str, ...]:
-        return tuple(self.options.ld_flags)
+    # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
+    cpp_flags = StrListOption(
+        "--cpp-flags",
+        default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
+        help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
+    ).advanced()
+    ld_flags = StrListOption(
+        "--ld-flags",
+        default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
+        help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
+    ).advanced()
 
     @property
     def environment_dict(self) -> Dict[str, str]:

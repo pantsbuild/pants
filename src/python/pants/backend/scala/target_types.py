@@ -5,28 +5,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     FieldSet,
-    GeneratedTargets,
-    GenerateTargetsRequest,
     MultipleSourcesField,
     SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
     StringField,
+    StringSequenceField,
     Target,
-    generate_file_level_targets,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JvmCompatibleResolvesField,
+    JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
 )
+
+
+class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
+
+
+@rule
+def scala_settings_request(_: ScalaSettingsRequest) -> TargetFilesGeneratorSettings:
+    # TODO: See https://github.com/pantsbuild/pants/issues/14382.
+    return TargetFilesGeneratorSettings(add_dependencies_on_all_siblings=True)
 
 
 class ScalaSourceField(SingleSourceField):
@@ -35,6 +44,24 @@ class ScalaSourceField(SingleSourceField):
 
 class ScalaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".scala",)
+
+
+class ScalaDependenciesField(Dependencies):
+    pass
+
+
+class ScalaConsumedPluginNamesField(StringSequenceField):
+    help = """The names of Scala plugins that this source file requires.
+
+        The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target,
+        and must be present in this target's resolve's lockfile.
+
+        If not specified, this will default to the plugins specified in `--scalac-plugins` for this
+        target's resolve.
+        """
+
+    alias = "scalac_plugins"
+    required = False
 
 
 @dataclass(frozen=True)
@@ -64,10 +91,12 @@ class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalatestTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala test, run with Scalatest."
 
@@ -76,39 +105,28 @@ class ScalatestTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Spec.scala", "*Suite.scala")
 
 
-class ScalatestTestsGeneratorTarget(Target):
+class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     alias = "scalatest_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
-        Dependencies,
-        JvmResolveField,
-        JvmProvidesTypesField,
+        ScalaDependenciesField,
     )
+    generated_target_cls = ScalatestTestTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaDependenciesField,
+    )
+    moved_fields = (
+        ScalaConsumedPluginNamesField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+        JvmResolveField,
+    )
+    settings_request_cls = ScalaSettingsRequest
     help = (
         "Generate a `scalatest_test` target for each file in the `sources` field (defaults to "
         f"all files in the directory matching {ScalatestTestsGeneratorSourcesField.default})."
-    )
-
-
-class GenerateTargetsFromScalatestTests(GenerateTargetsRequest):
-    generate_from = ScalatestTestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_scala_scalatest_tests(
-    request: GenerateTargetsFromScalatestTests, union_membership: UnionMembership
-) -> GeneratedTargets:
-    paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ScalatestTestsGeneratorSourcesField])
-    )
-    return generate_file_level_targets(
-        ScalatestTestTarget,
-        request.generator,
-        paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=True,
-        use_source_field=True,
     )
 
 
@@ -125,10 +143,12 @@ class ScalaJunitTestTarget(Target):
     alias = "scala_junit_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaJunitTestSourceField,
+        ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala test, run with JUnit."
 
@@ -137,37 +157,26 @@ class ScalaJunitTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
 
 
-class ScalaJunitTestsGeneratorTarget(Target):
+class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "scala_junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
-        Dependencies,
-        JvmResolveField,
+        ScalaDependenciesField,
+    )
+    generated_target_cls = ScalaJunitTestTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaDependenciesField,
+    )
+    moved_fields = (
+        ScalaConsumedPluginNamesField,
+        JvmJdkField,
         JvmProvidesTypesField,
+        JvmResolveField,
     )
+    settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_junit_test` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromScalaJunitTests(GenerateTargetsRequest):
-    generate_from = ScalaJunitTestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_scala_junit_tests(
-    request: GenerateTargetsFromScalaJunitTests, union_membership: UnionMembership
-) -> GeneratedTargets:
-    paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ScalaJunitTestsGeneratorSourcesField])
-    )
-    return generate_file_level_targets(
-        ScalaJunitTestTarget,
-        request.generator,
-        paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=True,
-        use_source_field=True,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -179,10 +188,12 @@ class ScalaSourceTarget(Target):
     alias = "scala_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaSourceField,
-        JvmCompatibleResolvesField,
+        ScalaConsumedPluginNamesField,
+        JvmResolveField,
         JvmProvidesTypesField,
+        JvmJdkField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -193,46 +204,33 @@ class ScalaSourceTarget(Target):
 
 
 class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
-    default = tuple(
-        (
-            "*.scala",
-            *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
-            *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
-        )
+    default = (
+        "*.scala",
+        *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
+        *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
     )
 
 
-class ScalaSourcesGeneratorTarget(Target):
+class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "scala_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ScalaDependenciesField,
         ScalaSourcesGeneratorSourcesField,
-        JvmCompatibleResolvesField,
+    )
+    generated_target_cls = ScalaSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaDependenciesField,
+    )
+    moved_fields = (
+        ScalaConsumedPluginNamesField,
+        JvmResolveField,
+        JvmJdkField,
         JvmProvidesTypesField,
     )
+    settings_request_cls = ScalaSettingsRequest
     help = "Generate a `scala_source` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromScalaSources(GenerateTargetsRequest):
-    generate_from = ScalaSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_scala_sources(
-    request: GenerateTargetsFromScalaSources, union_membership: UnionMembership
-) -> GeneratedTargets:
-    paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ScalaSourcesGeneratorSourcesField])
-    )
-    return generate_file_level_targets(
-        ScalaSourceTarget,
-        request.generator,
-        paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=True,
-        use_source_field=True,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -274,7 +272,5 @@ class ScalacPluginTarget(Target):
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalaJunitTests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalaSources),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromScalatestTests),
+        UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

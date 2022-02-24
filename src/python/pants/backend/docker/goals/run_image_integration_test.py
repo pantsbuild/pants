@@ -12,7 +12,7 @@ def run_pants_with_sources(sources: dict[str, str], *args: str) -> PantsResult:
     with setup_tmpdir(sources) as tmpdir:
         return run_pants(
             [
-                "--backend-packages=pants.backend.experimental.docker",
+                "--backend-packages=pants.backend.docker",
                 "--pants-ignore=__pycache__",
             ]
             + [arg.format(tmpdir=tmpdir) for arg in args]

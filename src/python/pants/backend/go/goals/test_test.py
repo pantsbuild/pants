@@ -23,10 +23,12 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.test import TestResult
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
+from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -47,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
+            QueryRule(ProcessResult, [GoSdkProcess]),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
@@ -502,6 +505,41 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout
     assert "FAIL: TestAddExternal" in result.stdout
+
+
+def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
+    go_version_result = rule_runner.request(
+        ProcessResult, [GoSdkProcess(["version"], description="Get `go` version.")]
+    )
+    if "go1.18" not in go_version_result.stdout.decode():
+        pytest.skip("Skipping because Go SDK is not 1.18 or higher.")
+
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/fuzz_test.go": textwrap.dedent(
+                """
+                package foo
+                import (
+                  "testing"
+                )
+                func FuzzFoo(f *testing.F) {
+                  f.Add("foo")
+                  f.Fuzz(func(t *testing.T, v string) {
+                    if v != "foo" {
+                      t.Fail()
+                    }
+                  })
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+    assert "PASS: FuzzFoo" in result.stdout
 
 
 def test_skip_tests(rule_runner: RuleRunner) -> None:
