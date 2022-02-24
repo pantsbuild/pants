@@ -32,9 +32,9 @@ from typing import Any, Dict, Iterable, cast
 import chevron
 import requests
 from common import die
-from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from readme_api import DocRef, ReadmeAPI
 
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
 from pants.version import MAJOR_MINOR
 
