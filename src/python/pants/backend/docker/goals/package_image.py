@@ -291,18 +291,31 @@ async def build_docker_image(
 
 
 def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
-    image_id_regexp = re.compile(r"writing image (sha256:\S+) done")
+    """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    image_id_regexp = re.compile(
+        "|".join(
+            (
+                # BuildKit output.
+                r"(writing image (?P<digest>sha256:\S+) done)",
+                # Docker output.
+                r"(Successfully built (?P<short_id>\S+))",
+            ),
+        )
+    )
     for output in outputs:
         image_id_match = next(
             (
-                re.search(image_id_regexp, line)
-                for line in reversed(output.decode().split("\n"))
-                if "writing image sha256:" in line
+                match
+                for match in (
+                    re.search(image_id_regexp, line)
+                    for line in reversed(output.decode().split("\n"))
+                )
+                if match
             ),
             None,
         )
         if image_id_match:
-            image_id = image_id_match.group(1)
+            image_id = image_id_match.group("digest") or image_id_match.group("short_id")
             return image_id
 
     return "<unknown>"
