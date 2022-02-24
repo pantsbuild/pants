@@ -279,7 +279,7 @@ class JvmWarDescriptorAddressField(StringField):
 class JvmWarContentField(SpecialCasedDependencies):
     alias = "content"
     help = (
-        "A list of addresses to `resource` and `file` targets with content to place in the "
+        "A list of addresses to `resources` and `files` targets with content to place in the "
         "document root of this WAR file."
     )
 
