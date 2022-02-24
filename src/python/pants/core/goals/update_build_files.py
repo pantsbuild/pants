@@ -302,16 +302,7 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="yapf.pex",
-            internal_only=True,
-            requirements=yapf.pex_requirements(),
-            interpreter_constraints=yapf.interpreter_constraints,
-            main=yapf.main,
-        ),
-    )
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
@@ -364,16 +355,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=black.pex_requirements(),
-            interpreter_constraints=black.interpreter_constraints,
-            main=black.main,
-        ),
-    )
+    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))

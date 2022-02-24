@@ -375,16 +375,7 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
-    pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="coverage.pex",
-            internal_only=True,
-            requirements=coverage.pex_requirements(),
-            interpreter_constraints=coverage.interpreter_constraints,
-            main=coverage.main,
-        ),
-    )
+    pex = await Get(VenvPex, PexRequest, coverage.to_pex_request())
     return CoverageSetup(pex)
 
 

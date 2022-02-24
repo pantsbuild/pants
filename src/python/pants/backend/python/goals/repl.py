@@ -133,14 +133,7 @@ async def create_ipython_repl_request(
     )
 
     ipython_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="ipython.pex",
-            main=ipython.main,
-            requirements=ipython.pex_requirements(),
-            interpreter_constraints=interpreter_constraints,
-            internal_only=True,
-        ),
+        Pex, PexRequest, ipython.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
 
     requirements_pex, sources, ipython_pex = await MultiGet(

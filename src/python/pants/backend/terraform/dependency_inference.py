@@ -68,28 +68,17 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
 
     parser_content = FileContent(
-        path="__pants_tf_parser.py",
-        content=parser_script_content,
-        is_executable=True,
+        path="__pants_tf_parser.py", content=parser_script_content, is_executable=True
     )
-
-    parser_digest = await Get(
-        Digest,
-        CreateDigest([parser_content]),
-    )
+    parser_digest = await Get(Digest, CreateDigest([parser_content]))
 
     parser_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="tf_parser.pex",
-            internal_only=True,
-            requirements=hcl2_parser.pex_requirements(),
-            interpreter_constraints=hcl2_parser.interpreter_constraints,
-            main=EntryPoint(PurePath(parser_content.path).stem),
-            sources=parser_digest,
+        PexRequest,
+        hcl2_parser.to_pex_request(
+            main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
         ),
     )
-
     return ParserSetup(parser_pex)
 
 
