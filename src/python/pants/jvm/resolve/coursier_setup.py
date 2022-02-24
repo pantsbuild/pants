@@ -128,7 +128,12 @@ class CoursierSubsystem(TemplatedExternalTool):
                 "https://maven-central.storage-download.googleapis.com/maven2",
                 "https://repo1.maven.org/maven2",
             ],
-            help=("Maven style repositories to resolve artifacts from."),
+            help=(
+                "Maven style repositories to resolve artifacts from."
+                "\n\n"
+                "Coursier will resolve these repositories in the order in which they are "
+                "specifed, and re-ordering repositories will cause artifacts to be "
+                "re-downloaded. This can result in artifacts in lockfiles becoming invalid."),
         )
 
     def generate_exe(self, plat: Platform) -> str:
