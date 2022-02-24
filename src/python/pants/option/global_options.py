@@ -1416,7 +1416,9 @@ class GlobalOptions(Subsystem):
     ).advanced()
 
     _loop_flag = "--loop"
-    loop = BoolOption(_loop_flag, help="Run goals continuously as file changes are detected.")
+    loop = BoolOption(
+        _loop_flag, default=False, help="Run goals continuously as file changes are detected."
+    )
     loop_max = IntOption(
         "--loop-max",
         default=2**32,

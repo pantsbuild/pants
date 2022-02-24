@@ -114,6 +114,7 @@ class DockerOptions(Subsystem):
     )
     build_target_stage = StrOption(
         "--build-target-stage",
+        default=None,
         help=(
             "Global default value for `target_stage` on `docker_image` targets, overriding "
             "the field value on the targets, if there is a matching stage in the `Dockerfile`."

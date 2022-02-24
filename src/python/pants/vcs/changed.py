@@ -96,10 +96,12 @@ class Changed(Subsystem):
 
     since = StrOption(
         "--since",
+        default=None,
         help="Calculate changes since this Git spec (commit range/SHA/ref).",
     )
     diffspec = StrOption(
         "--diffspec",
+        default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
     )
     dependees = EnumOption(

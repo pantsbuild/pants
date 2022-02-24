@@ -428,16 +428,16 @@ def test_scope_deprecation(caplog) -> None:
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        foo = StrOption("--foo", help="")
-        bar = StrOption("--bar", help="")
-        baz = StrOption("--baz", help="")
+        foo = StrOption("--foo", default=None, help="")
+        bar = StrOption("--bar", default=None, help="")
+        baz = StrOption("--baz", default=None, help="")
 
     class Subsystem2(Subsystem):
         options_scope = "new2"
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        qux = StrOption("--qux", help="")
+        qux = StrOption("--qux", default=None, help="")
 
     def register(opts: Options) -> None:
         opts.register(Subsystem1.options_scope, "--foo")
