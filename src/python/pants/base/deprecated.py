@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from packaging.version import InvalidVersion, Version
 
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized, memoized_method
 from pants.version import PANTS_SEMVER
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,7 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
     return v
 
 
+@memoized
 def warn_or_error(
     removal_version: str,
     entity: str,

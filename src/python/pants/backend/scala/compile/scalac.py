@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.backend.scala.compile.scalac_plugins import GlobalScalacPlugins
+from pants.backend.scala.compile.scalac_plugins import (
+    GlobalScalacPlugins,
+    ScalaPlugins,
+    ScalaPluginsForTargetRequest,
+    ScalaPluginsRequest,
+    ScalaPluginTargetsForTarget,
+)
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
@@ -18,16 +24,18 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -48,25 +56,15 @@ class ScalaLibraryRequest:
 @rule(desc="Compile with scalac")
 async def compile_scala_source(
     scala: ScalaSubsystem,
-    jdk_setup: JdkSetup,  # TODO(#13995) Calculate this explicitly based on input targets.
     scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
-    union_membership: UnionMembership,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
+
     # Request classpath entries for our direct dependencies.
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(
-                FallibleClasspathEntry,
-                ClasspathEntryRequest,
-                ClasspathEntryRequest.for_targets(
-                    union_membership, component=coarsened_dep, resolve=request.resolve
-                ),
-            )
-            for coarsened_dep in request.component.dependencies
-        )
-    )
+    dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
+    direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()
+
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
             description=str(request.component),
@@ -75,19 +73,7 @@ async def compile_scala_source(
             exit_code=1,
         )
 
-    all_dependency_jars = [
-        filename
-        for dependency in direct_dependency_classpath_entries
-        for filename in dependency.filenames
-    ]
-
-    # TODO(14171): Stop-gap for making sure that scala supplies all of its dependencies to
-    # deploy targets.
-    if not any(
-        filename.startswith("org.scala-lang_scala-library_") for filename in all_dependency_jars
-    ):
-        scala_library = await Get(ClasspathEntry, ScalaLibraryRequest(scala.version))
-        direct_dependency_classpath_entries += (scala_library,)
+    scala_version = scala.version_for_resolve(request.resolve.name)
 
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
@@ -106,6 +92,16 @@ async def compile_scala_source(
             for t in component_members_with_sources
         ),
     )
+
+    plugins_ = await MultiGet(
+        Get(
+            ScalaPluginTargetsForTarget,
+            ScalaPluginsForTargetRequest(target, request.resolve.name),
+        )
+        for target in request.component.members
+    )
+    plugins_request = ScalaPluginsRequest.from_target_plugins(plugins_, request.resolve)
+    local_plugins = await Get(ScalaPlugins, ScalaPluginsRequest, plugins_request)
 
     component_members_and_scala_source_files = [
         (target, sources)
@@ -128,10 +124,12 @@ async def compile_scala_source(
 
     toolcp_relpath = "__toolcp"
     scalac_plugins_relpath = "__plugincp"
+    local_scalac_plugins_relpath = "__localplugincp"
     usercp = "__cp"
 
-    user_classpath = Classpath(direct_dependency_classpath_entries)
-    tool_classpath, sources_digest = await MultiGet(
+    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
+
+    tool_classpath, sources_digest, jdk = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
@@ -140,12 +138,12 @@ async def compile_scala_source(
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-compiler",
-                            version=scala.version,
+                            version=scala_version,
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-library",
-                            version=scala.version,
+                            version=scala_version,
                         ),
                     ]
                 ),
@@ -157,11 +155,13 @@ async def compile_scala_source(
                 (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
             ),
         ),
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
 
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         scalac_plugins_relpath: scalac_plugins.classpath.digest,
+        local_scalac_plugins_relpath: local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
@@ -172,13 +172,14 @@ async def compile_scala_source(
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk_setup.jdk,
+            jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
                 *scalac_plugins.args(scalac_plugins_relpath),
+                *local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
                 "-d",

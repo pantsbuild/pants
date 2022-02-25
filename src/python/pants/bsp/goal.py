@@ -6,8 +6,10 @@ import sys
 
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
+from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
@@ -29,8 +31,16 @@ class BSPGoal(BuiltinGoal):
         specs: Specs,
         union_membership: UnionMembership
     ) -> ExitCode:
+        current_session_values = graph_session.scheduler_session.py_session.session_values
+        context = BSPContext()
+        session_values = SessionValues(
+            {
+                **current_session_values,
+                BSPContext: context,
+            }
+        )
         scheduler_session = graph_session.scheduler_session.scheduler.new_session(
-            build_id="bsp", dynamic_ui=False
+            build_id="bsp", dynamic_ui=False, session_values=session_values
         )
 
         saved_stdout = sys.stdout
@@ -40,6 +50,8 @@ class BSPGoal(BuiltinGoal):
             sys.stdin = os.fdopen(sys.stdin.fileno(), "rb", buffering=0)  # type: ignore[assignment]
             conn = BSPConnection(
                 scheduler_session,
+                union_membership,
+                context,
                 sys.stdin,  # type: ignore[arg-type]
                 sys.stdout,  # type: ignore[arg-type]
             )

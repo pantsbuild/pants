@@ -59,6 +59,7 @@ def build(tgt: DockerImageTarget, options: DockerOptions):
             EMPTY_DIGEST,
             (
                 BuiltDockerImage.create(
+                    "sha256:made-up",
                     fs.image_refs(
                         options.default_repository,
                         options.registries(),

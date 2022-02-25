@@ -7,5 +7,5 @@ jvm_artifact(
     artifact="scalameta_2.13",
     version="4.4.30",
     packages=["scala.meta.**"],
-    compatible_resolves=["scala_parser"],
+    resolve="scala_parser",
 )

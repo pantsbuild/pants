@@ -9,7 +9,7 @@ from typing import List, Optional
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.help.maybe_color import MaybeColor
 from pants.option.ranked_value import Rank, RankedValue
-from pants.util.docutil import terminal_width
+from pants.util.docutil import bin_name, terminal_width
 from pants.util.strutil import hard_wrap
 
 
@@ -53,6 +53,13 @@ class HelpFormatter(MaybeColor):
             add_option(oshi.advanced, category="advanced")
         if self._show_deprecated:
             add_option(oshi.deprecated, category="deprecated")
+        if oshi.advanced and not self._show_advanced:
+            lines.append(
+                self.maybe_green(
+                    f"Advanced options available. You can list them by running "
+                    f"{bin_name()} help-advanced {oshi.scope}."
+                )
+            )
         return [*lines, ""]
 
     def format_option(self, ohi: OptionHelpInfo) -> List[str]:

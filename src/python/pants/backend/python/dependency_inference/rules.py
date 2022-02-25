@@ -43,7 +43,7 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.option_types import BoolOption, EnumOption, IntOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class PythonInferSubsystem(Subsystem):
             "it is located in (recursively upward in the directory structure).\n\nEven if this "
             "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
             "will not be 'proper' dependencies, e.g. they will not show up in "
-            "`./pants dependencies` and their own dependencies will not be used.\n\nIf you "
+            f"`{bin_name()} dependencies` and their own dependencies will not be used.\n\nIf you "
             "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
             "you should enable this option."
         ),

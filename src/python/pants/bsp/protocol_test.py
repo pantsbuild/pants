@@ -11,6 +11,7 @@ from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
+from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.rules import rules as bsp_rules
 from pants.bsp.spec import (
@@ -61,8 +62,15 @@ def test_basic_bsp_protocol() -> None:
     with setup_pipes() as pipes:
         # TODO: This code should be moved to a context manager. For now, only the pipes are managed
         # with a context manager.
-        rule_runner = RuleRunner(rules=bsp_rules())
-        conn = BSPConnection(rule_runner.scheduler, pipes.inbound_reader, pipes.outbound_writer)
+        context = BSPContext()
+        rule_runner = RuleRunner(rules=bsp_rules(), extra_session_values={BSPContext: context})
+        conn = BSPConnection(
+            rule_runner.scheduler,
+            rule_runner.union_membership,
+            context,
+            pipes.inbound_reader,
+            pipes.outbound_writer,
+        )
 
         def run_bsp_server():
             conn.run()
@@ -94,13 +102,13 @@ def test_basic_bsp_protocol() -> None:
             bsp_version="0.0.0",
             root_uri="https://example.com",
             capabilities=BuildClientCapabilities(language_ids=()),
-            data=None,
+            data={"test": "foo"},
         )
         response_fut = endpoint.request("build/initialize", init_request.to_json_dict())
         raw_response = response_fut.result(timeout=15)
         response = InitializeBuildResult.from_json_dict(raw_response)
         assert response.display_name == "Pants"
-        assert response.bsp_version == "0.0.1"
+        assert response.bsp_version == "2.0.0"
 
         build_targets_request = WorkspaceBuildTargetsParams()
         response_fut = endpoint.request(

@@ -44,9 +44,6 @@ protobuf==3.19.4; python_version >= "3.6" \
     --hash=sha256:3112b58aac3bac9c8be2b60a9daf6b558ca3f7681c130dcdd788ade7c9ffbdca \
     --hash=sha256:8961c3a78ebfcd000920c9060a262f082f29838682b1f7201889300c1fbe0616 \
     --hash=sha256:9df0c10adf3e83015ced42a9a7bd64e13d06c4cf45c340d2c63020ea04499d0a
-types-futures==3.3.8; python_version >= "3.6" \
-    --hash=sha256:6fe8ccc2c2af7ef2fdd9bf73eab6d617074f09f30ad7d373510b4043d39c42de \
-    --hash=sha256:d6e97ec51d56b96debfbf1dea32ebec22c1687f16d2547ea0a34b48db45df205
-types-protobuf==3.19.11; python_version >= "3.6" \
-    --hash=sha256:2af7985754cc16d0fd6697e4fda4e897cefbdb59e9624aad6572d1c2e700787b \
-    --hash=sha256:a181e6c3ce51c2a5d2f54d800b96973518e1dd41cfc74b33677ad99905b3b9dd
+types-protobuf==3.19.12; python_version >= "3.6" \
+    --hash=sha256:b022247347471219acbe2fe68d2f3623d788252e99e9b97358b7ab904d268a78 \
+    --hash=sha256:130bf00e688ae9376682ac8f3d6610be797d8a6072f102f530ca1d579b52e54b

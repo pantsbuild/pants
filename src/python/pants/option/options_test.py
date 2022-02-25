@@ -17,7 +17,7 @@ import toml
 import yaml
 from packaging.version import Version
 
-from pants.base.deprecated import CodeRemovedError
+from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.config import Config
@@ -346,6 +346,7 @@ def test_deprecated_options(caplog) -> None:
         config: dict[str, dict[str, str]] | None = None,
     ) -> None:
         caplog.clear()
+        warn_or_error.clear()  # type: ignore[attr-defined]
         opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
         assert opts.for_scope(scope)[opt] == expected
         assert len(caplog.records) == 1
@@ -370,6 +371,7 @@ def test_deprecated_options(caplog) -> None:
 
     # Make sure the warnings don't come out for regular options.
     caplog.clear()
+    warn_or_error.clear()  # type: ignore[attr-defined]
     assert (
         create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"])
         .for_scope("scope")
@@ -426,16 +428,16 @@ def test_scope_deprecation(caplog) -> None:
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        foo = StrOption("--foo", help="")
-        bar = StrOption("--bar", help="")
-        baz = StrOption("--baz", help="")
+        foo = StrOption("--foo", default=None, help="")
+        bar = StrOption("--bar", default=None, help="")
+        baz = StrOption("--baz", default=None, help="")
 
     class Subsystem2(Subsystem):
         options_scope = "new2"
         deprecated_options_scope = "deprecated"
         deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
-        qux = StrOption("--qux", help="")
+        qux = StrOption("--qux", default=None, help="")
 
     def register(opts: Options) -> None:
         opts.register(Subsystem1.options_scope, "--foo")

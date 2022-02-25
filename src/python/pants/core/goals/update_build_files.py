@@ -20,7 +20,6 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -40,7 +39,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.dirutil import recursive_dirname
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -111,7 +110,9 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         "project."
     )
 
-    required_union_implementations = (RewrittenBuildFileRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RewrittenBuildFileRequest in union_membership
 
     @classmethod
     def register_options(cls, register):
@@ -197,7 +198,6 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    pants_bin: PantsBin,
 ) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
@@ -283,7 +283,7 @@ async def update_build_files(
 
     if update_build_files_subsystem.check:
         console.print_stdout(
-            f"\nTo fix `update-build-files` failures, run `{pants_bin.name} update-build-files`."
+            f"\nTo fix `update-build-files` failures, run `{bin_name()} update-build-files`."
         )
 
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
@@ -302,16 +302,7 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="yapf.pex",
-            internal_only=True,
-            requirements=yapf.pex_requirements(),
-            interpreter_constraints=yapf.interpreter_constraints,
-            main=yapf.main,
-        ),
-    )
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
@@ -364,16 +355,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=black.pex_requirements(),
-            interpreter_constraints=black.interpreter_constraints,
-            main=black.main,
-        ),
-    )
+    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))

@@ -23,8 +23,8 @@ from pants.backend.python.macros.common_fields import (
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
-    PythonRequirementCompatibleResolvesField,
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
     PythonRequirementsFileSourcesField,
     PythonRequirementsFileTarget,
@@ -406,7 +406,7 @@ class PoetryRequirementsTargetGenerator(Target):
         TypeStubsModuleMappingField,
         PoetryRequirementsSourceField,
         RequirementsOverrideField,
-        PythonRequirementCompatibleResolvesField,
+        PythonRequirementResolveField,
     )
 
 
@@ -421,6 +421,10 @@ async def generate_from_python_requirement(
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
     pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
 
     file_tgt = PythonRequirementsFileTarget(
         {PythonRequirementsFileSourcesField.alias: pyproject_rel_path},
@@ -448,15 +452,15 @@ async def generate_from_python_requirement(
         )
     )
 
-    generator[PythonRequirementCompatibleResolvesField].normalized_value(python_setup)
+    # Validate the resolve is legal.
+    generator[PythonRequirementResolveField].normalized_value(python_setup)
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    overrides = generator[RequirementsOverrideField].flatten_and_normalize()
     inherited_fields = {
         field.alias: field.value
         for field in request.generator.field_values.values()
-        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementCompatibleResolvesField))
+        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
     }
 
     def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:

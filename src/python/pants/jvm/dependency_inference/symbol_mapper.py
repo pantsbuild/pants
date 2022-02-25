@@ -12,7 +12,8 @@ from pants.build_graph.address import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import AllJvmTypeProvidingTargets
-from pants.jvm.target_types import JvmProvidesTypesField
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmProvidesTypesField, JvmResolveField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -31,28 +32,30 @@ class SymbolMap:
     """A mapping of JVM package names to owning addresses."""
 
     def __init__(self):
-        self._symbol_map: dict[str, set[Address]] = defaultdict(set)
+        self._symbol_map: dict[tuple[str, str], set[Address]] = defaultdict(set)
 
-    def add_symbol(self, symbol: str, address: Address):
+    def add_symbol(self, symbol: str, address: Address, *, resolve: str):
         """Declare a single Address as a provider of a symbol."""
-        self._symbol_map[symbol].add(address)
+        self._symbol_map[(resolve, symbol)].add(address)
 
-    def addresses_for_symbol(self, symbol: str) -> frozenset[Address]:
+    def addresses_for_symbol(self, symbol: str, *, resolve: str) -> frozenset[Address]:
         """Returns the set of addresses that provide the passed symbol.
 
         :param symbol: a fully-qualified JVM symbol (e.g. `foo.bar.Thing`).
+        :param resolve: name of resolve name in which to check for symbol.
         """
-        return frozenset(self._symbol_map[symbol])
+        return frozenset(self._symbol_map[(resolve, symbol)])
 
     def merge(self, other: SymbolMap) -> None:
         """Merge 'other' into this dependency map."""
-        for symbol, addresses in other._symbol_map.items():
-            self._symbol_map[symbol] |= addresses
+        for (resolve, symbol), addresses in other._symbol_map.items():
+            self._symbol_map[(resolve, symbol)] |= addresses
 
     def to_json_dict(self):
         return {
             "symbol_map": {
-                sym: [str(addr) for addr in addrs] for sym, addrs in self._symbol_map.items()
+                f"{resolve}/{sym}": [str(addr) for addr in addrs]
+                for (resolve, sym), addrs in self._symbol_map.items()
             },
         }
 
@@ -82,6 +85,7 @@ class FirstPartySymbolMapping:
 async def merge_first_party_module_mappings(
     union_membership: UnionMembership,
     targets_that_provide_types: AllJvmTypeProvidingTargets,
+    jvm: JvmSubsystem,
 ) -> FirstPartySymbolMapping:
     all_mappings = await MultiGet(
         Get(
@@ -101,14 +105,15 @@ async def merge_first_party_module_mappings(
     # here is that _one_ of the souce files amongst the set of sources actually provides that type.
 
     # Collect each address associated with a `provides` annotation and index by the provided type.
-    provided_types: dict[str, set[Address]] = defaultdict(set)
+    provided_types: dict[tuple[str, str], set[Address]] = defaultdict(set)
     for tgt in targets_that_provide_types:
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
         for provided_type in tgt[JvmProvidesTypesField].value or []:
-            provided_types[provided_type].add(tgt.address)
+            provided_types[(resolve, provided_type)].add(tgt.address)
 
     # Check that at least one address declared by each `provides` value actually provides the type:
-    for provided_type, provided_addresses in provided_types.items():
-        symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type)
+    for (resolve, provided_type), provided_addresses in provided_types.items():
+        symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type, resolve=resolve)
         if not provided_addresses.intersection(symbol_addresses):
             raise JvmFirstPartyPackageMappingException(
                 f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "

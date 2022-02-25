@@ -149,14 +149,10 @@ async def mypy_typecheck_partition(
 
     mypy_pex_get = Get(
         VenvPex,
-        PexRequest(
-            output_filename="mypy.pex",
-            internal_only=True,
-            main=mypy.main,
-            requirements=mypy.pex_requirements(
-                extra_requirements=first_party_plugins.requirement_strings,
-            ),
+        PexRequest,
+        mypy.to_pex_request(
             interpreter_constraints=tool_interpreter_constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 

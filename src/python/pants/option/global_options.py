@@ -13,7 +13,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Type, cast
 
 from pants.base.build_environment import (
@@ -34,9 +34,9 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classmethod
+from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
 from pants.version import VERSION
@@ -594,15 +594,15 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Use this Pants version. Note that Pants only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
-            "is using once the program is already running.\n\nIf you use the `./pants` script from "
+            f"is using once the program is already running.\n\nIf you use the `{bin_name()}` script from "
             f"{doc_url('installation')}, however, changing the value in your "
             "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
-            "Run `./pants --version` to check what is being used.",
+            f"Run `{bin_name()} --version` to check what is being used.",
         )
         register(
             "--pants-bin-name",
             advanced=True,
-            default="./pants",
+            default="./pants",  # noqa: PANTSBIN
             help="The name of the script or binary used to invoke Pants. "
             "Useful when printing help messages.",
         )
@@ -630,7 +630,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, "dist"),
-            help="Write end products, such as the results of `./pants package`, to this dir.",
+            help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
         )
         register(
             "--pants-subprocessdir",
@@ -1310,12 +1310,11 @@ class GlobalOptions(Subsystem):
                 "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
                 "delete the option.\n\n"
                 "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
-                "  1. Run `./pants update-build-files --fix-python-macros`\n"
+                f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
                 "  2. Check the logs for an ERROR log to see if you have to manually add "
                 "`name=` anywhere.\n"
                 "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
                 "pants.toml.\n\n"
-                "You can ignore this warning with `[GLOBAL].ignore_warnings`."
                 "(Why upgrade from the old macro mechanism to target generation? Among other "
                 "benefits, it makes sure that the Pants daemon is properly invalidated when you "
                 "change `requirements.txt` and `pyproject.toml`.)"
@@ -1417,7 +1416,9 @@ class GlobalOptions(Subsystem):
     ).advanced()
 
     _loop_flag = "--loop"
-    loop = BoolOption(_loop_flag, help="Run goals continuously as file changes are detected.")
+    loop = BoolOption(
+        _loop_flag, default=False, help="Run goals continuously as file changes are detected."
+    )
     loop_max = IntOption(
         "--loop-max",
         default=2**32,
@@ -1610,6 +1611,10 @@ class GlobalOptions(Subsystem):
     def get_options_flags(cls) -> GlobalOptionsFlags:
         return GlobalOptionsFlags.create(cast("Type[GlobalOptions]", cls))
 
+    @memoized_property
+    def named_caches_dir(self) -> PurePath:
+        return Path(self.options.named_caches_dir).resolve()
+
 
 @dataclass(frozen=True)
 class GlobalOptionsFlags:
@@ -1641,3 +1646,13 @@ class ProcessCleanupOption:
     """
 
     val: bool
+
+
+@dataclass(frozen=True)
+class NamedCachesDirOption:
+    """A wrapper around the global option `named_caches_dir`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: PurePath

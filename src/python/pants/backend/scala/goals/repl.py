@@ -9,9 +9,10 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
@@ -23,34 +24,39 @@ class ScalaRepl(ReplImplementation):
 
 @rule(level=LogLevel.DEBUG)
 async def create_scala_repl_request(
-    request: ScalaRepl, bash: BashBinary, jdk_setup: JdkSetup, scala_subsystem: ScalaSubsystem
+    request: ScalaRepl, bash: BashBinary, scala_subsystem: ScalaSubsystem
 ) -> ReplRequest:
-    jdk = jdk_setup.jdk
-    user_classpath, tool_classpath = await MultiGet(
-        Get(Classpath, Addresses, request.addresses),
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__toolcp",
-                artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=scala_subsystem.version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=scala_subsystem.version,
-                        ),
-                    ]
-                ),
+    user_classpath = await Get(Classpath, Addresses, request.addresses)
+
+    roots = await Get(CoarsenedTargets, Addresses, request.addresses)
+    environs = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target)) for target in roots
+    )
+    jdk = max(environs, key=lambda j: j.jre_major_version)
+
+    scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            prefix="__toolcp",
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-compiler",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-reflect",
+                        version=scala_version,
+                    ),
+                ]
             ),
         ),
     )
@@ -81,7 +87,10 @@ async def create_scala_repl_request(
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
-        extra_env=jdk.env,
+        extra_env={
+            **jdk.env,
+            "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
+        },
         run_in_workspace=False,
         append_only_caches=jdk.append_only_caches,
     )

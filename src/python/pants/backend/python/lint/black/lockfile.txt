@@ -39,9 +39,9 @@ black==22.1.0; python_full_version >= "3.6.2" \
     --hash=sha256:373922fc66676133ddc3e754e4509196a8c392fec3f5ca4486673e685a421321 \
     --hash=sha256:3524739d76b6b3ed1132422bf9d82123cd1705086723bc3e235ca39fd21c667d \
     --hash=sha256:a7c0192d35635f6fc1174be575cb7915e92e5dd629ee79fdaf0dcfa41a80afb5
-click==8.0.3; python_version >= "3.6" and python_full_version >= "3.6.2" \
-    --hash=sha256:353f466495adaeb40b6b5f592f9f91cb22372351c84caeb068132442a4518ef3 \
-    --hash=sha256:410e932b050f5eed773c4cda94de75971c89cdb3155a72a0831139a79e5ecb5b
+click==8.0.4; python_version >= "3.6" and python_full_version >= "3.6.2" \
+    --hash=sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1 \
+    --hash=sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb
 colorama==0.4.4; python_version >= "3.6" and python_full_version >= "3.6.2" and platform_system == "Windows" \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b
@@ -88,9 +88,9 @@ typed-ast==1.5.2; python_version < "3.8" and implementation_name == "cpython" an
     --hash=sha256:f290617f74a610849bd8f5514e34ae3d09eafd521dceaa6cf68b3f4414266d4e \
     --hash=sha256:df05aa5b241e2e8045f5f4367a9f6187b09c4cdf8578bb219861c4e27c443db5 \
     --hash=sha256:525a2d4088e70a9f75b08b3f87a51acc9cde640e19cc523c7e41aa355564ae27
-typing-extensions==4.0.1; python_version < "3.8" and python_full_version >= "3.6.2" and python_version >= "3.6" or python_version < "3.10" \
-    --hash=sha256:7f001e5ac290a0c0401508864c7ec868be4e701886d5b573a9528ed3973d9d3b \
-    --hash=sha256:4ca091dea149f945ec56afb48dae714f21e8692ef22a395223bcd328961b6a0e
+typing-extensions==4.1.1; python_version < "3.8" and python_full_version >= "3.6.2" and python_version >= "3.6" or python_version < "3.10" \
+    --hash=sha256:21c85e0fe4b9a155d0799430b0ad741cdce7e359660ccbd8b530613e8df88ce2 \
+    --hash=sha256:1a9462dcc3347a79b1f1c0271fbe79e844580bb598bafa1ed208b94da3cdcd42
 zipp==3.6.0; python_version >= "3.6" and python_full_version >= "3.6.2" and python_version < "3.8" \
     --hash=sha256:9fe5ea21568a0a70e50f273397638d39b03353731e6cbbb3fd8502a33fec40bc \
     --hash=sha256:71c644c5369f4a6e07636f0aa966270449561fcea2e3d6747b8d23efaa9d7832

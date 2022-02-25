@@ -7,6 +7,7 @@ import os.path
 from pathlib import Path, PurePath
 from typing import Iterable
 
+from pants.base.build_environment import get_buildroot
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpec,
@@ -44,8 +45,8 @@ class SpecsParser:
     class BadSpecError(Exception):
         """Indicates an unparseable command line selector."""
 
-    def __init__(self, root_dir: str) -> None:
-        self._root_dir = os.path.realpath(root_dir)
+    def __init__(self, root_dir: str | None = None) -> None:
+        self._root_dir = os.path.realpath(root_dir or get_buildroot())
 
     def _normalize_spec_path(self, path: str) -> str:
         is_abs = not path.startswith("//") and os.path.isabs(path)

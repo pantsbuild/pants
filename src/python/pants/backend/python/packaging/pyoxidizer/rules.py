@@ -1,8 +1,13 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import dataclasses
 import logging
+import os
 from dataclasses import dataclass
+from textwrap import dedent
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
@@ -10,25 +15,29 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
     PyOxidizerConfigSourceField,
     PyOxidizerDependenciesField,
     PyOxidizerEntryPointField,
+    PyOxidizerOutputPathField,
     PyOxidizerUnclassifiedResources,
 )
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
+    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     FileContent,
     MergeDigests,
+    RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
+from pants.engine.process import BashBinary, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
     Targets,
 )
 from pants.engine.unions import UnionRule
@@ -45,97 +54,127 @@ class PyOxidizerFieldSet(PackageFieldSet):
     dependencies: PyOxidizerDependenciesField
     unclassified_resources: PyOxidizerUnclassifiedResources
     template: PyOxidizerConfigSourceField
+    output_path: PyOxidizerOutputPathField
+
+
+@dataclass(frozen=True)
+class PyoxidizerRunnerScript:
+    digest: Digest
+    path: str
+
+    CACHE_PATH = os.path.join(".cache", "pyoxidizer")
+
+
+@rule
+async def create_pyoxidizer_runner_script() -> PyoxidizerRunnerScript:
+    # Note: PyOxidizer expects an absolute path for its cache dir, which can only be resolved
+    # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
+    # absolute paths inside the sandbox.
+    script = FileContent(
+        "__run_pyoxidizer.sh",
+        dedent(
+            f"""\
+            export PYOXIDIZER_CACHE_DIR="$(/bin/pwd)/{PyoxidizerRunnerScript.CACHE_PATH}"
+            exec "$@"
+            """
+        ).encode("utf-8"),
+    )
+    digest = await Get(Digest, CreateDigest([script]))
+    return PyoxidizerRunnerScript(digest, script.path)
 
 
 @rule(level=LogLevel.DEBUG)
 async def package_pyoxidizer_binary(
-    pyoxidizer: PyOxidizer, field_set: PyOxidizerFieldSet
+    pyoxidizer: PyOxidizer,
+    field_set: PyOxidizerFieldSet,
+    runner_script: PyoxidizerRunnerScript,
+    bash: BashBinary,
 ) -> BuiltPackage:
-    logger.debug(f"Incoming package_pyoxidizer_binary field set: {field_set}")
-    targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
-    target = targets[0]
-
-    logger.debug(f"Received these targets inside pyox targets: {target.address.target_name}")
-
-    packages = await Get(
-        FieldSetsPerTarget,
-        FieldSetsPerTargetRequest(PackageFieldSet, [target]),
+    direct_deps, pyoxidizer_pex = await MultiGet(
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(Pex, PexRequest, pyoxidizer.to_pex_request()),
     )
-    logger.debug(f"Retrieved the following FieldSetsPerTarget {packages}")
 
+    deps_field_sets = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [direct_deps[0]])
+    )
     built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in packages.field_sets
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
     )
-
-    wheels = [
+    wheel_paths = [
         artifact.relpath
-        for wheel in built_packages
-        for artifact in wheel.artifacts
-        if artifact.relpath is not None
+        for built_pkg in built_packages
+        for artifact in built_pkg.artifacts
+        if artifact.relpath is not None and artifact.relpath.endswith(".whl")
     ]
-    logger.debug(f"This is the built package retrieved {built_packages}")
-
-    # Pulling this merged digests idea from the Docker plugin
-    built_package_digests = [built_package.digest for built_package in built_packages]
-
-    # Pip install pyoxidizer
-    pyoxidizer_pex = await Get(
-        Pex,
-        PexRequest(
-            output_filename="pyoxidizer.pex",
-            internal_only=True,
-            requirements=pyoxidizer.pex_requirements(),
-            interpreter_constraints=pyoxidizer.interpreter_constraints,
-            main=pyoxidizer.main,
-        ),
-    )
 
     config_template = None
     if field_set.template.value is not None:
-        config_template_source = await Get(SourceFiles, SourceFilesRequest([field_set.template]))
-
+        config_template_source = await Get(
+            HydratedSources, HydrateSourcesRequest(field_set.template)
+        )
         digest_contents = await Get(DigestContents, Digest, config_template_source.snapshot.digest)
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
         executable_name=field_set.address.target_name,
         entry_point=field_set.entry_point.value,
-        wheels=wheels,
+        wheels=wheel_paths,
         template=config_template,
-        unclassified_resources=None
-        if not field_set.unclassified_resources.value
-        else list(field_set.unclassified_resources.value),
+        unclassified_resources=(
+            None
+            if not field_set.unclassified_resources.value
+            else list(field_set.unclassified_resources.value)
+        ),
     )
 
     rendered_config = config.render()
-    logger.debug(f"Rendered configuation to use -> {rendered_config}")
+    logger.debug(f"Configuration used for {field_set.address}: {rendered_config}")
     config_digest = await Get(
         Digest,
         CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))]),
     )
 
-    all_digests = (config_digest, *built_package_digests)
-    merged_digest = await Get(Digest, MergeDigests(d for d in all_digests if d))
-    merged_digest_snapshot = await Get(Snapshot, Digest, merged_digest)
-    logger.debug(merged_digest_snapshot)
-
-    result = await Get(
-        ProcessResult,
-        PexProcess(
-            pyoxidizer_pex,
-            argv=["build", *pyoxidizer.args],
-            description="Running PyOxidizer build (...this can take a minute...)",
-            input_digest=merged_digest,
-            level=LogLevel.DEBUG,
-            output_directories=["build"],
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                config_digest,
+                runner_script.digest,
+                *(built_package.digest for built_package in built_packages),
+            )
         ),
     )
+    pex_process = await Get(
+        Process,
+        PexProcess(
+            pyoxidizer_pex,
+            argv=("build", *pyoxidizer.args),
+            description=f"Building {field_set.address} with PyOxidizer",
+            input_digest=input_digest,
+            level=LogLevel.INFO,
+            output_directories=("build",),
+        ),
+    )
+    process_with_caching = dataclasses.replace(
+        pex_process,
+        argv=(bash.path, runner_script.path, *pex_process.argv),
+        append_only_caches={
+            **pex_process.append_only_caches,
+            "pyoxidizer": runner_script.CACHE_PATH,
+        },
+    )
 
-    snapshot = await Get(Snapshot, Digest, result.output_digest)
-    artifacts = [BuiltPackageArtifact(file) for file in snapshot.files]
+    result = await Get(ProcessResult, Process, process_with_caching)
+
+    stripped_digest = await Get(Digest, RemovePrefix(result.output_digest, "build"))
+    final_snapshot = await Get(
+        Snapshot,
+        AddPrefix(stripped_digest, field_set.output_path.value_or_default(file_ending=None)),
+    )
     return BuiltPackage(
-        result.output_digest,
-        artifacts=tuple(artifacts),
+        final_snapshot.digest,
+        artifacts=tuple(BuiltPackageArtifact(file) for file in final_snapshot.files),
     )
 
 

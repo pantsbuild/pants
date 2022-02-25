@@ -28,7 +28,7 @@ from pants.core.goals.update_build_files import (
     maybe_rename_deprecated_targets,
     update_build_files,
 )
-from pants.core.util_rules import config_files, pants_bin
+from pants.core.util_rules import config_files
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
@@ -67,7 +67,6 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
-            *pants_bin.rules(),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
@@ -134,7 +133,6 @@ def black_rule_runner() -> RuleRunner:
         rules=(
             format_build_file_with_black,
             update_build_files,
-            *pants_bin.rules(),
             *config_files.rules(),
             *pex.rules(),
             SubsystemRule(Black),
@@ -200,7 +198,6 @@ def run_yapf(
         rules=(
             format_build_file_with_yapf,
             update_build_files,
-            *pants_bin.rules(),
             *config_files.rules(),
             *pex.rules(),
             SubsystemRule(Yapf),

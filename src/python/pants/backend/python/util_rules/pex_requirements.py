@@ -18,7 +18,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 )
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError, LockfileMetadataValidation
 from pants.engine.fs import FileContent
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -215,11 +215,11 @@ def _invalid_tool_lockfile_error(
 
     yield (
         "To regenerate your lockfile based on your current configuration, run "
-        f"`./pants generate-lockfiles --resolve={tool_name}`. "
+        f"`{bin_name()} generate-lockfiles --resolve={tool_name}`. "
     ) if isinstance(lockfile, ToolCustomLockfile) else (
         "To generate a custom lockfile based on your current configuration, set "
         f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-        f"`./pants generate-lockfiles --resolve={tool_name}`. "
+        f"`{bin_name()} generate-lockfiles --resolve={tool_name}`. "
     )
 
 
@@ -269,6 +269,6 @@ def _invalid_user_lockfile_error(
         )
 
     yield "To regenerate your lockfile, "
-    yield f"run `./pants generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
+    yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
         lockfile, Lockfile
     ) else f"Update your plugin generating this object: {lockfile}"
