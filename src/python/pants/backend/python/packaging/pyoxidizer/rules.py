@@ -92,16 +92,7 @@ async def package_pyoxidizer_binary(
 ) -> BuiltPackage:
     direct_deps, pyoxidizer_pex = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(
-            Pex,
-            PexRequest(
-                output_filename="pyoxidizer.pex",
-                internal_only=True,
-                requirements=pyoxidizer.pex_requirements(),
-                interpreter_constraints=pyoxidizer.interpreter_constraints,
-                main=pyoxidizer.main,
-            ),
-        ),
+        Get(Pex, PexRequest, pyoxidizer.to_pex_request()),
     )
 
     deps_field_sets = await Get(

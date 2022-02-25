@@ -77,16 +77,7 @@ def generate_argv(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
-    isort_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="isort.pex",
-            internal_only=True,
-            requirements=isort.pex_requirements(),
-            interpreter_constraints=isort.interpreter_constraints,
-            main=isort.main,
-        ),
-    )
+    isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),

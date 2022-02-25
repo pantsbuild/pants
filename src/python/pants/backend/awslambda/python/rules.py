@@ -118,16 +118,8 @@ async def package_python_awslambda(
         additional_lockfile_args=additional_pex_args,
     )
 
-    lambdex_request = PexRequest(
-        output_filename="lambdex.pex",
-        internal_only=True,
-        requirements=lambdex.pex_requirements(),
-        interpreter_constraints=lambdex.interpreter_constraints,
-        main=lambdex.main,
-    )
-
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
-        Get(VenvPex, PexRequest, lambdex_request),
+        Get(VenvPex, PexRequest, lambdex.to_pex_request()),
         Get(Pex, PexFromTargetsRequest, pex_request),
         Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),

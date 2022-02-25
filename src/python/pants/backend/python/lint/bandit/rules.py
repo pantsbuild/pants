@@ -45,13 +45,8 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
 
     bandit_pex_get = Get(
         VenvPex,
-        PexRequest(
-            output_filename="bandit.pex",
-            internal_only=True,
-            requirements=bandit.pex_requirements(),
-            interpreter_constraints=partition.interpreter_constraints,
-            main=bandit.main,
-        ),
+        PexRequest,
+        bandit.to_pex_request(interpreter_constraints=partition.interpreter_constraints),
     )
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)

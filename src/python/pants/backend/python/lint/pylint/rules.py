@@ -88,13 +88,10 @@ async def pylint_lint_partition(
 
     pylint_pex_get = Get(
         Pex,
-        PexRequest(
-            output_filename="pylint.pex",
-            internal_only=True,
-            requirements=pylint.pex_requirements(
-                extra_requirements=first_party_plugins.requirement_strings,
-            ),
+        PexRequest,
+        pylint.to_pex_request(
             interpreter_constraints=partition.interpreter_constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
