@@ -19,7 +19,7 @@ from pants.backend.helm.testutil import (
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
 from pants.build_graph.address import Address
-from pants.core.target_types import FilesGeneratorTarget, FileTarget, generate_targets_from_files
+from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -38,10 +38,9 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *source_root.rules(),
             *helmdocs_rules(),
-            generate_targets_from_files,
             QueryRule(HelmChartSourceFiles, (HelmChartSourceFilesRequest,)),
-            QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [GenerateHelmDocsRequest]),
+            QueryRule(HydratedSources, (HydrateSourcesRequest,)),
+            QueryRule(GeneratedSources, (GenerateHelmDocsRequest,)),
         ],
     )
 
@@ -69,7 +68,7 @@ def test_generates_readme_docs(rule_runner: RuleRunner) -> None:
     assert "README.md" in generated_sources.snapshot.files
 
 
-def test_packaged_chart_contains_generated_readme(rule_runner: RuleRunner) -> None:
+def test_chart_sources_contains_generated_readme(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
