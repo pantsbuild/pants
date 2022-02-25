@@ -9,7 +9,7 @@ class HelmUnitTestDependenciesField(Dependencies):
 
 
 # -----------------------------------------------------------------------------------------------
-# `helm_unittests` target generator
+# `helm_unittest_tests` target
 # -----------------------------------------------------------------------------------------------
 
 
@@ -21,4 +21,4 @@ class HelmUnitTestSourcesField(MultipleSourcesField):
 class HelmUnitTestsTarget(Target):
     alias = "helm_unittest_tests"
     core_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestSourcesField, HelmUnitTestDependenciesField)
-    help = "Generate a `helm_unittest` target for each file in the `sources` field"
+    help = "A group of test files run with the Helm UnitTest plugin"
