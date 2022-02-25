@@ -6,28 +6,9 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
-
-if TYPE_CHECKING:
-    from pants.option.subsystem import Subsystem
-
-_PropType = TypeVar("_PropType")
-_DefaultType = TypeVar("_DefaultType")
-_EnumT = TypeVar("_EnumT", bound=Enum)
-_ValueT = TypeVar("_ValueT")
-# NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
-_ListMemberType = TypeVar("_ListMemberType")
-# NB: The `Any` should be `type[Subsystem]`, however the use-case is generally lambdas passed into
-# constructors, and `mypy` will complain that `Type[Subsystem]` has no attribute `foo`.
-_DynamicVal = Callable[[Any], _ValueT]
-_MaybeDynamic = Union[_DynamicVal[_ValueT], _ValueT]
-_HelpT = _MaybeDynamic[str]
-
-
-def _eval_maybe_dynamic(val: _MaybeDynamic[_ValueT], subsystem_cls: "type[Subsystem]") -> _ValueT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[operator,return-value]
 
 
 @dataclass(frozen=True)
@@ -36,8 +17,31 @@ class OptionsInfo:
     flag_options: dict[str, Any]
 
 
-class _OptionBase(Generic[_PropType, _DefaultType]):
-    """Descriptor for subsystem options.
+# The type of the option.
+_OptT = TypeVar("_OptT")
+# The type of option's default (may be _OptT or some other type like `None`)
+_DefaultT = TypeVar("_DefaultT")
+# The type of pants.option.subsystem.Subsystem classes.
+# NB: Ideally this would be `type[Subsystem]`, however where this type is used is generally
+# provided untyped lambdas.
+_SubsystemType = Any
+# A "dynamic" value type. This exists to allow clients to provide callable arguments taking the
+# subsytem type and returning a value. E.g. `prop = Option(..., default=lambda cls: cls.default)`.
+# This is necessary to support "base" subsystem types which are subclassed with more specific
+# values.
+_DynamicDefaultT = Callable[[_SubsystemType], _DefaultT]
+# The type of the `default` parameter for each option.
+_MaybeDynamicT = Union[_DynamicDefaultT[_DefaultT], _DefaultT]
+# The type of the `help` parameter for each option.
+_HelpT = _MaybeDynamicT[str]
+
+
+def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[operator,return-value]
+
+
+class _OptionBase(Generic[_OptT, _DefaultT]):
+    """Descriptor base for subsystem options.
 
     Clients shouldn't use this class directly, instead use one of the concrete classes below.
 
@@ -47,15 +51,16 @@ class _OptionBase(Generic[_PropType, _DefaultType]):
     """
 
     _flag_names: tuple[str, ...]
-    _default: _DefaultType
+    _default: _DefaultT
     _help: _HelpT
     _extra_kwargs: dict[str, Any]
 
-    # NB: We define `__new__` rather than `__init__` because some subclasses need to define __new__.
+    # NB: We define `__new__` rather than `__init__` because some subclasses need to define
+    # `__new__` and mypy has issues if your class defines both.
     def __new__(
         cls,
         *flag_names: str,
-        default: _DefaultType,
+        default: _DefaultT,
         help: _HelpT,
     ):
         self = super().__new__(cls)
@@ -65,9 +70,13 @@ class _OptionBase(Generic[_PropType, _DefaultType]):
         self._extra_kwargs = {}
         return self
 
-    # Override if necessary
+    # Subclasses can override if necessary
     def get_option_type(self, subsystem_cls):
         return type(self).option_type
+
+    # Subclasses can override if necessary
+    def _convert_(self, val: Any) -> _OptT:
+        return cast("_OptT", val)
 
     def get_flag_options(self, subsystem_cls) -> dict:
         return dict(
@@ -82,7 +91,7 @@ class _OptionBase(Generic[_PropType, _DefaultType]):
         ...
 
     @overload
-    def __get__(self, obj: object, objtype: Any) -> _PropType | _DefaultType:
+    def __get__(self, obj: object, objtype: Any) -> _OptT | _DefaultT:
         ...
 
     def __get__(self, obj, objtype):
@@ -94,70 +103,65 @@ class _OptionBase(Generic[_PropType, _DefaultType]):
             return None
         return self._convert_(option_value)
 
-    # Subclasses can override if necessary
-    def _convert_(self, val: Any) -> _PropType:
-        return cast("_PropType", val)
-
-    def advanced(self) -> _OptionBase[_PropType, _DefaultType]:
+    def advanced(self) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["advanced"] = True
         return self
 
-    def from_file(self) -> _OptionBase[_PropType, _DefaultType]:
+    def from_file(self) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["fromfile"] = True
         return self
 
-    def metavar(self, metavar: str) -> _OptionBase[_PropType, _DefaultType]:
+    def metavar(self, metavar: str) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["metavar"] = metavar
         return self
 
     def mutually_exclusive_group(
         self, mutually_exclusive_group: str
-    ) -> _OptionBase[_PropType, _DefaultType]:
+    ) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["mutually_exclusive_group"] = mutually_exclusive_group
         return self
 
-    def default_help_repr(self, default_help_repr: str) -> _OptionBase[_PropType, _DefaultType]:
+    def default_help_repr(self, default_help_repr: str) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["default_help_repr"] = default_help_repr
         return self
 
-    def deprecated(
-        self, *, removal_version: str, hint: str
-    ) -> _OptionBase[_PropType, _DefaultType]:
+    def deprecated(self, *, removal_version: str, hint: str) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["removal_version"] = removal_version
         self._extra_kwargs["removal_hint"] = hint
         return self
 
-    def daemoned(self) -> _OptionBase[_PropType, _DefaultType]:
+    def daemoned(self) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["daemon"] = True
         return self
 
-    def non_fingerprinted(self) -> _OptionBase[_PropType, _DefaultType]:
+    def non_fingerprinted(self) -> _OptionBase[_OptT, _DefaultT]:
         self._extra_kwargs["fingerprint"] = False
         return self
 
 
+# The type of the list members.
+# NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
+_ListMemberT = TypeVar("_ListMemberT")
+
+
 class _ListOptionBase(
-    _OptionBase["tuple[_ListMemberType, ...]", "tuple[_ListMemberType, ...]"],
-    Generic[_ListMemberType],
+    _OptionBase["tuple[_ListMemberT, ...]", "tuple[_ListMemberT, ...]"],
+    Generic[_ListMemberT],
 ):
-    """A homogenous list of options of some type.
+    """Descriptor base for a  subsystem option of  ahomogenous list of some type.
 
     Don't use this class directly, instead use one of the conrete classes below.
 
     The default value will always be set as an empty list, and the Python property always returns
     a tuple (for immutability).
-
-    In order to define the `member_type` registration option, `self.member_type` must return a valid
-    list member type. This can either be set using a class variable or by passing it into `__new__`.
     """
 
     option_type = list
-    member_type: Any
 
     def __new__(
         cls,
         *flag_names: str,
-        default: list[_ListMemberType] = [],
+        default: list[_ListMemberT] = [],
         help: _HelpT,
     ):
         default = default or []
@@ -169,27 +173,25 @@ class _ListOptionBase(
         )
         return instance
 
+    # Subclasses can override if necessary
+    def get_member_type(self, subsystem_cls):
+        return type(self).member_type
+
+    # Subclasses can override if necessary
+    def _convert_(self, value: list[Any]) -> tuple[_ListMemberT]:
+        return cast("tuple[_ListMemberT]", tuple(value))
+
     def get_flag_options(self, subsystem_cls) -> dict[str, Any]:
         return dict(
             member_type=self.get_member_type(subsystem_cls),
             **super().get_flag_options(subsystem_cls),
         )
 
-    # Override if necessary
-    def get_member_type(self, subsystem_cls):
-        return type(self).member_type
-
-    def _convert_(self, value: list[Any]) -> tuple[_ListMemberType]:
-        return cast("tuple[_ListMemberType]", tuple(value))
-
 
 # -----------------------------------------------------------------------------------------------
-# Concrete Option Classes
+# String Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
 _StrDefault = TypeVar("_StrDefault", str, None)
-_IntDefault = TypeVar("_IntDefault", int, None)
-_FloatDefault = TypeVar("_FloatDefault", float, None)
-_BoolDefault = TypeVar("_BoolDefault", bool, None)
 
 
 class StrOption(_OptionBase[str, _StrDefault]):
@@ -198,16 +200,115 @@ class StrOption(_OptionBase[str, _StrDefault]):
     option_type: Any = str
 
 
+class StrListOption(_ListOptionBase[str]):
+    """A homogenous list of string options."""
+
+    member_type: Any = str
+
+
+class TargetOption(_OptionBase[str, _StrDefault]):
+    """A Pants Target option."""
+
+    option_type: Any = custom_types.target_option
+
+
+class TargetListOption(StrListOption):
+    """A homogenous list of target options."""
+
+    member_type: Any = custom_types.target_option
+
+
+class DirOption(_OptionBase[str, _StrDefault]):
+    """A directory option."""
+
+    option_type: Any = custom_types.dir_option
+
+
+class DirListOption(StrListOption):
+    """A homogenous list of directory options."""
+
+    member_type: Any = custom_types.dir_option
+
+
+class FileOption(_OptionBase[str, _StrDefault]):
+    """A file option."""
+
+    option_type: Any = custom_types.file_option
+
+
+class FileListOption(StrListOption):
+    """A homogenous list of file options."""
+
+    member_type: Any = custom_types.file_option
+
+
+class ShellStrOption(_OptionBase[str, _StrDefault]):
+    """A shell string option."""
+
+    option_type: Any = custom_types.shell_str
+
+
+class ShellStrListOption(StrListOption):
+    """A homogenous list of shell string options."""
+
+    member_type: Any = custom_types.shell_str
+
+
+class WorkspacePathOption(_OptionBase[str, _StrDefault]):
+    """A workspace path option."""
+
+    option_type: Any = custom_types.workspace_path
+
+
+# -----------------------------------------------------------------------------------------------
+# Int Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+_IntDefault = TypeVar("_IntDefault", int, None)
+
+
 class IntOption(_OptionBase[int, _IntDefault]):
     """An int option."""
 
     option_type: Any = int
 
 
+class IntListOption(_ListOptionBase[int]):
+    """A homogenous list of int options."""
+
+    member_type: Any = int
+
+
+class MemorySizeOption(_OptionBase[int, _IntDefault]):
+    """A memory size option."""
+
+    option_type: Any = custom_types.memory_size
+
+
+class MemorySizeListOption(IntListOption):
+    """A homogenous list of memory size options."""
+
+    member_type: Any = custom_types.memory_size
+
+
+_FloatDefault = TypeVar("_FloatDefault", float, None)
+
+
 class FloatOption(_OptionBase[float, _FloatDefault]):
     """A float option."""
 
     option_type: Any = float
+
+
+class FloatListOption(_ListOptionBase[float]):
+    """A homogenous list of float options."""
+
+    member_type: Any = float
+
+
+# -----------------------------------------------------------------------------------------------
+# Bool Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+_BoolDefault = TypeVar("_BoolDefault", bool, None)
 
 
 class BoolOption(_OptionBase[bool, _BoolDefault]):
@@ -220,39 +321,53 @@ class BoolOption(_OptionBase[bool, _BoolDefault]):
     option_type: Any = bool
 
 
-class EnumOption(_OptionBase[_PropType, _DefaultType]):
+class BoolListOption(_ListOptionBase[bool]):
+    """A homogenous list of bool options."""
+
+    member_type: Any = bool
+
+
+# -----------------------------------------------------------------------------------------------
+# Enum Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+_EnumT = TypeVar("_EnumT", bound=Enum)
+
+
+class EnumOption(_OptionBase[_OptT, _DefaultT]):
     """An Enum option.
 
-    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
-    of the default. Otherwise, you'll need to provide the `enum_type`.
-    In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
-    provide it.
+    - If you provide a static non-None `default` parameter, the `enum_type` parameter will be
+        inferred from the type of the the default.
+    - If you provide a dynamic `default` or `default` is `None`, you must also provide `enum_type`.
 
     E.g.
-        EnumOption(..., enum_type=MyEnum)  # property type is deduced as `MyEnum | None`
-        EnumOption(..., default=MyEnum.Value)  # property type is deduced as `MyEnum`
-        EnumOption(..., enum_type=MyEnum default=lambda cls: cls.default_val)  # property type is `MyEnum`
+        # The property type is `MyEnum`
+        EnumOption(..., default=MyEnum.Value)
+        EnumOption(..., enum_type=MyEnum default=lambda cls: cls.default_val)
+
+        # The property type is `MyEnum | None`
+        EnumOption(..., enum_type=MyEnum, default=None)
     """
 
-    @overload
+    @overload  # Case: static default
     def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT, _EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
-    @overload
+    @overload  # Case: dynamic default
     def __new__(
         cls,
         *flag_names: str,
         enum_type: type[_EnumT],
-        # NB: Marking this as `_DynamicVal[_EnumT]` will upset mypy at the call site because `mypy`
-        # won't be able to have enough info to deduce the correct type.
-        default: _DynamicVal[Any],
+        # NB: Marking this as `_DynamicDefaultT[_EnumT]` will upset mypy at the call site because
+        # mypy won't be able to have enough info to deduce the correct type.
+        default: _DynamicDefaultT[Any],
         help: _HelpT,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
-    @overload
+    @overload  # Case: default is `None`
     def __new__(
         cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
     ) -> EnumOption[_EnumT, None]:
@@ -285,140 +400,40 @@ class EnumOption(_OptionBase[_PropType, _DefaultType]):
         return enum_type
 
 
-class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generic[_ValueT]):
-    """A dictionary option mapping strings to client-provided `_ValueT`.
-
-    If you provide a `default` parameter, the `_ValueT` type parameter will be inferred from the
-    type of the values in the default. Otherwise, you'll need to provide `_ValueT` if you want a
-    non-`Any` type.
-
-    E.g.
-        # Explicit
-        DictOption[str](...)  # property type is `dict[str, str]`
-        DictOption[Any](..., default=dict(key="val"))  # property type is `dict[str, Any]`
-        # Implicit
-        DictOption(...)  # property type is `dict[str, Any]`
-        DictOption(..., default={"key": "val"})  # property type is `dict[str, str]`
-        DictOption(..., default={"key": 1})  # property type is `dict[str, int]`
-        DictOption(..., default={"key1": 1, "key2": "str"})  # property type is `dict[str, Any]`
-
-    NOTE: The property returns a mutable object. Care should be used to not mutate the object.
-    NOTE: Dictionary values are simply returned as parsed, and are not guaranteed to be of the
-    `_ValueT` specified.
-    """
-
-    option_type: Any = dict
-
-    def __new__(cls, *flag_names, default: dict[str, _ValueT] | None = None, help):
-        return super().__new__(
-            cls,  # type: ignore[arg-type]
-            *flag_names,
-            default=default or {},  # type: ignore[arg-type]
-            help=help,
-        )
-
-    def _convert_(self, val: Any) -> dict[str, _ValueT]:
-        return cast("dict[str, _ValueT]", val)
-
-
-class TargetOption(_OptionBase[str, _StrDefault]):
-    """A Pants Target option."""
-
-    option_type: Any = custom_types.target_option
-
-
-class DirOption(_OptionBase[str, _StrDefault]):
-    """A directory option."""
-
-    option_type: Any = custom_types.dir_option
-
-
-class FileOption(_OptionBase[str, _StrDefault]):
-    """A file option."""
-
-    option_type: Any = custom_types.file_option
-
-
-class ShellStrOption(_OptionBase[str, _StrDefault]):
-    """A shell string option."""
-
-    option_type: Any = custom_types.shell_str
-
-
-class WorkspacePathOption(_OptionBase[str, _StrDefault]):
-    """A workspace path option."""
-
-    option_type: Any = custom_types.workspace_path
-
-
-class MemorySizeOption(_OptionBase[int, _IntDefault]):
-    """A memory size option."""
-
-    option_type: Any = custom_types.memory_size
-
-
-class StrListOption(_ListOptionBase[str]):
-    """A homogenous list of string options."""
-
-    member_type: Any = str
-
-
-class IntListOption(_ListOptionBase[int]):
-    """A homogenous list of int options."""
-
-    member_type: Any = int
-
-
-class FloatListOption(_ListOptionBase[float]):
-    """A homogenous list of float options."""
-
-    member_type: Any = float
-
-
-class BoolListOption(_ListOptionBase[bool]):
-    """A homogenous list of bool options.
-
-    @TODO: Tri-bool.
-    """
-
-    member_type: Any = bool
-
-
-class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
+class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     """An homogenous list of Enum options.
 
-    If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
-    of the first element of the default. Otherwise, you'll need to provide the `option_type`.
-    In either case, mypy will infer the correct Generic's type-parameter, so you shouldn't need to
-    provide it.
+    - If you provide a static `default` parameter, the `enum_type` parameter will be inferred from
+        the type of the first element of the default.
+    - If you provide a dynamic `default` or provide no default, you must also provide `enum_type`.
 
-    E.g.
-        EnumListOption(..., enum_type=MyEnum)  # property type is deduced as `[MyEnum]`
-        EnumListOption(..., default=[MyEnum.Value])  # property type is deduced as `[MyEnum]`
-        EnumListOption(..., enum_type=MyEnum default=lambda cls: cls.default_val)  # property type is `[MyEnum]`
+    E.g. In all 3 cases the property type is `list[MyEnum]`
+        EnumListOption(..., enum_type=MyEnum)
+        EnumListOption(..., default=[MyEnum.Value])
+        EnumListOption(..., enum_type=MyEnum default=lambda cls: cls.default)
     """
 
-    @overload
+    @overload  # Case: static default
     def __new__(
-        cls, *flag_names: str, default: _MaybeDynamic[list[_EnumT]], help: _HelpT
+        cls, *flag_names: str, default: list[_EnumT], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
-    @overload
+    @overload  # Case: dynamic default
     def __new__(
         cls,
         *flag_names: str,
         enum_type: type[_EnumT],
-        # NB: Marking this as `_DynamicVal[list[_EnumT]]` will upset mypy at the call site because
-        # `mypy` won't be able to have enough info to deduce the correct type.
-        default: _DynamicVal[Any],
+        # NB: Marking this as `_DynamicDefaultT[list[_EnumT]]` will upset mypy at the call site
+        # because mypy won't be able to have enough info to deduce the correct type.
+        default: _DynamicDefaultT[Any],
         help: _HelpT,
     ) -> EnumListOption[_EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
-    @overload
+    @overload  # Case: implicit default
     def __new__(
         cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
     ) -> EnumListOption[_EnumT]:
@@ -448,34 +463,51 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
         return enum_type
 
 
-class TargetListOption(StrListOption):
-    """A homogenous list of target options."""
-
-    member_type: Any = custom_types.target_option
-
-
-class DirListOption(StrListOption):
-    """A homogenous list of directory options."""
-
-    member_type: Any = custom_types.dir_option
+# -----------------------------------------------------------------------------------------------
+# Dict Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+_ValueT = TypeVar("_ValueT")
 
 
-class FileListOption(StrListOption):
-    """A homogenous list of file options."""
+class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generic[_ValueT]):
+    """A dictionary option mapping strings to client-provided `_ValueT`.
 
-    member_type: Any = custom_types.file_option
+    If you provide a `default` parameter, the `_ValueT` type parameter will be inferred from the
+    type of the values in the default. Otherwise, you'll need to provide `_ValueT` if you want a
+    non-`Any` type.
+
+    E.g.
+        # Explicit
+        DictOption[str](...)  # property type is `dict[str, str]`
+        DictOption[Any](..., default=dict(key="val"))  # property type is `dict[str, Any]`
+        # Implicit
+        DictOption(...)  # property type is `dict[str, Any]`
+        DictOption(..., default={"key": "val"})  # property type is `dict[str, str]`
+        DictOption(..., default={"key": 1})  # property type is `dict[str, int]`
+        DictOption(..., default={"key1": 1, "key2": "str"})  # property type is `dict[str, Any]`
+
+    NOTE: The property returns a mutable object. Care should be used to not mutate the object.
+    NOTE: Dictionary values are simply returned as parsed, and are not guaranteed to be of the
+    `_ValueT` specified.
+    """
+
+    option_type: Any = dict
+
+    def __new__(cls, *flag_names, default: dict[str, _ValueT] = {}, help):
+        return super().__new__(
+            cls,  # type: ignore[arg-type]
+            *flag_names,
+            default=default,  # type: ignore[arg-type]
+            help=help,
+        )
+
+    def _convert_(self, val: Any) -> dict[str, _ValueT]:
+        return cast("dict[str, _ValueT]", val)
 
 
-class ShellStrListOption(StrListOption):
-    """A homogenous list of shell string options."""
-
-    member_type: Any = custom_types.shell_str
-
-
-class MemorySizeListOption(IntListOption):
-    """A homogenous list of memory size options."""
-
-    member_type: Any = custom_types.memory_size
+# -----------------------------------------------------------------------------------------------
+# "Specialized" Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
 
 
 class ArgsListOption(ShellStrListOption):
