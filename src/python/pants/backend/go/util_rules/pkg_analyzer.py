@@ -23,7 +23,7 @@ async def setup_go_package_analyzer() -> PackageAnalyzerSetup:
         LoadedGoBinary,
         LoadedGoBinaryRequest(
             "analyze_package",
-            ("main.go", "read.go", "build_context.go", "string_utils.go"),
+            ("main.go", "read.go", "build_context.go", "string_utils.go", "syslist.go"),
             binary_path,
         ),
     )

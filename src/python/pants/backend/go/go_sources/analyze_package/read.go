@@ -19,12 +19,17 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
+	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -588,4 +593,299 @@ func parseGoEmbed(args string, pos token.Position) ([]fileEmbed, error) {
 		list = append(list, fileEmbed{path, pathPos})
 	}
 	return list, nil
+}
+
+// goodOSArchFile returns false if the name contains a $GOOS or $GOARCH
+// suffix which does not match the current system.
+// The recognized name formats are:
+//
+//     name_$(GOOS).*
+//     name_$(GOARCH).*
+//     name_$(GOOS)_$(GOARCH).*
+//     name_$(GOOS)_test.*
+//     name_$(GOARCH)_test.*
+//     name_$(GOOS)_$(GOARCH)_test.*
+//
+// Exceptions:
+// if GOOS=android, then files with GOOS=linux are also matched.
+// if GOOS=illumos, then files with GOOS=solaris are also matched.
+// if GOOS=ios, then files with GOOS=darwin are also matched.
+func goodOSArchFile(ctxt *build.Context, name string, allTags map[string]bool) bool {
+	name, _, _ = stringsCut(name, ".")
+
+	// Before Go 1.4, a file called "linux.go" would be equivalent to having a
+	// build tag "linux" in that file. For Go 1.4 and beyond, we require this
+	// auto-tagging to apply only to files with a non-empty prefix, so
+	// "foo_linux.go" is tagged but "linux.go" is not. This allows new operating
+	// systems, such as android, to arrive without breaking existing code with
+	// innocuous source code in "android.go". The easiest fix: cut everything
+	// in the name before the initial _.
+	i := strings.Index(name, "_")
+	if i < 0 {
+		return true
+	}
+	name = name[i:] // ignore everything before first _
+
+	l := strings.Split(name, "_")
+	if n := len(l); n > 0 && l[n-1] == "test" {
+		l = l[:n-1]
+	}
+	n := len(l)
+	if n >= 2 && knownOS[l[n-2]] && knownArch[l[n-1]] {
+		return matchTag(ctxt, l[n-1], allTags) && matchTag(ctxt, l[n-2], allTags)
+	}
+	if n >= 1 && (knownOS[l[n-1]] || knownArch[l[n-1]]) {
+		return matchTag(ctxt, l[n-1], allTags)
+	}
+	return true
+}
+
+var knownOS = make(map[string]bool)
+var knownArch = make(map[string]bool)
+
+func init() {
+	for _, v := range strings.Fields(goosList) {
+		knownOS[v] = true
+	}
+	for _, v := range strings.Fields(goarchList) {
+		knownArch[v] = true
+	}
+}
+
+// matchFile determines whether the file with the given name in the given directory
+// should be included in the package being constructed.
+// If the file should be included, matchFile returns a non-nil *fileInfo (and a nil error).
+// Non-nil errors are reserved for unexpected problems.
+//
+// If name denotes a Go program, matchFile reads until the end of the
+// imports and returns that section of the file in the fileInfo's header field,
+// even though it only considers text until the first non-comment
+// for +build lines.
+//
+// If allTags is non-nil, matchFile records any encountered build tag
+// by setting allTags[tag] = true.
+func matchFile(ctxt *build.Context, dir, name string, allTags map[string]bool, binaryOnly *bool, fset *token.FileSet) (*fileInfo, error) {
+	if strings.HasPrefix(name, "_") ||
+		strings.HasPrefix(name, ".") {
+		return nil, nil
+	}
+
+	i := strings.LastIndex(name, ".")
+	if i < 0 {
+		i = len(name)
+	}
+	ext := name[i:]
+
+	if !goodOSArchFile(ctxt, name, allTags) && !ctxt.UseAllFiles {
+		return nil, nil
+	}
+
+	var dummyPkg Package
+	if ext != ".go" && fileListForExt(&dummyPkg, ext) == nil {
+		// skip
+		return nil, nil
+	}
+
+	info := &fileInfo{filename: filepath.Join(dir, name), fset: fset}
+	if ext == ".syso" {
+		// binary, no reading
+		return info, nil
+	}
+
+	f, err := os.Open(info.filename)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.HasSuffix(name, ".go") {
+		err = readGoInfo(f, info)
+		if strings.HasSuffix(name, "_test.go") {
+			binaryOnly = nil // ignore //go:binary-only-package comments in _test.go files
+		}
+	} else {
+		binaryOnly = nil // ignore //go:binary-only-package comments in non-Go sources
+		info.header, err = readComments(f)
+	}
+	f.Close()
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %v", info.filename, err)
+	}
+
+	// Look for +build comments to accept or reject the file.
+	ok, sawBinaryOnly, err := shouldBuild(ctxt, info.header, allTags)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", name, err)
+	}
+	if !ok && !ctxt.UseAllFiles {
+		return nil, nil
+	}
+
+	if binaryOnly != nil && sawBinaryOnly {
+		*binaryOnly = true
+	}
+
+	return info, nil
+}
+
+var (
+	slashSlash = []byte("//")
+	slashStar  = []byte("/*")
+	starSlash  = []byte("*/")
+	newline    = []byte("\n")
+)
+var (
+	bSlashSlash = []byte(slashSlash)
+	bStarSlash  = []byte(starSlash)
+	bSlashStar  = []byte(slashStar)
+	bPlusBuild  = []byte("+build")
+
+	goBuildComment = []byte("//go:build")
+
+	errGoBuildWithoutBuild = errors.New("//go:build comment without // +build comment")
+	errMultipleGoBuild     = errors.New("multiple //go:build comments")
+)
+
+func isGoBuildComment(line []byte) bool {
+	if !bytes.HasPrefix(line, goBuildComment) {
+		return false
+	}
+	line = bytes.TrimSpace(line)
+	rest := line[len(goBuildComment):]
+	return len(rest) == 0 || len(bytes.TrimSpace(rest)) < len(rest)
+}
+
+// Special comment denoting a binary-only package.
+// See https://golang.org/design/2775-binary-only-packages
+// for more about the design of binary-only packages.
+var binaryOnlyComment = []byte("//go:binary-only-package")
+
+// shouldBuild reports whether it is okay to use this file,
+// The rule is that in the file's leading run of // comments
+// and blank lines, which must be followed by a blank line
+// (to avoid including a Go package clause doc comment),
+// lines beginning with '// +build' are taken as build directives.
+//
+// The file is accepted only if each such line lists something
+// matching the file. For example:
+//
+//      // +build windows linux
+//
+// marks the file as applicable only on Windows and Linux.
+//
+// For each build tag it consults, shouldBuild sets allTags[tag] = true.
+//
+// shouldBuild reports whether the file should be built
+// and whether a //go:binary-only-package comment was found.
+func shouldBuild(ctxt *build.Context, content []byte, allTags map[string]bool) (shouldBuild, binaryOnly bool, err error) {
+	// Identify leading run of // comments and blank lines,
+	// which must be followed by a blank line.
+	// Also identify any //go:build comments.
+	content, goBuild, sawBinaryOnly, err := parseFileHeader(content)
+	if err != nil {
+		return false, false, err
+	}
+
+	// If //go:build line is present, it controls.
+	// Otherwise fall back to +build processing.
+	switch {
+	case goBuild != nil:
+		x, err := constraint.Parse(string(goBuild))
+		if err != nil {
+			return false, false, fmt.Errorf("parsing //go:build line: %v", err)
+		}
+		shouldBuild = eval(ctxt, x, allTags)
+
+	default:
+		shouldBuild = true
+		p := content
+		for len(p) > 0 {
+			line := p
+			if i := bytes.IndexByte(line, '\n'); i >= 0 {
+				line, p = line[:i], p[i+1:]
+			} else {
+				p = p[len(p):]
+			}
+			line = bytes.TrimSpace(line)
+			if !bytes.HasPrefix(line, bSlashSlash) || !bytes.Contains(line, bPlusBuild) {
+				continue
+			}
+			text := string(line)
+			if !constraint.IsPlusBuild(text) {
+				continue
+			}
+			if x, err := constraint.Parse(text); err == nil {
+				if !eval(ctxt, x, allTags) {
+					shouldBuild = false
+				}
+			}
+		}
+	}
+
+	return shouldBuild, sawBinaryOnly, nil
+}
+
+func parseFileHeader(content []byte) (trimmed, goBuild []byte, sawBinaryOnly bool, err error) {
+	end := 0
+	p := content
+	ended := false       // found non-blank, non-// line, so stopped accepting // +build lines
+	inSlashStar := false // in /* */ comment
+
+Lines:
+	for len(p) > 0 {
+		line := p
+		if i := bytes.IndexByte(line, '\n'); i >= 0 {
+			line, p = line[:i], p[i+1:]
+		} else {
+			p = p[len(p):]
+		}
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 && !ended { // Blank line
+			// Remember position of most recent blank line.
+			// When we find the first non-blank, non-// line,
+			// this "end" position marks the latest file position
+			// where a // +build line can appear.
+			// (It must appear _before_ a blank line before the non-blank, non-// line.
+			// Yes, that's confusing, which is part of why we moved to //go:build lines.)
+			// Note that ended==false here means that inSlashStar==false,
+			// since seeing a /* would have set ended==true.
+			end = len(content) - len(p)
+			continue Lines
+		}
+		if !bytes.HasPrefix(line, slashSlash) { // Not comment line
+			ended = true
+		}
+
+		if !inSlashStar && isGoBuildComment(line) {
+			if goBuild != nil {
+				return nil, nil, false, errMultipleGoBuild
+			}
+			goBuild = line
+		}
+		if !inSlashStar && bytes.Equal(line, binaryOnlyComment) {
+			sawBinaryOnly = true
+		}
+	Comments:
+		for len(line) > 0 {
+			if inSlashStar {
+				if i := bytes.Index(line, starSlash); i >= 0 {
+					inSlashStar = false
+					line = bytes.TrimSpace(line[i+len(starSlash):])
+					continue Comments
+				}
+				continue Lines
+			}
+			if bytes.HasPrefix(line, bSlashSlash) {
+				continue Lines
+			}
+			if bytes.HasPrefix(line, bSlashStar) {
+				inSlashStar = true
+				line = bytes.TrimSpace(line[len(bSlashStar):])
+				continue Comments
+			}
+			// Found non-comment text.
+			break Lines
+		}
+	}
+
+	return content[:end], goBuild, sawBinaryOnly, nil
 }
