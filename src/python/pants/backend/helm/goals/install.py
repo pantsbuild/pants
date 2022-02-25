@@ -25,16 +25,22 @@ from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
+
+class InvalidHelmInstallArgumentsError(Exception):
+    
+    def __init__(self, invalid_args: Iterable[str]) -> None:
+        super().__init__(f"The following passthrough arguments are not accepted for a Helm install:\n{bullet_list(invalid_args)}\nPlease use the corresponding fields in `helm_deployment` target.")
 
 @dataclass(frozen=True)
 class InstallHelmDeploymentFieldSet(HelmDeploymentFieldSet, InstallFieldSet):
     pass
 
 
-_VALID_PASSTHROUGH_FLAGS = [
+_VALID_PASSTHROUGH_FLAGS = {
     "--atomic",
     "--dry-run",
     "--debug",
@@ -43,9 +49,9 @@ _VALID_PASSTHROUGH_FLAGS = [
     "--reuse-values",
     "--wait",
     "--wait-for-jobs",
-]
+}
 
-_VALID_PASSTHROUGH_OPTS = ["--kubeconfig"]
+_VALID_PASSTHROUGH_OPTS = {"--kubeconfig"}
 
 
 @rule(desc="Run Helm install process", level=LogLevel.DEBUG)
@@ -56,7 +62,7 @@ async def run_helm_install(
 ) -> InstallProcesses:
     valid_args, removed_args = _cleanup_passthrough_args(install.options.args)
     if removed_args:
-        logger.warning(f"The following arguments are ignored: {removed_args}")
+        raise InvalidHelmInstallArgumentsError(removed_args)
 
     deployment_tgt = await Get(WrappedTarget, Address, field_set.address)
 
@@ -98,7 +104,7 @@ def _cleanup_passthrough_args(args: Iterable[str]) -> tuple[list[str], list[str]
     removed_args: list[str] = []
 
     skip = False
-    for arg in list(args):
+    for arg in args:
         if skip:
             valid_args.append(arg)
             continue
