@@ -59,10 +59,6 @@ async def run_helm_install(
         logger.warning(f"The following arguments are ignored: {removed_args}")
 
     deployment_tgt = await Get(WrappedTarget, Address, field_set.address)
-    # dependency_targets = await Get(Targets, DependenciesRequest(field_set.dependencies))
-    # docker_dependencies = [
-    #     target for target in dependency_targets if DockerFieldSet.is_applicable(target)
-    # ]
 
     chart, values_files = await MultiGet(
         Get(
@@ -73,13 +69,6 @@ async def run_helm_install(
             SourceFilesRequest([field_set.sources]),
         ),
     )
-    # wrapped_chart = await Get(WrappedTarget, Address, chart.address)
-    # chart_fs = HelmPublishFieldSet.create(wrapped_chart.target)
-
-    # registries = helm.registries()
-    # repository = chart_fs.format_repository(helm.default_oci_repository, {})
-    # registry_refs = tuple(registries.get(*(chart_fs.registries.value or [])))
-    # chart_ref = "/".join([registry_refs[0].address, repository, chart_meta.name])
 
     helm_process = helm_binary.upgrade(
         field_set.release_name.value or field_set.address.target_name,
@@ -89,7 +78,6 @@ async def run_helm_install(
         description=field_set.description.value,
         value_files=values_files.snapshot,
         values=field_set.values.value or FrozenDict[str, str](),
-        # chart_version=chart.metadata.version,
         chart_digest=chart.snapshot.digest,
         skip_crds=field_set.skip_crds.value,
         output_format=InstallOutputFormat.TABLE,

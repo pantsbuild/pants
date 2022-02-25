@@ -19,7 +19,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
 from pants.option.custom_types import shell_str
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,9 @@ class InstallSubsystem(GoalSubsystem):
     name = "install"
     help = "Perform an install process"
 
-    required_union_implementation = (InstallFieldSet,)
+    @classmethod
+    def activated(cls, union_memebership: UnionMembership) -> bool:
+        return InstallFieldSet in union_memebership
 
     @classmethod
     def register_options(cls, register) -> None:
