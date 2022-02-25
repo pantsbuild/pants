@@ -123,7 +123,7 @@ def all_third_party_helm_artifacts(targets: AllHelmArtifactTargets) -> AllThirdP
 
 
 @rule
-def thrid_party_helm_artifact_mapping(
+def third_party_helm_artifact_mapping(
     all_targets: AllHelmArtifactTargets, config: HelmSubsystem
 ) -> ThirdPartyArtifactMapping:
     artifacts = [HelmArtifact.from_target(tgt) for tgt in all_targets]
