@@ -45,7 +45,7 @@ class InstallProcesses(Collection[InstallProcess]):
 
 
 class InstallSubsystem(GoalSubsystem):
-    name = "install"
+    name = "experimental-install"
     help = "Perform an install process"
 
     @classmethod
