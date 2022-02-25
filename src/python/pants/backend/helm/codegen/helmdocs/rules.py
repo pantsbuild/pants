@@ -5,7 +5,7 @@ from pants.backend.helm.codegen.helmdocs.subsystem import HelmDocsSubsystem
 from pants.backend.helm.target_types import HelmChartReadmeField, HelmChartSourcesField
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, PathGlobs, RemovePrefix, Snapshot, DigestContents
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -16,6 +16,9 @@ from pants.util.logging import LogLevel
 
 _GENERATED_FILE_NAME = "README.md"
 
+
+class HelmDocsGenerationFailedError(Exception):
+    pass
 
 class GenerateHelmDocsRequest(GenerateSourcesRequest):
     input = HelmChartSourcesField
@@ -67,6 +70,12 @@ async def generate_helm_docs(
         Digest,
         DigestSubset(result.output_digest, PathGlobs([f"{sources_prefix}/{_GENERATED_FILE_NAME}"])),
     )
+    generated_file_contents = await Get(DigestContents, Digest, generated_file)
+    if len(generated_file_contents) == 0:
+        raise HelmDocsGenerationFailedError(f"Could not find a generated {_GENERATED_FILE_NAME} file for target: {request.protocol_target.address}")
+    if len(generated_file_contents[0].content.decode()) == 0:
+        raise HelmDocsGenerationFailedError(f"Generated {_GENERATED_FILE_NAME} file had no contents at target: {request.protocol_target.address}")
+
     source_root_request = SourceRootRequest.for_target(request.protocol_target)
     normalized_digest, source_root = await MultiGet(
         Get(Digest, RemovePrefix(generated_file, sources_prefix)),
