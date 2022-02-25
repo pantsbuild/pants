@@ -30,7 +30,7 @@ import (
 // Package represents the results of analyzing a Go package.
 type Package struct {
 	Name    string   // package name
-	AllTags []string // tags that can influence file selection in this directory
+	AllTags []string `json:",omitempty"` // tags that can influence file selection in this directory
 
 	// Source files
 	GoFiles           []string `json:",omitempty"` // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
@@ -48,12 +48,12 @@ type Package struct {
 	SysoFiles         []string `json:",omitempty"` // .syso system object files to add to archive
 
 	// Cgo directives
-	CgoCFLAGS    []string // Cgo CFLAGS directives
-	CgoCPPFLAGS  []string // Cgo CPPFLAGS directives
-	CgoCXXFLAGS  []string // Cgo CXXFLAGS directives
-	CgoFFLAGS    []string // Cgo FFLAGS directives
-	CgoLDFLAGS   []string // Cgo LDFLAGS directives
-	CgoPkgConfig []string // Cgo pkg-config directives
+	CgoCFLAGS    []string `json:",omitempty"` // Cgo CFLAGS directives
+	CgoCPPFLAGS  []string `json:",omitempty"` // Cgo CPPFLAGS directives
+	CgoCXXFLAGS  []string `json:",omitempty"` // Cgo CXXFLAGS directives
+	CgoFFLAGS    []string `json:",omitempty"` // Cgo FFLAGS directives
+	CgoLDFLAGS   []string `json:",omitempty"` // Cgo LDFLAGS directives
+	CgoPkgConfig []string `json:",omitempty"` // Cgo pkg-config directives
 
 	// Test information
 	TestGoFiles  []string `json:",omitempty"`
