@@ -21,7 +21,11 @@ async def setup_go_package_analyzer() -> PackageAnalyzerSetup:
     binary_path = "./package_analyzer"
     binary = await Get(
         LoadedGoBinary,
-        LoadedGoBinaryRequest("analyze_package", ("main.go", "read.go"), binary_path),
+        LoadedGoBinaryRequest(
+            "analyze_package",
+            ("main.go", "read.go", "build_context.go", "string_utils.go"),
+            binary_path,
+        ),
     )
     return PackageAnalyzerSetup(
         digest=binary.digest,
