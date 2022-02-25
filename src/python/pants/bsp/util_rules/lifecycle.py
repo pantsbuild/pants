@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec import (
     BuildServerCapabilities,
@@ -12,18 +14,30 @@ from pants.bsp.spec import (
     RunProvider,
     TestProvider,
 )
-from pants.bsp.types import BSPLanguageSupport
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.version import VERSION
+
+# Version of BSP supported by Pants.
+BSP_VERSION = "2.0.0"
+
+
+@union
+class BSPLanguageSupport:
+    """Union exposed by language backends to inform BSP core rules of capabilities to advertise to
+    clients."""
+
+    language_id: ClassVar[str]
+    can_compile: bool = False
+    can_test: bool = False
+    can_run: bool = False
+    can_debug: bool = False
+
 
 # -----------------------------------------------------------------------------------------------
 # Initialize Build Request
 # See https://build-server-protocol.github.io/docs/specification.html#initialize-build-request
 # -----------------------------------------------------------------------------------------------
-
-# Version of BSP supported by Pants.
-BSP_VERSION = "2.0.0"
 
 
 class InitializeBuildHandlerMapping(BSPHandlerMapping):
