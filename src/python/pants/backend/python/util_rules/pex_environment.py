@@ -10,6 +10,7 @@ from typing import Mapping
 
 from pants.core.util_rules import subprocess_environment
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
+from pants.core.util_rules.system_binaries import PythonBinary
 from pants.engine import process
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment
@@ -19,7 +20,7 @@ from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBinary, PythonBootstrap
+from pants.python.binaries import PythonBootstrap
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
