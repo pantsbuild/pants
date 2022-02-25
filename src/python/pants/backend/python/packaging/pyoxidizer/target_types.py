@@ -12,7 +12,6 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
-from pants.util.docutil import bin_name
 
 
 class PyOxidizerOutputPathField(OutputPathField):
@@ -27,7 +26,7 @@ class PyOxidizerOutputPathField(OutputPathField):
         "the `name` of the `pyoxidizer_target`. So, using the default for this field, the target "
         "`src/python/project:bin` might have a final path like "
         "`src.python.project/bin/aarch-64-apple-darwin/release/bin`.\n\n"
-        f"When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. "
+        f"When running `./pants package`, this path will be prefixed by `--distdir` (e.g. "
         "`dist/`).\n\n"
         "Warning: setting this value risks naming collisions with other package targets you may "
         "have."
