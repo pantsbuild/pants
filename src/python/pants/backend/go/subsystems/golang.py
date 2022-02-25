@@ -18,7 +18,7 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
