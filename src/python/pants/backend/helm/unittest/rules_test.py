@@ -11,16 +11,16 @@ from pants.backend.helm.goals.package import rules as helm_package_rules
 from pants.backend.helm.resolve import artifacts, fetch
 from pants.backend.helm.subsystem import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
-from pants.backend.helm.test.unittest.rules import HelmUnitTestFieldSet
-from pants.backend.helm.test.unittest.rules import rules as test_rules
-from pants.backend.helm.test.unittest.subsystem import rules as unittest_rules
-from pants.backend.helm.test.unittest.target_types import HelmUnitTestsTarget
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
     K8S_SERVICE_FILE,
 )
+from pants.backend.helm.unittest.rules import HelmUnitTestFieldSet
+from pants.backend.helm.unittest.rules import rules as test_rules
+from pants.backend.helm.unittest.subsystem import rules as unittest_rules
+from pants.backend.helm.unittest.target_types import HelmUnitTestsTarget
 from pants.backend.helm.util_rules import chart, sources, tool
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult

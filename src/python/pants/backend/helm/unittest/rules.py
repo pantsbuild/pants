@@ -4,8 +4,8 @@
 from dataclasses import dataclass
 
 from pants.backend.helm.target_types import HelmChartFieldSet
-from pants.backend.helm.test.unittest.subsystem import HelmUnitTestPlugin
-from pants.backend.helm.test.unittest.target_types import (
+from pants.backend.helm.unittest.subsystem import HelmUnitTestPlugin
+from pants.backend.helm.unittest.target_types import (
     HelmUnitTestDependenciesField,
     HelmUnitTestSourcesField,
 )

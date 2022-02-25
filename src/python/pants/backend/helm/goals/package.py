@@ -10,12 +10,10 @@ from pathlib import PurePath
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPathField
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmBinary
-from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import AddPrefix, Digest, RemovePrefix
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 

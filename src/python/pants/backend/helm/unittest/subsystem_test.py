@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.helm.test.unittest.subsystem import HelmUnitTestPlugin
-from pants.backend.helm.test.unittest.subsystem import rules as unittest_rules
+from pants.backend.helm.unittest.subsystem import HelmUnitTestPlugin
+from pants.backend.helm.unittest.subsystem import rules as unittest_rules
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.util_rules import config_files, external_tool
