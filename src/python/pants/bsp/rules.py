@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from pants.bsp.context import BSPContext
-from pants.bsp.util_rules.compile import rules as bsp_compile_rules
-from pants.bsp.util_rules.lifecycle import rules as bsp_lifecycle_rules
-from pants.bsp.util_rules.targets import rules as bsp_targets_rules
+from pants.bsp.util_rules import compile, lifecycle, targets
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 
@@ -18,7 +16,7 @@ async def bsp_context(session_values: SessionValues) -> BSPContext:
 def rules():
     return (
         *collect_rules(),
-        *bsp_lifecycle_rules(),
-        *bsp_targets_rules(),
-        *bsp_compile_rules(),
+        *compile.rules(),
+        *lifecycle.rules(),
+        *targets.rules(),
     )
