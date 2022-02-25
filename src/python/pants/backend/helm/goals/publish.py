@@ -103,11 +103,11 @@ class HelmPublishFieldSet(PublishFieldSet):
     ) -> tuple[str, ...]:
         if not artifact.name:
             raise HelmArtifactMissingNameError(
-                "Could not obtain Helm chart artifact name since it is missing"
+                f"Could not obtain Helm chart artifact name since it is missing in target at: {self.address}"
             )
         if not artifact.metadata:
             raise HelmArtifactMissingMetadataError(
-                "Could not obtain Helm chart metadata since it is missing"
+                f"Could not obtain Helm chart metadata since it is missing in target at: {self.address}"
             )
 
         repository = self.format_repository(default_repository, {})
