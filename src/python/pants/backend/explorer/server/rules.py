@@ -16,6 +16,7 @@ from pants.backend.explorer.request_state import RequestState
 from pants.backend.explorer.server.query import Query
 from pants.backend.explorer.setup import ExplorerServer, ExplorerServerRequest
 from pants.backend.project_info.peek import _PeekJsonEncoder
+from pants.base.exiter import ExitCode
 from pants.engine.rules import collect_rules, rule
 
 
@@ -72,9 +73,10 @@ class UvicornServer:
             print(" => Exiting...")
             self.server.should_exit = True
 
-    def run(self):
+    def run(self) -> ExitCode:
         print("Starting the Explorer Web UI server...")
         self.server.run()
+        return 0
 
 
 @rule
