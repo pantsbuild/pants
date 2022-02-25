@@ -266,11 +266,13 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		// TODO: `MatchFile` will actually parse the imports but does not return the AST. Consider vendoring
 		// the MatchFile logic to avoid double parsing.
-		matches, err := buildContext.MatchFile(directory, name)
+		binaryOnly := false
+		fileInfo, err := matchFile(buildContext, directory, name, allTags, &binaryOnly, fileSet)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check build tags for %s: %s", name, err)
+			pkg.InvalidGoFiles[name] = err.Error()
+			continue
 		}
-		if !matches {
+		if fileInfo == nil {
 			if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
 				// `go` ignores files prefixed with underscore or period. Since this is not due to
 				// build constraints, do not report it as an ignored file. Fall through.
