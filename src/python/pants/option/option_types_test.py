@@ -79,7 +79,10 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
             self.options.dyn_opt = option_value
 
         prop = option_type("--opt", default=default, help="")
-        prop_no_default = option_type("--opt-no-default", default=None, help="")
+        if expected_register_kwargs["type"] is list:
+            prop_no_default = option_type("--opt-no-default", help="")
+        else:
+            prop_no_default = option_type("--opt-no-default", default=None, help="")
         dyn_prop = option_type("--dyn-opt", default=default, help=lambda cls: cls.dyn_help)
 
     class MySubsystem(MyBaseSubsystem):
