@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -12,7 +13,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 
 
 class PyOxidizerOutputPathField(OutputPathField):
@@ -48,14 +49,32 @@ class PyOxidizerEntryPointField(StringField):
 
 
 class PyOxidizerDependenciesField(Dependencies):
-    pass
+    required = True
+    supports_transitive_excludes = True
+    help = (
+        "The addresses of `python_distribution` target(s) to include in the binary, e.g. "
+        "`['src/python/project:dist']`.\n\n"
+        "The distribution(s) must generate at least one wheel file. For example, if using "
+        f"`{GenerateSetupField.alias}=True`, then make sure `{WheelField.alias}=True`. See "
+        f"{doc_url('python-distributions')}.\n\n"
+        "Usually, you only need to specify a single `python_distribution`. However, if "
+        "that distribution depends on another first-party distribution in your repository, you "
+        "must specify that dependency too, otherwise PyOxidizer would try installing the "
+        "distribution from PyPI. Note that a `python_distribution` target might depend on "
+        "another `python_distribution` target even if it is not included in its own `dependencies` "
+        f"field, as explained at {doc_url('python-distributions')}; if code from one distribution "
+        "imports code from another distribution, then there is a dependency and you must "
+        "include both `python_distribution` targets in the `dependencies` field of this "
+        "`pyoxidizer_binary` target.\n\n"
+        "Target types other than `python_distribution` will be ignored."
+    )
 
 
 class PyOxidizerUnclassifiedResources(StringSequenceField):
     alias = "filesystem_resources"
     help = (
         "Adds support for listing dependencies that MUST be installed to the filesystem "
-        "(e.g. Numpy). See"
+        "(e.g. Numpy). See "
         "https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer_packaging_additional_files.html#installing-unclassified-files-on-the-filesystem"
     )
 
@@ -89,5 +108,14 @@ class PyOxidizerTarget(Target):
         PyOxidizerUnclassifiedResources,
     )
     help = (
-        "A single-file Python executable with a Python interpreter embedded, built via PyOxidizer."
+        "A single-file Python executable with a Python interpreter embedded, built via "
+        "PyOxidizer.\n\n"
+        "To use this target, first create a `python_distribution` target with the code you want "
+        f"included in your binary, per {doc_url('python-distributions')}. Then add this "
+        f"`python_distribution` target to the `dependencies` field. See the `help` for "
+        f"`dependencies` for more information.\n\n"
+        f"You may optionally want to set the `{PyOxidizerEntryPointField.alias}` field. For "
+        "advanced use cases, you can use a custom PyOxidizer config file, rather than what Pants "
+        f"generates, by setting the `{PyOxidizerConfigSourceField.alias}` field. You may also want "
+        "to set `[pyoxidizer].args` to a value like `['--release']`."
     )

@@ -16,8 +16,10 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
     PyOxidizerDependenciesField,
     PyOxidizerEntryPointField,
     PyOxidizerOutputPathField,
+    PyOxidizerTarget,
     PyOxidizerUnclassifiedResources,
 )
+from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import (
@@ -38,9 +40,11 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InvalidTargetException,
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -90,13 +94,9 @@ async def package_pyoxidizer_binary(
     runner_script: PyoxidizerRunnerScript,
     bash: BashBinary,
 ) -> BuiltPackage:
-    direct_deps, pyoxidizer_pex = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(Pex, PexRequest, pyoxidizer.to_pex_request()),
-    )
-
+    direct_deps = await Get(Targets, DependenciesRequest(field_set.dependencies))
     deps_field_sets = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [direct_deps[0]])
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps)
     )
     built_packages = await MultiGet(
         Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
@@ -107,6 +107,13 @@ async def package_pyoxidizer_binary(
         for artifact in built_pkg.artifacts
         if artifact.relpath is not None and artifact.relpath.endswith(".whl")
     ]
+    if not wheel_paths:
+        raise InvalidTargetException(
+            f"The `{PyOxidizerTarget.alias}` target {field_set.address} must include "
+            "in its `dependencies` field at least one `python_distribution` target that produces a "
+            f"`.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure "
+            f"`{WheelField.alias}=True`. See {doc_url('python-distributions')}."
+        )
 
     config_template = None
     if field_set.template.value is not None:
@@ -127,14 +134,13 @@ async def package_pyoxidizer_binary(
             else list(field_set.unclassified_resources.value)
         ),
     )
-
     rendered_config = config.render()
     logger.debug(f"Configuration used for {field_set.address}: {rendered_config}")
-    config_digest = await Get(
-        Digest,
-        CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))]),
-    )
 
+    pyoxidizer_pex, config_digest = await MultiGet(
+        Get(Pex, PexRequest, pyoxidizer.to_pex_request()),
+        Get(Digest, CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))])),
+    )
     input_digest = await Get(
         Digest,
         MergeDigests(
