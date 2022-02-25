@@ -19,11 +19,15 @@ _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
 _ListMemberType = TypeVar("_ListMemberType")
-_HelpT = Union[Callable[["type[Subsystem]"], str], str]
+# NB: The `Any` should be `type[Subsystem]`, however the use-case is generally lambdas passed into
+# constructors, and `mypy` will complain that `Type[Subsystem]` has no attribute `foo`.
+_DynamicVal = Callable[[Any], _ValueT]
+_MaybeDynamic = Union[_DynamicVal[_ValueT], _ValueT]
+_HelpT = _MaybeDynamic[str]
 
 
-def _eval_maybe_helpt(help: _HelpT, subsystem_cls: "type[Subsystem]") -> str:
-    return help(subsystem_cls) if inspect.isfunction(help) else help  # type: ignore[operator,return-value]
+def _eval_maybe_dynamic(val: _MaybeDynamic[_ValueT], subsystem_cls: "type[Subsystem]") -> _ValueT:
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[operator,return-value]
 
 
 @dataclass(frozen=True)
@@ -62,14 +66,14 @@ class _OptionBase(Generic[_PropType, _DefaultType]):
         return self
 
     # Override if necessary
-    def get_option_type(self):
+    def get_option_type(self, subsystem_cls):
         return type(self).option_type
 
     def get_flag_options(self, subsystem_cls) -> dict:
         return dict(
-            help=_eval_maybe_helpt(self._help, subsystem_cls),
-            default=self._default,
-            type=self.get_option_type(),
+            help=_eval_maybe_dynamic(self._help, subsystem_cls),
+            default=_eval_maybe_dynamic(self._default, subsystem_cls),
+            type=self.get_option_type(subsystem_cls),
             **self._extra_kwargs,
         )
 
@@ -167,12 +171,12 @@ class _ListOptionBase(
 
     def get_flag_options(self, subsystem_cls) -> dict[str, Any]:
         return dict(
-            member_type=self.get_member_type(),
+            member_type=self.get_member_type(subsystem_cls),
             **super().get_flag_options(subsystem_cls),
         )
 
     # Override if necessary
-    def get_member_type(self):
+    def get_member_type(self, subsystem_cls):
         return type(self).member_type
 
     def _convert_(self, value: list[Any]) -> tuple[_ListMemberType]:
@@ -227,13 +231,27 @@ class EnumOption(_OptionBase[_PropType, _DefaultType]):
     E.g.
         EnumOption(..., enum_type=MyEnum)  # property type is deduced as `MyEnum | None`
         EnumOption(..., default=MyEnum.Value)  # property type is deduced as `MyEnum`
+        EnumOption(..., enum_type=MyEnum default=lambda cls: cls.default_val)  # property type is `MyEnum`
     """
 
     @overload
     def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT, _EnumT]:
         ...
 
-    # N.B. This has an additional param for the default-is-None case: `enum_type`.
+    # N.B. This has an additional param: `enum_type`.
+    @overload
+    def __new__(
+        cls,
+        *flag_names: str,
+        enum_type: type[_EnumT],
+        # NB: Marking this as `_DynamicVal[_EnumT]` will upset mypy at the call site because `mypy`
+        # won't be able to have enough info to deduce the correct type.
+        default: _DynamicVal[Any],
+        help: _HelpT,
+    ) -> EnumOption[_EnumT, _EnumT]:
+        ...
+
+    # N.B. This has an additional param: `enum_type`.
     @overload
     def __new__(
         cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
@@ -251,15 +269,19 @@ class EnumOption(_OptionBase[_PropType, _DefaultType]):
         instance._enum_type = enum_type
         return instance
 
-    def get_option_type(self):
+    def get_option_type(self, subsystem_cls):
         enum_type = self._enum_type
-        default = self._default
+        default = _eval_maybe_dynamic(self._default, subsystem_cls)
         if enum_type is None:
             if default is None:
                 raise ValueError(
                     "`enum_type` must be provided to the constructor if `default` isn't provided."
                 )
             return type(default)
+        elif default is not None and not isinstance(default, enum_type):
+            raise ValueError(
+                f"Expected the default value to be of type '{enum_type}', got '{type(default)}'"
+            )
         return enum_type
 
 
@@ -373,15 +395,29 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
     E.g.
         EnumListOption(..., enum_type=MyEnum)  # property type is deduced as `[MyEnum]`
         EnumListOption(..., default=[MyEnum.Value])  # property type is deduced as `[MyEnum]`
+        EnumListOption(..., enum_type=MyEnum default=lambda cls: cls.default_val)  # property type is `[MyEnum]`
     """
 
     @overload
     def __new__(
-        cls, *flag_names: str, default: list[_EnumT], help: _HelpT
+        cls, *flag_names: str, default: _MaybeDynamic[list[_EnumT]], help: _HelpT
     ) -> EnumListOption[_EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
+    # N.B. This has an additional param: `enum_type`.
+    @overload
+    def __new__(
+        cls,
+        *flag_names: str,
+        enum_type: type[_EnumT],
+        # NB: Marking this as `_DynamicVal[list[_EnumT]]` will upset mypy at the call site because
+        # `mypy` won't be able to have enough info to deduce the correct type.
+        default: _DynamicVal[Any],
+        help: _HelpT,
+    ) -> EnumListOption[_EnumT]:
+        ...
+
+    # N.B. This has an additional param: `enum_type`.
     @overload
     def __new__(
         cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
@@ -399,9 +435,9 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
         instance._enum_type = enum_type
         return instance
 
-    def get_member_type(self):
+    def get_member_type(self, subsystem_cls):
         enum_type = self._enum_type
-        default = self._default
+        default = _eval_maybe_dynamic(self._default, subsystem_cls)
         if enum_type is None:
             if not default:
                 raise ValueError(
