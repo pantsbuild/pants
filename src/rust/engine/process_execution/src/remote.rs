@@ -1341,11 +1341,7 @@ pub async fn check_action_cache(
         move |mut client| {
           let request = remexec::GetActionResultRequest {
             action_digest: Some(action_digest.into()),
-            instance_name: metadata
-              .instance_name
-              .as_ref()
-              .cloned()
-              .unwrap_or_else(String::new),
+            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
