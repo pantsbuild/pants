@@ -158,7 +158,7 @@ def test_analyse_deployment_dependencies(rule_runner: RuleRunner) -> None:
     source_root_patterns = ("src/*",)
     rule_runner.set_options(
         [f"--source-root-patterns={repr(source_root_patterns)}"],
-        env_inherit=set(["PATH", "PYENV_ROOT", "HOME"]),
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))

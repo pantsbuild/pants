@@ -31,9 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidHelmInstallArgumentsError(Exception):
-    
     def __init__(self, invalid_args: Iterable[str]) -> None:
-        super().__init__(f"The following passthrough arguments are not accepted for a Helm install:\n{bullet_list(invalid_args)}\nPlease use the corresponding fields in `helm_deployment` target.")
+        super().__init__(
+            f"The following passthrough arguments are not accepted for a Helm install:\n{bullet_list(invalid_args)}\nPlease use the corresponding fields in `helm_deployment` target."
+        )
+
 
 @dataclass(frozen=True)
 class InstallHelmDeploymentFieldSet(HelmDeploymentFieldSet, InstallFieldSet):

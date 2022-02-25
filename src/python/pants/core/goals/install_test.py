@@ -5,14 +5,15 @@ from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
+
+from pants.core.goals.install import Install, InstallFieldSet, InstallProcess, InstallProcesses
+from pants.core.register import rules as core_rules
 from pants.engine import process
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import rule
 from pants.engine.target import COMMON_TARGET_FIELDS, StringSequenceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
-
-from pants.core.goals.install import Install, InstallFieldSet, InstallProcess, InstallProcesses
 
 
 class MockDestinationsField(StringSequenceField):

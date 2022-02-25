@@ -33,8 +33,7 @@ class InstallFieldSet(FieldSet, metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class InstallProcess:
-    """Individual process to run in the given order to perform the
-    installation."""
+    """Individual process to run in the given order to perform the installation."""
 
     name: str
     description: str | None = None

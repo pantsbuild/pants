@@ -101,4 +101,4 @@ class HelmRegistries:
 
     @memoized_method
     def all_classic(self) -> tuple[HelmRegistry, ...]:
-        return tuple(set([registry for _, registry in self.all.items() if not registry.is_oci]))
+        return tuple({registry for _, registry in self.all.items() if not registry.is_oci})

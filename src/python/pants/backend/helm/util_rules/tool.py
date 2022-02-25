@@ -414,9 +414,7 @@ async def setup_helm(
                 Get(Digest, AddPrefix(binary.digest, f"{data_dir}/plugins/{prefix}"))
                 for prefix, binary in downloaded_plugin_and_names
             )
-            plugins_digests = await Get(
-                Digest, MergeDigests([digest for digest in prefixed_plugins_digeests])
-            )
+            plugins_digests = await Get(Digest, MergeDigests(prefixed_plugins_digeests))
             mutable_input_digest = await Get(
                 Digest, MergeDigests([mutable_input_digest, plugins_digests])
             )
