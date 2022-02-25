@@ -131,7 +131,7 @@ def _publish_registry_addresses(
     return tuple([registry.address for registry in registries_options])
 
 
-@rule(desc="Push Helm chart to OCI registries", level=LogLevel.DEBUG)
+@rule(desc="Prepare to push Helm chart to OCI registries", level=LogLevel.DEBUG)
 async def push_helm_chart(
     request: PublishHelmChartRequest,
     helm: HelmBinary,
