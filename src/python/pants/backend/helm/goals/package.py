@@ -48,8 +48,7 @@ class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
 async def run_helm_package(field_set: HelmPackageFieldSet, helm: HelmBinary) -> BuiltPackage:
     output_dir = "__output_dir"
 
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
-    chart = await Get(HelmChart, HelmChartFieldSet, HelmChartFieldSet.create(wrapped_target.target))
+    chart = await Get(HelmChart, HelmChartFieldSet, field_set)
 
     output_destination = PurePath(field_set.output_path.value_or_default(file_ending=None))
 
