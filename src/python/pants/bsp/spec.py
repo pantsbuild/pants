@@ -3,14 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum
-from typing import Any
+from enum import Enum, IntEnum
+from typing import Any, ClassVar
 
 from pants.bsp.utils import freeze_json
 from pants.build_graph.address import Address, AddressInput
 
 # -----------------------------------------------------------------------------------------------
-# Base types
+# Base classes
+# -----------------------------------------------------------------------------------------------
+
+
+class BSPNotification:
+    """Base class for all notifications so that a notification carries its RPC method name."""
+
+    notification_name: ClassVar[str]
+
+    def to_json_dict(self) -> dict[str, Any]:
+        ...
+
+
+# -----------------------------------------------------------------------------------------------
+# Basic JSON Structures
+# See https://build-server-protocol.github.io/docs/specification.html#basic-json-structures
 # -----------------------------------------------------------------------------------------------
 
 Uri = str
@@ -225,7 +240,7 @@ class TaskId:
     # relationship of tasks makes it possible to render tasks in
     # a tree-like user interface or inspect what caused a certain task
     # execution.
-    parents: tuple[str, ...] | None
+    parents: tuple[str, ...] | None = None
 
     @classmethod
     def from_json_dict(cls, d):
@@ -234,8 +249,16 @@ class TaskId:
             parents=tuple(d["parents"]) if "parents" in d else None,
         )
 
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "id": self.id,
+        }
+        if self.parents is not None:
+            result["parents"] = self.parents
+        return result
 
-class StatusCode:
+
+class StatusCode(IntEnum):
     # Execution was successful.
     OK = 1
 
@@ -593,3 +616,273 @@ class SourcesResult:
 
     def to_json_dict(self):
         return {"items": [item.to_json_dict() for item in self.items]}
+
+
+# -----------------------------------------------------------------------------------------------
+# Task Notifications
+# See https://build-server-protocol.github.io/docs/specification.html#compile-request
+# -----------------------------------------------------------------------------------------------
+
+
+class TaskDataKind(Enum):
+    # `data` field must contain a CompileTask object.
+    COMPILE_TASK = "compile-task"
+
+    #  `data` field must contain a CompileReport object.
+    COMPILE_REPORT = "compile-report"
+
+    # `data` field must contain a TestTask object.
+    TEST_TASK = "test-task"
+
+    # `data` field must contain a TestReport object.
+    TEST_REPORT = "test-report"
+
+    # `data` field must contain a TestStart object.
+    TEST_START = "test-start"
+
+    # `data` field must contain a TestFinish object.
+    TEST_FINISH = "test-finish"
+
+
+@dataclass(frozen=True)
+class TaskStartParams(BSPNotification):
+    notification_name = "build/taskStart"
+
+    # Unique id of the task with optional reference to parent task id
+    task_id: TaskId
+
+    # Timestamp of when the event started in milliseconds since Epoch.
+    event_time: int | None = None
+
+    # Message describing the task.
+    message: str | None = None
+
+    # Task-specific data.
+    # Note: This field is serialized as two fields: `dataKind` (for type name) and `data`.
+    data: CompileTask | None = None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"taskId": self.task_id.to_json_dict()}
+        if self.event_time is not None:
+            result["eventTime"] = self.event_time
+        if self.message is not None:
+            result["message"] = self.message
+        if self.data is not None:
+            if isinstance(self.data, CompileTask):
+                result["dataKind"] = TaskDataKind.COMPILE_TASK.value
+            else:
+                raise AssertionError(
+                    f"TaskStartParams contained an unexpected instance: {self.data}"
+                )
+            result["data"] = self.data.to_json_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class TaskProgressParams(BSPNotification):
+    notification_name = "build/taskProgress"
+
+    # Unique id of the task with optional reference to parent task id
+    task_id: TaskId
+
+    # Timestamp of when the progress event was generated in milliseconds since Epoch.
+    event_time: int | None = None
+
+    # Message describing the task progress.
+    # Information about the state of the task at the time the event is sent.
+    message: str | None = None
+
+    # If known, total amount of work units in this task.
+    total: int | None = None
+
+    # If known, completed amount of work units in this task.
+    progress: int | None = None
+
+    # Name of a work unit. For example, "files" or "tests". May be empty.
+    unit: str | None = None
+
+    # TODO: `data` field is not currently represented. Once we know what types will be sent, then it can be bound.
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"taskId": self.task_id.to_json_dict()}
+        if self.event_time is not None:
+            result["eventTime"] = self.event_time
+        if self.message is not None:
+            result["message"] = self.message
+        if self.total is not None:
+            result["total"] = self.total
+        if self.progress is not None:
+            result["progress"] = self.progress
+        if self.unit is not None:
+            result["unit"] = self.unit
+        return result
+
+
+@dataclass(frozen=True)
+class TaskFinishParams(BSPNotification):
+    notification_name = "build/taskFinish"
+
+    # Unique id of the task with optional reference to parent task id
+    task_id: TaskId
+
+    # Timestamp of the event in milliseconds.
+    event_time: int | None = None
+
+    # Message describing the finish event.
+    message: str | None = None
+
+    # Task completion status.
+    status: StatusCode = StatusCode.OK
+
+    # Task-specific data.
+    # Note: This field is serialized as two fields: `dataKind` (for type name) and `data`.
+    data: CompileReport | None = None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "taskId": self.task_id.to_json_dict(),
+            "statusCode": self.status.value,
+        }
+        if self.event_time is not None:
+            result["eventTime"] = self.event_time
+        if self.message is not None:
+            result["message"] = self.message
+        if self.data is not None:
+            if isinstance(self.data, CompileReport):
+                result["dataKind"] = TaskDataKind.COMPILE_REPORT.value
+            else:
+                raise AssertionError(
+                    f"TaskFinishParams contained an unexpected instance: {self.data}"
+                )
+            result["data"] = self.data.to_json_dict()
+        return result
+
+
+# -----------------------------------------------------------------------------------------------
+# Compile Request
+# See https://build-server-protocol.github.io/docs/specification.html#compile-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CompileParams:
+    # A sequence of build targets to compile.
+    targets: tuple[BuildTargetIdentifier, ...]
+
+    # A unique identifier generated by the client to identify this request.
+    # The server may include this id in triggered notifications or responses.
+    origin_id: str | None = None
+
+    # Optional arguments to the compilation process.
+    arguments: tuple[str, ...] | None = ()
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(
+            targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
+            origin_id=d.get("originId"),
+            arguments=tuple(d["arguments"]) if "arguments" in d else None,
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"targets": [tgt.to_json_dict() for tgt in self.targets]}
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        if self.arguments is not None:
+            result["arguments"] = self.arguments
+        return result
+
+
+@dataclass(frozen=True)
+class CompileResult:
+    # An optional request id to know the origin of this report.
+    origin_id: str | None
+
+    # A status code for the execution.
+    status_code: int
+
+    # Kind of data to expect in the `data` field. If this field is not set, the kind of data is not specified.
+    data_kind: str | None = None
+
+    # A field containing language-specific information, like products
+    # of compilation or compiler-specific metadata the client needs to know.
+    data: Any | None = None
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(
+            origin_id=d.get("originId"),
+            status_code=d["statusCode"],
+            data_kind=d.get("dataKind"),
+            data=d.get("data"),
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "statusCode": self.status_code,
+        }
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        if self.data_kind is not None:
+            result["dataKind"] = self.data_kind
+        if self.data is not None:
+            result["data"] = self.data  # TODO: Enforce to_json_dict available
+        return result
+
+
+@dataclass(frozen=True)
+class CompileTask:
+    target: BuildTargetIdentifier
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(target=BuildTargetIdentifier.from_json_dict(d["target"]))
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {"target": self.target.to_json_dict()}
+
+
+@dataclass(frozen=True)
+class CompileReport:
+    # The build target that was compiled
+    target: BuildTargetIdentifier
+
+    # An optional request id to know the origin of this report.
+    origin_id: str | None = None
+
+    # The total number of reported errors compiling this target.
+    errors: int | None = None
+
+    # The total number of reported warnings compiling the target.
+    warnings: int | None = None
+
+    # The total number of milliseconds it took to compile the target.
+    time: int | None = None
+
+    # The compilation was a noOp compilation.
+    no_op: bool | None = None
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(
+            target=BuildTargetIdentifier.from_json_dict(d["target"]),
+            origin_id=d.get("originId"),
+            errors=d.get("errors"),
+            warnings=d.get("warnings"),
+            time=d.get("time"),
+            no_op=d.get("noOp"),
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result = {"target": self.target.to_json_dict()}
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        if self.errors is not None:
+            result["errors"] = self.errors
+        if self.warnings is not None:
+            result["warnings"] = self.warnings
+        if self.time is not None:
+            result["time"] = self.time
+        if self.no_op is not None:
+            result["noOp"] = self.no_op
+        return result
