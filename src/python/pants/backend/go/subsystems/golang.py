@@ -62,14 +62,8 @@ class GolangSubsystem(Subsystem):
         ),
     ).advanced()
 
-    cgo_enabled = BoolOption(
-        "--experimental-cgo",
-        default=False,
-        help=(
-            "Enable cgo. This option is for testing purposes only to allow Pants developers to enable cgo support. "
-            "Pants does not currently have full cgo support."
-        ),
-    ).advanced()
+    # TODO: Make this a proper option once cgo is enabled.
+    cgo_enabled: bool = False
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
