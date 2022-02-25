@@ -8,6 +8,7 @@ from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ToolCustomLockfile,
@@ -15,7 +16,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import FileContent
+from pants.engine.fs import Digest, FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
@@ -193,6 +194,23 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return InterpreterConstraints(self.options.interpreter_constraints)
 
+    def to_pex_request(
+        self,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
+    ) -> PexRequest:
+        return PexRequest(
+            output_filename=f"{self.options_scope.replace('-', '_')}.pex",
+            internal_only=True,
+            requirements=self.pex_requirements(extra_requirements=extra_requirements),
+            interpreter_constraints=interpreter_constraints or self.interpreter_constraints,
+            main=main,
+            sources=sources,
+        )
+
 
 class PythonToolBase(PythonToolRequirementsBase):
     """Base class for subsystems that configure a python tool to be invoked out-of-process."""
@@ -242,3 +260,18 @@ class PythonToolBase(PythonToolRequirementsBase):
         if not is_default_entry_point:
             return EntryPoint.parse(cast(str, self.options.entry_point))
         return self.default_main
+
+    def to_pex_request(
+        self,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
+    ) -> PexRequest:
+        return super().to_pex_request(
+            interpreter_constraints=interpreter_constraints,
+            extra_requirements=extra_requirements,
+            main=main or self.main,
+            sources=sources,
+        )

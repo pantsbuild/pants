@@ -52,14 +52,10 @@ async def flake8_lint_partition(
 ) -> LintResult:
     flake8_pex_get = Get(
         VenvPex,
-        PexRequest(
-            output_filename="flake8.pex",
-            internal_only=True,
-            requirements=flake8.pex_requirements(
-                extra_requirements=first_party_plugins.requirement_strings,
-            ),
+        PexRequest,
+        flake8.to_pex_request(
             interpreter_constraints=partition.interpreter_constraints,
-            main=flake8.main,
+            extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)

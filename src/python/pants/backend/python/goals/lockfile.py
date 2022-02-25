@@ -187,13 +187,9 @@ async def generate_lockfile(
 
         _poetry_pex = await Get(
             VenvPex,
-            PexRequest(
-                output_filename="poetry.pex",
-                internal_only=True,
-                requirements=poetry_subsystem.pex_requirements(),
-                interpreter_constraints=poetry_subsystem.interpreter_constraints,
-                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
-                sources=_launcher_digest,
+            PexRequest,
+            poetry_subsystem.to_pex_request(
+                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem), sources=_launcher_digest
             ),
         )
 
