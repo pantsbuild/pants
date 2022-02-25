@@ -70,7 +70,7 @@ DEFAULT_MODULE_MAPPING = {
     "google-cloud-secret-manager": ("google.cloud.secretmanager",),
     "google-cloud-storage": ("google.cloud.storage",),
     "ipython": ("IPython",),
-    "JACK-Client": ("jack",),
+    "jack-client": ("jack",),
     "kafka-python": ("kafka",),
     "lark-parser": ("lark",),
     "opencv-python": ("cv2",),
@@ -82,8 +82,8 @@ DEFAULT_MODULE_MAPPING = {
     "psycopg2-binary": ("psycopg2",),
     "pycrypto": ("Crypto",),
     "pyhamcrest": ("hamcrest",),
-    "PyGObject": ("gi",),
-    "PyJWT": ("jwt",),
+    "pygobject": ("gi",),
+    "pyjwt": ("jwt",),
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),
     "pypi-kenlm": ("kenlm",),
@@ -93,7 +93,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-dotenv": ("dotenv",),
     "python-hcl2": ("hcl2",),
     "python-jose": ("jose",),
-    "python-Levenshtein": ("Levenshtein",),
+    "python-levenshtein": ("Levenshtein",),
     "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
     "python-magic": ("magic",),
     "python-pptx": ("pptx",),
@@ -105,7 +105,7 @@ DEFAULT_MODULE_MAPPING = {
     "scikit-image": ("skimage",),
     "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
-    "streamlit_aggrid": ("st_aggrid",),
+    "streamlit-aggrid": ("st_aggrid",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
