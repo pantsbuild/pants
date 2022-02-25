@@ -8,35 +8,24 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec import (
-    BuildServerCapabilities,
     BuildTarget,
     BuildTargetIdentifier,
-    CompileProvider,
-    DebugProvider,
-    InitializeBuildParams,
-    InitializeBuildResult,
-    RunProvider,
     SourceItem,
     SourceItemKind,
     SourcesItem,
     SourcesParams,
     SourcesResult,
-    TestProvider,
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
-from pants.bsp.types import BSPLanguageSupport
 from pants.bsp.util_rules.compile import rules as bsp_compile_rules
+from pants.bsp.util_rules.lifecycle import rules as bsp_lifecycle_rules
 from pants.build_graph.address import AddressInput
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.version import VERSION
-
-# Version of BSP supported by Pants.
-BSP_VERSION = "2.0.0"
 
 
 @rule
@@ -53,59 +42,6 @@ class BSPBuildTargetsRequest:
 @dataclass(frozen=True)
 class BSPBuildTargets:
     targets: tuple[BuildTarget, ...] = ()
-
-
-# -----------------------------------------------------------------------------------------------
-# Initialize Build Request
-# See https://build-server-protocol.github.io/docs/specification.html#initialize-build-request
-# -----------------------------------------------------------------------------------------------
-
-
-class InitializeBuildHandlerMapping(BSPHandlerMapping):
-    method_name = "build/initialize"
-    request_type = InitializeBuildParams
-    response_type = InitializeBuildResult
-
-
-@rule
-async def bsp_build_initialize(
-    _request: InitializeBuildParams, union_membership: UnionMembership
-) -> InitializeBuildResult:
-    compile_provider_language_ids = []
-    test_provider_language_ids = []
-    run_provider_language_ids = []
-    debug_provider_language_ids = []
-    language_support_impls = union_membership.get(BSPLanguageSupport)
-    for lang in language_support_impls:
-        if lang.can_compile:
-            compile_provider_language_ids.append(lang.language_id)
-        if lang.can_test:
-            test_provider_language_ids.append(lang.language_id)
-        if lang.can_run:
-            run_provider_language_ids.append(lang.language_id)
-        if lang.can_debug:
-            debug_provider_language_ids.append(lang.language_id)
-
-    return InitializeBuildResult(
-        display_name="Pants",
-        version=VERSION,
-        bsp_version=BSP_VERSION,  # TODO: replace with an actual BSP version
-        capabilities=BuildServerCapabilities(
-            compile_provider=CompileProvider(
-                language_ids=tuple(sorted(compile_provider_language_ids))
-            ),
-            test_provider=TestProvider(language_ids=tuple(sorted(test_provider_language_ids))),
-            run_provider=RunProvider(language_ids=tuple(sorted(run_provider_language_ids))),
-            debug_provider=DebugProvider(language_ids=tuple(sorted(debug_provider_language_ids))),
-            inverse_sources_provider=None,
-            dependency_sources_provider=None,
-            dependency_modules_provider=None,
-            resources_provider=None,
-            can_reload=None,
-            build_target_changed_provider=None,
-        ),
-        data=None,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -206,8 +142,8 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
 def rules():
     return (
         *collect_rules(),
+        *bsp_lifecycle_rules(),
         *bsp_compile_rules(),
-        UnionRule(BSPHandlerMapping, InitializeBuildHandlerMapping),
         UnionRule(BSPHandlerMapping, WorkspaceBuildTargetsHandlerMapping),
         UnionRule(BSPHandlerMapping, BuildTargetSourcesHandlerMapping),
     )
