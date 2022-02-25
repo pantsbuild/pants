@@ -101,11 +101,8 @@ class HelmBinary:
         output_directories: Iterable[str] = (),
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> Process:
-        argv = [self.path]
-        argv.extend(args)
-
         return Process(
-            argv,
+            [self.path, *args],
             env=self.env,
             description=description,
             level=level,

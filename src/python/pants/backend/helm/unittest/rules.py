@@ -11,6 +11,7 @@ from pants.backend.helm.unittest.target_types import (
 )
 from pants.backend.helm.util_rules.chart import HelmChart
 from pants.backend.helm.util_rules.tool import HelmBinary
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -119,7 +120,15 @@ async def run_helm_unittest(
     )
 
     xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir}/**"]))
+        Digest,
+        DigestSubset(
+            process_result.output_digest,
+            PathGlobs(
+                [f"{reports_dir}/**"],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="`test` goal",
+            ),
+        ),
     )
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir))
 
