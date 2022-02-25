@@ -1,4 +1,4 @@
-import ReactMarkdown from 'react-markdown'
+import { Remark } from 'react-remark'
 import Card, { CardProps } from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
@@ -30,7 +30,7 @@ export const TargetFieldDoc = ({ info, sx, ...props }: TargetFieldDocProps) => (
       <Typography variant="h6"><code>{info.alias}</code>{info.required && " *"}</Typography>
       <Typography variant="subtitle2">{info.provider}</Typography>
       <Divider />
-      <ReactMarkdown>{info.description}</ReactMarkdown>
+      <Remark>{info.description}</Remark>
     </CardContent>
   </Card>
 );
@@ -46,7 +46,7 @@ export const TargetDoc = ({ info }: TargetDocProps) => info ? (
         <Typography variant="h6"><code>{info.alias}</code></Typography>
         <Typography variant="subtitle2">{info.summary}</Typography>
         <Divider />
-        <ReactMarkdown>{info.description}</ReactMarkdown>
+        <Remark>{info.description}</Remark>
       </CardContent>
     </Card>
     {info.fields.map((field, index) => (

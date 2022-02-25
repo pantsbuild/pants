@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { styled } from '@mui/material/styles';
-import ReactMarkdown from 'react-markdown'
+// import ReactMarkdown from 'react-markdown'
 import Chip from '@mui/material/Chip';
 import Card, { CardProps } from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
@@ -113,7 +113,7 @@ export const Target = ({target, ...props}: TargetProps) => {
         {description && (
           <>
             <Divider />
-            <ReactMarkdown>{description}</ReactMarkdown>
+            {/*<ReactMarkdown>{description}</ReactMarkdown>*/}
           </>
         )}
       </CardContent>

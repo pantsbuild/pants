@@ -22,7 +22,7 @@
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-helmet-async": "^1.2.2",
-    "react-markdown": "^8.0.0",
+    "react-remark": "^2.1.0",
     "react-router-dom": "^6.2.1",
     "react-scripts": "5.0.0",
     "simplebar-react": "^2.3.6",
@@ -52,5 +52,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/react-test-renderer": "^17.0.1",
+    "react-test-renderer": "^17.0.2"
   }
 }

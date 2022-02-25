@@ -1,0 +1,93 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`TargetDoc renders help card. 1`] = `
+Array [
+  <div
+    className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation1 MuiCard-root css-bhp9pd-MuiPaper-root-MuiCard-root"
+  >
+    <div
+      className="MuiCardContent-root css-46bh2p-MuiCardContent-root"
+    >
+      <h6
+        className="MuiTypography-root MuiTypography-h6 css-2ulfj5-MuiTypography-root"
+      >
+        <code>
+          target-type
+        </code>
+      </h6>
+      <h6
+        className="MuiTypography-root MuiTypography-subtitle2 css-ati914-MuiTypography-root"
+      >
+        Describes the \`target-type\` target.
+      </h6>
+      <hr
+        className="MuiDivider-root MuiDivider-fullWidth css-9mgopn-MuiDivider-root"
+      />
+      <p>
+        More help text.
+      </p>
+    </div>
+  </div>,
+  <div
+    className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation1 MuiCard-root css-11wej7y-MuiPaper-root-MuiCard-root"
+  >
+    <div
+      className="MuiCardContent-root css-46bh2p-MuiCardContent-root"
+    >
+      <h6
+        className="MuiTypography-root MuiTypography-h6 css-2ulfj5-MuiTypography-root"
+      >
+        <code>
+          field_a
+        </code>
+         *
+      </h6>
+      <h6
+        className="MuiTypography-root MuiTypography-subtitle2 css-ati914-MuiTypography-root"
+      >
+        test
+      </h6>
+      <hr
+        className="MuiDivider-root MuiDivider-fullWidth css-9mgopn-MuiDivider-root"
+      />
+      <p>
+        Info for 
+        <code>
+          field_a
+        </code>
+        .
+      </p>
+    </div>
+  </div>,
+  <div
+    className="MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation1 MuiCard-root css-11wej7y-MuiPaper-root-MuiCard-root"
+  >
+    <div
+      className="MuiCardContent-root css-46bh2p-MuiCardContent-root"
+    >
+      <h6
+        className="MuiTypography-root MuiTypography-h6 css-2ulfj5-MuiTypography-root"
+      >
+        <code>
+          field_b
+        </code>
+      </h6>
+      <h6
+        className="MuiTypography-root MuiTypography-subtitle2 css-ati914-MuiTypography-root"
+      >
+        plugged
+      </h6>
+      <hr
+        className="MuiDivider-root MuiDivider-fullWidth css-9mgopn-MuiDivider-root"
+      />
+      <p>
+        Info for 
+        <code>
+          field_b
+        </code>
+        .
+      </p>
+    </div>
+  </div>,
+]
+`;
