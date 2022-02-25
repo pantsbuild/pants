@@ -1991,14 +1991,22 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     alias = "dependencies"
     help = (
-        "Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib']."
-        "\n\nAlternatively, you may include file names. Pants will find which target owns that "
-        "file, and create a new target from that which only includes the file in its `sources` "
-        "field. For files relative to the current BUILD file, prefix with `./`; otherwise, put the "
-        "full path, e.g. ['./sibling.txt', 'resources/demo.json'].\n\nYou may exclude dependencies "
-        "by prefixing with `!`, e.g. `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are "
-        "intended for false positives with dependency inference; otherwise, simply leave off the "
-        "dependency from the BUILD file."
+        "Addresses to other targets that this target depends on, e.g. "
+        "['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].\n\n"
+        "This augments any dependencies inferred by Pants, such as by analyzing your imports. Use "
+        f"`{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final "
+        "result.\n\n"
+        f"See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for "
+        "more about how addresses are formed, including for generated targets. You can also run "
+        f"`{bin_name()} list ::` to find all addresses in your project, or "
+        f"`{bin_name()} list dir:` to find all addresses defined in that directory.\n\n"
+        "If the target is in the same BUILD file, you can leave off the BUILD file path, e.g. "
+        "`:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use "
+        "`./` for the file path, e.g. `./main.py:tgt`; for all other generated targets, "
+        "use `:tgt#generated_name`.\n\n"
+        "You may exclude dependencies by prefixing with `!`, e.g. "
+        "`['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives "
+        "with dependency inference; otherwise, simply leave off the dependency from the BUILD file."
     )
     supports_transitive_excludes = False
 
