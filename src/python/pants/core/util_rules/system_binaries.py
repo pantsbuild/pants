@@ -10,11 +10,17 @@ from textwrap import dedent
 from typing import Sequence
 
 from pants.engine import process
-from pants.engine.internals.selectors import Get
-from pants.engine.process import BinaryPath, BinaryPathRequest, BinaryPaths, BinaryPathTest
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+)
 from pants.engine.rules import collect_rules, rule
 from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBinary
+from pants.python.binaries import PythonBootstrap
 from pants.util.logging import LogLevel
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
@@ -23,6 +29,16 @@ SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
 # -------------------------------------------------------------------------------------------
 # Binaries
 # -------------------------------------------------------------------------------------------
+
+
+class PythonBinary(BinaryPath):
+    """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
+
+    Python is usable for `@rule` scripting independently of `pants.backend.python`, but currently
+    thirdparty dependencies are not supported, because PEX lives in that backend.
+
+    TODO: Consider extracting PEX out into the core in order to support thirdparty dependencies.
+    """
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -91,6 +107,73 @@ class TarBinary(BinaryPath):
 # -------------------------------------------------------------------------------------------
 # Rules to find binaries
 # -------------------------------------------------------------------------------------------
+
+
+@rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
+async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
+    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
+    # for maximum compatibility with internal scripts.
+    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
+    all_python_binary_paths = await MultiGet(
+        Get(
+            BinaryPaths,
+            BinaryPathRequest(
+                search_path=interpreter_search_paths,
+                binary_name=binary_name,
+                check_file_entries=True,
+                test=BinaryPathTest(
+                    args=[
+                        "-c",
+                        # N.B.: The following code snippet must be compatible with Python 3.6+.
+                        #
+                        # We hash the underlying Python interpreter executable to ensure we detect
+                        # changes in the real interpreter that might otherwise be masked by Pyenv
+                        # shim scripts found on the search path. Naively, just printing out the full
+                        # version_info would be enough, but that does not account for supported abi
+                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
+                        # interpreter.)
+                        #
+                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
+                        # (writes) since it's a common OS buffer size and an even multiple of the
+                        # hash block size.
+                        dedent(
+                            """\
+                            import sys
+
+                            major, minor = sys.version_info[:2]
+                            if not (major == 3 and minor >= 6):
+                                sys.exit(1)
+
+                            import hashlib
+                            hasher = hashlib.sha256()
+                            with open(sys.executable, "rb") as fp:
+                                for chunk in iter(lambda: fp.read(8192), b""):
+                                    hasher.update(chunk)
+                            sys.stdout.write(hasher.hexdigest())
+                            """
+                        ),
+                    ],
+                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
+                ),
+            ),
+        )
+        for binary_name in python_bootstrap.interpreter_names
+    )
+
+    for binary_paths in all_python_binary_paths:
+        path = binary_paths.first_path
+        if path:
+            return PythonBinary(
+                path=path.path,
+                fingerprint=path.fingerprint,
+            )
+
+    raise BinaryNotFoundError(
+        "Was not able to locate a Python interpreter to execute rule code.\n"
+        "Please ensure that Python is available in one of the locations identified by "
+        "`[python-bootstrap] search_path`, which currently expands to:\n"
+        f"  {interpreter_search_paths}"
+    )
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)

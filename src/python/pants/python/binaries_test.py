@@ -2,21 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import sys
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Iterable, List, Sequence, TypeVar
 
-import pytest
-
 from pants.base.build_environment import get_pants_cachedir
 from pants.engine.environment import Environment
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, rule
-from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBinary, PythonBootstrap, get_asdf_data_dir, get_pyenv_root
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.python.binaries import PythonBootstrap, get_asdf_data_dir, get_pyenv_root
+from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
 
@@ -114,36 +107,6 @@ def test_get_pex_python_paths() -> None:
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
-@dataclass(frozen=True)
-class PythonBinaryVersion:
-    version: str
-
-
-@rule
-async def python_binary_version(python_binary: PythonBinary) -> PythonBinaryVersion:
-    process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=(python_binary.path, "--version"),
-            description=r"Running `{python_binary.path} --version`",
-        ),
-    )
-    return PythonBinaryVersion(process_result.stdout.decode())
-
-
-@pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[*python_binaries.rules(), python_binary_version, QueryRule(PythonBinaryVersion, [])]
-    )
-
-
-def test_python_binary(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options((), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    python_binary_version = rule_runner.request(PythonBinaryVersion, [])
-    assert python_binary_version.version.startswith("Python 3.")
-
-
 def test_get_pyenv_root() -> None:
     home = "/♡"
     default_root = f"{home}/.pyenv"
@@ -154,10 +117,10 @@ def test_get_pyenv_root() -> None:
     assert get_pyenv_root(Environment({})) is None
 
 
-def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
+def test_get_pyenv_paths() -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
-    rule_runner.write_files({".python-version": f"{local_pyenv_version}\n"})
+    RuleRunner().write_files({".python-version": f"{local_pyenv_version}\n"})
     with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
         pyenv_root,
         expected_paths,
@@ -181,7 +144,7 @@ def test_get_asdf_dir() -> None:
     assert get_asdf_data_dir(Environment({})) is None
 
 
-def test_get_asdf_paths(rule_runner: RuleRunner) -> None:
+def test_get_asdf_paths() -> None:
     # 3.9.4 is intentionally "left out" so that it's only found if the "all installs" fallback is
     # used
     all_python_versions = ["2.7.14", "3.5.5", "3.7.10", "3.9.4", "3.9.5"]
@@ -190,7 +153,7 @@ def test_get_asdf_paths(rule_runner: RuleRunner) -> None:
     asdf_local_versions_str = " ".join(
         materialize_indices(all_python_versions, asdf_local_versions)
     )
-    rule_runner.write_files(
+    RuleRunner().write_files(
         {
             ".tool-versions": (
                 "nodejs 16.0.1\n"
@@ -225,7 +188,7 @@ def test_get_asdf_paths(rule_runner: RuleRunner) -> None:
         assert expected_asdf_local_paths == local_paths
 
 
-def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
+def test_expand_interpreter_search_paths() -> None:
     local_pyenv_version = "3.5.5"
     all_python_versions = ["2.7.14", local_pyenv_version, "3.7.10", "3.9.4", "3.9.5"]
     asdf_home_versions = [0, 1, 2]
@@ -233,7 +196,7 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     asdf_local_versions_str = " ".join(
         materialize_indices(all_python_versions, asdf_local_versions)
     )
-    rule_runner.write_files(
+    RuleRunner().write_files(
         {
             ".python-version": f"{local_pyenv_version}\n",
             ".tool-versions": (
@@ -296,18 +259,3 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
         "/qux",
     ]
     assert expected == expanded_paths
-
-
-def test_interpreter_search_path_file_entries() -> None:
-    rule_runner = RuleRunner(
-        rules=[*python_binaries.rules(), QueryRule(PythonBinary, input_types=())]
-    )
-    current_python = os.path.realpath(sys.executable)
-    rule_runner.set_options(
-        args=[
-            f"--python-bootstrap-search-path=[{current_python!r}]",
-            f"--python-bootstrap-names=[{os.path.basename(current_python)!r}]",
-        ]
-    )
-    python_binary = rule_runner.request(PythonBinary, inputs=())
-    assert current_python == python_binary.path
