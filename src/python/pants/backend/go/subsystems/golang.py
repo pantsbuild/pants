@@ -18,7 +18,7 @@ from pants.engine.process import (
     ProcessResult,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -59,6 +59,15 @@ class GolangSubsystem(Subsystem):
             "Environment variables to set when invoking the `go` tool. "
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
             "or just `ENV_VAR` to copy the value from Pants's own environment."
+        ),
+    ).advanced()
+
+    cgo_enabled = BoolOption(
+        "--experimental-cgo",
+        default=False,
+        help=(
+            "Enable cgo. This option is for testing purposes only to allow Pants developers to enable cgo support. "
+            "Pants does not currently have full cgo support."
         ),
     ).advanced()
 

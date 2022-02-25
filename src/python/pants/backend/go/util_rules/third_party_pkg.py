@@ -11,6 +11,7 @@ from typing import Any
 
 import ijson
 
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
@@ -253,6 +254,7 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
     analyzer: PackageAnalyzerSetup,
+    golang_subsystem: GolangSubsystem,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -319,6 +321,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
+            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
         ),
     )
 
