@@ -728,16 +728,11 @@ func matchFile(ctxt *build.Context, dir, name string, allTags map[string]bool, b
 }
 
 var (
-	slashSlash = []byte("//")
-	slashStar  = []byte("/*")
-	starSlash  = []byte("*/")
-	newline    = []byte("\n")
-)
-var (
-	bSlashSlash = []byte(slashSlash)
-	bStarSlash  = []byte(starSlash)
-	bSlashStar  = []byte(slashStar)
+	bSlashSlash = []byte("//")
+	bStarSlash  = []byte("/*")
+	bSlashStar  = []byte("*/")
 	bPlusBuild  = []byte("+build")
+	newline     = []byte("\n")
 
 	goBuildComment = []byte("//go:build")
 
@@ -851,7 +846,7 @@ Lines:
 			end = len(content) - len(p)
 			continue Lines
 		}
-		if !bytes.HasPrefix(line, slashSlash) { // Not comment line
+		if !bytes.HasPrefix(line, bSlashSlash) { // Not comment line
 			ended = true
 		}
 
@@ -867,9 +862,9 @@ Lines:
 	Comments:
 		for len(line) > 0 {
 			if inSlashStar {
-				if i := bytes.Index(line, starSlash); i >= 0 {
+				if i := bytes.Index(line, bStarSlash); i >= 0 {
 					inSlashStar = false
-					line = bytes.TrimSpace(line[i+len(starSlash):])
+					line = bytes.TrimSpace(line[i+len(bStarSlash):])
 					continue Comments
 				}
 				continue Lines
