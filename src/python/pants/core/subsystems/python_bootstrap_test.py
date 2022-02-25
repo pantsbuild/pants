@@ -7,8 +7,12 @@ from pathlib import Path, PurePath
 from typing import Iterable, List, Sequence, TypeVar
 
 from pants.base.build_environment import get_pants_cachedir
+from pants.core.subsystems.python_bootstrap import (
+    PythonBootstrap,
+    get_asdf_data_dir,
+    get_pyenv_root,
+)
 from pants.engine.environment import Environment
-from pants.python.binaries import PythonBootstrap, get_asdf_data_dir, get_pyenv_root
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
