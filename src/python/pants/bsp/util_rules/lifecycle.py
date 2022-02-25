@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec import (
+from pants.bsp.spec.lifecycle import (
     BuildServerCapabilities,
     CompileProvider,
     DebugProvider,

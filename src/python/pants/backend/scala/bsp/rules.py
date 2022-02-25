@@ -14,7 +14,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.spec.base import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import AddressInput

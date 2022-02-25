@@ -5,21 +5,14 @@ import time
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec import (
-    CompileParams,
-    CompileReport,
-    CompileResult,
-    CompileTask,
-    StatusCode,
-    TaskFinishParams,
-    TaskId,
-    TaskStartParams,
-)
+from pants.bsp.spec.base import StatusCode, TaskId
+from pants.bsp.spec.compile import CompileParams, CompileReport, CompileResult, CompileTask
 
 # -----------------------------------------------------------------------------------------------
 # Compile Request
 # See https://build-server-protocol.github.io/docs/specification.html#compile-request
 # -----------------------------------------------------------------------------------------------
+from pants.bsp.spec.task import TaskFinishParams, TaskStartParams
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 

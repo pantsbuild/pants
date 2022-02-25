@@ -15,7 +15,7 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
 from pants.bsp.context import BSPContext
-from pants.bsp.spec import BSPNotification
+from pants.bsp.spec.task import BSPNotification
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.unions import UnionMembership, union
 
