@@ -16,9 +16,9 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.util_rules import archive
-from pants.core.util_rules.archive import UnzipBinary
+from pants.core.util_rules import system_binaries
 from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import BashBinary, Process, ProcessResult
@@ -213,5 +213,5 @@ def rules():
     return (
         *collect_rules(),
         *pex_rules(),
-        *archive.rules(),
+        *system_binaries.rules(),
     )

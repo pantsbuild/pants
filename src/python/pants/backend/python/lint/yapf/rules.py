@@ -67,16 +67,7 @@ def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tu
 
 @rule(level=LogLevel.DEBUG)
 async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
-    yapf_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="yapf.pex",
-            internal_only=True,
-            requirements=yapf.pex_requirements(),
-            interpreter_constraints=yapf.interpreter_constraints,
-            main=yapf.main,
-        ),
-    )
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),

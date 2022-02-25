@@ -13,7 +13,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
+from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -98,14 +98,9 @@ async def generate_python_from_protobuf(
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
-    mypy_request = PexRequest(
-        output_filename="mypy_protobuf.pex",
-        internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements(),
-        interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
-    )
 
     if python_protobuf_subsystem.mypy_plugin:
+        mypy_request = python_protobuf_mypy_plugin.to_pex_request()
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),

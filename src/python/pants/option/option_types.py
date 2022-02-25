@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from pants.option.subsystem import Subsystem
 
 _PropType = TypeVar("_PropType")
+_DefaultType = TypeVar("_DefaultType")
 _EnumT = TypeVar("_EnumT", bound=Enum)
 _ValueT = TypeVar("_ValueT")
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
@@ -31,7 +32,7 @@ class OptionsInfo:
     flag_options: dict[str, Any]
 
 
-class _OptionBase(Generic[_PropType]):
+class _OptionBase(Generic[_PropType, _DefaultType]):
     """Descriptor for subsystem options.
 
     Clients shouldn't use this class directly, instead use one of the concrete classes below.
@@ -39,32 +40,18 @@ class _OptionBase(Generic[_PropType]):
     This class serves two purposes:
         - Collect registration values for your option.
         - Provide a typed property for Python usage
-
-    In order to define the `type` registration option, `self.option_type` must return a valid
-    registration type. This can either be set using a class variable or by passing it into
-    `__new__`.
-
-    NOTE: Due to https://github.com/python/mypy/issues/5146 subclasses unfortunately need to provide
-    overloaded `__new__` methods, as subclasses do not inherit overloaded function's annotations.
-    Use one of the existing subclasses as a guide on how to do this.
     """
 
     _flag_names: tuple[str, ...]
-    _default: Any
+    _default: _DefaultType
     _help: _HelpT
     _extra_kwargs: dict[str, Any]
 
-    # NB: Due to https://github.com/python/mypy/issues/5146, we try to keep the parameter list as
-    # short as possible to avoid having to repeat the param in each of the 3 `__new__` specs that
-    # each subclass must provide.
-    # If you need additional information, this class follows the "Builder" pattern. Use the
-    # "builder" methods to attach additional information. (E.g. see `advanced` method)
-    # NB: We define `__new__` rather than `__init__` because otherwise subclasses would have to
-    # define 3 `__new__`s AND `__init__`.
+    # NB: We define `__new__` rather than `__init__` because some subclasses need to define __new__.
     def __new__(
         cls,
         *flag_names: str,
-        default: Any,
+        default: _DefaultType,
         help: _HelpT,
     ):
         self = super().__new__(cls)
@@ -91,7 +78,7 @@ class _OptionBase(Generic[_PropType]):
         ...
 
     @overload
-    def __get__(self, obj: object, objtype: Any) -> _PropType:
+    def __get__(self, obj: object, objtype: Any) -> _PropType | _DefaultType:
         ...
 
     def __get__(self, obj, objtype):
@@ -107,41 +94,48 @@ class _OptionBase(Generic[_PropType]):
     def _convert_(self, val: Any) -> _PropType:
         return cast("_PropType", val)
 
-    def advanced(self) -> _OptionBase[_PropType]:
+    def advanced(self) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["advanced"] = True
         return self
 
-    def from_file(self) -> _OptionBase[_PropType]:
+    def from_file(self) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["fromfile"] = True
         return self
 
-    def metavar(self, metavar: str) -> _OptionBase[_PropType]:
+    def metavar(self, metavar: str) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["metavar"] = metavar
         return self
 
-    def mutually_exclusive_group(self, mutually_exclusive_group: str) -> _OptionBase[_PropType]:
+    def mutually_exclusive_group(
+        self, mutually_exclusive_group: str
+    ) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["mutually_exclusive_group"] = mutually_exclusive_group
         return self
 
-    def default_help_repr(self, default_help_repr: str) -> _OptionBase[_PropType]:
+    def default_help_repr(self, default_help_repr: str) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["default_help_repr"] = default_help_repr
         return self
 
-    def deprecated(self, *, removal_version: str, hint: str) -> _OptionBase[_PropType]:
+    def deprecated(
+        self, *, removal_version: str, hint: str
+    ) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["removal_version"] = removal_version
         self._extra_kwargs["removal_hint"] = hint
         return self
 
-    def daemoned(self) -> _OptionBase[_PropType]:
+    def daemoned(self) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["daemon"] = True
         return self
 
-    def non_fingerprinted(self) -> _OptionBase[_PropType]:
+    def non_fingerprinted(self) -> _OptionBase[_PropType, _DefaultType]:
         self._extra_kwargs["fingerprint"] = False
         return self
 
 
-class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListMemberType]):
+class _ListOptionBase(
+    _OptionBase["tuple[_ListMemberType, ...]", "tuple[_ListMemberType, ...]"],
+    Generic[_ListMemberType],
+):
     """A homogenous list of options of some type.
 
     Don't use this class directly, instead use one of the conrete classes below.
@@ -159,15 +153,14 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
     def __new__(
         cls,
         *flag_names: str,
-        member_type: _ListMemberType | None = None,
-        default: list[_ListMemberType] | None = None,
+        default: list[_ListMemberType] = [],
         help: _HelpT,
     ):
         default = default or []
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
             *flag_names,
-            default=default,
+            default=default,  # type: ignore[arg-type]
             help=help,
         )
         return instance
@@ -189,60 +182,31 @@ class _ListOptionBase(_OptionBase["tuple[_ListMemberType, ...]"], Generic[_ListM
 # -----------------------------------------------------------------------------------------------
 # Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
+_StrDefault = TypeVar("_StrDefault", str, None)
+_IntDefault = TypeVar("_IntDefault", int, None)
+_FloatDefault = TypeVar("_FloatDefault", float, None)
+_BoolDefault = TypeVar("_BoolDefault", bool, None)
 
 
-class StrOption(_OptionBase[_PropType]):
+class StrOption(_OptionBase[str, _StrDefault]):
     """A string option."""
 
     option_type: Any = str
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> StrOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> StrOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class IntOption(_OptionBase[_PropType]):
+class IntOption(_OptionBase[int, _IntDefault]):
     """An int option."""
 
     option_type: Any = int
 
-    @overload
-    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> IntOption[int]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> IntOption[int | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class FloatOption(_OptionBase[_PropType]):
+class FloatOption(_OptionBase[float, _FloatDefault]):
     """A float option."""
 
     option_type: Any = float
 
-    @overload
-    def __new__(cls, *flag_names: str, default: float, help: _HelpT) -> FloatOption[float]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> FloatOption[float | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class BoolOption(_OptionBase[_PropType]):
+class BoolOption(_OptionBase[bool, _BoolDefault]):
     """A bool option.
 
     If you don't provide a `default` value, this becomes a "tri-bool" where the property will return
@@ -251,19 +215,8 @@ class BoolOption(_OptionBase[_PropType]):
 
     option_type: Any = bool
 
-    @overload
-    def __new__(cls, *flag_names: str, default: bool, help: _HelpT) -> BoolOption[bool]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> BoolOption[bool | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
+class EnumOption(_OptionBase[_PropType, _DefaultType]):
     """An Enum option.
 
     If you provide a `default` parameter, the `enum_type` parameter will be inferred from the type
@@ -277,21 +230,21 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
     """
 
     @overload
-    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT]:
+    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT, _EnumT]:
         ...
 
-    # N.B. This has an additional param for the no-default-provided case: `enum_type`.
+    # N.B. This has an additional param for the default-is-None case: `enum_type`.
     @overload
     def __new__(
-        cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
-    ) -> EnumOption[_EnumT | None]:
+        cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
+    ) -> EnumOption[_EnumT, None]:
         ...
 
     def __new__(
         cls,
         *flag_names,
         enum_type=None,
-        default=None,
+        default,
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)
@@ -310,7 +263,7 @@ class EnumOption(_OptionBase[_PropType], Generic[_PropType]):
         return enum_type
 
 
-class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
+class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generic[_ValueT]):
     """A dictionary option mapping strings to client-provided `_ValueT`.
 
     If you provide a `default` parameter, the `_ValueT` type parameter will be inferred from the
@@ -338,7 +291,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             *flag_names,
-            default=default or {},
+            default=default or {},  # type: ignore[arg-type]
             help=help,
         )
 
@@ -346,106 +299,40 @@ class DictOption(_OptionBase["dict[str, _ValueT]"], Generic[_ValueT]):
         return cast("dict[str, _ValueT]", val)
 
 
-class TargetOption(_OptionBase[_PropType]):
+class TargetOption(_OptionBase[str, _StrDefault]):
     """A Pants Target option."""
 
     option_type: Any = custom_types.target_option
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> TargetOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> TargetOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class DirOption(_OptionBase[_PropType]):
+class DirOption(_OptionBase[str, _StrDefault]):
     """A directory option."""
 
     option_type: Any = custom_types.dir_option
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> DirOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> DirOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class FileOption(_OptionBase[_PropType]):
+class FileOption(_OptionBase[str, _StrDefault]):
     """A file option."""
 
     option_type: Any = custom_types.file_option
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> FileOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> FileOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class ShellStrOption(_OptionBase[_PropType]):
+class ShellStrOption(_OptionBase[str, _StrDefault]):
     """A shell string option."""
 
     option_type: Any = custom_types.shell_str
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> ShellStrOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> ShellStrOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class WorkspacePathOption(_OptionBase[_PropType]):
+class WorkspacePathOption(_OptionBase[str, _StrDefault]):
     """A workspace path option."""
 
     option_type: Any = custom_types.workspace_path
 
-    @overload
-    def __new__(cls, *flag_names: str, default: str, help: _HelpT) -> WorkspacePathOption[str]:
-        ...
 
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> WorkspacePathOption[str | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
-
-
-class MemorySizeOption(_OptionBase[_PropType]):
+class MemorySizeOption(_OptionBase[int, _IntDefault]):
     """A memory size option."""
 
     option_type: Any = custom_types.memory_size
-
-    @overload
-    def __new__(cls, *flag_names: str, default: int, help: _HelpT) -> MemorySizeOption[int]:
-        ...
-
-    @overload
-    def __new__(cls, *flag_names: str, help: _HelpT) -> MemorySizeOption[int | None]:
-        ...
-
-    def __new__(cls, *flag_names, default=None, help):
-        return super().__new__(cls, *flag_names, default=default, help=help)
 
 
 class StrListOption(_ListOptionBase[str]):
@@ -505,7 +392,7 @@ class EnumListOption(_ListOptionBase[_PropType], Generic[_PropType]):
         cls,
         *flag_names,
         enum_type=None,
-        default=None,
+        default=[],
         help,
     ):
         instance = super().__new__(cls, *flag_names, default=default, help=help)

@@ -14,7 +14,7 @@ from pants.backend.scala.dependency_inference import rules as scala_dep_inferenc
 from pants.backend.scala.dependency_inference import scala_parser
 from pants.backend.scala.dependency_inference import symbol_mapper as scala_symbol_mapper
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, DependenciesRequest
@@ -40,6 +40,7 @@ def rule_runner() -> RuleRunner:
             *scala_symbol_mapper.rules(),
             *scala_dep_inference_rules.rules(),
             *scala_target_types.rules(),
+            *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, (DependenciesRequest,)),
         ],

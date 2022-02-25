@@ -58,16 +58,7 @@ def generate_args(
 @rule(level=LogLevel.DEBUG)
 async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
 
-    docformatter_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="docformatter.pex",
-            internal_only=True,
-            requirements=docformatter.pex_requirements(),
-            interpreter_constraints=docformatter.interpreter_constraints,
-            main=docformatter.main,
-        ),
-    )
+    docformatter_pex_get = Get(VenvPex, PexRequest, docformatter.to_pex_request())
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),

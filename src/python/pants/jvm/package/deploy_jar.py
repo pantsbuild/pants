@@ -14,7 +14,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.core.util_rules.archive import ZipBinary
+from pants.core.util_rules.system_binaries import ZipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import BashBinary, Process, ProcessResult

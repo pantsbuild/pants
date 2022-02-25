@@ -14,6 +14,7 @@ from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules import system_binaries
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -38,7 +39,6 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.python import binaries as python_binaries
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 
@@ -258,7 +258,7 @@ class EngineInitializer:
                 *graph.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *python_binaries.rules(),
+                *system_binaries.rules(),
                 *platform.rules(),
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
@@ -285,7 +285,7 @@ class EngineInitializer:
                     for goal_type in goal_map.values()
                 ),
                 # Install queries for each request/response pair used by the BSP support.
-                # Note: These are necessary because the BSP support is a built-in goal and that makes
+                # Note: These are necessary because the BSP support is a built-in goal that makes
                 # synchronous requests into the engine.
                 *(
                     QueryRule(impl.response_type, (impl.request_type,))

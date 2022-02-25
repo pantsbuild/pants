@@ -6,12 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.bsp.spec import BuildTargetIdentifier, Uri
-
-
-@dataclass(frozen=True)
-class JvmBuildTarget:
-    pass
-
+from pants.jvm.bsp.spec import JvmBuildTarget
 
 # -----------------------------------------------------------------------------------------------
 # Scala-specific Build Target
@@ -55,18 +50,22 @@ class ScalaBuildTarget:
             scala_binary_version=d["scalaBinaryVersion"],
             platform=d["platform"],
             jars=tuple(d.get("jars", [])),
-            jvm_build_target=JvmBuildTarget(),  # TODO: deserialize this
+            jvm_build_target=JvmBuildTarget.from_json_dict(d["jvmBuildTarget"])
+            if "jvmBuildTarget" in d
+            else None,
         )
 
     def to_json_dict(self):
-        return {
+        result = {
             "scalaOrganization": self.scala_organization,
             "scalaVersion": self.scala_version,
             "scalaBinaryVersion": self.scala_binary_version,
             "platform": self.platform,
             "jars": list(self.jars),
-            "jvmBuildTarget": None,  # TODO: serialize this
         }
+        if self.jvm_build_target is not None:
+            result["jvmBuildTarget"] = self.jvm_build_target.to_json_dict()
+        return result
 
 
 # -----------------------------------------------------------------------------------------------

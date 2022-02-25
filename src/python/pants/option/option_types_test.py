@@ -79,7 +79,10 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
             self.options.dyn_opt = option_value
 
         prop = option_type("--opt", default=default, help="")
-        prop_no_default = option_type("--opt-no-default", help="")
+        if expected_register_kwargs["type"] is list:
+            prop_no_default = option_type("--opt-no-default", help="")
+        else:
+            prop_no_default = option_type("--opt-no-default", default=None, help="")
         dyn_prop = option_type("--dyn-opt", default=default, help=lambda cls: cls.dyn_help)
 
     class MySubsystem(MyBaseSubsystem):
@@ -114,7 +117,9 @@ def test_other_options():
 
         dict_prop = DictOption[Any]("--dict-opt", help="")
         enum_prop = EnumOption("--enum-opt", default=MyEnum.Val1, help="")
-        optional_enum_prop = EnumOption("--optional-enum-opt", enum_type=MyEnum, help="")
+        optional_enum_prop = EnumOption(
+            "--optional-enum-opt", enum_type=MyEnum, default=None, help=""
+        )
         enum_list_prop = EnumListOption("--enum-list-opt", default=[MyEnum.Val1], help="")
         defaultless_enum_list_prop = EnumListOption(
             "--defaultless-enum-list-opt", enum_type=MyEnum, help=""
@@ -173,12 +178,12 @@ def test_builder_methods():
 def test_subsystem_option_ordering() -> None:
     class MySubsystemBase(Subsystem):
         # Make sure these are out of alphabetical order
-        z_prop = StrOption("--z", help="")
-        y_prop = StrOption("--y", help="")
+        z_prop = StrOption("--z", default=None, help="")
+        y_prop = StrOption("--y", default=None, help="")
 
     class MySubsystem(MySubsystemBase):
-        b_prop = StrOption("--b", help="")
-        a_prop = StrOption("--a", help="")
+        b_prop = StrOption("--b", default=None, help="")
+        a_prop = StrOption("--a", default=None, help="")
 
     register = Mock()
     MySubsystem.register_options(register)
@@ -198,23 +203,23 @@ def test_property_types() -> None:
             pass
 
         str_opt = StrOption("--opt", default="", help="")
-        optional_str_opt = StrOption("--opt", help="")
+        optional_str_opt = StrOption("--opt", default=None, help="")
         int_opt = IntOption("--opt", default=0, help="")
-        optional_int_opt = IntOption("--opt", help="")
+        optional_int_opt = IntOption("--opt", default=None, help="")
         float_opt = FloatOption("--opt", default=1.0, help="")
-        optional_float_opt = FloatOption("--opt", help="")
+        optional_float_opt = FloatOption("--opt", default=None, help="")
         bool_opt = BoolOption("--opt", default=True, help="")
-        optional_bool_opt = BoolOption("--opt", help="")
+        optional_bool_opt = BoolOption("--opt", default=None, help="")
         target_opt = TargetOption("--opt", default="", help="")
-        optional_target_opt = TargetOption("--opt", help="")
+        optional_target_opt = TargetOption("--opt", default=None, help="")
         dir_opt = DirOption("--opt", default="", help="")
-        optional_dir_opt = DirOption("--opt", help="")
+        optional_dir_opt = DirOption("--opt", default=None, help="")
         file_opt = FileOption("--opt", default="", help="")
-        optional_file_opt = FileOption("--opt", help="")
+        optional_file_opt = FileOption("--opt", default=None, help="")
         shellstr_opt = ShellStrOption("--opt", default="", help="")
-        optional_shellstr_opt = ShellStrOption("--opt", help="")
+        optional_shellstr_opt = ShellStrOption("--opt", default=None, help="")
         memorysize_opt = MemorySizeOption("--opt", default=1, help="")
-        optional_memorysize_opt = MemorySizeOption("--opt", help="")
+        optional_memorysize_opt = MemorySizeOption("--opt", default=None, help="")
 
         # List opts
         str_list_opt = StrListOption("--opt", help="")
@@ -229,9 +234,9 @@ def test_property_types() -> None:
 
         # Enum opts
         enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
-        optional_enum_opt = EnumOption("--opt", enum_type=MyEnum, help="")
+        optional_enum_opt = EnumOption("--opt", enum_type=MyEnum, default=None, help="")
         # mypy correctly complains about not matching any possibilities
-        enum_opt_bad = EnumOption("--opt", help="")  # type: ignore[call-overload]
+        enum_opt_bad = EnumOption("--opt", default=None, help="")  # type: ignore[call-overload]
         enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
         enum_list_opt2 = EnumListOption("--opt", enum_type=MyEnum, help="")
         # mypy correctly complains about needing a type annotation

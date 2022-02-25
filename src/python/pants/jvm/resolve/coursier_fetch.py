@@ -49,7 +49,7 @@ from pants.jvm.resolve.common import (
     Coordinates,
     GatherJvmCoordinatesRequest,
 )
-from pants.jvm.resolve.coursier_setup import Coursier, CoursierWrapperProcess
+from pants.jvm.resolve.coursier_setup import Coursier, CoursierFetchProcess
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
@@ -365,7 +365,7 @@ async def coursier_resolve_lockfile(
 
     process_result = await Get(
         ProcessResult,
-        CoursierWrapperProcess(
+        CoursierFetchProcess(
             args=(
                 coursier_report_file_name,
                 *coursier_resolve_info.coord_arg_strings,
@@ -519,7 +519,7 @@ async def coursier_fetch_one_coord(
 
     process_result = await Get(
         ProcessResult,
-        CoursierWrapperProcess(
+        CoursierFetchProcess(
             args=(
                 coursier_report_file_name,
                 "--intransitive",

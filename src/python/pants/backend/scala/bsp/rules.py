@@ -12,9 +12,11 @@ from pants.backend.scala.bsp.spec import (
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.base.build_root import BuildRoot
+from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.rules import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.bsp.spec import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.types import BSPLanguageSupport
 from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
@@ -23,6 +25,13 @@ from pants.engine.target import Dependencies, DependenciesRequest, Target, Wrapp
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
+
+LANGUAGE_ID = "scala"
+
+
+class ScalaBSPLanguageSupport(BSPLanguageSupport):
+    language_id = LANGUAGE_ID
+    can_compile = True
 
 
 class ScalaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
@@ -50,8 +59,10 @@ async def bsp_resolve_one_scala_build_target(
         display_name=str(request.target.address),
         base_directory=None,
         tags=(),
-        capabilities=BuildTargetCapabilities(),
-        language_ids=("scala",),
+        capabilities=BuildTargetCapabilities(
+            can_compile=True,
+        ),
+        language_ids=(LANGUAGE_ID,),
         dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
         data_kind="scala",
         data=ScalaBuildTarget(
@@ -68,9 +79,10 @@ async def bsp_resolve_one_scala_build_target(
 async def bsp_resolve_all_scala_build_targets(
     _: ScalaBSPBuildTargetsRequest,
     all_scala_targets: AllScalaTargets,
-    jvm: JvmSubsystem,
-    scala: ScalaSubsystem,
+    bsp_context: BSPContext,
 ) -> BSPBuildTargets:
+    if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
+        return BSPBuildTargets()
     build_targets = await MultiGet(
         Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
     )
@@ -129,6 +141,7 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
 def rules():
     return (
         *collect_rules(),
+        UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsRequest, ScalaBSPBuildTargetsRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
     )
