@@ -1,6 +1,9 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -10,9 +13,24 @@ from pants.engine.target import (
     Target,
 )
 
-# TODO: This runs into https://github.com/pantsbuild/pants/issues/13587
-# class PyOxidizerEntryPointField(PexEntryPointField):
-#     pass
+
+class PyOxidizerOutputPathField(OutputPathField):
+    help = (
+        "Where the built directory tree should be located.\n\n"
+        "If undefined, this will use the path to the BUILD file, followed by the target name. "
+        "For example, `src/python/project:bin` would be "
+        "`src.python.project/bin/`.\n\n"
+        "Regardless of whether you use the default or set this field, the path will end with "
+        "PyOxidizer's file format of `<platform>/{debug,release}/install/<binary_name>`, where "
+        "`platform` is a Rust platform triplet like `aarch-64-apple-darwin` and `binary_name` is "
+        "the `name` of the `pyoxidizer_target`. So, using the default for this field, the target "
+        "`src/python/project:bin` might have a final path like "
+        "`src.python.project/bin/aarch-64-apple-darwin/release/bin`.\n\n"
+        "When running `./pants package`, this path will be prefixed by `--distdir` (e.g. "
+        "`dist/`).\n\n"
+        "Warning: setting this value risks naming collisions with other package targets you may "
+        "have."
+    )
 
 
 class PyOxidizerEntryPointField(StringField):
@@ -63,6 +81,7 @@ class PyOxidizerTarget(Target):
     alias = "pyoxidizer_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        PyOxidizerOutputPathField,
         PyOxidizerConfigSourceField,
         PyOxidizerDependenciesField,
         PyOxidizerEntryPointField,
