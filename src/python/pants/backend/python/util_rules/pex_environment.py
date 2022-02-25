@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Mapping
 
-from pants.core.util_rules import subprocess_environment
+from pants.core.subsystems.python_bootstrap import PythonBootstrap
+from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import PythonBinary
 from pants.engine import process
@@ -19,8 +20,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
-from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBootstrap
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -229,5 +228,5 @@ def rules():
         *collect_rules(),
         *process.rules(),
         *subprocess_environment.rules(),
-        *python_binaries.rules(),
+        *system_binaries.rules(),
     ]

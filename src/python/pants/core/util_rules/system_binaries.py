@@ -9,6 +9,8 @@ from enum import Enum
 from textwrap import dedent
 from typing import Sequence
 
+from pants.core.subsystems import python_bootstrap
+from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.engine import process
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import (
@@ -19,8 +21,6 @@ from pants.engine.process import (
     BinaryPathTest,
 )
 from pants.engine.rules import collect_rules, rule
-from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBootstrap
 from pants.util.logging import LogLevel
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
@@ -258,4 +258,4 @@ async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBin
 
 
 def rules():
-    return [*collect_rules(), *python_binaries.rules(), *process.rules()]
+    return [*collect_rules(), *python_bootstrap.rules(), *process.rules()]
