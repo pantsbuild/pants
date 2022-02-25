@@ -19,7 +19,7 @@ def test_end_to_end() -> None:
         "hellotest/utils/BUILD": dedent(
             """\
             python_sources(name="lib")
-    
+
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
@@ -80,7 +80,7 @@ def test_requires_wheels() -> None:
                 wheel=False,
                 provides=python_artifact(name="dist", version="0.0.1"),
             )
-            
+
             pyoxidizer_binary(name="bin", dependencies=[":dist"])
             """
         ),
