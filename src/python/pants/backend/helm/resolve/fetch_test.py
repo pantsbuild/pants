@@ -40,31 +40,6 @@ def rule_runner() -> RuleRunner:
     )
 
 
-# def test_invalid_registry_in_artifact(rule_runner: RuleRunner) -> None:
-#     rule_runner.write_files(
-#         {
-#             "3rdparty/helm/jetstack/BUILD": dedent(
-#                 """\
-#                 helm_artifact(
-#                   name='cert-manager',
-#                   registry='https://charts.jetstack.io',
-#                   artifact='cert-manager',
-#                   version='1.7.1'
-#                 )
-#                 """
-#             ),
-#         }
-#     )
-
-#     repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
-#     rule_runner.set_options([f"--helm-registries={repositories_opts}"])
-
-#     with pytest.raises(InvalidRegistryError) as invalid_reg:
-#       rule_runner.request(FetchedHelmArtifacts, [])
-
-#     assert invalid_reg.args
-
-
 def test_download_artifacts(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
