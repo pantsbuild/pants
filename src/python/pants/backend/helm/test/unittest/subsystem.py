@@ -26,7 +26,7 @@ class HelmUnitTestReportFormat(Enum):
 class HelmUnitTestPlugin(HelmPlugin):
     options_scope = "helm-unittest"
     plugin_name = "unittest"
-    help = "BDD styled unit test framework for Kubernetes Helm charts as a Helm plugin."
+    help = "Behavior-Driven Development styled unit test framework for Kubernetes Helm charts as a Helm plugin. (https://github.com/quintush/helm-unittest)"
 
     default_version = "0.2.8"
     default_known_versions = [
