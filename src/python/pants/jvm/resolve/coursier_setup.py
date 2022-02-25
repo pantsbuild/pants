@@ -39,6 +39,11 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     # times if the source is the same as well.
     classpath = dict()
     for dep in report['dependencies']:
+        if not dep.get('file'):
+            raise Exception(
+                f"No jar found for {dep['coord']}. Check that it's available in the "
+                "repositories configured in [coursier].repos in pants.toml."
+            )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
         _, ext = os.path.splitext(source)
