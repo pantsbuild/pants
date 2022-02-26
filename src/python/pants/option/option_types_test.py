@@ -177,21 +177,24 @@ def test_other_options() -> None:
     assert my_subsystem.args_prop == ("--arg1",)
 
 
-def test_builder_methods():
+def test_advanced_params():
     class MySubsystem(Subsystem):
         def __init__(self):
             self.options = SimpleNamespace()
 
-        prop = (
-            StrOption("--opt", default=None, help="")
-            .advanced()
-            .metavar("META")
-            .from_file()
-            .mutually_exclusive_group("group")
-            .default_help_repr("Help!")
-            .deprecated(removal_version="99.9.9", hint="it's purple")
-            .daemoned()
-            .non_fingerprinted()
+        prop = StrOption(
+            "--opt",
+            default=None,
+            help="",
+            advanced=True,
+            daemon=True,
+            default_help_repr="Help!",
+            fingerprint=False,
+            fromfile=True,
+            metavar="META",
+            mutually_exclusive_group="group",
+            removal_hint="it's purple",
+            removal_version="99.9.9",
         )
 
     flag_options = MySubsystem.prop.flag_options
