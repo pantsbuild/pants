@@ -44,7 +44,8 @@ class AnonymousTelemetry(Subsystem):
             f"asynchronously, with silent failure, and does not impact build times or "
             f"outcomes.\n{_telemetry_docs_referral}."
         ),
-    ).advanced()
+        advanced=True,
+    )
     repo_id = StrOption(
         "--repo-id",
         default=None,
@@ -55,7 +56,8 @@ class AnonymousTelemetry(Subsystem):
             f"config file, so anonymity of the repo is not guaranteed (although user anonymity "
             f"is always guaranteed).\n{_telemetry_docs_referral}."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 class AnonymousTelemetryCallback(WorkunitsCallback):

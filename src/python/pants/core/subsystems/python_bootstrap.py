@@ -33,46 +33,42 @@ class PythonBootstrapSubsystem(Subsystem):
         "`python` subsystem for that."
     )
 
-    search_path = (
-        StrListOption(
-            "--search-path",
-            default=["<PYENV>", "<PATH>"],
-            help=(
-                "A list of paths to search for Python interpreters.\n\n"
-                "Which interpeters are actually used from these paths is context-specific: "
-                "the Python backend selects interpreters using options on the `python` subsystem, "
-                "in particular, the `[python].interpreter_constraints` option.\n\n"
-                "You can specify absolute paths to interpreter binaries "
-                "and/or to directories containing interpreter binaries. The order of entries does "
-                "not matter.\n\n"
-                "The following special strings are supported:\n\n"
-                "* `<PATH>`, the contents of the PATH env var\n"
-                "* `<ASDF>`, all Python versions currently configured by ASDF "
-                "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
-                "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
-                "BUILD_ROOT/.tool-versions\n"
-                "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
-                "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
-                "BUILD_ROOT/.python-version\n"
-                "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    search_path = StrListOption(
+        "--search-path",
+        default=["<PYENV>", "<PATH>"],
+        help=(
+            "A list of paths to search for Python interpreters.\n\n"
+            "Which interpeters are actually used from these paths is context-specific: "
+            "the Python backend selects interpreters using options on the `python` subsystem, "
+            "in particular, the `[python].interpreter_constraints` option.\n\n"
+            "You can specify absolute paths to interpreter binaries "
+            "and/or to directories containing interpreter binaries. The order of entries does "
+            "not matter.\n\n"
+            "The following special strings are supported:\n\n"
+            "* `<PATH>`, the contents of the PATH env var\n"
+            "* `<ASDF>`, all Python versions currently configured by ASDF "
+            "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
+            "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
+            "BUILD_ROOT/.tool-versions\n"
+            "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
+            "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
+            "BUILD_ROOT/.python-version\n"
+            "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
-    names = (
-        StrListOption(
-            "--names",
-            default=["python", "python3"],
-            help=(
-                "The names of Python binaries to search for. See the `--search-path` option to "
-                "influence where interpreters are searched for.\n\n"
-                "This does not impact which Python interpreter is used to run your code, only what "
-                "is used to run internal tools."
-            ),
-        )
-        .advanced()
-        .metavar("<python-binary-names>")
+    names = StrListOption(
+        "--names",
+        default=["python", "python3"],
+        help=(
+            "The names of Python binaries to search for. See the `--search-path` option to "
+            "influence where interpreters are searched for.\n\n"
+            "This does not impact which Python interpreter is used to run your code, only what "
+            "is used to run internal tools."
+        ),
+        advanced=True,
+        metavar="<python-binary-names>",
     )
 
 

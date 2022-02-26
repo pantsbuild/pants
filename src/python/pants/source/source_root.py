@@ -106,32 +106,28 @@ class SourceRootConfig(Subsystem):
         "src/java",
     ]
 
-    root_patterns = (
-        StrListOption(
-            "--root-patterns",
-            default=DEFAULT_ROOT_PATTERNS,
-            help="A list of source root suffixes. A directory with this suffix will be considered "
-            "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
-            "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
-            "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
-            "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
-            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
-            "Use `/` to signify that the buildroot itself is a source root. "
-            f"See {doc_url('source-roots')}.",
-        )
-        .advanced()
-        .metavar('["pattern1", "pattern2", ...]')
+    root_patterns = StrListOption(
+        "--root-patterns",
+        default=DEFAULT_ROOT_PATTERNS,
+        help="A list of source root suffixes. A directory with this suffix will be considered "
+        "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
+        "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
+        "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
+        "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
+        "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+        "Use `/` to signify that the buildroot itself is a source root. "
+        f"See {doc_url('source-roots')}.",
+        advanced=True,
+        metavar='["pattern1", "pattern2", ...]',
     )
-    marker_filenames = (
-        StrListOption(
-            "--marker-filenames",
-            help="The presence of a file of this name in a directory indicates that the directory "
-            "is a source root. The content of the file doesn't matter, and may be empty. "
-            "Useful when you can't or don't wish to centrally enumerate source roots via "
-            "`root_patterns`.",
-        )
-        .advanced()
-        .metavar("filename")
+    marker_filenames = StrListOption(
+        "--marker-filenames",
+        help="The presence of a file of this name in a directory indicates that the directory "
+        "is a source root. The content of the file doesn't matter, and may be empty. "
+        "Useful when you can't or don't wish to centrally enumerate source roots via "
+        "`root_patterns`.",
+        advanced=True,
+        metavar="filename",
     )
 
     @memoized_method

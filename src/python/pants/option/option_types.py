@@ -62,12 +62,36 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         *flag_names: str,
         default: _DefaultT,
         help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
     ):
         self = super().__new__(cls)
         self._flag_names = flag_names
         self._default = default
         self._help = help
-        self._extra_kwargs = {}
+        self._extra_kwargs = {
+            k: v
+            for k, v in {
+                "advanced": advanced,
+                "daemon": daemon,
+                "default_help_repr": default_help_repr,
+                "fingerprint": fingerprint,
+                "fromfile": fromfile,
+                "metavar": metavar,
+                "mutually_exclusive_group": mutually_exclusive_group,
+                "removal_hint": removal_hint,
+                "removal_version": removal_version,
+            }.items()
+            if v is not None
+        }
         return self
 
     # Subclasses can override if necessary
@@ -103,41 +127,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             return None
         return self._convert_(option_value)
 
-    def advanced(self) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["advanced"] = True
-        return self
-
-    def from_file(self) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["fromfile"] = True
-        return self
-
-    def metavar(self, metavar: str) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["metavar"] = metavar
-        return self
-
-    def mutually_exclusive_group(
-        self, mutually_exclusive_group: str
-    ) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["mutually_exclusive_group"] = mutually_exclusive_group
-        return self
-
-    def default_help_repr(self, default_help_repr: str) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["default_help_repr"] = default_help_repr
-        return self
-
-    def deprecated(self, *, removal_version: str, hint: str) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["removal_version"] = removal_version
-        self._extra_kwargs["removal_hint"] = hint
-        return self
-
-    def daemoned(self) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["daemon"] = True
-        return self
-
-    def non_fingerprinted(self) -> _OptionBase[_OptT, _DefaultT]:
-        self._extra_kwargs["fingerprint"] = False
-        return self
-
 
 # The type of the list members.
 # NB: We don't provide constraints, as our `XListOption` types act like a set of contraints
@@ -163,6 +152,16 @@ class _ListOptionBase(
         *flag_names: str,
         default: list[_ListMemberT] = [],
         help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
     ):
         default = default or []
         instance = super().__new__(
@@ -170,6 +169,15 @@ class _ListOptionBase(
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            advanced=advanced,
+            daemon=daemon,
+            default_help_repr=default_help_repr,
+            fingerprint=fingerprint,
+            fromfile=fromfile,
+            metavar=metavar,
+            mutually_exclusive_group=mutually_exclusive_group,
+            removal_hint=removal_hint,
+            removal_version=removal_version,
         )
         return instance
 
@@ -349,8 +357,23 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         EnumOption(..., enum_type=MyEnum, default=None)
     """
 
-    @overload  # Case: static default
-    def __new__(cls, *flag_names: str, default: _EnumT, help: _HelpT) -> EnumOption[_EnumT, _EnumT]:
+    @overload
+    def __new__(
+        cls,
+        *flag_names: str,
+        default: _EnumT,
+        help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
+    ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
@@ -363,13 +386,37 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # mypy won't be able to have enough info to deduce the correct type.
         default: _DynamicDefaultT[Any],
         help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: default is `None`
     def __new__(
-        cls, *flag_names: str, enum_type: type[_EnumT], default: None, help: _HelpT
+        cls,
+        *flag_names: str,
+        enum_type: type[_EnumT],
+        default: None,
+        help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
     ) -> EnumOption[_EnumT, None]:
         ...
 
@@ -379,8 +426,32 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type=None,
         default,
         help,
+        # Additional bells/whistles
+        advanced=None,
+        daemon=None,
+        default_help_repr=None,
+        fingerprint=None,
+        fromfile=None,
+        metavar=None,
+        mutually_exclusive_group=None,
+        removal_hint=None,
+        removal_version=None,
     ):
-        instance = super().__new__(cls, *flag_names, default=default, help=help)
+        instance = super().__new__(
+            cls,
+            *flag_names,
+            default=default,
+            help=help,
+            advanced=advanced,
+            daemon=daemon,
+            default_help_repr=default_help_repr,
+            fingerprint=fingerprint,
+            fromfile=fromfile,
+            metavar=metavar,
+            mutually_exclusive_group=mutually_exclusive_group,
+            removal_hint=removal_hint,
+            removal_version=removal_version,
+        )
         instance._enum_type = enum_type
         return instance
 
@@ -415,7 +486,20 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
 
     @overload  # Case: static default
     def __new__(
-        cls, *flag_names: str, default: list[_EnumT], help: _HelpT
+        cls,
+        *flag_names: str,
+        default: list[_EnumT],
+        help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = ...,
+        daemon: bool | None = ...,
+        default_help_repr: str | None = ...,
+        fingerprint: bool | None = ...,
+        fromfile: bool | None = ...,
+        metavar: str | None = ...,
+        mutually_exclusive_group: str | None = ...,
+        removal_hint: str | None = ...,
+        removal_version: str | None = ...,
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -429,13 +513,36 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         # because mypy won't be able to have enough info to deduce the correct type.
         default: _DynamicDefaultT[Any],
         help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = ...,
+        daemon: bool | None = ...,
+        default_help_repr: str | None = ...,
+        fingerprint: bool | None = ...,
+        fromfile: bool | None = ...,
+        metavar: str | None = ...,
+        mutually_exclusive_group: str | None = ...,
+        removal_hint: str | None = ...,
+        removal_version: str | None = ...,
     ) -> EnumListOption[_EnumT]:
         ...
 
     # N.B. This has an additional param: `enum_type`.
     @overload  # Case: implicit default
     def __new__(
-        cls, *flag_names: str, enum_type: type[_EnumT], help: _HelpT
+        cls,
+        *flag_names: str,
+        enum_type: type[_EnumT],
+        help: _HelpT,
+        # Additional bells/whistles
+        advanced: bool | None = ...,
+        daemon: bool | None = ...,
+        default_help_repr: str | None = ...,
+        fingerprint: bool | None = ...,
+        fromfile: bool | None = ...,
+        metavar: str | None = ...,
+        mutually_exclusive_group: str | None = ...,
+        removal_hint: str | None = ...,
+        removal_version: str | None = ...,
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -445,8 +552,32 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type=None,
         default=[],
         help,
+        # Additional bells/whistles
+        advanced=None,
+        daemon=None,
+        default_help_repr=None,
+        fingerprint=None,
+        fromfile=None,
+        metavar=None,
+        mutually_exclusive_group=None,
+        removal_hint=None,
+        removal_version=None,
     ):
-        instance = super().__new__(cls, *flag_names, default=default, help=help)
+        instance = super().__new__(
+            cls,
+            *flag_names,
+            default=default,
+            help=help,
+            advanced=advanced,
+            daemon=daemon,
+            default_help_repr=default_help_repr,
+            fingerprint=fingerprint,
+            fromfile=fromfile,
+            metavar=metavar,
+            mutually_exclusive_group=mutually_exclusive_group,
+            removal_hint=removal_hint,
+            removal_version=removal_version,
+        )
         instance._enum_type = enum_type
         return instance
 
@@ -493,12 +624,35 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 
     option_type: Any = dict
 
-    def __new__(cls, *flag_names, default: dict[str, _ValueT] = {}, help):
+    def __new__(
+        cls,
+        *flag_names,
+        default: dict[str, _ValueT] = {},
+        help,
+        advanced: bool | None = None,
+        daemon: bool | None = None,
+        default_help_repr: str | None = None,
+        fingerprint: bool | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_hint: str | None = None,
+        removal_version: str | None = None,
+    ):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            advanced=advanced,
+            daemon=daemon,
+            default_help_repr=default_help_repr,
+            fingerprint=fingerprint,
+            fromfile=fromfile,
+            metavar=metavar,
+            mutually_exclusive_group=mutually_exclusive_group,
+            removal_hint=removal_hint,
+            removal_version=removal_version,
         )
 
     def _convert_(self, val: Any) -> dict[str, _ValueT]:

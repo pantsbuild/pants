@@ -597,7 +597,8 @@ class PexBinaryDefaults(Subsystem):
             "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
             "`pex_binary` targets"
         ),
-    ).advanced()
+        advanced=True,
+    )
     resolve_local_platforms = BoolOption(
         "--resolve-local-platforms",
         default=False,
@@ -609,7 +610,8 @@ class PexBinaryDefaults(Subsystem):
             "is found (or if this option is `False`), resolve for the platform by accepting "
             "only pre-built binary distributions (wheels)."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 # -----------------------------------------------------------------------------------------------

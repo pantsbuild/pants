@@ -60,7 +60,8 @@ class GolangSubsystem(Subsystem):
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
             "or just `ENV_VAR` to copy the value from Pants's own environment."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
