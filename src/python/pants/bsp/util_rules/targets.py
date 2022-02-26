@@ -6,9 +6,8 @@ from dataclasses import dataclass
 
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec import (
-    BuildTarget,
-    BuildTargetIdentifier,
+from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
+from pants.bsp.spec.targets import (
     SourceItem,
     SourceItemKind,
     SourcesItem,

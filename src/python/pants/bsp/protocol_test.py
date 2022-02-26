@@ -14,13 +14,12 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.rules import rules as bsp_rules
-from pants.bsp.spec import (
+from pants.bsp.spec.lifecycle import (
     BuildClientCapabilities,
     InitializeBuildParams,
     InitializeBuildResult,
-    WorkspaceBuildTargetsParams,
-    WorkspaceBuildTargetsResult,
 )
+from pants.bsp.spec.targets import WorkspaceBuildTargetsParams, WorkspaceBuildTargetsResult
 from pants.testutil.rule_runner import RuleRunner
 
 
