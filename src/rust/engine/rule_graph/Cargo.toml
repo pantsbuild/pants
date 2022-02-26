@@ -6,9 +6,11 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "9207e5776322fb9b0b738d57b026412ef5c904d4" }
+indexmap = "1.8"
 log = "0.4"
 petgraph = "0.5"
-indexmap = "1.8"
 
 [dev-dependencies]
 env_logger = "0.5.4"

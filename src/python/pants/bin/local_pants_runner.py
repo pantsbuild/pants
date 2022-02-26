@@ -7,7 +7,6 @@ import logging
 import sys
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -206,18 +205,25 @@ class LocalPantsRunner:
             return
 
         ids: set[int] = set()
+        count_by_type: Counter[type] = Counter()
         sizes_by_type: Counter[type] = Counter()
 
-        def report(item: Any) -> None:
+        items, rust_sizes = self.graph_session.scheduler_session.live_items()
+        for item in items:
+            count_by_type[type(item)] += 1
             sizes_by_type[type(item)] += deep_getsizeof(item, ids)
 
-        for keys, value in self.graph_session.scheduler_session.live_items():
-            for key in keys:
-                report(key)
-            report(value)
+        entries = [
+            (size, count_by_type[typ], f"{typ.__module__}.{typ.__qualname__}")
+            for typ, size in sizes_by_type.items()
+        ]
+        entries.extend(
+            (size, count, f"(native) {name}") for name, (count, size) in rust_sizes.items()
+        )
 
-        for typ, size in sorted(sizes_by_type.items(), key=lambda i: i[1]):
-            print(f"{size}\t\t{typ.__module__}.{typ.__qualname__}", file=sys.stderr)
+        print("Memory summary:", file=sys.stderr)
+        for size, count, name in sorted(entries):
+            print(f"{size}\t\t{count}\t\t{name}", file=sys.stderr)
 
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing

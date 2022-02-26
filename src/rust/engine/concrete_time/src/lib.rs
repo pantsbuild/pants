@@ -25,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use deepsize::DeepSizeOf;
 use serde_derive::Serialize;
 
 /// A concrete data representation of a duration.
@@ -38,7 +39,7 @@ use serde_derive::Serialize;
 ///
 /// It can be used to represent a timestamp (as a duration since the unix epoch) or simply a
 /// duration between two arbitrary timestamps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, DeepSizeOf, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct Duration {
   /// How many seconds did this `Duration` last?
   pub secs: u64,

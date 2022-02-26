@@ -14,6 +14,8 @@ protos = { path = "../protos" }
 bytes = "1.0"
 cache = { path = "../cache" }
 derivative = "2.2"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "9207e5776322fb9b0b738d57b026412ef5c904d4", features=["log"] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"

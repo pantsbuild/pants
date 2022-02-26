@@ -933,21 +933,14 @@ fn scheduler_live_items<'py>(
   py: Python<'py>,
   py_scheduler: &'py PyScheduler,
   py_session: &'py PySession,
-) -> Vec<(Vec<PyObject>, PyObject)> {
-  let items = py_scheduler
+) -> (Vec<PyObject>, HashMap<String, (usize, usize)>) {
+  let (items, sizes) = py_scheduler
     .0
     .core
     .executor
     .enter(|| py.allow_threads(|| py_scheduler.0.live_items(&py_session.0)));
-  items
-    .into_iter()
-    .map(|(params, value)| {
-      (
-        params.keys().map(|k| k.value.to_object(py)).collect(),
-        value.to_object(py),
-      )
-    })
-    .collect()
+  let py_items = items.into_iter().map(|value| value.to_object(py)).collect();
+  (py_items, sizes)
 }
 
 #[pyfunction]

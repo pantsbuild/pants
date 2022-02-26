@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use deepsize::DeepSizeOf;
 use serde::Serialize;
 
 use crate::WorkdirSymlink;
 use fs::{default_cache_path, RelativePath};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
 
 impl CacheName {
