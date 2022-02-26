@@ -39,12 +39,18 @@ class MockExportRequest(ExportRequest):
     pass
 
 
-def mock_export(edr: ExportRequest, digest: Digest, symlinks: tuple[Symlink, ...]) -> ExportResult:
+def mock_export(
+    edr: ExportRequest,
+    digest: Digest,
+    symlinks: tuple[Symlink, ...],
+    post_processing_shell_cmds: tuple[str, ...],
+) -> ExportResult:
     return ExportResult(
         description=f"mock export for {','.join(t.address.spec for t in edr.targets)}",
         reldir="mock",
         digest=digest,
         symlinks=symlinks,
+        post_processing_shell_cmds=post_processing_shell_cmds,
     )
 
 
@@ -69,7 +75,17 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                     output_type=ExportResults,
                     input_type=ExportRequest,
                     mock=lambda req: ExportResults(
-                        (mock_export(req, digest, (Symlink("somefile", "link_to_somefile"),)),),
+                        (
+                            mock_export(
+                                req,
+                                digest,
+                                (Symlink("somefile", "link_to_somefile"),),
+                                (
+                                    'cp "${DIGEST_ROOT}/foo/bar" "${DIGEST_ROOT}/foo/bar_copy1"',
+                                    'cp "${DIGEST_ROOT}/foo/bar" "${DIGEST_ROOT}/foo/bar_copy2"',
+                                ),
+                            ),
+                        )
                     ),
                 ),
                 MockGet(
@@ -99,10 +115,13 @@ def test_run_export_rule() -> None:
     exit_code, stdout = run_export_rule(rule_runner, [make_target("foo/bar", "baz")])
     assert exit_code == 0
     assert "Wrote mock export for foo/bar:baz to dist/export/mock" in stdout
-    expected_dist_path = os.path.join(rule_runner.build_root, "dist/export/mock/foo/bar")
-    assert os.path.isfile(expected_dist_path)
-    with open(expected_dist_path, "rb") as fp:
-        assert fp.read() == b"BAR"
+    for filename in ["bar", "bar_copy1", "bar_copy2"]:
+        expected_dist_path = os.path.join(
+            rule_runner.build_root, "dist", "export", "mock", "foo", filename
+        )
+        assert os.path.isfile(expected_dist_path)
+        with open(expected_dist_path, "rb") as fp:
+            assert fp.read() == b"BAR"
 
     symlink = "dist/export/mock/link_to_somefile"
     assert os.path.islink(symlink)
