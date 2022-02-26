@@ -13,7 +13,8 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine.process import Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess

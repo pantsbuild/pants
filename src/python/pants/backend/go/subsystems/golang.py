@@ -7,16 +7,14 @@ import logging
 import os
 from dataclasses import dataclass
 
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem

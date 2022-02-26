@@ -15,7 +15,6 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSour
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine import process
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -43,7 +42,6 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *jdk_rules(),
             *graph.rules(),
-            *process.rules(),
             *jvm_compile_rules(),
             *stripped_source_files.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),

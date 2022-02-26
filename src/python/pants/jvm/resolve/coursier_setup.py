@@ -16,10 +16,10 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import PythonBinary
+from pants.core.util_rules.system_binaries import BashBinary, PythonBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
