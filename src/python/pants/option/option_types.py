@@ -29,15 +29,17 @@ _SubsystemType = Any
 # subsytem type and returning a value. E.g. `prop = Option(..., default=lambda cls: cls.default)`.
 # This is necessary to support "base" subsystem types which are subclassed with more specific
 # values.
-_DynamicDefaultT = Callable[[_SubsystemType], _DefaultT]
+# NB: Marking this as `Callable[[_SubsystemType], _DefaultT]` will upset mypy at the call site
+# because mypy won't be able to have enough info to deduce the correct type.
+_DynamicDefaultT = Callable[[_SubsystemType], Any]
 # The type of the `default` parameter for each option.
-_MaybeDynamicT = Union[_DynamicDefaultT[_DefaultT], _DefaultT]
+_MaybeDynamicT = Union[_DynamicDefaultT, _DefaultT]
 # The type of the `help` parameter for each option.
 _HelpT = _MaybeDynamicT[str]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[operator,return-value]
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[operator,return-value,no-any-return]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -51,7 +53,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     """
 
     _flag_names: tuple[str, ...]
-    _default: _DefaultT
+    _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
     _extra_kwargs: dict[str, Any]
 
@@ -60,7 +62,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     def __new__(
         cls,
         *flag_names: str,
-        default: _DefaultT,
+        default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
         # Additional bells/whistles
         advanced: bool | None = None,
@@ -150,7 +152,7 @@ class _ListOptionBase(
     def __new__(
         cls,
         *flag_names: str,
-        default: list[_ListMemberT] = [],
+        default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
         # Additional bells/whistles
         advanced: bool | None = None,
@@ -382,9 +384,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         cls,
         *flag_names: str,
         enum_type: type[_EnumT],
-        # NB: Marking this as `_DynamicDefaultT[_EnumT]` will upset mypy at the call site because
-        # mypy won't be able to have enough info to deduce the correct type.
-        default: _DynamicDefaultT[Any],
+        default: _DynamicDefaultT,
         help: _HelpT,
         # Additional bells/whistles
         advanced: bool | None = None,
@@ -509,9 +509,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         cls,
         *flag_names: str,
         enum_type: type[_EnumT],
-        # NB: Marking this as `_DynamicDefaultT[list[_EnumT]]` will upset mypy at the call site
-        # because mypy won't be able to have enough info to deduce the correct type.
-        default: _DynamicDefaultT[Any],
+        default: _DynamicDefaultT,
         help: _HelpT,
         # Additional bells/whistles
         advanced: bool | None = ...,
@@ -627,7 +625,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
     def __new__(
         cls,
         *flag_names,
-        default: dict[str, _ValueT] = {},
+        default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
         advanced: bool | None = None,
         daemon: bool | None = None,
