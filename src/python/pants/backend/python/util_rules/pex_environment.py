@@ -33,24 +33,23 @@ class PexRuntimeEnvironment(Subsystem):
 
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
-    _executable_search_paths = (
-        StrListOption(
-            "--executable-search-paths",
-            default=["<PATH>"],
-            help=(
-                "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-                'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
-                "env var."
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    _executable_search_paths = StrListOption(
+        "--executable-search-paths",
+        default=["<PATH>"],
+        help=(
+            "The PATH value that will be used by the PEX subprocess and any subprocesses it "
+            'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
+            "env var."
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
     _verbosity = IntOption(
         "--verbosity",
         default=0,
         help=("Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."),
-    ).advanced()
+        advanced=True,
+    )
     venv_use_symlinks = BoolOption(
         "--venv-use-symlinks",
         default=False,
@@ -61,7 +60,8 @@ class PexRuntimeEnvironment(Subsystem):
             "distributions do not work with symlinked venvs though, so you may not be able to "
             "enable this optimization as a result."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:

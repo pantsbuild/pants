@@ -25,7 +25,8 @@ class JvmSubsystem(Subsystem):
             "The JDK to use when building and running Pants' internal JVM support code and other "
             "non-compiler tools. See `jvm` help for supported values."
         ),
-    ).advanced()
+        advanced=True,
+    )
     jdk = StrOption(
         "--jdk",
         default="adopt:1.11",
@@ -37,7 +38,8 @@ class JvmSubsystem(Subsystem):
             " instead, but note that this can lead to inconsistent behavior since the JVM version"
             " will be whatever happens to be found first on the system's PATH."
         ),
-    ).advanced()
+        advanced=True,
+    )
     resolves = DictOption(
         "--resolves",
         default={"jvm-default": "3rdparty/jvm/default.lock"},

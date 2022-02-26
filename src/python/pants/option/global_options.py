@@ -1358,11 +1358,13 @@ class GlobalOptions(Subsystem):
             "Include only targets with these tags (optional '+' prefix) or without these "
             f"tags ('-' prefix). See {doc_url('advanced-target-selection')}."
         ),
-    ).metavar("[+-]tag1,tag2,...")
+        metavar="[+-]tag1,tag2,...",
+    )
     exclude_target_regexp = StrListOption(
         "--exclude-target-regexp",
         help="Exclude targets that match these regexes. This does not impact file arguments.",
-    ).metavar("<regexp>")
+        metavar="<regexp>",
+    )
 
     files_not_found_behavior = EnumOption(
         "--files-not-found-behavior",
@@ -1370,7 +1372,8 @@ class GlobalOptions(Subsystem):
         help="What to do when files and globs specified in BUILD files, such as in the "
         "`sources` field, cannot be found. This happens when the files do not exist on "
         "your machine or when they are ignored by the `--pants-ignore` option.",
-    ).advanced()
+        advanced=True,
+    )
 
     owners_not_found_behavior = EnumOption(
         "--owners-not-found-behavior",
@@ -1379,7 +1382,8 @@ class GlobalOptions(Subsystem):
             "What to do when file arguments do not have any owning target. This happens when "
             "there are no targets whose `sources` fields include the file argument."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     build_patterns = StrListOption(
         "--build-patterns",
@@ -1391,7 +1395,8 @@ class GlobalOptions(Subsystem):
             "You may also need to update the option `[tailor].build_file_name` so that it is "
             "compatible with this option."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     build_ignore = StrListOption(
         "--build-ignore",
@@ -1401,19 +1406,22 @@ class GlobalOptions(Subsystem):
             "that instead.\n\n"
             "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
         ),
-    ).advanced()
+        advanced=True,
+    )
     build_file_prelude_globs = StrListOption(
         "--build-file-prelude-globs",
         help=(
             "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
             f"See {doc_url('macros')}."
         ),
-    ).advanced()
+        advanced=True,
+    )
     subproject_roots = StrListOption(
         "--subproject-roots",
         help="Paths that correspond with build roots for any subproject that this "
         "project depends on.",
-    ).advanced()
+        advanced=True,
+    )
 
     _loop_flag = "--loop"
     loop = BoolOption(
@@ -1423,13 +1431,15 @@ class GlobalOptions(Subsystem):
         "--loop-max",
         default=2**32,
         help=f"The maximum number of times to loop when `{_loop_flag}` is specified.",
-    ).advanced()
+        advanced=True,
+    )
 
     streaming_workunits_report_interval = FloatOption(
         "--streaming-workunits-report-interval",
         default=1.0,
         help="Interval in seconds between when streaming workunit event receivers will be polled.",
-    ).advanced()
+        advanced=True,
+    )
     streaming_workunits_complete_async = BoolOption(
         "--streaming-workunits-complete-async",
         default=not is_in_container(),
@@ -1439,7 +1449,8 @@ class GlobalOptions(Subsystem):
             "To reduce data loss, this flag defaults to false inside of containers, such as "
             "when run with Docker."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @classmethod
     def validate_instance(cls, opts):

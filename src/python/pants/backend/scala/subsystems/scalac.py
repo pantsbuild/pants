@@ -23,20 +23,16 @@ class Scalac(Subsystem):
     args = ArgsListOption(
         help=f"Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
     )
-    plugins_global = (
-        StrListOption(
-            "--plugins-global",
-            help=(
-                "A list of addresses of `scalac_plugin` targets which should be used for "
-                "compilation of all Scala targets in a build.\n\nIf you set this, you must also "
-                "set `[scalac].plugins_global_lockfile`."
-            ),
-        )
-        .advanced()
-        .deprecated(
-            removal_version="2.12.0.dev0",
-            hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
-        )
+    plugins_global = StrListOption(
+        "--plugins-global",
+        help=(
+            "A list of addresses of `scalac_plugin` targets which should be used for "
+            "compilation of all Scala targets in a build.\n\nIf you set this, you must also "
+            "set `[scalac].plugins_global_lockfile`."
+        ),
+        advanced=True,
+        removal_version="2.12.0.dev0",
+        removal_hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
     )
 
     # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option
@@ -50,21 +46,17 @@ class Scalac(Subsystem):
         ),
     )
 
-    plugins_global_lockfile = (
-        StrOption(
-            "--plugins-global-lockfile",
-            default=DEFAULT_TOOL_LOCKFILE,
-            help=(
-                "The filename of the lockfile for global plugins. You must set this option to a "
-                "file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set "
-                "`[scalac].plugins_global`."
-            ),
-        )
-        .advanced()
-        .deprecated(
-            removal_version="2.12.0.dev0",
-            hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
-        )
+    plugins_global_lockfile = StrOption(
+        "--plugins-global-lockfile",
+        default=DEFAULT_TOOL_LOCKFILE,
+        help=(
+            "The filename of the lockfile for global plugins. You must set this option to a "
+            "file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set "
+            "`[scalac].plugins_global`."
+        ),
+        advanced=True,
+        removal_version="2.12.0.dev0",
+        removal_hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
     )
 
     def parsed_default_plugins(self) -> dict[str, list[str]]:

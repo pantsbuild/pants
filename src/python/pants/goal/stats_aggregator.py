@@ -35,7 +35,8 @@ class StatsAggregatorSubsystem(Subsystem):
             "caching.\n\nFor histogram summaries to work, you must add `hdrhistogram` to "
             "`[GLOBAL].plugins`."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
