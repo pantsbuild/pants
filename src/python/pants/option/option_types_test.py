@@ -134,7 +134,7 @@ def test_other_options() -> None:
         dyn_enum_list_prop = EnumListOption(
             "--dyn-enum-list-opt",
             enum_type=MyEnum,
-            default=lambda cls: [cls.dyn_default],
+            default=lambda cls: cls.dyn_default_list,
             help=lambda cls: f"{cls.dyn_help}",
         )
         defaultless_enum_list_prop = EnumListOption(
@@ -146,6 +146,7 @@ def test_other_options() -> None:
     class MySubsystem(MyBaseSubsystem):
         dyn_help = "Dynamic Help"
         dyn_default = MyEnum.Val1
+        dyn_default_list = [MyEnum.Val1]
 
     register = Mock()
     MySubsystem.register_options(register)
@@ -265,6 +266,8 @@ def test_property_types() -> None:
         file_list_opt = FileListOption("--opt", help="")
         shellstr_list_opt = ShellStrListOption("--opt", help="")
         memorysize_list_opt = MemorySizeListOption("--opt", help="")
+        # And just test one dynamic default
+        dyn_str_list_opt = StrListOption("--opt", default=lambda cls: cls.default, help="")
 
         # Enum opts
         enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
@@ -277,7 +280,7 @@ def test_property_types() -> None:
         enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
         enum_list_opt2 = EnumListOption("--opt", enum_type=MyEnum, help="")
         dyn_enum_list_opt = EnumListOption(
-            "--opt", enum_type=MyEnum, default=lambda cls: [cls.default], help=""
+            "--opt", enum_type=MyEnum, default=lambda cls: cls.default_list, help=""
         )
         # mypy correctly complains about needing a type annotation
         enum_list_bad_opt = EnumListOption("--opt", default=[], help="")  # type: ignore[var-annotated]
@@ -291,6 +294,7 @@ def test_property_types() -> None:
         dict_opt5 = DictOption("--opt", default=dict(key="val"), help="")
         dict_opt6 = DictOption("--opt", default=dict(key=1), help="")
         dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
+        dyn_dict_opt = DictOption[str]("--opt", lambda cls: cls.default, help="")
 
     my_subsystem = MySubsystem()
     if TYPE_CHECKING:
@@ -322,6 +326,7 @@ def test_property_types() -> None:
         assert_type["tuple[str, ...]"](my_subsystem.file_list_opt)
         assert_type["tuple[str, ...]"](my_subsystem.shellstr_list_opt)
         assert_type["tuple[int, ...]"](my_subsystem.memorysize_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.dyn_str_list_opt)
 
         assert_type["MyEnum"](my_subsystem.enum_opt)
         assert_type["MyEnum | None"](my_subsystem.optional_enum_opt)
@@ -339,3 +344,4 @@ def test_property_types() -> None:
         assert_type["dict[str, str]"](my_subsystem.dict_opt5)
         assert_type["dict[str, int]"](my_subsystem.dict_opt6)
         assert_type["dict[str, object]"](my_subsystem.dict_opt7)
+        assert_type["dict[str, str]"](my_subsystem.dyn_dict_opt)
