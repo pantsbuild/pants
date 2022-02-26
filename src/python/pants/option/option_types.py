@@ -670,18 +670,12 @@ class ArgsListOption(ShellStrListOption):
     Clients can call `passthrough()` to set the "passthrough" flag. See `passthrough` for more info.
     """
 
-    def __new__(cls, help: _HelpT):
-        return super().__new__(
+    def __new__(cls, help: _HelpT, *, passthrough: bool | None = None):
+        instance = super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
             help=help,
         )
-
-    def passthrough(self) -> "ArgsListOption":
-        """Set the "passthrough" flag.
-
-        This should be used when callers can alternatively use "--" followed by the arguments,
-        instead of having to provide "--[scope]-args='--arg1 --arg2'".
-        """
-        self._extra_kwargs["passthrough"] = True
-        return self
+        if passthrough is not None:
+            instance._extra_kwargs["passthrough"] = passthrough
+        return instance
