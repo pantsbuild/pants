@@ -19,4 +19,5 @@ class GoTestSubsystem(Subsystem):
             "binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to "
             "learn more about the options supported by Go test binaries."
         ),
-    ).passthrough()
+        passthrough=True,
+    )

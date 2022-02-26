@@ -671,7 +671,7 @@ class ArgsListOption(ShellStrListOption):
     """
 
     def __new__(cls, help: _HelpT, *, passthrough: bool | None = None):
-        instance =  super().__new__(
+        instance = super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
             help=help,
