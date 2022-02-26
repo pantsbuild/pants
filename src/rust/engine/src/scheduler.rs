@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::context::{Context, Core};
-use crate::nodes::{Select, Visualizer};
+use crate::nodes::{NodeKey, Select, Visualizer};
 use crate::python::{Failure, Params, TypeId, Value};
 use crate::session::{ObservedValueResult, Root, Session};
 
@@ -138,6 +138,20 @@ impl Scheduler {
     );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
+  }
+
+  ///
+  /// Returns references to all Python objects held alive by the graph.
+  ///
+  pub fn live_items(&self, session: &Session) -> Vec<(Params, Value)> {
+    let context = Context::new(self.core.clone(), session.clone());
+    let mut items = vec![];
+    self.core.graph.visit_live(&context, |k, v| {
+      if let NodeKey::Task(ref t) = k {
+        items.push((t.params.clone(), v.try_into().unwrap()))
+      }
+    });
+    items
   }
 
   ///

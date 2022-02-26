@@ -977,8 +977,9 @@ impl From<DownloadedFile> for NodeKey {
 #[derive(Derivative, Clone)]
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
-  params: Params,
+  pub params: Params,
   product: TypeId,
+  // TODO: This is large, and should probably be in an Arc.
   task: tasks::Task,
   // The Params and the Task struct are sufficient to uniquely identify it.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]

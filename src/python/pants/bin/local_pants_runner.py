@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections import Counter
 from dataclasses import dataclass
+from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -31,6 +33,7 @@ from pants.init.specs_calculator import calculate_specs
 from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.collections import deep_getsizeof
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)
@@ -197,6 +200,25 @@ class LocalPantsRunner:
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
+    def _maybe_report_memory_summary(self) -> None:
+        global_options = self.options.for_global_scope()
+        if not global_options.memory_summary:
+            return
+
+        ids: set[int] = set()
+        sizes_by_type: Counter[type] = Counter()
+
+        def report(item: Any) -> None:
+            sizes_by_type[type(item)] += deep_getsizeof(item, ids)
+
+        for keys, value in self.graph_session.scheduler_session.live_items():
+            for key in keys:
+                report(key)
+            report(value)
+
+        for typ, size in sorted(sizes_by_type.items(), key=lambda i: i[1]):
+            print(f"{size}\t\t{typ.__module__}.{typ.__qualname__}", file=sys.stderr)
+
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
@@ -259,6 +281,7 @@ class LocalPantsRunner:
                 try:
                     engine_result = self._run_inner()
                 finally:
+                    self._maybe_report_memory_summary()
                     metrics = self.graph_session.scheduler_session.metrics()
                     self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                     self.run_tracker.end_run(engine_result)
