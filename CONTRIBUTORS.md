@@ -203,6 +203,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan King
 + Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
