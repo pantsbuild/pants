@@ -9,7 +9,6 @@ import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, cast
 
 from pkg_resources import Requirement
 
@@ -18,6 +17,7 @@ from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
@@ -112,72 +112,56 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         """
         return cls.__name__.lower()
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--version",
-            type=str,
-            default=cls.default_version,
-            advanced=True,
-            help=f"Use this version of {cls.name}."
-            + (
-                f"\n\nSupported {cls.name} versions: {cls.version_constraints}"
-                if cls.version_constraints
-                else ""
-            ),
-        )
+    version = StrOption(
+        "--version",
+        default=lambda cls: cls.default_version,
+        advanced=True,
+        help=lambda cls: f"Use this version of {cls.name}."
+        + (
+            f"\n\nSupported {cls.name} versions: {cls.version_constraints}"
+            if cls.version_constraints
+            else ""
+        ),
+    )
 
-        help_str = textwrap.dedent(
+    # Note that you can compute the length and sha256 conveniently with:
+    #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+    known_versions = StrListOption(
+        "--known-versions",
+        default=lambda cls: cls.default_known_versions,
+        advanced=True,
+        help=textwrap.dedent(
             f"""
-            Known versions to verify downloads against.
+        Known versions to verify downloads against.
 
-            Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
 
-              - `version` is the version string
-              - `platform` is one of [{','.join(Platform.__members__.keys())}],
-              - `sha256` is the 64-character hex representation of the expected sha256
-                digest of the download file, as emitted by `shasum -a 256`
-              - `length` is the expected length of the download file in bytes, as emitted by
-                `wc -c`
+            - `version` is the version string
+            - `platform` is one of [{','.join(Platform.__members__.keys())}],
+            - `sha256` is the 64-character hex representation of the expected sha256
+            digest of the download file, as emitted by `shasum -a 256`
+            - `length` is the expected length of the download file in bytes, as emitted by
+            `wc -c`
 
-            E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+        E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
-            Values are space-stripped, so pipes can be indented for readability if necessary.
-            """
-        )
-        # Note that you can compute the length and sha256 conveniently with:
-        #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
-        register(
-            "--known-versions",
-            type=list,
-            member_type=str,
-            default=cls.default_known_versions,
-            advanced=True,
-            help=help_str,
-        )
+        Values are space-stripped, so pipes can be indented for readability if necessary.
+        """
+        ),
+    )
 
-        register(
-            "--use-unsupported-version",
-            advanced=True,
-            type=UnsupportedVersionUsage,
-            help=textwrap.dedent(
-                f"""
+    use_unsupported_version = EnumOption(
+        "--use-unsupported-version",
+        advanced=True,
+        help=lambda cls: textwrap.dedent(
+            f"""
                 What action to take in case the requested version of {cls.name} is not supported.
 
                 Supported {cls.name} versions: {cls.version_constraints if cls.version_constraints else "unspecified"}
                 """
-            ),
-            default=UnsupportedVersionUsage.RaiseError,
-        )
-
-    @property
-    def version(self) -> str:
-        return cast(str, self.options.version)
-
-    @property
-    def known_versions(self) -> tuple[str, ...]:
-        return tuple(self.options.known_versions)
+        ),
+        default=UnsupportedVersionUsage.RaiseError,
+    )
 
     @abstractmethod
     def generate_url(self, plat: Platform) -> str:
@@ -283,54 +267,40 @@ class TemplatedExternalTool(ExternalTool):
     default_url_template: str
     default_url_platform_mapping: dict[str, str] | None = None
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
+    url_template = StrOption(
+        "--url-template",
+        default=lambda cls: cls.default_url_template,
+        advanced=True,
+        help=(
+            "URL to download the tool, either as a single binary file or a compressed file "
+            "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
+            "work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g. "
+            "`file:/this/is/absolute`, possibly by [templating the buildroot in a "
+            f"config file]({doc_url('options#config-file-entries')})).\n\n"
+            "Use `{version}` to have the value from --version substituted, and `{platform}` to "
+            "have a value from --url-platform-mapping substituted in, depending on the "
+            "current platform. For example, "
+            "https://github.com/.../protoc-{version}-{platform}.zip."
+        ),
+    )
 
-        register(
-            "--url-template",
-            type=str,
-            default=cls.default_url_template,
-            advanced=True,
-            help=(
-                "URL to download the tool, either as a single binary file or a compressed file "
-                "(e.g. zip file). You can change this to point to your own hosted file, e.g. to "
-                "work with proxies or for access via the filesystem through a `file:$abspath` URL (e.g. "
-                "`file:/this/is/absolute`, possibly by [templating the buildroot in a "
-                f"config file]({doc_url('options#config-file-entries')})).\n\n"
-                "Use `{version}` to have the value from --version substituted, and `{platform}` to "
-                "have a value from --url-platform-mapping substituted in, depending on the "
-                "current platform. For example, "
-                "https://github.com/.../protoc-{version}-{platform}.zip."
-            ),
-        )
-
-        register(
-            "--url-platform-mapping",
-            type=dict,
-            default=cls.default_url_platform_mapping,
-            advanced=True,
-            help=(
-                "A dictionary mapping platforms to strings to be used when generating the URL "
-                "to download the tool.\n\nIn --url-template, anytime the `{platform}` string is "
-                "used, Pants will determine the current platform, and substitute `{platform}` with "
-                "the respective value from your dictionary.\n\nFor example, if you define "
-                '`{"macos_x86_64": "apple-darwin", "linux_x86_64": "unknown-linux"}, and run Pants on '
-                "Linux with an intel architecture, then `{platform}` will be substituted in the --url-template option with "
-                "unknown-linux."
-            ),
-        )
-
-    @property
-    def url_template(self) -> str:
-        return cast(str, self.options.url_template)
-
-    @property
-    def url_platform_mapping(self) -> dict[str, str] | None:
-        return cast(Optional[Dict[str, str]], self.options.url_platform_mapping)
+    url_platform_mapping = DictOption[str](
+        "--url-platform-mapping",
+        default=lambda cls: cls.default_url_platform_mapping,
+        advanced=True,
+        help=(
+            "A dictionary mapping platforms to strings to be used when generating the URL "
+            "to download the tool.\n\nIn --url-template, anytime the `{platform}` string is "
+            "used, Pants will determine the current platform, and substitute `{platform}` with "
+            "the respective value from your dictionary.\n\nFor example, if you define "
+            '`{"macos_x86_64": "apple-darwin", "linux_x86_64": "unknown-linux"}, and run Pants on '
+            "Linux with an intel architecture, then `{platform}` will be substituted in the --url-template option with "
+            "unknown-linux."
+        ),
+    )
 
     def generate_url(self, plat: Platform):
-        platform = self.url_platform_mapping[plat.value] if self.url_platform_mapping else ""
+        platform = self.url_platform_mapping.get(plat.value, "")
         return self.url_template.format(version=self.version, platform=platform)
 
 

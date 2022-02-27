@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, List, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
@@ -41,6 +41,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
@@ -296,91 +297,55 @@ class TestSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return TestFieldSet in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--debug",
-            type=bool,
-            default=False,
-            help=(
-                "Run tests sequentially in an interactive process. This is necessary, for "
-                "example, when you add breakpoints to your code."
-            ),
-        )
-        register(
-            "--force",
-            type=bool,
-            default=False,
-            help="Force the tests to run, even if they could be satisfied from cache.",
-        )
-        register(
-            "--output",
-            type=ShowOutput,
-            default=ShowOutput.FAILED,
-            help="Show stdout/stderr for these tests.",
-        )
-        register(
-            "--use-coverage",
-            type=bool,
-            default=False,
-            help="Generate a coverage report if the test runner supports it.",
-        )
-        register(
-            "--open-coverage",
-            type=bool,
-            default=False,
-            help=(
-                "If a coverage report file is generated, open it on the local system if the "
-                "system supports this."
-            ),
-        )
-        register(
-            "--xml-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            help=(
-                "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run that supports producing them."
-            ),
-        )
-        register(
-            "--extra-env-vars",
-            type=list,
-            member_type=str,
-            default=[],
-            help=(
-                "Additional environment variables to include in test processes. "
-                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
-            ),
-        )
-
-    @property
-    def extra_env_vars(self) -> list[str]:
-        return cast(List[str], self.options.extra_env_vars)
-
-    @property
-    def debug(self) -> bool:
-        return cast(bool, self.options.debug)
-
-    @property
-    def force(self) -> bool:
-        return cast(bool, self.options.force)
-
-    @property
-    def output(self) -> ShowOutput:
-        return cast(ShowOutput, self.options.output)
-
-    @property
-    def use_coverage(self) -> bool:
-        return cast(bool, self.options.use_coverage)
-
-    @property
-    def open_coverage(self) -> bool:
-        return cast(bool, self.options.open_coverage)
+    debug = BoolOption(
+        "--debug",
+        default=False,
+        help=(
+            "Run tests sequentially in an interactive process. This is necessary, for "
+            "example, when you add breakpoints to your code."
+        ),
+    )
+    force = BoolOption(
+        "--force",
+        default=False,
+        help="Force the tests to run, even if they could be satisfied from cache.",
+    )
+    output = EnumOption(
+        "--output",
+        default=ShowOutput.FAILED,
+        help="Show stdout/stderr for these tests.",
+    )
+    use_coverage = BoolOption(
+        "--use-coverage",
+        default=False,
+        help="Generate a coverage report if the test runner supports it.",
+    )
+    open_coverage = BoolOption(
+        "--open-coverage",
+        default=False,
+        help=(
+            "If a coverage report file is generated, open it on the local system if the "
+            "system supports this."
+        ),
+    )
+    xml_dir = StrOption(
+        "--xml-dir",
+        metavar="<DIR>",
+        default=None,
+        advanced=True,
+        help=(
+            "Specifying a directory causes Junit XML result files to be emitted under "
+            "that dir for each test run that supports producing them."
+        ),
+    )
+    extra_env_vars = StrListOption(
+        "--extra-env-vars",
+        help=(
+            "Additional environment variables to include in test processes. "
+            "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+            "`ENV_VAR` to copy the value of a variable in Pants's own environment."
+        ),
+    )
 
 
 class Test(Goal):
