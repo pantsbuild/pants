@@ -30,6 +30,7 @@ mod glob_matching;
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
+mod tree;
 
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
