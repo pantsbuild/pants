@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from typing import List, Tuple
 
@@ -13,17 +14,26 @@ from pants.core.goals.export import (
     ExportRequest,
     ExportResult,
     ExportResults,
+    PostProcessingCommand,
     Symlink,
     export,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockEffect,
+    MockGet,
+    RuleRunner,
+    mock_console,
+    run_rule_with_mocks,
+)
 
 
 class MockTarget(Target):
@@ -43,15 +53,27 @@ def mock_export(
     edr: ExportRequest,
     digest: Digest,
     symlinks: tuple[Symlink, ...],
-    post_processing_shell_cmds: tuple[str, ...],
+    post_processing_cmds: tuple[PostProcessingCommand, ...],
 ) -> ExportResult:
     return ExportResult(
         description=f"mock export for {','.join(t.address.spec for t in edr.targets)}",
         reldir="mock",
         digest=digest,
         symlinks=symlinks,
-        post_processing_shell_cmds=post_processing_shell_cmds,
+        post_processing_cmds=post_processing_cmds,
     )
+
+
+def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractiveProcessResult:
+    subprocess.check_call(
+        ip.argv,
+        stderr=subprocess.STDOUT,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "DIGEST_ROOT": os.path.join(rule_runner.build_root, "dist", "export", "mock"),
+        },
+    )
+    return InteractiveProcessResult(0)
 
 
 def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int, str]:
@@ -81,8 +103,12 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                                 digest,
                                 (Symlink("somefile", "link_to_somefile"),),
                                 (
-                                    'cp "${DIGEST_ROOT}/foo/bar" "${DIGEST_ROOT}/foo/bar_copy1"',
-                                    'cp "${DIGEST_ROOT}/foo/bar" "${DIGEST_ROOT}/foo/bar_copy2"',
+                                    PostProcessingCommand(
+                                        ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar1"]
+                                    ),
+                                    PostProcessingCommand(
+                                        ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar2"]
+                                    ),
                                 ),
                             ),
                         )
@@ -98,6 +124,16 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                     input_type=AddPrefix,
                     mock=lambda ap: rule_runner.request(Digest, [ap]),
                 ),
+                MockGet(
+                    output_type=Environment,
+                    input_type=EnvironmentRequest,
+                    mock=lambda env: rule_runner.request(Environment, [env]),
+                ),
+                MockEffect(
+                    output_type=InteractiveProcessResult,
+                    input_type=InteractiveProcess,
+                    mock=lambda ip: _mock_run(rule_runner, ip),
+                ),
             ],
             union_membership=union_membership,
         )
@@ -109,13 +145,15 @@ def test_run_export_rule() -> None:
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
             QueryRule(Digest, [CreateDigest]),
+            QueryRule(Environment, [EnvironmentRequest]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
         ],
         target_types=[MockTarget],
     )
     exit_code, stdout = run_export_rule(rule_runner, [make_target("foo/bar", "baz")])
     assert exit_code == 0
     assert "Wrote mock export for foo/bar:baz to dist/export/mock" in stdout
-    for filename in ["bar", "bar_copy1", "bar_copy2"]:
+    for filename in ["bar", "bar1", "bar2"]:
         expected_dist_path = os.path.join(
             rule_runner.build_root, "dist", "export", "mock", "foo", filename
         )

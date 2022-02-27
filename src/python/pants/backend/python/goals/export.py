@@ -16,7 +16,13 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.core.goals.export import ExportError, ExportRequest, ExportResult, ExportResults
+from pants.core.goals.export import (
+    ExportError,
+    ExportRequest,
+    ExportResult,
+    ExportResults,
+    PostProcessingCommand,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.selectors import Get, MultiGet
@@ -108,12 +114,18 @@ async def export_virtualenv(
         f"virtualenv for the resolve '{request.resolve}' (using {min_interpreter})",
         dest,
         digest=pex.digest,
-        post_processing_shell_cmds=[
-            (
-                'PEX_TOOLS=1 "${DIGEST_ROOT}/requirements.pex/__main__.py" venv --pip --collisions-ok '
-                f'"${{DIGEST_ROOT}}/{py_version}"'
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    "{digest_root}/requirements.pex/__main__.py",
+                    "venv",
+                    "--pip",
+                    "--collisions-ok",
+                    f"{{digest_root}}/{py_version}",
+                ],
+                {"PEX_TOOLS": "1"},
             ),
-            'rm -rf "${DIGEST_ROOT}/requirements.pex"',
+            PostProcessingCommand(["rm", "-rf", "{digest_root}/requirements.pex"]),
         ],
     )
 
