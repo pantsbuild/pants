@@ -113,8 +113,8 @@ bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "9207e5776322fb9b0b738d57b026412ef5c904d4", features=["smallvec"] }
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34", features=["smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
 either = "1.6"

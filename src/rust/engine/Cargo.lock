@@ -552,7 +552,7 @@ dependencies = [
 [[package]]
 name = "deepsize"
 version = "0.2.0"
-source = "git+https://github.com/stuhood/deepsize.git?rev=9207e5776322fb9b0b738d57b026412ef5c904d4#9207e5776322fb9b0b738d57b026412ef5c904d4"
+source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
 dependencies = [
  "deepsize_derive",
  "log",
@@ -562,7 +562,7 @@ dependencies = [
 [[package]]
 name = "deepsize_derive"
 version = "0.1.2"
-source = "git+https://github.com/stuhood/deepsize.git?rev=9207e5776322fb9b0b738d57b026412ef5c904d4#9207e5776322fb9b0b738d57b026412ef5c904d4"
+source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
 dependencies = [
  "proc-macro2",
  "quote",

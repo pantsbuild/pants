@@ -150,6 +150,8 @@ impl Scheduler {
     let context = Context::new(self.core.clone(), session.clone());
     let mut items = vec![];
     let mut sizes: HashMap<String, (usize, usize)> = HashMap::new();
+    // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
+    let mut deep_context = deepsize::Context::new();
     self.core.graph.visit_live(&context, |k, v| {
       if let NodeKey::Task(ref t) = k {
         items.extend(t.params.keys().map(|k| k.to_value()));
@@ -157,7 +159,12 @@ impl Scheduler {
       }
       let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
-      entry.1 += k.deep_size_of() + v.deep_size_of();
+      entry.1 += {
+        std::mem::size_of_val(&k)
+          + k.deep_size_of_children(&mut deep_context)
+          + std::mem::size_of_val(&v)
+          + v.deep_size_of_children(&mut deep_context)
+      };
     });
     (items, sizes)
   }
