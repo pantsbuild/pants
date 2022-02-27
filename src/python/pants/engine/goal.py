@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 from typing_extensions import final
 
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
@@ -95,14 +96,12 @@ class Outputting:
     Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
     """
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--output-file",
-            metavar="<path>",
-            help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
-        )
+    output_file = StrOption(
+        "--output-file",
+        default=None,
+        metavar="<path>",
+        help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
+    )
 
     @final
     @contextmanager
@@ -132,15 +131,12 @@ class Outputting:
 
 
 class LineOriented(Outputting):
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--sep",
-            default="\\n",
-            metavar="<separator>",
-            help="String to use to separate lines in line-oriented output.",
-        )
+    sep = StrOption(
+        "--sep",
+        default="\\n",
+        metavar="<separator>",
+        help="String to use to separate lines in line-oriented output.",
+    )
 
     @final
     @contextmanager

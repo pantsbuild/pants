@@ -18,6 +18,7 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
 )
+from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized
@@ -41,36 +42,29 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         "them."
     )
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--target-type",
-            type=list,
-            metavar="[+-]type1,type2,...",
-            help="Filter on these target types, e.g. `resources` or `python_sources`.",
-        )
-        register(
-            "--granularity",
-            type=TargetGranularity,
-            default=TargetGranularity.all_targets,
-            help=(
-                "Filter to rendering only targets declared in BUILD files, only file-level "
-                "targets, or all targets."
-            ),
-        )
-        register(
-            "--address-regex",
-            type=list,
-            metavar="[+-]regex1,regex2,...",
-            help="Filter on target addresses matching these regexes.",
-        )
-        register(
-            "--tag-regex",
-            type=list,
-            metavar="[+-]regex1,regex2,...",
-            help="Filter on targets with tags matching these regexes.",
-        )
+    target_type = StrListOption(
+        "--target-type",
+        metavar="[+-]type1,type2,...",
+        help="Filter on these target types, e.g. `resources` or `python_sources`.",
+    )
+    granularity = EnumOption(
+        "--granularity",
+        default=TargetGranularity.all_targets,
+        help=(
+            "Filter to rendering only targets declared in BUILD files, only file-level "
+            "targets, or all targets."
+        ),
+    )
+    address_regex = StrListOption(
+        "--address-regex",
+        metavar="[+-]regex1,regex2,...",
+        help="Filter on target addresses matching these regexes.",
+    )
+    tag_regex = StrListOption(
+        "--tag-regex",
+        metavar="[+-]regex1,regex2,...",
+        help="Filter on targets with tags matching these regexes.",
+    )
 
 
 class FilterGoal(Goal):

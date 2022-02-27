@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.custom_types import file_option, shell_str
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption
 from pants.util.docutil import bin_name
 
 
@@ -33,59 +31,36 @@ class Hadolint(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Hadolint when running `{bin_name()} lint`.",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to an YAML config file understood by Hadolint "
-                "(https://github.com/hadolint/hadolint#configure).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                "this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include all relevant config files during runs "
-                "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
-                f"Use `[{cls.options_scope}].config` instead if your config is in a "
-                "non-standard location."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = BoolOption(
+        "--skip",
+        default=False,
+        help=f"Don't use Hadolint when running `{bin_name()} lint`.",
+    )
+    args = ArgsListOption(
+        help=("Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"),
+    )
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: (
+            "Path to an YAML config file understood by Hadolint "
+            "(https://github.com/hadolint/hadolint#configure).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            "this option if the config is located in a non-standard location."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include all relevant config files during runs "
+            "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
+            f"Use `[{cls.options_scope}].config` instead if your config is in a "
+            "non-standard location."
+        ),
+    )
 
     def config_request(self) -> ConfigFilesRequest:
         # Refer to https://github.com/hadolint/hadolint#configure for how config files are
@@ -93,6 +68,6 @@ class Hadolint(TemplatedExternalTool):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=[".hadolint.yaml", ".hadolint.yml"],
         )
