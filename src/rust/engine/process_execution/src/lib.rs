@@ -33,6 +33,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
+use deepsize::DeepSizeOf;
 use fs::RelativePath;
 use futures::future::try_join_all;
 use futures::try_join;
@@ -78,7 +79,9 @@ pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(
+  PartialOrd, Ord, Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize, Deserialize,
+)]
 #[allow(non_camel_case_types)]
 pub enum Platform {
   Macos_x86_64,
@@ -149,7 +152,7 @@ impl TryFrom<String> for Platform {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
   // Cached in all locations, regardless of success or failure.
   Always,
@@ -196,7 +199,7 @@ pub struct WorkdirSymlink {
 /// The `complete` and `nailgun` Digests are the computed union of various inputs.
 ///
 /// TODO: See `crate::local::prepare_workdir` regarding validation of overlapping inputs.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq, Serialize)]
 pub struct InputDigests {
   /// All of the input Digests, merged and relativized. Runners without the ability to consume the
   /// Digests individually should directly consume this value.
@@ -331,7 +334,7 @@ impl Default for InputDigests {
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq, Serialize)]
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
   ///
@@ -502,7 +505,7 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
@@ -516,7 +519,7 @@ pub struct FallibleProcessResultWithPlatform {
 
 /// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
 /// conversion is lossy, but the interesting parts are preserved.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
   /// The time from starting to completion, including preparing the chroot and cleanup.
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
@@ -616,7 +619,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
   RanLocally,
   RanRemotely,

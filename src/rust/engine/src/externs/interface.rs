@@ -33,7 +33,7 @@ use process_execution::RemoteCacheWarningsBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-  PyResult as PyO3Result, Python,
+  PyResult as PyO3Result, Python, ToPyObject,
 };
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny};
@@ -137,6 +137,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(scheduler_execute, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_metrics, m)?)?;
+  m.add_function(wrap_pyfunction!(scheduler_live_items, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_create, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_shutdown, m)?)?;
 
@@ -925,6 +926,21 @@ fn scheduler_metrics<'py>(
     .core
     .executor
     .enter(|| py.allow_threads(|| py_scheduler.0.metrics(&py_session.0)))
+}
+
+#[pyfunction]
+fn scheduler_live_items<'py>(
+  py: Python<'py>,
+  py_scheduler: &'py PyScheduler,
+  py_session: &'py PySession,
+) -> (Vec<PyObject>, HashMap<String, (usize, usize)>) {
+  let (items, sizes) = py_scheduler
+    .0
+    .core
+    .executor
+    .enter(|| py.allow_threads(|| py_scheduler.0.live_items(&py_session.0)));
+  let py_items = items.into_iter().map(|value| value.to_object(py)).collect();
+  (py_items, sizes)
 }
 
 #[pyfunction]

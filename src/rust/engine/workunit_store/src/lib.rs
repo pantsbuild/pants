@@ -37,6 +37,7 @@ use std::time::{Duration, SystemTime};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use concrete_time::TimeSpan;
+use deepsize::DeepSizeOf;
 use hdrhistogram::serialization::Serializer;
 use log::log;
 pub use log::Level;
@@ -58,7 +59,7 @@ mod metrics;
 /// NB: This type is defined here to make it easily accessible to both the `process_execution`
 /// and `engine` crates: it's not actually used by the WorkunitStore.
 ///
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, PartialEq, Eq, Hash)]
 pub struct RunId(pub u32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
