@@ -1423,6 +1423,12 @@ class GlobalOptions(Subsystem):
         ),
     ).advanced()
 
+    memory_summary = BoolOption(
+        "--memory-summary",
+        default=False,
+        help=("Report a summary of memory usage at the end of each run."),
+    ).advanced()
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
